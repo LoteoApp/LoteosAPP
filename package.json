@@ -1,0 +1,17 @@
+{
+  "name": "loteosapp",
+  "private": true,
+  "packageManager": "pnpm@10.30.1",
+  "scripts": {
+    "dev": "pnpm --filter @loteos/frontend dev",
+    "build": "pnpm --filter @loteos/frontend build",
+    "test": "pnpm test:backend && pnpm test:frontend",
+    "test:backend": "cd apps/backend && go test ./...",
+    "test:backend:coverage": "cd apps/backend && go test -count=1 -coverprofile coverage.out ./internal/system ./internal/system/http && go tool cover -func coverage.out",
+    "test:frontend": "pnpm --filter @loteos/frontend test",
+    "test:frontend:coverage": "pnpm --filter @loteos/frontend test:coverage",
+    "test:coverage": "pnpm test:backend:coverage && pnpm test:frontend:coverage",
+    "typecheck": "pnpm --filter @loteos/frontend typecheck",
+    "preview": "pnpm --filter @loteos/frontend preview"
+  }
+}

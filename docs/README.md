@@ -1,0 +1,20 @@
+# Documentación técnica
+
+Esta carpeta contiene la documentación que debe mantenerse junto con el código.
+
+## Guías
+
+- [Desarrollo y Docker Compose](development.md): requisitos, arranque, puertos,
+  variables de entorno, logs y resolución de problemas.
+- [PostgreSQL y migraciones](database.md): conexión desde Go, Goose, creación,
+  aplicación, rollback y reglas para modificar el esquema.
+- [Arquitectura y estructura](architecture.md): arquitectura modular por
+  funcionalidad, límites de dependencia, estructura objetivo del backend y del
+  frontend, pruebas y servicios de Compose.
+- [Pruebas y cobertura](testing.md): herramientas elegidas, estrategia, umbrales
+  mínimos, ubicación de tests y comandos para ejecutar las suites.
+
+## Regla de mantenimiento
+
+Cuando una decisión técnica afecte la forma de levantar, probar o desplegar el
+proyecto, actualizar la documentación correspondiente en el mismo cambio.
