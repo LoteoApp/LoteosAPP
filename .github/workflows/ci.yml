@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend / typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @loteos/frontend typecheck
+
+      - name: Test (with coverage thresholds)
+        run: pnpm --filter @loteos/frontend test:coverage
+
+      - name: Build
+        run: pnpm --filter @loteos/frontend build
+
+  frontend-audit:
+    name: Frontend / dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high
+
+  backend:
+    name: Backend / vet, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Build
+        working-directory: apps/backend
+        run: go build ./...
+
+      - name: Vet
+        working-directory: apps/backend
+        run: go vet ./...
+
+      - name: Test
+        working-directory: apps/backend
+        run: go test ./...
+
+  backend-audit:
+    name: Backend / dependency audit (govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: apps/backend
+        run: govulncheck ./...
+
+  dependency-review:
+    name: Dependency review (PR diff)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  compose-config:
+    name: Validate docker compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker compose config
+        run: docker compose config
