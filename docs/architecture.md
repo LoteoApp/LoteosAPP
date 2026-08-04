@@ -236,6 +236,10 @@ secundario de iniciar cada réplica del backend.
 
 - Monorepo con pnpm como único package manager de JavaScript.
 - React, TypeScript, Vite y Tailwind CSS para el frontend.
+- shadcn/ui como base de componentes visuales, instalados en `shared/ui`.
+  Configuración manual (sin la CLI) porque el registro de shadcn no es
+  accesible desde el entorno de desarrollo asistido; se agregan componentes
+  copiando su código fuente cuando haga falta.
 - Go para el backend.
 - PostgreSQL con `pgxpool` para persistencia.
 - Goose y archivos SQL versionados para migraciones.

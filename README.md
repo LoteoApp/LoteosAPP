@@ -62,7 +62,7 @@ pnpm test:coverage
 ```text
 apps/
 ├── backend/       # API Go y comandos de migración
-└── frontend/      # React + TypeScript + Vite + Tailwind CSS
+└── frontend/      # React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 docs/              # Documentación técnica
 migrations/        # Migraciones SQL versionadas de PostgreSQL
 compose.yaml       # Entorno completo de desarrollo
