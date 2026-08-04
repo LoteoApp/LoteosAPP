@@ -15,6 +15,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
   frontend, pruebas y servicios de Compose.
 - [Pruebas y cobertura](testing.md): herramientas elegidas, estrategia, umbrales
   mínimos, ubicación de tests y comandos para ejecutar las suites.
+- [Integración continua](ci.md): jobs del workflow de GitHub Actions, cuándo
+  corre cada uno y su relación con la auditoría de dependencias.
 
 ## Regla de mantenimiento
 

@@ -75,4 +75,5 @@ compose.yaml       # Entorno completo de desarrollo
 - [PostgreSQL y migraciones](docs/database.md)
 - [Arquitectura y estructura](docs/architecture.md)
 - [Pruebas y cobertura](docs/testing.md)
+- [Integración continua](docs/ci.md)
 - [Reglas para agentes y colaboradores](AGENTS.md)

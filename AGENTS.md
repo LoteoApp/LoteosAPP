@@ -95,3 +95,4 @@ Agregar capturas si hay cambios visuales.
 - Full test suite and coverage: `pnpm test` and `pnpm test:coverage` from the repository root.
 - Database environment: `docker compose config` and `docker compose up --build`.
 - Keep dependencies and configuration minimal; do not add libraries without a concrete need.
+- CI runs build, test, coverage, and dependency-audit checks automatically on every pull request; see `docs/ci.md`. Running these commands locally before pushing still saves round trips.
