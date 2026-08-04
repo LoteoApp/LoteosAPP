@@ -1,4 +1,4 @@
-package httpx
+package response
 
 import (
 	"encoding/json"

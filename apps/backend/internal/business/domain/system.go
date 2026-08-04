@@ -1,9 +1,6 @@
-package system
+package domain
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 type Info struct {
 	Service   string       `json:"service"`
@@ -30,9 +27,4 @@ type PoolInfo struct {
 	IdleConnections     int32 `json:"idle_connections"`
 	NewConnections      int64 `json:"new_connections"`
 	ClosedConnections   int64 `json:"closed_connections"`
-}
-
-type Repository interface {
-	Snapshot(ctx context.Context) (DatabaseInfo, PoolInfo, error)
-	Ping(ctx context.Context) error
 }
