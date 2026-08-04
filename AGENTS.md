@@ -1,5 +1,10 @@
 # LoteosAPP
 
+## Language
+
+- Respond to the user in Spanish.
+- Code, identifiers, comments, and commit messages stay in English.
+
 ## Package manager
 
 - Never use `npm`.
@@ -47,6 +52,41 @@
 - Do not lower coverage thresholds, remove assertions, add broad exclusions, or skip tests merely to make a suite pass.
 - When adding a backend feature, extend the root `test:backend:coverage` command so its core and HTTP packages are included in the coverage report.
 - Run `pnpm test` for all suites and `pnpm test:coverage` for coverage before finishing a functional change.
+
+## Commits
+
+- Use simplified Conventional Commits: `<type>: <description>`.
+- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+- Description in English, imperative, lowercase, no trailing period.
+- Examples:
+  - `feat: add authentication`
+  - `fix: correct installment calculation`
+  - `refactor: reorganize user service`
+  - `test: add login tests`
+  - `docs: document customer endpoint`
+  - `chore: update dependencies`
+
+## Pull Requests
+
+Every PR description must include:
+
+```
+## Qué se hizo
+
+Descripción breve del cambio.
+
+## Cómo probarlo
+
+Pasos para levantar el entorno y probar el cambio.
+
+## Cambios en base de datos
+
+Migraciones agregadas o modificadas, si aplica.
+
+## Capturas
+
+Agregar capturas si hay cambios visuales.
+```
 
 ## Verification
 
