@@ -1,19 +1,21 @@
-package system
+package usecase
 
 import (
 	"context"
 	"errors"
 	"testing"
+
+	"loteosapp/backend/internal/business/domain"
 )
 
 type repositoryStub struct {
-	database    DatabaseInfo
-	pool        PoolInfo
+	database    domain.DatabaseInfo
+	pool        domain.PoolInfo
 	snapshotErr error
 	pingErr     error
 }
 
-func (repository repositoryStub) Snapshot(context.Context) (DatabaseInfo, PoolInfo, error) {
+func (repository repositoryStub) Snapshot(context.Context) (domain.DatabaseInfo, domain.PoolInfo, error) {
 	return repository.database, repository.pool, repository.snapshotErr
 }
 
@@ -25,8 +27,8 @@ func TestServiceInfoBuildsConnectedSnapshot(t *testing.T) {
 	t.Parallel()
 
 	service := NewService(repositoryStub{
-		database: DatabaseInfo{DatabaseName: "loteosapp"},
-		pool:     PoolInfo{MaxConnections: 10},
+		database: domain.DatabaseInfo{DatabaseName: "loteosapp"},
+		pool:     domain.PoolInfo{MaxConnections: 10},
 	})
 
 	info, err := service.Info(context.Background())

@@ -10,13 +10,13 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"loteosapp/backend/internal/platform/config"
+	"loteosapp/backend/internal/infrastructure/environments"
 )
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	cfg := config.LoadMigration()
+	cfg := environments.LoadMigration()
 
 	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
