@@ -6,8 +6,9 @@
 - Node.js 20.19+ y pnpm 10+.
 - Go 1.26+.
 
-El frontend usa React 19, Vite 8, TypeScript 7 y Tailwind CSS 4. El backend
-usa Go 1.26, `pgx/v5/pgxpool` y Goose para migraciones.
+El frontend usa React 19, Vite 8, TypeScript 7, Tailwind CSS 4 y shadcn/ui
+(componentes en `apps/frontend/src/shared/ui`). El backend usa Go 1.26,
+`pgx/v5/pgxpool` y Goose para migraciones.
 
 ## Arrancar todo con Docker
 
