@@ -47,3 +47,22 @@ declarada en la directiva `go` de `apps/backend/go.mod` (vía
 `actions/setup-go` con `go-version-file`). Mantener esa directiva en la
 última versión de parche disponible evita que `govulncheck` reporte
 vulnerabilidades ya corregidas en la librería estándar.
+
+## Protección de ramas
+
+`develop` y `main` requieren, para poder mergear un PR:
+
+- al menos 1 aprobación de un reviewer;
+- que los 6 checks de este workflow estén en verde;
+- que la rama del PR esté actualizada contra la base (`strict: true`).
+
+Esta regla no vive en ningún archivo del repositorio: se administra desde
+GitHub, en **Settings > Branches > Branch protection rules**. Cualquier
+cambio (agregar un check nuevo, sumar otro colaborador, exigirlo también a
+admins) se hace ahí, no con un commit.
+
+Los tres colaboradores del repo son admins, y la regla está configurada sin
+`enforce_admins`. Esto significa que, aunque la regla se muestra y aplica
+igual para todos, cualquier admin puede optar por "Merge without waiting for
+requirements" y saltear la aprobación o el CI si lo necesita — queda
+registrado en el historial del PR, pero no es un bloqueo absoluto.
