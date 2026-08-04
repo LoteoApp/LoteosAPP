@@ -22,10 +22,24 @@
 
 ## Architecture
 
-- Organize backend and frontend code by feature, not by global technical layers.
+- Organize frontend code by feature. Organize backend code by technical layer
+  (`internal/business`, `internal/infrastructure`), not by feature.
 - Follow the dependency rules documented in `docs/architecture.md`.
-- Backend feature cores must not depend on HTTP, PostgreSQL, or concrete `pgx` types.
-- Keep backend infrastructure under `internal/platform` and dependency wiring under `internal/app`.
+- Backend domain and use cases (`internal/business`) must not depend on HTTP,
+  PostgreSQL, or concrete `pgx` types.
+- Keep domain entities under `internal/business/domain`, contracts the
+  business needs from its adapters (e.g. `Repository`) under
+  `internal/business/gateway`, and use cases under `internal/business/usecase`.
+  Use cases depend on `gateway` contracts, never on a concrete adapter.
+- Keep every adapter (persistence, environment configuration, HTTP delivery,
+  HTTP server bootstrap) under `internal/infrastructure`.
+- Keep the dependency injection container (IoC wiring: pool, repositories, use
+  cases, handlers) under `internal/infrastructure/delivery/webapp/dependencies`.
+  It only builds objects; it does not read configuration, register routes, or
+  build the HTTP server.
+- `internal/app` is the composition root and owns process lifecycle: it reads
+  configuration, asks `dependencies` for the object graph, registers routes,
+  builds the HTTP server, then runs and shuts it down.
 - Keep frontend composition under `src/app`, feature code under `src/features`, and genuinely reusable code under `src/shared`.
 - Frontend features may depend on `shared`; they must not import another feature's internal files.
 - Prefer direct imports over broad barrel files.

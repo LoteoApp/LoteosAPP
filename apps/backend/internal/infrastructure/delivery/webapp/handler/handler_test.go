@@ -1,4 +1,4 @@
-package systemhttp
+package handler_test
 
 import (
 	"context"
@@ -8,17 +8,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"loteosapp/backend/internal/platform/httpx"
-	"loteosapp/backend/internal/system"
+	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
 )
 
 type serviceStub struct {
-	info     system.Info
+	info     domain.Info
 	infoErr  error
 	readyErr error
 }
 
-func (service serviceStub) Info(context.Context) (system.Info, error) {
+func (service serviceStub) Info(context.Context) (domain.Info, error) {
 	return service.info, service.infoErr
 }
 
@@ -49,9 +51,9 @@ func TestHealthRoutes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			response := performRequest(test.service, test.path)
-			if response.Code != test.wantStatus {
-				t.Errorf("status = %d, want %d", response.Code, test.wantStatus)
+			recorder := performRequest(test.service, test.path)
+			if recorder.Code != test.wantStatus {
+				t.Errorf("status = %d, want %d", recorder.Code, test.wantStatus)
 			}
 		})
 	}
@@ -60,15 +62,15 @@ func TestHealthRoutes(t *testing.T) {
 func TestInfoRoute(t *testing.T) {
 	t.Parallel()
 
-	want := system.Info{Service: "loteosapp-backend", Status: "ok"}
-	response := performRequest(serviceStub{info: want}, "/api/v1/system")
+	want := domain.Info{Service: "loteosapp-backend", Status: "ok"}
+	recorder := performRequest(serviceStub{info: want}, "/api/v1/system")
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 
-	var got system.Info
-	if err := json.NewDecoder(response.Body).Decode(&got); err != nil {
+	var got domain.Info
+	if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if got.Service != want.Service || got.Status != want.Status {
@@ -79,17 +81,17 @@ func TestInfoRoute(t *testing.T) {
 func TestInfoRouteHidesInternalErrors(t *testing.T) {
 	t.Parallel()
 
-	response := performRequest(
+	recorder := performRequest(
 		serviceStub{infoErr: errors.New("connection password leaked")},
 		"/api/v1/system",
 	)
 
-	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
 	}
 
-	var got httpx.ErrorResponse
-	if err := json.NewDecoder(response.Body).Decode(&got); err != nil {
+	var got response.ErrorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if got.Code != "database_diagnostic_failed" {
@@ -101,13 +103,13 @@ func TestInfoRouteHidesInternalErrors(t *testing.T) {
 }
 
 func performRequest(service serviceStub, path string) *httptest.ResponseRecorder {
-	handler := NewHandler(service)
+	h := handler.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	route.RegisterRoutes(mux, h)
 
 	request := httptest.NewRequest(http.MethodGet, path, nil)
-	response := httptest.NewRecorder()
-	mux.ServeHTTP(response, request)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
 
-	return response
+	return recorder
 }
