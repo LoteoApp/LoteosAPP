@@ -3,6 +3,30 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "administrador",
+        "description": "Control total: crea usuarios, asigna permisos y loteos, gestiona ventas, cobranzas, edicion/eliminacion de lotes"
+      },
+      {
+        "name": "administrativo",
+        "description": "Visualiza informacion, edita datos configurables por el administrador, carga ventas"
+      },
+      {
+        "name": "agrimensor",
+        "description": "Carga DXF, fotos, planos e informacion de manzanas/lotes en loteos asignados"
+      },
+      {
+        "name": "escribano",
+        "description": "Administra documentacion legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados"
+      },
+      {
+        "name": "inmobiliaria",
+        "description": "Ve loteos asignados, gestiona clientes, reserva lotes individuales, cobra sobre el loteo asignado"
+      }
+    ]
+  },
   "clients": [
     {
       "clientId": "loteosapp-frontend",
