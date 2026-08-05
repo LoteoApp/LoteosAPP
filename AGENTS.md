@@ -102,6 +102,9 @@ Migraciones agregadas o modificadas, si aplica.
 Agregar capturas si hay cambios visuales.
 ```
 
+Antes de pushear, revisar si el cambio deja desactualizada la documentación existente
+(`README.md`, `docs/`) y actualizarla en el mismo PR.
+
 ## Verification
 
 - Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
