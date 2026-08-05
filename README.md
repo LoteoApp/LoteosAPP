@@ -62,7 +62,7 @@ pnpm test:coverage
 ```text
 apps/
 ├── backend/       # API Go y comandos de migración
-└── frontend/      # React + TypeScript + Vite + Tailwind CSS
+└── frontend/      # React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 docs/              # Documentación técnica
 migrations/        # Migraciones SQL versionadas de PostgreSQL
 compose.yaml       # Entorno completo de desarrollo
@@ -75,4 +75,5 @@ compose.yaml       # Entorno completo de desarrollo
 - [PostgreSQL y migraciones](docs/database.md)
 - [Arquitectura y estructura](docs/architecture.md)
 - [Pruebas y cobertura](docs/testing.md)
+- [Integración continua](docs/ci.md)
 - [Reglas para agentes y colaboradores](AGENTS.md)

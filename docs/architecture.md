@@ -41,27 +41,33 @@ apps/backend/
 ├── internal/
 │   ├── app/
 │   │   └── app.go
-│   ├── platform/
-│   │   ├── config/
-│   │   ├── postgres/
-│   │   ├── httpserver/
-│   │   └── httpx/
-│   ├── system/
-│   │   ├── service.go
-│   │   ├── http/
-│   │   │   └── handler.go
-│   │   └── postgres/
-│   │       └── repository.go
-│   └── lots/                    # Ejemplo de funcionalidad futura
-│       ├── lot.go
-│       ├── errors.go
-│       ├── repository.go
-│       ├── service.go
-│       ├── http/
-│       │   ├── handler.go
-│       │   └── dto.go
-│       └── postgres/
-│           └── repository.go
+│   ├── business/
+│   │   ├── domain/
+│   │   │   └── system.go
+│   │   ├── gateway/
+│   │   │   └── repository.go
+│   │   └── usecase/
+│   │       └── service.go
+│   └── infrastructure/
+│       ├── environments/
+│       │   └── config.go
+│       ├── repository/
+│       │   └── postgres/
+│       │       ├── pool.go
+│       │       └── repository.go
+│       └── delivery/
+│           └── webapp/
+│               ├── dependencies/
+│               │   └── dependencies.go
+│               ├── handler/
+│               │   └── handler.go
+│               ├── response/
+│               │   └── json.go
+│               ├── route/
+│               │   └── route.go
+│               └── server/
+│                   ├── server.go
+│                   └── cors.go
 ├── Dockerfile.dev
 ├── go.mod
 └── go.sum
@@ -75,34 +81,61 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `cmd/server`: inicia el proceso, recibe señales y delega la construcción de la
   aplicación. Debe contener muy poca lógica.
 - `cmd/migrate`: ejecuta las migraciones y termina.
-- `internal/app`: composition root. Construye configuración, pool, repositorios,
-  servicios, handlers y rutas.
-- `internal/platform`: infraestructura compartida sin reglas del negocio, como
-  configuración, servidor HTTP, conexión a PostgreSQL y respuestas JSON.
-- `internal/<feature>`: entidades, reglas, errores, casos de uso e interfaces de
-  una funcionalidad.
-- `internal/<feature>/http`: adapta requests HTTP a llamadas del caso de uso y
-  convierte el resultado en una respuesta.
-- `internal/<feature>/postgres`: implementa los contratos de persistencia con
-  `pgxpool` y SQL explícito.
+- `internal/app`: composition root y ciclo de vida del proceso. Al iniciar, lee
+  la configuración (`environments`), pide a `dependencies` el grafo de
+  objetos ya armado, registra las rutas y construye el `*http.Server`. Además
+  sirve requests y apaga todo de forma ordenada ante una señal de cierre.
+- `internal/infrastructure/delivery/webapp/dependencies`: contenedor de
+  inyección de dependencias (IoC). Recibe lo que necesita desde `internal/app`
+  (por ejemplo la cadena de conexión) y arma el grafo repositorio → servicio →
+  handler, listo para usar. No conoce configuración, rutas ni el servidor
+  HTTP; eso es responsabilidad de `internal/app`.
+- `internal/business/domain`: entidades y tipos de valor del negocio, sin
+  depender de HTTP ni de PostgreSQL.
+- `internal/business/gateway`: contratos (interfaces) que el negocio necesita de
+  sus adaptadores, como `Repository`. Los casos de uso dependen de estos
+  contratos, nunca de una implementación concreta.
+- `internal/business/usecase`: casos de uso que orquestan el dominio a través de
+  los contratos de `gateway`.
+- `internal/infrastructure/environments`: carga de configuración desde
+  variables de entorno.
+- `internal/infrastructure/repository/postgres`: implementa los contratos de
+  persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
+  la apertura y configuración del pool de conexiones.
+- `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
+  llamadas del caso de uso y convierte el resultado en una respuesta.
+- `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
+  consistentes, de éxito y de error.
+- `internal/infrastructure/delivery/webapp/route`: registra los endpoints HTTP
+  sobre un `*http.ServeMux` a partir de los handlers.
+- `internal/infrastructure/delivery/webapp/server`: construye el `*http.Server`
+  y el middleware CORS.
 
 ### Dirección de dependencias
 
 ```mermaid
 flowchart LR
     main["cmd/server"] --> app["internal/app"]
-    app --> http["feature/http"]
-    app --> postgres["feature/postgres"]
-    http --> core["núcleo de la feature"]
-    postgres --> core
-    postgres --> platform["platform/postgres"]
+    app --> environments["infrastructure/environments"]
+    app --> deps["infrastructure/delivery/webapp/dependencies"]
+    app --> route["infrastructure/delivery/webapp/route"]
+    app --> server["infrastructure/delivery/webapp/server"]
+    deps --> repo["infrastructure/repository/postgres"]
+    route --> handler["infrastructure/delivery/webapp/handler"]
+    handler --> response["infrastructure/delivery/webapp/response"]
+    handler --> usecase["business/usecase"]
+    repo -.implementa.-> gateway["business/gateway"]
+    usecase --> gateway
+    usecase --> domain["business/domain"]
+    gateway --> domain
 ```
 
-El núcleo de una funcionalidad no importa sus adaptadores. Por lo tanto:
+El dominio y los casos de uso no importan sus adaptadores; son los adaptadores
+los que importan e implementan los contratos del negocio. Por lo tanto:
 
 - un handler no ejecuta SQL ni contiene reglas del negocio;
 - un repositorio no toma decisiones del negocio;
-- un servicio no conoce `http.Request`, JSON ni tipos concretos de `pgx`;
+- un caso de uso no conoce `http.Request`, JSON ni tipos concretos de `pgx`;
 - las interfaces se definen cerca de quien las consume y se mantienen pequeñas;
 - no se crea una interfaz para cada tipo, solamente para un límite real;
 - las operaciones de I/O reciben `context.Context` como primer parámetro.
@@ -236,6 +269,10 @@ secundario de iniciar cada réplica del backend.
 
 - Monorepo con pnpm como único package manager de JavaScript.
 - React, TypeScript, Vite y Tailwind CSS para el frontend.
+- shadcn/ui como base de componentes visuales, instalados en `shared/ui`.
+  Configuración manual (sin la CLI) porque el registro de shadcn no es
+  accesible desde el entorno de desarrollo asistido; se agregan componentes
+  copiando su código fuente cuando haga falta.
 - Go para el backend.
 - PostgreSQL con `pgxpool` para persistencia.
 - Goose y archivos SQL versionados para migraciones.

@@ -1,11 +1,11 @@
-package systempostgres
+package postgres
 
 import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"loteosapp/backend/internal/system"
+	"loteosapp/backend/internal/business/domain"
 )
 
 type Repository struct {
@@ -16,8 +16,8 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (repository *Repository) Snapshot(ctx context.Context) (system.DatabaseInfo, system.PoolInfo, error) {
-	var database system.DatabaseInfo
+func (repository *Repository) Snapshot(ctx context.Context) (domain.DatabaseInfo, domain.PoolInfo, error) {
+	var database domain.DatabaseInfo
 	err := repository.pool.QueryRow(ctx, `
 		SELECT
 			version(),
@@ -35,11 +35,11 @@ func (repository *Repository) Snapshot(ctx context.Context) (system.DatabaseInfo
 		&database.DatabaseTime,
 	)
 	if err != nil {
-		return system.DatabaseInfo{}, system.PoolInfo{}, err
+		return domain.DatabaseInfo{}, domain.PoolInfo{}, err
 	}
 
 	stat := repository.pool.Stat()
-	pool := system.PoolInfo{
+	pool := domain.PoolInfo{
 		MaxConnections:      repository.pool.Config().MaxConns,
 		TotalConnections:    stat.TotalConns(),
 		AcquiredConnections: stat.AcquiredConns(),

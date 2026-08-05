@@ -12,8 +12,8 @@ Es la opción recomendada porque:
 - Mantiene las queries parametrizadas con placeholders `$1`, `$2`, etc.
 
 La conexión del backend se configura en
-`apps/backend/internal/platform/postgres/pool.go` y se construye desde
-`apps/backend/internal/app/app.go`. Al iniciar:
+`apps/backend/internal/infrastructure/repository/postgres/pool.go` y se
+construye desde `apps/backend/internal/app/app.go`. Al iniciar:
 
 1. Lee `DATABASE_URL`.
 2. Construye un `pgxpool.Pool`.

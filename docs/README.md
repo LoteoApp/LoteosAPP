@@ -4,6 +4,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
 
 ## Guías
 
+- [Dominio](domain.md): entidades, roles y permisos, reglas de negocio,
+  ciclo de vida del lote y estructura requerida del archivo DXF.
 - [Desarrollo y Docker Compose](development.md): requisitos, arranque, puertos,
   variables de entorno, logs y resolución de problemas.
 - [PostgreSQL y migraciones](database.md): conexión desde Go, Goose, creación,
@@ -13,6 +15,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
   frontend, pruebas y servicios de Compose.
 - [Pruebas y cobertura](testing.md): herramientas elegidas, estrategia, umbrales
   mínimos, ubicación de tests y comandos para ejecutar las suites.
+- [Integración continua](ci.md): jobs del workflow de GitHub Actions, cuándo
+  corre cada uno y su relación con la auditoría de dependencias.
 
 ## Regla de mantenimiento
 

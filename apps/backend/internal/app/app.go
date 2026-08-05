@@ -9,12 +9,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"loteosapp/backend/internal/platform/config"
-	"loteosapp/backend/internal/platform/httpserver"
-	platformpostgres "loteosapp/backend/internal/platform/postgres"
-	"loteosapp/backend/internal/system"
-	systemhttp "loteosapp/backend/internal/system/http"
-	systempostgres "loteosapp/backend/internal/system/postgres"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/dependencies"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/server"
+	"loteosapp/backend/internal/infrastructure/environments"
 )
 
 type App struct {
@@ -23,23 +21,19 @@ type App struct {
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg := config.LoadServer()
+	cfg := environments.LoadServer()
 
-	pool, err := platformpostgres.OpenPool(ctx, cfg.DatabaseURL)
+	container, err := dependencies.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	repository := systempostgres.NewRepository(pool)
-	service := system.NewService(repository)
-	handler := systemhttp.NewHandler(service)
-
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	route.RegisterRoutes(mux, container.Handler)
 
 	return &App{
-		server: httpserver.New(cfg.Port, httpserver.WithCORS(cfg.FrontendOrigin, mux)),
-		pool:   pool,
+		server: server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
+		pool:   container.Pool,
 	}, nil
 }
 

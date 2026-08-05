@@ -1,5 +1,10 @@
 # LoteosAPP
 
+## Language
+
+- Respond to the user in Spanish.
+- Code, identifiers, comments, and commit messages stay in English.
+
 ## Package manager
 
 - Never use `npm`.
@@ -17,10 +22,24 @@
 
 ## Architecture
 
-- Organize backend and frontend code by feature, not by global technical layers.
+- Organize frontend code by feature. Organize backend code by technical layer
+  (`internal/business`, `internal/infrastructure`), not by feature.
 - Follow the dependency rules documented in `docs/architecture.md`.
-- Backend feature cores must not depend on HTTP, PostgreSQL, or concrete `pgx` types.
-- Keep backend infrastructure under `internal/platform` and dependency wiring under `internal/app`.
+- Backend domain and use cases (`internal/business`) must not depend on HTTP,
+  PostgreSQL, or concrete `pgx` types.
+- Keep domain entities under `internal/business/domain`, contracts the
+  business needs from its adapters (e.g. `Repository`) under
+  `internal/business/gateway`, and use cases under `internal/business/usecase`.
+  Use cases depend on `gateway` contracts, never on a concrete adapter.
+- Keep every adapter (persistence, environment configuration, HTTP delivery,
+  HTTP server bootstrap) under `internal/infrastructure`.
+- Keep the dependency injection container (IoC wiring: pool, repositories, use
+  cases, handlers) under `internal/infrastructure/delivery/webapp/dependencies`.
+  It only builds objects; it does not read configuration, register routes, or
+  build the HTTP server.
+- `internal/app` is the composition root and owns process lifecycle: it reads
+  configuration, asks `dependencies` for the object graph, registers routes,
+  builds the HTTP server, then runs and shuts it down.
 - Keep frontend composition under `src/app`, feature code under `src/features`, and genuinely reusable code under `src/shared`.
 - Frontend features may depend on `shared`; they must not import another feature's internal files.
 - Prefer direct imports over broad barrel files.
@@ -48,6 +67,41 @@
 - When adding a backend feature, extend the root `test:backend:coverage` command so its core and HTTP packages are included in the coverage report.
 - Run `pnpm test` for all suites and `pnpm test:coverage` for coverage before finishing a functional change.
 
+## Commits
+
+- Use simplified Conventional Commits: `<type>: <description>`.
+- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+- Description in English, imperative, lowercase, no trailing period.
+- Examples:
+  - `feat: add authentication`
+  - `fix: correct installment calculation`
+  - `refactor: reorganize user service`
+  - `test: add login tests`
+  - `docs: document customer endpoint`
+  - `chore: update dependencies`
+
+## Pull Requests
+
+Every PR description must include:
+
+```
+## Qué se hizo
+
+Descripción breve del cambio.
+
+## Cómo probarlo
+
+Pasos para levantar el entorno y probar el cambio.
+
+## Cambios en base de datos
+
+Migraciones agregadas o modificadas, si aplica.
+
+## Capturas
+
+Agregar capturas si hay cambios visuales.
+```
+
 ## Verification
 
 - Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
@@ -55,3 +109,4 @@
 - Full test suite and coverage: `pnpm test` and `pnpm test:coverage` from the repository root.
 - Database environment: `docker compose config` and `docker compose up --build`.
 - Keep dependencies and configuration minimal; do not add libraries without a concrete need.
+- CI runs build, test, coverage, and dependency-audit checks automatically on every pull request; see `docs/ci.md`. Running these commands locally before pushing still saves round trips.
