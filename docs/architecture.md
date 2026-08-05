@@ -51,6 +51,9 @@ apps/backend/
 │   └── infrastructure/
 │       ├── environments/
 │       │   └── config.go
+│       ├── auth/
+│       │   └── keycloak/
+│       │       └── verifier.go
 │       ├── repository/
 │       │   └── postgres/
 │       │       ├── pool.go
@@ -61,6 +64,8 @@ apps/backend/
 │               │   └── dependencies.go
 │               ├── handler/
 │               │   └── handler.go
+│               ├── middleware/
+│               │   └── auth.go
 │               ├── response/
 │               │   └── json.go
 │               ├── route/
@@ -99,6 +104,12 @@ vacíos antes de que exista una funcionalidad que los necesite.
   los contratos de `gateway`.
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
+- `internal/infrastructure/auth/keycloak`: valida el JWT (Bearer token)
+  emitido por Keycloak contra su JWKS y extrae el `sub` y los roles del
+  token.
+- `internal/infrastructure/delivery/webapp/middleware`: adapta la
+  validación de `auth/keycloak` a un middleware HTTP; rechaza requests sin
+  token válido y expone el llamador autenticado al resto de la request.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
   la apertura y configuración del pool de conexiones.
@@ -121,7 +132,10 @@ flowchart LR
     app --> route["infrastructure/delivery/webapp/route"]
     app --> server["infrastructure/delivery/webapp/server"]
     deps --> repo["infrastructure/repository/postgres"]
+    deps --> keycloak["infrastructure/auth/keycloak"]
     route --> handler["infrastructure/delivery/webapp/handler"]
+    route --> middleware["infrastructure/delivery/webapp/middleware"]
+    middleware --> keycloak
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecase["business/usecase"]
     repo -.implementa.-> gateway["business/gateway"]
