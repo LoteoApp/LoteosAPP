@@ -148,3 +148,16 @@ jobs:
 
       - name: docker compose config
         run: docker compose config
+
+  main-source-branch:
+    name: Only allow merges into main from develop or hotfix/*
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR source branch
+        run: |
+          HEAD_REF="${{ github.head_ref }}"
+          if [ "$HEAD_REF" != "develop" ] && [[ "$HEAD_REF" != hotfix/* ]]; then
+            echo "PRs into main must come from develop or a hotfix/* branch (got '$HEAD_REF')."
+            exit 1
+          fi
