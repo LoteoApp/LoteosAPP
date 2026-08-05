@@ -70,6 +70,9 @@ services:
     command: ["pnpm", "--filter", "@loteos/frontend", "dev", "--host", "0.0.0.0"]
     environment:
       VITE_API_URL: http://localhost:${BACKEND_PORT:-8080}
+      VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_PORT:-8081}
+      VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
+      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT:-loteosapp-frontend}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:

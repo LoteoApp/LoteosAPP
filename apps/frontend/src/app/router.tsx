@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router'
 import App from './App'
+import RequireAuth from '../features/auth/components/RequireAuth'
 import LotsPage from '../features/lots/pages/LotsPage'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
@@ -15,30 +16,58 @@ export const router = createBrowserRouter([
   },
   {
     path: '/lotes',
-    element: <LotsPage />,
+    element: (
+      <RequireAuth>
+        <LotsPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/clientes',
-    element: <ClientsPage />,
+    element: (
+      <RequireAuth>
+        <ClientsPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/reservas',
-    element: <ReservationsPage />,
+    element: (
+      <RequireAuth>
+        <ReservationsPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/ventas',
-    element: <SalesPage />,
+    element: (
+      <RequireAuth>
+        <SalesPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/cobranzas',
-    element: <BillingPage />,
+    element: (
+      <RequireAuth>
+        <BillingPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/usuarios',
-    element: <UsersPage />,
+    element: (
+      <RequireAuth>
+        <UsersPage />
+      </RequireAuth>
+    ),
   },
   {
     path: '/documentacion',
-    element: <LegalPage />,
+    element: (
+      <RequireAuth>
+        <LegalPage />
+      </RequireAuth>
+    ),
   },
 ])
