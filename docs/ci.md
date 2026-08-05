@@ -66,3 +66,16 @@ Los tres colaboradores del repo son admins, y la regla está configurada sin
 igual para todos, cualquier admin puede optar por "Merge without waiting for
 requirements" y saltear la aprobación o el CI si lo necesita — queda
 registrado en el historial del PR, pero no es un bloqueo absoluto.
+
+## Origen permitido de los PRs hacia main
+
+GitHub no tiene una regla nativa de protección de rama para restringir desde
+qué rama puede venir un PR (ni en branch protection clásica ni en Rulesets).
+El job `main-source-branch` cubre ese hueco: corre solo en PRs contra `main`
+y falla si la rama de origen no es `develop` ni empieza con `hotfix/`.
+
+`hotfix/*` es la vía de escape para arreglos urgentes que no pueden esperar a
+pasar por `develop` primero. Si se mergea un hotfix a `main`, hay que
+mergearlo (o cherry-pickearlo) también a `develop` en el mismo momento, para
+que no se pierda en el próximo release normal. Esa sincronización es manual,
+el CI no la fuerza.
