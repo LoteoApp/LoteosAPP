@@ -97,7 +97,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.5.2
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB:-keycloak}
@@ -109,6 +109,8 @@ services:
       KC_HOSTNAME: localhost
     ports:
       - "${KEYCLOAK_PORT:-8081}:8080"
+    volumes:
+      - ./keycloak/realm-loteosapp.json:/opt/keycloak/data/import/realm-loteosapp.json:ro
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.0 200' <&3"]
       interval: 10s
