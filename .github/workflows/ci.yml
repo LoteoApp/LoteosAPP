@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  frontend:
-    name: Frontend / typecheck, test, build
+  build:
+    name: Build / typecheck + build (frontend + backend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,65 +26,94 @@ jobs:
           node-version: "24"
           cache: pnpm
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Frontend typecheck
         run: pnpm --filter @loteos/frontend typecheck
 
-      - name: Test (with coverage thresholds)
-        run: pnpm --filter @loteos/frontend test:coverage
-
-      - name: Build
+      - name: Frontend build
         run: pnpm --filter @loteos/frontend build
-
-  frontend-audit:
-    name: Frontend / dependency audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: pnpm audit
-        run: pnpm audit --audit-level=high
-
-  backend:
-    name: Backend / vet, test, build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: apps/backend/go.mod
           cache-dependency-path: apps/backend/go.sum
 
-      - name: Build
-        working-directory: apps/backend
-        run: go build ./...
-
-      - name: Vet
+      - name: Backend vet
         working-directory: apps/backend
         run: go vet ./...
 
-      - name: Test
+      - name: Backend build
         working-directory: apps/backend
-        run: go test ./...
+        run: go build ./...
 
-  backend-audit:
-    name: Backend / dependency audit (govulncheck)
+  test:
+    name: Test / frontend + backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Run tests
+        run: pnpm test
+
+  coverage:
+    name: Coverage / frontend + backend (thresholds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Run coverage
+        run: pnpm test:coverage
+
+  dependency-audit:
+    name: Dependency audit / frontend + backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit (frontend)
+        run: pnpm audit --audit-level=high
 
       - uses: actions/setup-go@v5
         with:
@@ -94,7 +123,7 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Run govulncheck
+      - name: govulncheck (backend)
         working-directory: apps/backend
         run: govulncheck ./...
 
