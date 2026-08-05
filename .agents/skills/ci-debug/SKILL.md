@@ -11,23 +11,27 @@ description: >
   build/test/coverage job on this repo. Always report the PR/commit and the
   full pass/fail list first, even when everything is green — only go into
   root-cause diagnosis for checks that actually failed. If invoked without a
-  specific PR/branch/commit, resolve it from the open PR on the current
-  branch and ask the user if there isn't exactly one — never assume "the
-  last PR mentioned in conversation". Don't waste time retrying the GitHub
-  logs API against Azure Blob Storage URLs — go straight to local
-  reproduction.
-compatibility: Requires a GitHub personal access token with repo scope, and
-  the frontend toolchain (pnpm/node) available in the sandbox. Backend (Go)
-  and Docker checks cannot be reproduced locally — see step 4.
+  specific PR/branch/commit, don't resolve an associated PR from GitHub —
+  there may not be one open yet. Instead run the full CI suite locally
+  against the current branch (uncommitted changes included), simulating
+  what GitHub Actions would run, and report the pass/fail summary directly.
+  This is the mode to use right before pushing, to catch failures before
+  they hit CI — never assume "the last PR mentioned in conversation" as a
+  substitute for either mode. Don't waste time retrying the GitHub logs API
+  against Azure Blob Storage URLs — go straight to local reproduction.
+compatibility: For PR diagnosis, requires a GitHub personal access token
+  with repo scope. For either mode, requires the frontend toolchain
+  (pnpm/node) available in the sandbox. Backend (Go) and Docker checks are
+  only reproduced locally if go/govulncheck/docker are actually installed
+  in the sandbox — see step 4.
 ---
 
 # LoteosAPP: diagnose a failing CI check
 
-## 1. Figure out which PR you're checking
+## 1. Decide: PR diagnosis, or local pre-push run?
 
-If the user named a PR number, branch, or commit, use that. Otherwise, don't
-guess or default to "the last PR I opened" — resolve it from the current
-state of the repo:
+If the user named a PR number, branch, or commit to check against GitHub,
+use the **PR diagnosis** flow: resolve it and continue with step 2.
 
 ```bash
 BRANCH=$(git -C <repo-root> branch --show-current)
@@ -40,6 +44,17 @@ returns none, ask the user which PR or branch to check instead of picking
 one arbitrarily — there may be several open PRs and no way to know which one
 they mean. If somehow more than one comes back (shouldn't normally happen
 for a single branch), also ask rather than picking the first.
+
+If the user did **not** name a PR, branch, or commit — e.g. "revisá el CI
+antes de pushear", "¿el CI va a pasar?", or any ask to check CI status with
+nothing more specific to go on — don't try to resolve an associated PR from
+GitHub either. There may not be one open yet, and this is almost always
+someone about to push who wants to catch failures before they happen. Skip
+the GitHub API entirely and go straight to the **local pre-push run**: run
+`scripts/reproduce-ci.sh <repo-root>` against the current branch's working
+tree (uncommitted changes included) and report the pass/fail summary it
+prints, per step 4. Steps 2 and 3 don't apply in this mode — there's no PR
+or check-run to query yet.
 
 ## 2. Report the PR status first, always
 
@@ -82,16 +97,27 @@ client-rendered.
 
 ## 4. Reproduce locally
 
-Run `scripts/reproduce-ci.sh <repo-root>`. It syncs the frontend to a scratch
-copy and runs the same commands as the `build`, `test`, `coverage`, and
-`dependency-audit` (frontend half) jobs in `.github/workflows/ci.yml`, so
-whatever fails, fails the same way here — with full output, not a one-line
-annotation.
+Run `scripts/reproduce-ci.sh <repo-root>`. It syncs the repo to a scratch
+copy and runs the same commands as every job in `.github/workflows/ci.yml`
+except `dependency-review` (which needs a real PR diff and only runs on
+GitHub): `build`, `test`, `coverage`, and `dependency-audit` for frontend
+*and* backend, plus `compose-config`. Whatever fails, fails the same way
+here — with full output, not a one-line annotation — and it ends with a
+PASS/FAIL summary (also reflected in its exit code).
 
-If the failing job is backend-only (`go vet`/`go test`/`govulncheck`) or
-`compose-config`, the script can't run it (no Go toolchain, no Docker in the
-sandbox). Say this explicitly and ask the user to run the equivalent command
-locally — don't guess at what the error might be from the annotation alone.
+Backend (`go vet`/`go build`/`go test`/`govulncheck`) and `compose-config`
+only run if `go`/`govulncheck`/`docker` are actually available in the
+sandbox; the script checks for each and skips with an explicit message
+rather than failing silently or guessing. If something got skipped and the
+change touches `apps/backend` or `compose.yaml`, say so and ask the user to
+run the equivalent command locally.
+
+In **local pre-push run** mode, this step is the whole skill: run the
+script, show the summary, and stop — there's no PR to report status for and
+nothing has failed on GitHub yet, just tell the user what would happen if
+they pushed now. In **PR diagnosis** mode, use this to reproduce the
+specific job GitHub reported as failing (matching the name from step 2's
+list) before moving to step 5.
 
 ## 5. Explain the diagnosis before touching anything
 
@@ -110,6 +136,11 @@ use the `open-pr` skill to verify, show the diff, and push the fix — don't re-
 `reproduce-ci.sh` as a substitute for that skill's `verify.sh`; they overlap
 on purpose (same underlying checks) but `open-pr` is the one that also handles
 docs review and the PR body.
+
+In **local pre-push run** mode there's no diagnosis hand-off needed if
+everything passed — just report the summary and let the user decide when to
+push (`open-pr` skill from there). If something failed, walk through step 5
+first before touching anything, same as PR diagnosis mode.
 
 ## Known root causes worth checking first
 

@@ -9,7 +9,10 @@ description: >
   it tracked as issues — not just when they say "épica" or "tarea" literally.
   Also use it when the user wants a new task added under work that's already
   in flight. Always check existing epics first and either fit the new work
-  into one or propose a new epic — don't create either blindly.
+  into one or propose a new epic — don't create either blindly. Can also
+  branch (from a freshly pulled `develop`) for a task right after creating
+  it, but only after proposing the exact branch name and getting explicit
+  confirmation — never branch unprompted.
 compatibility: Requires a GitHub personal access token with repo and project
   scope (ask the user if one hasn't been shared in the session).
 ---
@@ -108,10 +111,30 @@ If the user asked to be assigned (or it's implied — "que te la asigne"), set
 `assignees` on creation as shown above, or `PATCH` an existing issue's
 `assignees` field.
 
-If the user wants to start work right away on one of the tasks, hand off to
-the `open-pr` skill's branch step (step 1: branch from a freshly pulled
-`develop`, named `<type>/<task_number>-<slug>`) rather than duplicating that
-logic here.
+For each task just created, propose branching for it and wait for
+confirmation before doing anything — don't create branches unprompted, and
+don't assume every task in a batch should get one right away. Propose the
+name using the same convention as `open-pr` step 1 —
+`<type>/<task_number>-<slug>`, `<type>` one of
+`feat`/`fix`/`refactor`/`test`/`docs`/`chore` — inferred from the task, with
+a short Spanish-or-English slug from its title, and show the exact name for
+confirmation before creating it (e.g. "¿Creo la rama
+`feat/91-agregar-listado-lotes` para esta task?"). This is the detail users
+correct most often (wrong type, slug too long, wrong task number), so don't
+skip the confirmation even when the name seems obvious.
+
+Once confirmed, branch exactly as `open-pr` step 1 does — from a freshly
+pulled `develop`, never from a stale local copy:
+
+```bash
+git checkout develop
+git pull <remote-with-token> develop
+git checkout -b <type>/<task_number>-<slug>
+```
+
+Only branch for tasks the user actually confirmed — if several tasks were
+created in one batch and they only want to start one now, don't branch for
+the rest.
 
 ## 7. Report back
 
