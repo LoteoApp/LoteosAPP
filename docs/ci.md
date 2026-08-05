@@ -48,6 +48,17 @@ declarada en la directiva `go` de `apps/backend/go.mod` (vía
 última versión de parche disponible evita que `govulncheck` reporte
 vulnerabilidades ya corregidas en la librería estándar.
 
+## Secretos y credenciales
+
+El repo tiene activado el secret scanning nativo de GitHub con push
+protection (**Settings > Code security**). Push protection corre en el
+servidor de GitHub y rechaza el `push` antes de que un secreto conocido
+(tokens de AWS, Stripe, npm, GitHub, etc.) llegue al historial; secret
+scanning además revisa el repo de forma continua y avisa por alerta si algo
+se filtró igual. No es un job de este workflow ni vive en ningún archivo del
+repositorio — se administra desde GitHub, y aplica antes de que el código
+llegue a un PR, no como parte de este pipeline.
+
 ## Protección de ramas
 
 `develop` y `main` requieren, para poder mergear un PR:
