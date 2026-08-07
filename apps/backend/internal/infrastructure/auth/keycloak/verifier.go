@@ -26,12 +26,19 @@ type Verifier struct {
 // with an empty key set.
 var failFastOnFirstFetch = false
 
-// NewVerifier fetches the issuer's JWKS and keeps it refreshed in the
-// background until Close is called. It fails if the initial fetch fails.
-func NewVerifier(ctx context.Context, issuer, audience string) (*Verifier, error) {
+// NewVerifier fetches the JWKS from jwksBaseURL and keeps it refreshed in
+// the background until Close is called. It fails if the initial fetch
+// fails.
+//
+// jwksBaseURL and issuer are often the same value, but can differ behind
+// split-horizon DNS (e.g. in Docker Compose): jwksBaseURL must be reachable
+// from this process, while issuer must match the canonical `iss` Keycloak
+// stamps on tokens (governed by KC_HOSTNAME), which callers may reach
+// through a different, publicly reachable URL.
+func NewVerifier(ctx context.Context, jwksBaseURL, issuer, audience string) (*Verifier, error) {
 	refreshCtx, cancel := context.WithCancel(context.Background())
 
-	jwksURL := issuer + "/protocol/openid-connect/certs"
+	jwksURL := jwksBaseURL + "/protocol/openid-connect/certs"
 
 	k, err := keyfunc.NewDefaultOverrideCtx(refreshCtx, []string{jwksURL}, keyfunc.Override{
 		NoErrorReturnFirstHTTPReq: &failFastOnFirstFetch,

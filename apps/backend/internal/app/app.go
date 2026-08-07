@@ -25,7 +25,7 @@ type App struct {
 func New(ctx context.Context) (*App, error) {
 	cfg := environments.LoadServer()
 
-	container, err := dependencies.New(ctx, cfg.DatabaseURL, cfg.KeycloakIssuer, cfg.KeycloakAudience)
+	container, err := dependencies.New(ctx, cfg.DatabaseURL, cfg.KeycloakJWKSBaseURL, cfg.KeycloakIssuer, cfg.KeycloakAudience)
 	if err != nil {
 		return nil, err
 	}

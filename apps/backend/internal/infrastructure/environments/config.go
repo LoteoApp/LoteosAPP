@@ -3,11 +3,12 @@ package environments
 import "os"
 
 type Server struct {
-	DatabaseURL      string
-	FrontendOrigin   string
-	Port             string
-	KeycloakIssuer   string
-	KeycloakAudience string
+	DatabaseURL         string
+	FrontendOrigin      string
+	Port                string
+	KeycloakIssuer      string
+	KeycloakJWKSBaseURL string
+	KeycloakAudience    string
 }
 
 type Migration struct {
@@ -17,11 +18,12 @@ type Migration struct {
 
 func LoadServer() Server {
 	return Server{
-		DatabaseURL:      envOrDefault("DATABASE_URL", defaultDatabaseURL),
-		FrontendOrigin:   envOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
-		Port:             envOrDefault("PORT", "8080"),
-		KeycloakIssuer:   envOrDefault("KEYCLOAK_ISSUER", defaultKeycloakIssuer),
-		KeycloakAudience: envOrDefault("KEYCLOAK_AUDIENCE", defaultKeycloakAudience),
+		DatabaseURL:         envOrDefault("DATABASE_URL", defaultDatabaseURL),
+		FrontendOrigin:      envOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
+		Port:                envOrDefault("PORT", "8080"),
+		KeycloakIssuer:      envOrDefault("KEYCLOAK_ISSUER", defaultKeycloakIssuer),
+		KeycloakJWKSBaseURL: envOrDefault("KEYCLOAK_JWKS_BASE_URL", defaultKeycloakIssuer),
+		KeycloakAudience:    envOrDefault("KEYCLOAK_AUDIENCE", defaultKeycloakAudience),
 	}
 }
 

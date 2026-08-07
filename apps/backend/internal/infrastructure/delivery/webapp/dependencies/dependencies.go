@@ -17,13 +17,13 @@ type Container struct {
 	Verifier *keycloak.Verifier
 }
 
-func New(ctx context.Context, databaseURL, keycloakIssuer, keycloakAudience string) (*Container, error) {
+func New(ctx context.Context, databaseURL, keycloakJWKSBaseURL, keycloakIssuer, keycloakAudience string) (*Container, error) {
 	pool, err := postgres.OpenPool(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	verifier, err := keycloak.NewVerifier(ctx, keycloakIssuer, keycloakAudience)
+	verifier, err := keycloak.NewVerifier(ctx, keycloakJWKSBaseURL, keycloakIssuer, keycloakAudience)
 	if err != nil {
 		pool.Close()
 		return nil, err
