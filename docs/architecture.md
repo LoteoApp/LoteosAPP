@@ -106,7 +106,9 @@ vacíos antes de que exista una funcionalidad que los necesite.
   variables de entorno.
 - `internal/infrastructure/auth/keycloak`: valida el JWT (Bearer token)
   emitido por Keycloak contra su JWKS y extrae el `sub` y los roles del
-  token.
+  token. También implementa `gateway.IdentityProvider` contra la Admin REST
+  API de Keycloak (alta/baja de usuarios, asignación de rol de realm),
+  autenticándose con las credenciales de servicio del client del backend.
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/keycloak` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
@@ -139,6 +141,7 @@ flowchart LR
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecase["business/usecase"]
     repo -.implementa.-> gateway["business/gateway"]
+    keycloak -.implementa.-> gateway
     usecase --> gateway
     usecase --> domain["business/domain"]
     gateway --> domain

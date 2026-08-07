@@ -105,7 +105,8 @@ func TestInfoRouteHidesInternalErrors(t *testing.T) {
 func performRequest(service serviceStub, path string) *httptest.ResponseRecorder {
 	h := handler.NewHandler(service)
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux, h)
+	// The user routes aren't exercised by these diagnostics tests.
+	route.RegisterRoutes(mux, h, nil, nil)
 
 	request := httptest.NewRequest(http.MethodGet, path, nil)
 	recorder := httptest.NewRecorder()

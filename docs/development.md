@@ -61,6 +61,11 @@ Endpoints operativos del backend:
 - `GET /readyz`: confirma que el backend puede conectarse con PostgreSQL.
 - `GET /api/v1/system`: devuelve el diagnóstico del backend y la base durante
   el desarrollo.
+- `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
+  usuario nuevo en Keycloak y en Postgres, devuelve una contraseña temporal
+  de un solo uso.
+- `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
+  propio perfil (nombre y apellido).
 
 Si un puerto está ocupado, se puede cambiar sin editar Compose:
 
@@ -84,6 +89,16 @@ POSTGRES_PASSWORD=loteosapp
 POSTGRES_PORT=5432
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
+```
+
+El backend necesita además llamar a la Admin REST API de Keycloak (alta de
+usuarios), autenticándose con las credenciales del client
+`loteosapp-backend`:
+
+```text
+KEYCLOAK_BASE_URL=http://keycloak:8080
+KEYCLOAK_REALM=loteosapp
+KEYCLOAK_CLIENT_SECRET=loteosapp-backend-dev-secret
 ```
 
 El backend recibe internamente esta conexión:

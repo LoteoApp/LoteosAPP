@@ -45,6 +45,9 @@ services:
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8081}/realms/${KEYCLOAK_REALM:-loteosapp}
       KEYCLOAK_JWKS_BASE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-loteosapp}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_BACKEND_CLIENT:-loteosapp-backend}
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-loteosapp-backend-dev-secret}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
