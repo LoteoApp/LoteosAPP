@@ -186,7 +186,8 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 apps/frontend/src/
 ├── app/
 │   ├── App.tsx
-│   ├── router.tsx              # Cuando existan varias rutas
+│   ├── router.tsx
+│   ├── AppLayout.tsx           # Navbar de pestañas + área de contenido
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
 │   ├── system-status/
