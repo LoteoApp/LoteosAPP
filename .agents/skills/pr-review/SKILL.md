@@ -109,25 +109,27 @@ Go through the diff with these in mind. Not everything applies to every PR — a
 
 ## 6. Draft the review — always show it before posting anything
 
-Produce two things:
+Produce two things, and keep them separate — they serve different audiences:
 
-1. **A summary** (a few sentences to a short paragraph): overall assessment, the most important issues first, and whether documentation needs updating. This is not a PR body — it's your review commentary.
-2. **Inline comments**: a list of `{file, line, comment}` for anything specific enough to attach to a line — a missing test for a new branch, a naming mismatch, a layering violation, a stale doc reference. Use the line number from the diff (the new/right-hand side for additions, matching what GitHub's line-comment API expects). Don't force an inline comment for things that are really about the PR as a whole (missing doc update, PR body mismatch, overall size) — those belong in the summary.
+1. **A summary, for the user in chat only.** Overall assessment, the most important issues first, whether documentation needs updating, anything you noticed that isn't specific enough to pin to a line (PR body mismatches, overall size/shape, scope creep). This is how the user decides whether to publish anything at all — it never gets posted to GitHub. Don't fold it into the review body in step 7.
+2. **Inline comments**: a list of `{file, line, comment}` for anything specific enough to attach to a line — a missing test for a new branch, a naming mismatch, a layering violation, a stale doc reference. Use the line number from the diff (the new/right-hand side for additions, matching what GitHub's line-comment API expects). These, and only these, are what get posted.
 
-Show both to the user in the chat, exactly as they'd be posted, before touching GitHub. Wait for explicit confirmation. This mirrors how `open-pr` never pushes without showing the diff first — a review comment on a real PR is the same kind of one-way door, so don't skip this even if the findings seem minor or obviously correct.
+Show both to the user in the chat, exactly as they'd appear, before touching GitHub. Wait for explicit confirmation. This mirrors how `open-pr` never pushes without showing the diff first — a review comment on a real PR is the same kind of one-way door, so don't skip this even if the findings seem minor or obviously correct.
 
 In local-diff mode there's nothing to post — the draft above *is* the deliverable. Stop here.
 
 ## 7. Post the review (PR mode only, after confirmation)
 
-Post as a single review with event `COMMENT` — **never** `APPROVE` or `REQUEST_CHANGES`. This skill's job is to surface things a human reviewer should look at, not to substitute for the human approval the repo's branch protection rules require. If everything looks solid, say so in the summary text, but still post as `COMMENT` (or just report "sin observaciones" in chat and skip posting anything if there's truly nothing to say).
+Post only the inline comments from step 6 — leave the review's own `body` empty. GitHub already threads each comment against its line and groups them under the reviewer; repeating the chat summary as a top-level review comment just duplicates what the lines already say and reads like a canned report on a PR that real people are looking at. The summary is for the user's own decision-making, not for the PR.
+
+Event `COMMENT` — **never** `APPROVE` or `REQUEST_CHANGES`. This skill's job is to surface things a human reviewer should look at, not to substitute for the human approval the repo's branch protection rules require.
 
 ```bash
 curl -s -X POST -H "Authorization: token $TOKEN" \
   "https://api.github.com/repos/LoteoApp/LoteosAPP/pulls/<pr_number>/reviews" \
   -d '{
     "event": "COMMENT",
-    "body": "<summary from step 6>",
+    "body": "",
     "comments": [
       {"path": "<file>", "line": <line>, "side": "RIGHT", "body": "<comment>"}
     ]
@@ -135,5 +137,7 @@ curl -s -X POST -H "Authorization: token $TOKEN" \
 ```
 
 `side: "RIGHT"` refers to the new version of the file (additions/context) — use `"LEFT"` only if commenting on a removed line, which is rare for this kind of review. If a comment's line isn't actually part of the diff hunk (context lines outside what changed), GitHub's API will reject it — double check the line falls within a `patch` hunk from step 2 before including it.
+
+If there's genuinely nothing specific enough for a line comment (everything looks solid, or the only findings are PR-wide things that belong in the chat summary), don't post an empty review — just report that in chat and stop.
 
 Report the review URL back to the user when done.
