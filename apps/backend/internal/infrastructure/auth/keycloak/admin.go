@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -56,17 +57,17 @@ func (client *AdminClient) CreateUser(ctx context.Context, email, rol string) (s
 
 	temporaryPassword, err := generateTemporaryPassword()
 	if err != nil {
-		client.deleteUser(ctx, token, keycloakID)
+		client.deleteUserLogged(ctx, token, keycloakID)
 		return "", "", fmt.Errorf("generate temporary password: %w", err)
 	}
 
 	if err := client.setTemporaryPassword(ctx, token, keycloakID, temporaryPassword); err != nil {
-		client.deleteUser(ctx, token, keycloakID)
+		client.deleteUserLogged(ctx, token, keycloakID)
 		return "", "", err
 	}
 
 	if err := client.assignRealmRole(ctx, token, keycloakID, rol); err != nil {
-		client.deleteUser(ctx, token, keycloakID)
+		client.deleteUserLogged(ctx, token, keycloakID)
 		return "", "", err
 	}
 
@@ -204,6 +205,15 @@ func (client *AdminClient) findRealmRole(ctx context.Context, token, rol string)
 	}
 
 	return map[string]any{"id": role.ID, "name": role.Name}, nil
+}
+
+// deleteUserLogged runs a compensating deleteUser and logs failure instead of
+// discarding it, so an orphaned Keycloak user leaves a trace to investigate.
+func (client *AdminClient) deleteUserLogged(ctx context.Context, token, keycloakID string) {
+	if err := client.deleteUser(ctx, token, keycloakID); err != nil {
+		slog.ErrorContext(ctx, "compensating keycloak delete failed after user creation error",
+			"keycloak_id", keycloakID, "error", err)
+	}
 }
 
 func (client *AdminClient) deleteUser(ctx context.Context, token, keycloakID string) error {
