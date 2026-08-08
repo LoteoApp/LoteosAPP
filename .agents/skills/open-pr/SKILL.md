@@ -148,4 +148,16 @@ don't ask the user for an issue number or treat it as missing information.
 Not every PR has a task behind it, and that's a normal, expected case, not
 an error.
 
+If the branch type is `docs`, label the PR `documentation` right after
+creating it — don't wait to be asked:
+
+```bash
+curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/LoteoApp/LoteosAPP/issues/<pr_number>/labels" \
+  -d '{"labels": ["documentation"]}'
+```
+
+(PRs use the same labels endpoint as issues.) Other branch types don't have
+an established label mapping yet — don't guess one.
+
 Report the resulting PR URL to the user.
