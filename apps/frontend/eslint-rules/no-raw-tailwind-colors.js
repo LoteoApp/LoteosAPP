@@ -88,7 +88,7 @@ export default {
     schema: [],
     messages: {
       rawColor:
-        'No uses la clase Tailwind cruda "{{token}}"; usa un token de tema (por ejemplo text-destructive, text-muted-foreground, bg-primary) definido en el theme de Tailwind.',
+        'Do not use the raw Tailwind class "{{token}}"; use a theme token (e.g. text-destructive, text-muted-foreground, bg-primary) defined in the Tailwind theme instead.',
     },
   },
   create(context) {
