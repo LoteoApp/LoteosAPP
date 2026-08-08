@@ -46,6 +46,12 @@
 - Do not create generic `utils`, `helpers`, `common`, `controllers`, `services`, `repositories`, or `models` directories.
 - Add abstractions and dependencies only when a concrete use case requires them; do not create empty placeholder directories.
 
+## Code comments
+
+- Don't add comments that just restate what the code already does, or that narrate the design decision behind it (why this style, what alternatives were considered, what it's meant to achieve). That kind of context belongs in `docs/` or the PR description, not inline in the source.
+- Reserve comments for the rare case where behavior genuinely isn't obvious from reading the code: a non-obvious workaround, a business or regulatory rule that isn't visible in the code itself, a warning about a footgun.
+- When tempted to explain what a block of code does, prefer a clearer name or a smaller function first; reach for a comment only if that isn't enough.
+
 ## Backend and database
 
 - Use `github.com/jackc/pgx/v5/pgxpool` for concurrent PostgreSQL access from the API.
