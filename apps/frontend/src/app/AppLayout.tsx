@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet } from 'react-router'
 
 const navItems = [
   { to: '/lotes', label: 'Lotes' },
@@ -19,7 +19,9 @@ export default function AppLayout() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4 md:flex-nowrap md:gap-8">
-          <span className="text-sm font-medium">LoteosAPP</span>
+          <Link to="/clientes" className="text-sm font-medium">
+            LoteosAPP
+          </Link>
 
           <button
             type="button"
@@ -42,7 +44,6 @@ export default function AppLayout() {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    onClick={() => setIsMenuOpen(false)}
                     className={({ isActive }) =>
                       `block border-b-2 py-2 text-sm transition-colors md:inline-flex md:items-center md:py-4 ${
                         isActive

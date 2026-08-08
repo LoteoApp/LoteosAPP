@@ -57,6 +57,15 @@ describe('AppLayout', () => {
     expect(screen.getByText('Contenido de lotes')).toBeInTheDocument()
   })
 
+  it('links the app name to the clients section', () => {
+    renderLayoutAt('/lotes')
+
+    expect(screen.getByRole('link', { name: 'LoteosAPP' })).toHaveAttribute(
+      'href',
+      '/clientes',
+    )
+  })
+
   it('toggles the mobile menu button when opened and closed', async () => {
     const user = userEvent.setup()
     renderLayoutAt('/lotes')
@@ -75,7 +84,7 @@ describe('AppLayout', () => {
     ).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('closes the mobile menu after picking a section', async () => {
+  it('keeps the mobile menu open after picking a section', async () => {
     const user = userEvent.setup()
     renderLayoutAt('/lotes')
 
@@ -83,8 +92,8 @@ describe('AppLayout', () => {
     await user.click(screen.getByRole('link', { name: 'Clientes' }))
 
     expect(
-      screen.getByRole('button', { name: 'Abrir menú' }),
-    ).toHaveAttribute('aria-expanded', 'false')
+      screen.getByRole('button', { name: 'Cerrar menú' }),
+    ).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Contenido de clientes')).toBeInTheDocument()
   })
 })
