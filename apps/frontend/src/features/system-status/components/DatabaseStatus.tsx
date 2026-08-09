@@ -3,6 +3,15 @@ import {
   type SystemInfoState,
 } from '../hooks/use-system-info'
 import type { SystemInfo } from '../types'
+import { Badge } from '../../../shared/ui/badge'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../../shared/ui/card'
 
 // Pre-dates theme tokens; migration tracked separately.
 /* eslint-disable local/no-raw-tailwind-colors */
@@ -10,43 +19,45 @@ export default function DatabaseStatus() {
   const state = useSystemInfo()
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-2xl shadow-cyan-950/20">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-slate-400">Estado de PostgreSQL</p>
-          <h2 className="mt-1 text-2xl font-semibold">Conexión de base de datos</h2>
-        </div>
-        <StatusBadge status={state.status} />
-      </div>
+    <Card>
+      <CardHeader>
+        <CardDescription>Estado de PostgreSQL</CardDescription>
+        <CardTitle className="text-2xl">Conexión de base de datos</CardTitle>
+        <CardAction>
+          <StatusBadge status={state.status} />
+        </CardAction>
+      </CardHeader>
 
-      {state.status === 'error' ? (
-        <ErrorMessage message={state.message} />
-      ) : state.status === 'success' ? (
-        <SystemDetails systemInfo={state.data} />
-      ) : (
-        <p className="mt-6 text-sm text-slate-400" aria-live="polite">
-          Consultando el backend y PostgreSQL...
-        </p>
-      )}
-    </section>
+      <CardContent>
+        {state.status === 'error' ? (
+          <ErrorMessage message={state.message} />
+        ) : state.status === 'success' ? (
+          <SystemDetails systemInfo={state.data} />
+        ) : (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Consultando el backend y PostgreSQL...
+          </p>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
 function ErrorMessage({ message }: { message: string }) {
   return (
     <div
-      className="mt-6 rounded-xl border border-rose-900/70 bg-rose-950/40 p-4 text-sm text-rose-200"
+      className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
       role="alert"
     >
       <p className="font-semibold">No se pudo consultar PostgreSQL</p>
-      <p className="mt-1 text-rose-300">{message}</p>
+      <p className="mt-1">{message}</p>
     </div>
   )
 }
 
 function SystemDetails({ systemInfo }: { systemInfo: SystemInfo }) {
   return (
-    <div className="mt-6 space-y-6">
+    <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
         <Detail label="Base de datos" value={systemInfo.database.database_name} />
         <Detail label="Usuario" value={systemInfo.database.user} />
@@ -58,14 +69,14 @@ function SystemDetails({ systemInfo }: { systemInfo: SystemInfo }) {
       </div>
 
       <div>
-        <p className="text-sm font-medium text-slate-400">Versión</p>
-        <p className="mt-2 break-words rounded-lg bg-slate-950 p-3 font-mono text-xs leading-5 text-cyan-200">
+        <p className="text-sm font-medium text-muted-foreground">Versión</p>
+        <p className="mt-2 break-words rounded-lg bg-muted p-3 font-mono text-xs leading-5 text-foreground">
           {systemInfo.database.version}
         </p>
       </div>
 
       <div>
-        <p className="text-sm font-medium text-slate-400">Pool de conexiones</p>
+        <p className="text-sm font-medium text-muted-foreground">Pool de conexiones</p>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Detail label="Máximo" value={systemInfo.pool.max_connections} />
           <Detail label="Totales" value={systemInfo.pool.total_connections} />
@@ -76,7 +87,7 @@ function SystemDetails({ systemInfo }: { systemInfo: SystemInfo }) {
         </div>
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-muted-foreground">
         Hora de PostgreSQL: {formatDate(systemInfo.database.database_time)} · Verificado:{' '}
         {formatDate(systemInfo.checked_at)}
       </p>
@@ -86,23 +97,25 @@ function SystemDetails({ systemInfo }: { systemInfo: SystemInfo }) {
 
 function Detail({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 break-words font-medium text-slate-200">{value}</p>
+    <div className="rounded-xl border border-border bg-muted/40 p-4">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words font-medium text-foreground">{value}</p>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: SystemInfoState['status'] }) {
   const label = status === 'loading' ? 'Consultando' : status === 'success' ? 'Conectado' : 'Desconectado'
-  const color =
-    status === 'loading'
-      ? 'border-amber-800 bg-amber-950/50 text-amber-300'
-      : status === 'success'
-        ? 'border-emerald-800 bg-emerald-950/50 text-emerald-300'
-        : 'border-rose-800 bg-rose-950/50 text-rose-300'
 
-  return <span className={`rounded-full border px-3 py-1 text-xs font-medium ${color}`}>{label}</span>
+  if (status === 'success') {
+    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{label}</Badge>
+  }
+
+  if (status === 'loading') {
+    return <Badge className="border-amber-200 bg-amber-50 text-amber-700">{label}</Badge>
+  }
+
+  return <Badge variant="destructive">{label}</Badge>
 }
 
 function formatDate(value: string) {

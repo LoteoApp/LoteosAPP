@@ -3,6 +3,9 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es"],
+  "defaultLocale": "es",
   "roles": {
     "realm": [
       {

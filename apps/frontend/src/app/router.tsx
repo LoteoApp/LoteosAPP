@@ -1,5 +1,6 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Outlet } from 'react-router'
 import App from './App'
+import RequireAuth from '../features/auth/components/RequireAuth'
 import LotsPage from '../features/lots/pages/LotsPage'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
@@ -14,31 +15,40 @@ export const router = createBrowserRouter([
     element: <App />,
   },
   {
-    path: '/lotes',
-    element: <LotsPage />,
-  },
-  {
-    path: '/clientes',
-    element: <ClientsPage />,
-  },
-  {
-    path: '/reservas',
-    element: <ReservationsPage />,
-  },
-  {
-    path: '/ventas',
-    element: <SalesPage />,
-  },
-  {
-    path: '/cobranzas',
-    element: <BillingPage />,
-  },
-  {
-    path: '/usuarios',
-    element: <UsersPage />,
-  },
-  {
-    path: '/documentacion',
-    element: <LegalPage />,
+    element: (
+      <RequireAuth>
+        <Outlet />
+      </RequireAuth>
+    ),
+    children: [
+      {
+        path: '/lotes',
+        element: <LotsPage />,
+      },
+      {
+        path: '/clientes',
+        element: <ClientsPage />,
+      },
+      {
+        path: '/reservas',
+        element: <ReservationsPage />,
+      },
+      {
+        path: '/ventas',
+        element: <SalesPage />,
+      },
+      {
+        path: '/cobranzas',
+        element: <BillingPage />,
+      },
+      {
+        path: '/usuarios',
+        element: <UsersPage />,
+      },
+      {
+        path: '/documentacion',
+        element: <LegalPage />,
+      },
+    ],
   },
 ])
