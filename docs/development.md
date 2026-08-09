@@ -144,6 +144,7 @@ Desde la raíz:
 ```powershell
 docker compose config
 pnpm --filter @loteos/frontend typecheck
+pnpm --filter @loteos/frontend lint
 pnpm --filter @loteos/frontend build
 ```
 
