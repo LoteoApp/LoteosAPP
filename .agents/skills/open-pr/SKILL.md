@@ -10,8 +10,8 @@ description: >
   just say "pushea esto" or "armemos el PR" without spelling out the steps.
   Also use it as a checklist before pushing any change to this repo, since it
   encodes house rules (English commit/PR titles, Spanish PR body, docs review,
-  explicit push confirmation, board cross-link) that are easy to forget
-  mid-task.
+  explicit push confirmation, documentation label, board cross-link) that are
+  easy to forget mid-task.
 compatibility: Requires a GitHub personal access token with repo scope (ask
   the user if one hasn't been shared in the session) and network access to
   api.github.com and github.com.
