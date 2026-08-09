@@ -3,13 +3,15 @@ name: open-pr
 description: >
   End-to-end workflow for pushing a change and opening a pull request in the
   LoteoApp/LoteosAPP repo (branch naming, commit message format, local
-  verification, PR body template, and the GitHub API calls to push and open
-  the PR). Use this whenever the user asks to push changes, commit and push,
+  verification, PR body template, labels, cross-linking the PR back to its
+  task issue on the board, and the GitHub API calls to push and open the
+  PR). Use this whenever the user asks to push changes, commit and push,
   open/create a PR, or wraps up a branch of work in this repo — even if they
   just say "pushea esto" or "armemos el PR" without spelling out the steps.
   Also use it as a checklist before pushing any change to this repo, since it
   encodes house rules (English commit/PR titles, Spanish PR body, docs review,
-  explicit push confirmation) that are easy to forget mid-task.
+  explicit push confirmation, board cross-link) that are easy to forget
+  mid-task.
 compatibility: Requires a GitHub personal access token with repo scope (ask
   the user if one hasn't been shared in the session) and network access to
   api.github.com and github.com.
@@ -35,7 +37,8 @@ git checkout -b <type>/<issue-number>-<slug>
 `<type>` is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore` — same
 list as commit types, see below. `<issue-number>` ties the branch to a GitHub
 issue when one exists (e.g. a task created by the `create-tasks`
-skill); omit it if there's no issue. Example: `feat/79-configure-router`.
+skill, which already names branches this way); omit it if there's no issue.
+Example: `feat/79-configure-router`.
 
 The one exception to "branch from develop": a hotfix destined for `main`
 directly uses `hotfix/<slug>` (see the `main-source-branch` CI check, which
@@ -126,11 +129,11 @@ Migraciones agregadas o modificadas, si aplica.
 Agregar capturas si hay cambios visuales.
 ```
 
-Link the PR to its task automatically, don't wait to be told: parse the
-issue number out of the branch name (the `<issue-number>` in
+Parse the issue number out of the branch name (the `<issue-number>` in
 `<type>/<issue-number>-<slug>` from step 1, e.g. `87` in
-`feat/87-secret-scanning`). If the branch name has one, add `Tarea: #<number>`
-at the end of the PR body — a plain reference, not a closing keyword.
+`feat/87-secret-scanning`) — you'll need it both for the `Tarea:` line below
+and for step 8. If the branch name has one, add `Tarea: #<number>` at the end
+of the PR body — a plain reference, not a closing keyword.
 
 Don't use `Closes`/`Fixes`/`Resolves`: those only auto-close the issue when
 the PR merges into the repo's *default* branch, which on GitHub is `main`
@@ -143,10 +146,10 @@ something the PR body can reliably trigger in this repo's branching model.
 
 If the branch name doesn't follow the `<type>/<issue-number>-<slug>`
 pattern (no leading number after the type, e.g. `chore/agent-skills`), that
-means this branch was never tied to a task — don't add a `Tarea:` line, and
-don't ask the user for an issue number or treat it as missing information.
-Not every PR has a task behind it, and that's a normal, expected case, not
-an error.
+means this branch was never tied to a task — don't add a `Tarea:` line, skip
+step 8 entirely, and don't ask the user for an issue number or treat it as
+missing information. Not every PR has a task behind it, and that's a normal,
+expected case, not an error.
 
 If the branch type is `docs`, label the PR `documentation` right after
 creating it — don't wait to be asked:
@@ -160,4 +163,40 @@ curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.git
 (PRs use the same labels endpoint as issues.) Other branch types don't have
 an established label mapping yet — don't guess one.
 
-Report the resulting PR URL to the user.
+## 8. Cross-link the PR on its task issue on the board
+
+Do this automatically, right after the PR is created — don't wait to be
+asked, and don't skip it because step 7 already put a `Tarea:` line in the
+PR body. That line is one-directional (PR → issue); this step makes it
+visible the other way too (issue → PR), which is what actually shows up when
+someone browses the board instead of the PR list.
+
+Skip this step entirely if step 7 didn't add a `Tarea:` line (no issue
+number in the branch name) — there's no issue to comment on.
+
+GitHub's automatic "Development" panel link on an issue only fires for
+`Closes #N`-style keywords in a PR merged into the *default* branch. Since
+this repo deliberately avoids that keyword (see step 7's reasoning) and
+merges into `develop`, not `main`, that panel will never populate on its
+own — a plain comment on the issue is the only reliable way to leave the
+association visible directly on the board:
+
+```bash
+curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/LoteoApp/LoteosAPP/issues/<issue_number>/comments" \
+  -d "$(python3 -c "import json,sys; print(json.dumps({'body': sys.argv[1]}))" "Rama \`<branch>\` — en progreso en #<pr_number> (abierto).")"
+```
+
+This comment reflects the state at PR-creation time only ("en progreso …
+abierto") — this skill has no step for later updating it to "mergeado" once
+the PR actually merges, since that happens through GitHub's review flow,
+outside this workflow. If asked to reconcile the board against reality later
+(e.g. "revisá qué issues ya tienen su PR mergeado y no está reflejado"),
+that's a separate pass: list PRs via
+`GET /repos/LoteoApp/LoteosAPP/pulls?state=all`, match each `head.ref`
+against the `<type>/<issue-number>-<slug>` pattern, and comment/update
+accordingly — don't assume this step already covers it.
+
+Report the resulting PR URL to the user, and mention whether an issue got the
+board comment (with its number) or whether step 8 was skipped because the
+branch had no issue number.
