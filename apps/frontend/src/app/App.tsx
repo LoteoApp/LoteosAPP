@@ -1,5 +1,7 @@
 import DatabaseStatus from '../features/system-status/components/DatabaseStatus'
 
+// Pre-dates theme tokens; migration tracked separately.
+/* eslint-disable local/no-raw-tailwind-colors */
 export default function App() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-16 text-slate-100">
