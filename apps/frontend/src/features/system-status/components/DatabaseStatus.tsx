@@ -4,6 +4,8 @@ import {
 } from '../hooks/use-system-info'
 import type { SystemInfo } from '../types'
 
+// Pre-dates theme tokens; migration tracked separately.
+/* eslint-disable local/no-raw-tailwind-colors */
 export default function DatabaseStatus() {
   const state = useSystemInfo()
 
