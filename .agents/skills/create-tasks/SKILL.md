@@ -139,6 +139,7 @@ the rest.
 ## 7. Report back
 
 Summarize what was created: epic (new or existing, with number), each task
-with its number and URL, confirmation they're on the Project board. Don't
-just say "listo" — the user has repeatedly cared about being able to see
-this structure reflected correctly on the board.
+with its number and URL, confirmation they're on the Project board, and
+whether a branch was created (with its name) for any of them. Don't just say
+"listo" — the user has repeatedly cared about being able to see this
+structure reflected correctly on the board.
