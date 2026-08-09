@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from '../../../shared/ui/card'
 
+// Pre-dates theme tokens; migration tracked separately.
+/* eslint-disable local/no-raw-tailwind-colors */
 export default function DatabaseStatus() {
   const state = useSystemInfo()
 
