@@ -32,7 +32,7 @@ func TestVerifierVerify(t *testing.T) {
 	newVerifier := func(t *testing.T) *keycloak.Verifier {
 		t.Helper()
 
-		verifier, err := keycloak.NewVerifier(context.Background(), server.URL, testAudience)
+		verifier, err := keycloak.NewVerifier(context.Background(), server.URL, server.URL, testAudience)
 		if err != nil {
 			t.Fatalf("NewVerifier() error = %v", err)
 		}
@@ -153,13 +153,45 @@ func TestVerifierVerify(t *testing.T) {
 	})
 }
 
+// TestVerifierVerifyAcceptsIssuerDifferentFromJWKSURL covers split-horizon
+// DNS setups (e.g. Docker Compose): the JWKS must be fetched from a URL
+// reachable by this process, but tokens can carry a different, canonical
+// `iss` (governed by Keycloak's KC_HOSTNAME) that callers reach through a
+// different, publicly reachable URL.
+func TestVerifierVerifyAcceptsIssuerDifferentFromJWKSURL(t *testing.T) {
+	t.Parallel()
+
+	key := generateRSAKey(t)
+	jwksServer := newJWKSServer(t, key)
+	t.Cleanup(jwksServer.Close)
+
+	const canonicalIssuer = "http://localhost:8081/realms/loteosapp"
+
+	verifier, err := keycloak.NewVerifier(context.Background(), jwksServer.URL, canonicalIssuer, testAudience)
+	if err != nil {
+		t.Fatalf("NewVerifier() error = %v", err)
+	}
+	t.Cleanup(verifier.Close)
+
+	token := signToken(t, key, jwt.MapClaims{
+		"iss": canonicalIssuer,
+		"aud": testAudience,
+		"sub": "user-123",
+		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour)),
+	})
+
+	if _, err := verifier.Verify(context.Background(), token); err != nil {
+		t.Fatalf("Verify() error = %v, want a token issued for the canonical issuer to be accepted", err)
+	}
+}
+
 func TestNewVerifierFailsWhenJWKSUnavailable(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 
-	if _, err := keycloak.NewVerifier(context.Background(), server.URL, testAudience); err == nil {
+	if _, err := keycloak.NewVerifier(context.Background(), server.URL, server.URL, testAudience); err == nil {
 		t.Error("NewVerifier() error = nil, want error when JWKS endpoint is unreachable")
 	}
 }

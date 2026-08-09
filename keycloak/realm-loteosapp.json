@@ -60,5 +60,15 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true
     }
+  ],
+  "users": [
+    {
+      "username": "service-account-loteosapp-backend",
+      "serviceAccountClientId": "loteosapp-backend",
+      "enabled": true,
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-realm"]
+      }
+    }
   ]
 }

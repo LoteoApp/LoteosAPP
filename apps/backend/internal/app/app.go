@@ -25,13 +25,13 @@ type App struct {
 func New(ctx context.Context) (*App, error) {
 	cfg := environments.LoadServer()
 
-	container, err := dependencies.New(ctx, cfg.DatabaseURL, cfg.KeycloakIssuer, cfg.KeycloakAudience)
+	container, err := dependencies.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux, container.Handler)
+	route.RegisterRoutes(mux, container.Handler, container.UserHandler, container.Verifier)
 
 	return &App{
 		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
