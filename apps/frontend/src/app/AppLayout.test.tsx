@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import AppLayout from './AppLayout'
 
 const sectionLabels = [
@@ -84,16 +84,62 @@ describe('AppLayout', () => {
     ).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('keeps the mobile menu open after picking a section', async () => {
+  it('closes the mobile menu after picking a section', async () => {
     const user = userEvent.setup()
     renderLayoutAt('/lotes')
 
     await user.click(screen.getByRole('button', { name: 'Abrir menú' }))
     await user.click(screen.getByRole('link', { name: 'Clientes' }))
 
-    expect(
-      screen.getByRole('button', { name: 'Cerrar menú' }),
-    ).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.getByText('Contenido de clientes')).toBeInTheDocument()
+  })
+
+  it('closes the mobile menu when the backdrop is clicked', async () => {
+    const user = userEvent.setup()
+    renderLayoutAt('/lotes')
+
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar menú lateral' }))
+
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+
+  it('opens the sidebar by default on desktop-sized viewports', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({ matches: true }),
+    )
+
+    renderLayoutAt('/lotes')
+
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+  })
+
+  it('keeps the sidebar open after picking a section on desktop-sized viewports', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({ matches: true }),
+    )
+
+    renderLayoutAt('/lotes')
+
+    await user.click(screen.getByRole('link', { name: 'Clientes' }))
+
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
     expect(screen.getByText('Contenido de clientes')).toBeInTheDocument()
   })
 })

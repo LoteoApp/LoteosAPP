@@ -1,69 +1,63 @@
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { ArrowLeftToLine, Menu } from 'lucide-react'
+import { Outlet } from 'react-router'
+import Sidebar from './Sidebar'
+import UserMenu from './UserMenu'
 
-const navItems = [
-  { to: '/lotes', label: 'Lotes' },
-  { to: '/clientes', label: 'Clientes' },
-  { to: '/reservas', label: 'Reservas' },
-  { to: '/ventas', label: 'Ventas' },
-  { to: '/cobranzas', label: 'Cobranzas' },
-  { to: '/usuarios', label: 'Usuarios' },
-  { to: '/documentacion', label: 'Documentación' },
-]
+function isDesktopViewport() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
+  }
+
+  return window.matchMedia('(min-width: 768px)').matches
+}
 
 export default function AppLayout() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport)
+
+  function closeSidebarOnMobile() {
+    if (!isDesktopViewport()) {
+      setIsSidebarOpen(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4 md:flex-nowrap md:gap-8">
-          <Link to="/clientes" className="text-sm font-medium">
-            LoteosAPP
-          </Link>
+    <div className="min-h-screen bg-background text-foreground md:flex">
+      {isSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Cerrar menú lateral"
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-foreground/20 md:hidden"
+        />
+      )}
 
+      <Sidebar isOpen={isSidebarOpen} onNavigate={closeSidebarOnMobile} />
+
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border px-4 md:px-8">
           <button
             type="button"
-            aria-expanded={isMenuOpen}
-            aria-controls="secciones-nav"
-            aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-            onClick={() => setIsMenuOpen((open) => !open)}
-            className="text-muted-foreground hover:text-foreground md:hidden"
+            aria-expanded={isSidebarOpen}
+            aria-controls="app-sidebar"
+            aria-label={isSidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+            onClick={() => setIsSidebarOpen((open) => !open)}
+            className="text-muted-foreground hover:text-foreground"
           >
-            {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            {isSidebarOpen ? (
+              <ArrowLeftToLine aria-hidden="true" />
+            ) : (
+              <Menu aria-hidden="true" />
+            )}
           </button>
 
-          <nav
-            id="secciones-nav"
-            aria-label="Secciones"
-            className={`w-full md:flex md:w-auto ${isMenuOpen ? 'flex' : 'hidden'}`}
-          >
-            <ul className="flex flex-col gap-1 py-2 md:flex-row md:gap-6 md:py-0">
-              {navItems.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `block border-b-2 py-2 text-sm transition-colors md:inline-flex md:items-center md:py-4 ${
-                        isActive
-                          ? 'border-foreground text-foreground'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      </header>
+          <UserMenu />
+        </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <Outlet />
-      </main>
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

@@ -187,7 +187,9 @@ apps/frontend/src/
 ├── app/
 │   ├── App.tsx
 │   ├── router.tsx
-│   ├── AppLayout.tsx           # Navbar de pestañas + área de contenido
+│   ├── AppLayout.tsx           # Sidebar + header + área de contenido
+│   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
+│   ├── UserMenu.tsx            # Menú de cuenta en el header (placeholder sin auth)
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
 │   ├── system-status/
