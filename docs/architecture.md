@@ -255,6 +255,17 @@ app → features → shared
 - Los tests se colocan junto al código probado con nombres como
   `DatabaseStatus.test.tsx`.
 
+### Diseño responsive
+
+- La app tiene que poder usarse desde el celular, así que los componentes
+  nuevos se diseñan mobile-first.
+- Con Tailwind esto significa escribir primero las clases sin prefijo
+  (aplican a cualquier tamaño) pensando en la pantalla más chica, y agregar
+  `sm:`/`md:`/`lg:` solamente para adaptar a pantallas más grandes — nunca al
+  revés.
+- Antes de dar por terminado un componente nuevo, probarlo al menos en un
+  viewport angosto (~375px de ancho) además del tamaño de escritorio.
+
 ## Reglas comunes
 
 - Usar el mismo vocabulario para una entidad en base de datos, backend,

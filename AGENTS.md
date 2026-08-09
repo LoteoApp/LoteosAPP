@@ -42,6 +42,7 @@
   builds the HTTP server, then runs and shuts it down.
 - Keep frontend composition under `src/app`, feature code under `src/features`, and genuinely reusable code under `src/shared`.
 - Frontend features may depend on `shared`; they must not import another feature's internal files.
+- The app must work on phones: build new frontend UI mobile-first. Write unprefixed Tailwind classes for the smallest viewport first, then layer `sm:`/`md:`/`lg:` overrides for larger screens, not the other way around. See `docs/architecture.md` for more detail.
 - Prefer direct imports over broad barrel files.
 - Do not create generic `utils`, `helpers`, `common`, `controllers`, `services`, `repositories`, or `models` directories.
 - Add abstractions and dependencies only when a concrete use case requires them; do not create empty placeholder directories.
