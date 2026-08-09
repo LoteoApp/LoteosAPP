@@ -113,7 +113,7 @@ Antes de pushear, revisar si el cambio deja desactualizada la documentación exi
 
 ## Verification
 
-- Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
+- Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend lint`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
 - Backend: `go test ./...` and `go vet ./...` from `apps/backend`.
 - Full test suite and coverage: `pnpm test` and `pnpm test:coverage` from the repository root.
 - Database environment: `docker compose config` and `docker compose up --build`.

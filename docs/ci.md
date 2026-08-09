@@ -15,7 +15,7 @@ push directo no hay una base con la que comparar.
 
 | Job | Qué hace |
 | --- | --- |
-| `build` | Typecheck y build del frontend; `go vet` y build del backend. |
+| `build` | Typecheck, lint y build del frontend; `go vet` y build del backend. |
 | `test` | `pnpm test` (suite de frontend y backend, sin cobertura). |
 | `coverage` | `pnpm test:coverage`, aplicando los umbrales de cobertura definidos en `AGENTS.md`. |
 | `dependency-audit` | `pnpm audit` (frontend) y `govulncheck` (backend), buscando vulnerabilidades conocidas en todo el árbol de dependencias actual. |
