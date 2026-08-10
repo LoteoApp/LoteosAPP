@@ -1,8 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { useAuth } from 'react-oidc-context'
 import AppLayout from './AppLayout'
+
+vi.mock('react-oidc-context', () => ({
+  useAuth: vi.fn(),
+}))
+
+const useAuthMock = vi.mocked(useAuth)
 
 const sectionLabels = [
   'Lotes',
@@ -13,6 +20,18 @@ const sectionLabels = [
   'Usuarios',
   'Documentación',
 ]
+
+beforeEach(() => {
+  useAuthMock.mockReturnValue({
+    signoutRedirect: vi.fn(),
+    user: {
+      profile: {
+        preferred_username: 'lzorzoli',
+        email: 'leonel@loteosapp.com',
+      },
+    },
+  } as unknown as ReturnType<typeof useAuth>)
+})
 
 function renderLayoutAt(path: string) {
   const router = createMemoryRouter(
