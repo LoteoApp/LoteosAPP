@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter } from 'react-router-dom'
 import App from './App'
 import AppLayout from './AppLayout'
 import LotsPage from '../features/lots/pages/LotsPage'

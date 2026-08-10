@@ -8,7 +8,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { Link, NavLink } from 'react-router'
+import { Link, NavLink } from 'react-router-dom'
 
 type NavItem = {
   to: string

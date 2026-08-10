@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeftToLine, Menu } from 'lucide-react'
-import { Outlet } from 'react-router'
+import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import UserMenu from './UserMenu'
 
