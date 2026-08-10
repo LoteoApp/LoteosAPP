@@ -42,9 +42,16 @@
   builds the HTTP server, then runs and shuts it down.
 - Keep frontend composition under `src/app`, feature code under `src/features`, and genuinely reusable code under `src/shared`.
 - Frontend features may depend on `shared`; they must not import another feature's internal files.
+- The app must work on phones: build new frontend UI mobile-first. Write unprefixed Tailwind classes for the smallest viewport first, then layer `sm:`/`md:`/`lg:` overrides for larger screens, not the other way around. See `docs/architecture.md` for more detail.
 - Prefer direct imports over broad barrel files.
 - Do not create generic `utils`, `helpers`, `common`, `controllers`, `services`, `repositories`, or `models` directories.
 - Add abstractions and dependencies only when a concrete use case requires them; do not create empty placeholder directories.
+
+## Code comments
+
+- Don't add comments that just restate what the code already does, or that narrate the design decision behind it (why this style, what alternatives were considered, what it's meant to achieve). That kind of context belongs in `docs/` or the PR description, not inline in the source.
+- Reserve comments for the rare case where behavior genuinely isn't obvious from reading the code: a non-obvious workaround, a business or regulatory rule that isn't visible in the code itself, a warning about a footgun.
+- When tempted to explain what a block of code does, prefer a clearer name or a smaller function first; reach for a comment only if that isn't enough.
 
 ## Backend and database
 
@@ -107,7 +114,7 @@ Antes de pushear, revisar si el cambio deja desactualizada la documentación exi
 
 ## Verification
 
-- Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
+- Frontend: `pnpm --filter @loteos/frontend typecheck`, `pnpm --filter @loteos/frontend lint`, `pnpm --filter @loteos/frontend test`, and `pnpm --filter @loteos/frontend build`.
 - Backend: `go test ./...` and `go vet ./...` from `apps/backend`.
 - Full test suite and coverage: `pnpm test` and `pnpm test:coverage` from the repository root.
 - Database environment: `docker compose config` and `docker compose up --build`.

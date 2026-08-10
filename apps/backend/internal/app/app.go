@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"loteosapp/backend/internal/infrastructure/auth/keycloak"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/dependencies"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/server"
@@ -16,29 +17,32 @@ import (
 )
 
 type App struct {
-	server *http.Server
-	pool   *pgxpool.Pool
+	server   *http.Server
+	pool     *pgxpool.Pool
+	verifier *keycloak.Verifier
 }
 
 func New(ctx context.Context) (*App, error) {
 	cfg := environments.LoadServer()
 
-	container, err := dependencies.New(ctx, cfg.DatabaseURL)
+	container, err := dependencies.New(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux, container.Handler)
+	route.RegisterRoutes(mux, container.Handler, container.UserHandler, container.Verifier)
 
 	return &App{
-		server: server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
-		pool:   container.Pool,
+		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
+		pool:     container.Pool,
+		verifier: container.Verifier,
 	}, nil
 }
 
 func (app *App) Run(ctx context.Context) error {
 	defer app.pool.Close()
+	defer app.verifier.Close()
 
 	serverErrors := make(chan error, 1)
 	go func() {

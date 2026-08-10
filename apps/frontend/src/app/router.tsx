@@ -1,0 +1,54 @@
+import { createBrowserRouter, Outlet } from 'react-router'
+import App from './App'
+import RequireAuth from '../features/auth/components/RequireAuth'
+import LotsPage from '../features/lots/pages/LotsPage'
+import ClientsPage from '../features/clients/pages/ClientsPage'
+import ReservationsPage from '../features/reservations/pages/ReservationsPage'
+import SalesPage from '../features/sales/pages/SalesPage'
+import BillingPage from '../features/billing/pages/BillingPage'
+import UsersPage from '../features/users/pages/UsersPage'
+import LegalPage from '../features/legal/pages/LegalPage'
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <App />,
+  },
+  {
+    element: (
+      <RequireAuth>
+        <Outlet />
+      </RequireAuth>
+    ),
+    children: [
+      {
+        path: '/lotes',
+        element: <LotsPage />,
+      },
+      {
+        path: '/clientes',
+        element: <ClientsPage />,
+      },
+      {
+        path: '/reservas',
+        element: <ReservationsPage />,
+      },
+      {
+        path: '/ventas',
+        element: <SalesPage />,
+      },
+      {
+        path: '/cobranzas',
+        element: <BillingPage />,
+      },
+      {
+        path: '/usuarios',
+        element: <UsersPage />,
+      },
+      {
+        path: '/documentacion',
+        element: <LegalPage />,
+      },
+    ],
+  },
+])
