@@ -3,6 +3,9 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es"],
+  "defaultLocale": "es",
   "roles": {
     "realm": [
       {
@@ -56,6 +59,16 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-loteosapp-backend",
+      "serviceAccountClientId": "loteosapp-backend",
+      "enabled": true,
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-realm"]
+      }
     }
   ]
 }

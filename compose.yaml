@@ -42,8 +42,12 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
       PORT: 8080
       FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM:-loteosapp}
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8081}/realms/${KEYCLOAK_REALM:-loteosapp}
+      KEYCLOAK_JWKS_BASE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-loteosapp}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_BACKEND_CLIENT:-loteosapp-backend}
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-loteosapp-backend-dev-secret}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -70,6 +74,9 @@ services:
     command: ["pnpm", "--filter", "@loteos/frontend", "dev", "--host", "0.0.0.0"]
     environment:
       VITE_API_URL: http://localhost:${BACKEND_PORT:-8080}
+      VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_PORT:-8081}
+      VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
+      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT:-loteosapp-frontend}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
