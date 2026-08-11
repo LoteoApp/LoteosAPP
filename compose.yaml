@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -q -U ${POSTGRES_USER:-loteosapp} -d ${POSTGRES_DB:-loteosapp}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -96,7 +96,7 @@ services:
     volumes:
       - keycloak_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${KEYCLOAK_DB_USER} -d $${KEYCLOAK_DB}"]
+      test: ["CMD-SHELL", "pg_isready -q -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB:-keycloak}"]
       interval: 5s
       timeout: 5s
       retries: 12
