@@ -18,7 +18,7 @@ const sectionLabels = [
   'Ventas',
   'Cobranzas',
   'Usuarios',
-  'Documentación',
+  'Inmobiliaria',
 ]
 
 beforeEach(() => {

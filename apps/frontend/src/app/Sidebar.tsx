@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import {
+  Building2,
   CalendarCheck,
-  FileText,
   Handshake,
   LandPlot,
   UserCog,
@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog },
-  { to: '/documentacion', label: 'Documentación', icon: FileText },
+  { to: '/inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
 ]
 
 type SidebarProps = {
