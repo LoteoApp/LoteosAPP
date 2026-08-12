@@ -1,28 +1,35 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeftToLine, Menu } from 'lucide-react'
 import { Outlet } from 'react-router'
+import { Button } from '../shared/ui/button'
 import Sidebar from './Sidebar'
 import UserMenu from './UserMenu'
 
-const DESKTOP_QUERY = '(min-width: 768px)'
-
-function isDesktopViewport() {
+function getDesktopMediaQuery() {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false
+    return null
   }
 
-  return window.matchMedia(DESKTOP_QUERY).matches
+  const breakpoint = getComputedStyle(document.documentElement)
+    .getPropertyValue('--breakpoint-md')
+    .trim()
+
+  return window.matchMedia(`(min-width: ${breakpoint || '768px'})`)
+}
+
+function isDesktopViewport() {
+  return getDesktopMediaQuery()?.matches ?? false
 }
 
 export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    const mediaQuery = getDesktopMediaQuery()
+
+    if (!mediaQuery) {
       return
     }
-
-    const mediaQuery = window.matchMedia(DESKTOP_QUERY)
 
     function handleChange(event: MediaQueryListEvent) {
       setIsSidebarOpen(event.matches)
@@ -56,20 +63,22 @@ export default function AppLayout() {
 
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border px-4 md:px-8">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
             aria-expanded={isSidebarOpen}
             aria-controls="app-sidebar"
             aria-label={isSidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
             onClick={() => setIsSidebarOpen((open) => !open)}
-            className="text-muted-foreground hover:text-foreground"
           >
             {isSidebarOpen ? (
               <ArrowLeftToLine aria-hidden="true" />
             ) : (
               <Menu aria-hidden="true" />
             )}
-          </button>
+          </Button>
 
           <UserMenu />
         </header>

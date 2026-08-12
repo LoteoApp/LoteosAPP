@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleUser } from 'lucide-react'
 import { useAuth } from 'react-oidc-context'
+import { resolveDisplayName } from '../features/auth/lib/resolveDisplayName'
 
 export default function UserMenu() {
   const auth = useAuth()
@@ -31,11 +32,7 @@ export default function UserMenu() {
     }
   }, [isOpen])
 
-  const displayName =
-    auth.user?.profile.preferred_username ??
-    auth.user?.profile.name ??
-    auth.user?.profile.email ??
-    'Usuario'
+  const displayName = resolveDisplayName(auth.user?.profile, 'Usuario')
   const email = auth.user?.profile.email
 
   function handleSignOut() {

@@ -36,12 +36,14 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
     <aside
       id="app-sidebar"
       aria-label="Secciones"
+      inert={!isOpen}
       className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-all duration-200 md:static md:translate-x-0 ${
         isOpen ? 'translate-x-0 md:w-64' : '-translate-x-full md:w-0 md:border-r-0'
       }`}
     >
       <Link
         to="/clientes"
+        onClick={onNavigate}
         className="flex h-16 w-64 shrink-0 items-center border-b border-sidebar-border px-6 text-sm font-medium text-sidebar-foreground"
       >
         LoteosAPP
