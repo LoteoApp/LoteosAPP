@@ -20,10 +20,14 @@ docker compose up --build
 
 La secuencia de inicio es:
 
-1. `db` inicia PostgreSQL y espera su health check.
+1. `db` y `keycloak-db` inician PostgreSQL (bases separadas) y esperan su
+   health check.
 2. `migrate` aplica las migraciones pendientes y termina con código 0.
-3. `backend` inicia la API cuando la base y las migraciones están listas.
-4. `frontend` inicia Vite cuando el backend está saludable.
+3. `keycloak` inicia e importa el realm `loteosapp` desde
+   `keycloak/realm-loteosapp.json`.
+4. `backend` inicia la API cuando la base, las migraciones y Keycloak están
+   listos.
+5. `frontend` inicia Vite cuando el backend está saludable.
 
 Para ejecutar en segundo plano:
 
@@ -53,7 +57,9 @@ El segundo comando es destructivo para los datos locales de PostgreSQL.
 | --- | --- | --- |
 | `frontend` | `http://localhost:5173` | Vite con recarga en caliente |
 | `backend` | `http://localhost:8080` | API Go |
-| `db` | `localhost:5432` | PostgreSQL |
+| `db` | `localhost:5432` | PostgreSQL de la aplicación |
+| `keycloak` | `http://localhost:8081` | Consola admin y endpoints OIDC |
+| `keycloak-db` | interno (sin puerto publicado) | PostgreSQL dedicado a Keycloak |
 
 Endpoints operativos del backend:
 
@@ -77,6 +83,71 @@ docker compose up --build
 
 El puerto interno del backend continúa siendo `8080`; solo cambia el puerto
 publicado en el host.
+
+## Keycloak (autenticación)
+
+`docker compose up --build` levanta Keycloak con un realm ya configurado para
+la aplicación, sin pasos manuales.
+
+### Qué trae el realm
+
+Al arrancar, el contenedor `keycloak` importa
+`keycloak/realm-loteosapp.json` (flag `--import-realm`) con:
+
+- **Realm** `loteosapp`, con el login en español
+  (`internationalizationEnabled`, `defaultLocale: es`).
+- **Clients**:
+  - `loteosapp-frontend`: público, con PKCE (S256), pensado para el flujo
+    Authorization Code de la SPA (`redirectUris: http://localhost:5173/*`).
+  - `loteosapp-backend`: confidencial (`client-secret`,
+    `loteosapp-backend-dev-secret` — solo para desarrollo local, mismo
+    criterio que el resto de las credenciales de `compose.yaml`), con
+    service accounts habilitado para llamadas servidor-a-servidor.
+- **Realm roles**, uno por cada rol de dominio documentado en
+  [domain.md](domain.md#usuarios-y-roles): `administrador`, `administrativo`,
+  `agrimensor`, `escribano`, `inmobiliaria`.
+
+El import usa la estrategia `IGNORE_EXISTING`: si el realm ya existe (por
+ejemplo, porque el volumen `keycloak_postgres_data` es de una corrida
+anterior), el archivo se ignora y no pisa cambios hechos a mano desde la
+consola. Para que una edición de `realm-loteosapp.json` se aplique sobre un
+entorno que ya lo tenía importado, hay que borrar ese volumen y volver a
+levantar:
+
+```powershell
+docker compose down
+docker volume rm loteosapp_keycloak_postgres_data
+docker compose up --build
+```
+
+Esto es destructivo: borra también los usuarios y cualquier cambio hecho a
+mano en ese realm.
+
+### Consola de administración
+
+`http://localhost:8081`, realm `master`, usuario/contraseña
+`KEYCLOAK_ADMIN_USER`/`KEYCLOAK_ADMIN_PASSWORD` (por defecto `admin`/`admin`).
+Desde ahí hay que cambiar al realm `loteosapp` (selector arriba a la
+izquierda) para ver los clients y roles importados.
+
+### Crear un usuario para probar el login
+
+El realm no trae usuarios cargados. Para probar el flujo de login:
+
+1. Consola admin → realm `loteosapp` → **Users** → **Add user**.
+2. Cargar username/email → **Create**.
+3. Pestaña **Credentials** → **Set password**. Si se deja el toggle
+   **Temporary** activado, Keycloak va a pedir cambiarla en el primer login
+   (funciona igual, es un paso extra).
+4. Opcional, pestaña **Role mapping** → asignar uno de los roles de dominio.
+
+### Backend y frontend
+
+El backend valida los tokens que emite Keycloak (JWKS del realm) vía
+`KEYCLOAK_ISSUER`/`KEYCLOAK_AUDIENCE`; ver [Variables de
+entorno](#variables-de-entorno) más abajo. El login/logout del frontend usa
+`react-oidc-context` contra el client `loteosapp-frontend`
+(`VITE_KEYCLOAK_URL`/`VITE_KEYCLOAK_REALM`/`VITE_KEYCLOAK_CLIENT_ID`).
 
 ## Variables de entorno
 
@@ -123,7 +194,7 @@ VITE_KEYCLOAK_REALM=loteosapp
 VITE_KEYCLOAK_CLIENT_ID=loteosapp-frontend
 ```
 
-El backend recibe internamente esta conexión:
+El backend recibe internamente esta conexión a PostgreSQL:
 
 ```text
 postgres://loteosapp:loteosapp@db:5432/loteosapp?sslmode=disable
