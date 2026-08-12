@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -32,6 +32,35 @@ beforeEach(() => {
     },
   } as unknown as ReturnType<typeof useAuth>)
 })
+
+function stubDesktopMatchMedia(initialMatches = true) {
+  const listeners = new Set<(event: { matches: boolean }) => void>()
+  const mediaQueryList = {
+    matches: initialMatches,
+    addEventListener: (
+      _event: string,
+      handler: (event: { matches: boolean }) => void,
+    ) => {
+      listeners.add(handler)
+    },
+    removeEventListener: (
+      _event: string,
+      handler: (event: { matches: boolean }) => void,
+    ) => {
+      listeners.delete(handler)
+    },
+  }
+
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mediaQueryList))
+
+  return {
+    emitChange(matches: boolean) {
+      for (const listener of listeners) {
+        listener({ matches })
+      }
+    },
+  }
+}
 
 function renderLayoutAt(path: string) {
   const router = createMemoryRouter(
@@ -131,10 +160,7 @@ describe('AppLayout', () => {
   })
 
   it('opens the sidebar by default on desktop-sized viewports', () => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({ matches: true }),
-    )
+    stubDesktopMatchMedia()
 
     renderLayoutAt('/lotes')
 
@@ -146,10 +172,7 @@ describe('AppLayout', () => {
 
   it('keeps the sidebar open after picking a section on desktop-sized viewports', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({ matches: true }),
-    )
+    stubDesktopMatchMedia()
 
     renderLayoutAt('/lotes')
 
@@ -160,5 +183,34 @@ describe('AppLayout', () => {
       'true',
     )
     expect(screen.getByText('Contenido de clientes')).toBeInTheDocument()
+  })
+
+  it('syncs the sidebar when the viewport crosses the desktop breakpoint', () => {
+    const { emitChange } = stubDesktopMatchMedia(true)
+
+    renderLayoutAt('/lotes')
+
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+
+    act(() => {
+      emitChange(false)
+    })
+
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+
+    act(() => {
+      emitChange(true)
+    })
+
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
   })
 })

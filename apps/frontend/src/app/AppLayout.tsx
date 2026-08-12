@@ -1,19 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeftToLine, Menu } from 'lucide-react'
 import { Outlet } from 'react-router'
 import Sidebar from './Sidebar'
 import UserMenu from './UserMenu'
+
+const DESKTOP_QUERY = '(min-width: 768px)'
 
 function isDesktopViewport() {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return false
   }
 
-  return window.matchMedia('(min-width: 768px)').matches
+  return window.matchMedia(DESKTOP_QUERY).matches
 }
 
 export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(DESKTOP_QUERY)
+
+    function handleChange(event: MediaQueryListEvent) {
+      setIsSidebarOpen(event.matches)
+    }
+
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   function closeSidebarOnMobile() {
     if (!isDesktopViewport()) {
