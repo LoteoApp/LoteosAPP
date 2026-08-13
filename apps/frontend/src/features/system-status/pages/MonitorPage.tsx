@@ -1,7 +1,7 @@
-import AuthStatus from '../features/auth/components/AuthStatus'
-import DatabaseStatus from '../features/system-status/components/DatabaseStatus'
+import AuthStatus from '../../auth/components/AuthStatus'
+import DatabaseStatus from '../components/DatabaseStatus'
 
-export default function App() {
+export default function MonitorPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-16 text-foreground">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10">

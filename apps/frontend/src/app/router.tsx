@@ -1,5 +1,6 @@
-import { createBrowserRouter, Outlet } from 'react-router'
-import App from './App'
+import { createBrowserRouter, Navigate } from 'react-router'
+import AppLayout from './AppLayout'
+import MonitorPage from '../features/system-status/pages/MonitorPage'
 import RequireAuth from '../features/auth/components/RequireAuth'
 import LotsPage from '../features/lots/pages/LotsPage'
 import ClientsPage from '../features/clients/pages/ClientsPage'
@@ -7,17 +8,25 @@ import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersPage from '../features/users/pages/UsersPage'
-import LegalPage from '../features/legal/pages/LegalPage'
+import AgenciesPage from '../features/agencies/pages/AgenciesPage'
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />,
+    element: (
+      <RequireAuth>
+        <Navigate to="/lotes" replace />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/monitor',
+    element: <MonitorPage />,
   },
   {
     element: (
       <RequireAuth>
-        <Outlet />
+        <AppLayout />
       </RequireAuth>
     ),
     children: [
@@ -46,8 +55,8 @@ export const router = createBrowserRouter([
         element: <UsersPage />,
       },
       {
-        path: '/documentacion',
-        element: <LegalPage />,
+        path: '/inmobiliaria',
+        element: <AgenciesPage />,
       },
     ],
   },
