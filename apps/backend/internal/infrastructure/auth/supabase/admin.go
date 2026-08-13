@@ -61,13 +61,8 @@ func (client *AdminClient) CreateUser(ctx context.Context, email, rol string) (s
 	}
 	defer response.Body.Close()
 
-	// GoTrue reports an already-registered email as either 409 or 422
-	// depending on the code path that catches it.
-	if response.StatusCode == http.StatusConflict || response.StatusCode == http.StatusUnprocessableEntity {
-		return "", "", domain.ErrEmailEnUso
-	}
 	if response.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("create supabase user: %w", unexpectedStatus(response))
+		return "", "", createUserError(response)
 	}
 
 	var created struct {
@@ -132,6 +127,25 @@ func (client *AdminClient) adminURL(path string) string {
 
 func unexpectedStatus(response *http.Response) error {
 	return fmt.Errorf("unexpected status %d", response.StatusCode)
+}
+
+// createUserError maps a non-200 response from POST /admin/users to an
+// error. GoTrue identifies a duplicate email through the error_code field
+// (observed as "email_exists" with HTTP 422), not through the status code
+// alone: other failures, like a weak password, also return 422.
+func createUserError(response *http.Response) error {
+	var apiError struct {
+		ErrorCode string `json:"error_code"`
+		Message   string `json:"msg"`
+	}
+	_ = json.NewDecoder(response.Body).Decode(&apiError)
+
+	if apiError.ErrorCode == "email_exists" || apiError.ErrorCode == "user_already_exists" {
+		return domain.ErrEmailEnUso
+	}
+
+	return fmt.Errorf("create supabase user: unexpected status %d, error_code %q: %s",
+		response.StatusCode, apiError.ErrorCode, apiError.Message)
 }
 
 func generateTemporaryPassword() (string, error) {

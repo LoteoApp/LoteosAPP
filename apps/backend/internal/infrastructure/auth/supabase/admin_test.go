@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,7 +41,11 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 		fake.requireAuthHeaders(t, r)
 
 		if fake.createUserStatus != http.StatusOK {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(fake.createUserStatus)
+			if fake.createUserBody != "" {
+				_, _ = w.Write([]byte(fake.createUserBody))
+			}
 			return
 		}
 
@@ -113,12 +118,13 @@ func TestAdminClientCreateUserHappyPath(t *testing.T) {
 func TestAdminClientCreateUserDuplicateEmail(t *testing.T) {
 	t.Parallel()
 
-	for _, status := range []int{http.StatusConflict, http.StatusUnprocessableEntity} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
+	for _, errorCode := range []string{"email_exists", "user_already_exists"} {
+		t.Run(errorCode, func(t *testing.T) {
 			t.Parallel()
 
 			fake := newFakeAdminServer(t)
-			fake.createUserStatus = status
+			fake.createUserStatus = http.StatusUnprocessableEntity
+			fake.createUserBody = fmt.Sprintf(`{"code":422,"error_code":%q,"msg":"A user with this email address has already been registered"}`, errorCode)
 			server := httptest.NewServer(fake.mux)
 			t.Cleanup(server.Close)
 
@@ -130,6 +136,31 @@ func TestAdminClientCreateUserDuplicateEmail(t *testing.T) {
 				t.Fatalf("CreateUser() error = %v, want %v", err, domain.ErrEmailEnUso)
 			}
 		})
+	}
+}
+
+// TestAdminClientCreateUserWeakPasswordIsNotDuplicateEmail guards against
+// mapping every 422 to ErrEmailEnUso: GoTrue also returns 422 for a weak
+// password, which must surface as a distinct, generic error instead of
+// telling the caller the email is already registered.
+func TestAdminClientCreateUserWeakPasswordIsNotDuplicateEmail(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.createUserStatus = http.StatusUnprocessableEntity
+	fake.createUserBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
+
+	if err == nil {
+		t.Fatal("CreateUser() error = nil, want error for a weak password")
+	}
+	if errors.Is(err, domain.ErrEmailEnUso) {
+		t.Fatalf("CreateUser() error = %v, want a generic error, not %v", err, domain.ErrEmailEnUso)
 	}
 }
 
