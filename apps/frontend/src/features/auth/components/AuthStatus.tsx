@@ -1,5 +1,6 @@
 import { useAuth } from 'react-oidc-context'
 import { Button } from '../../../shared/ui/button'
+import { resolveDisplayName } from '../lib/resolveDisplayName'
 
 export default function AuthStatus() {
   const auth = useAuth()
@@ -20,8 +21,7 @@ export default function AuthStatus() {
   }
 
   if (auth.isAuthenticated) {
-    const displayName =
-      auth.user?.profile.preferred_username ?? auth.user?.profile.name ?? auth.user?.profile.email
+    const displayName = resolveDisplayName(auth.user?.profile)
 
     return (
       <div className="flex items-center gap-3 text-sm">
