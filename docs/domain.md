@@ -27,6 +27,10 @@ se organiza el código de cada funcionalidad.
   impuesto municipal, impuesto provincial, cargo de inmobiliaria y otros.
 - **Usuario**: cuenta interna con rol y loteos asignados. Creado por el
   administrador (excepto el propio administrador).
+- **Inmobiliaria**: agencia externa (nombre, contacto) asociada a uno o más
+  loteos; se referencia desde Reserva y Venta como inmobiliaria
+  interviniente/referente. Es una entidad propia, distinta del rol de
+  usuario **Inmobiliaria** (ver [Usuarios y roles](#usuarios-y-roles)).
 
 ## Alta y visualización de un loteo
 
@@ -44,6 +48,18 @@ se organiza el código de cada funcionalidad.
 7. Carga de datos por lote (clic sobre el lote): precio, superficie,
    características.
 8. Carga de datos por manzana: hasta 4 calles que la rodean.
+9. Documentación legal del loteo (escrituras, certificaciones, poderes,
+   cartas documento) se carga y consulta desde esta misma vista, a cargo del
+   escribano asignado. No existe una sección de menú separada para esto; el
+   detalle de esta funcionalidad queda para una futura iteración.
+
+## Inmobiliarias
+
+Alta y gestión de inmobiliarias (agencias externas) asociadas a los loteos,
+desde el módulo **Inmobiliaria**. Se usan para completar el campo
+"inmobiliaria interviniente/referente" en [Reservas](#reservas) y
+[Venta](#venta). Campos y permisos de alta a definir en una futura
+iteración; el módulo está en construcción.
 
 ## Usuarios y roles
 
