@@ -36,6 +36,9 @@ jobs:
         run: pnpm --filter @loteos/frontend lint
 
       - name: Frontend build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         run: pnpm --filter @loteos/frontend build
 
       - uses: actions/setup-go@v5
