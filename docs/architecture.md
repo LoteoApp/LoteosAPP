@@ -188,10 +188,19 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ```text
 apps/frontend/src/
 ├── app/
-│   ├── App.tsx
-│   ├── router.tsx              # Cuando existan varias rutas
+│   ├── router.tsx
+│   ├── AppLayout.tsx           # Sidebar + header + área de contenido
+│   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
+│   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Keycloak
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
+│   ├── auth/
+│   │   ├── components/
+│   │   │   ├── AppAuthProvider.tsx
+│   │   │   ├── AuthStatus.tsx
+│   │   │   └── RequireAuth.tsx # Guarda las rutas protegidas del router
+│   │   └── config/
+│   │       └── oidc-config.ts
 │   ├── system-status/
 │   │   ├── api/
 │   │   │   └── get-system-info.ts
@@ -199,6 +208,8 @@ apps/frontend/src/
 │   │   │   └── DatabaseStatus.tsx
 │   │   ├── hooks/
 │   │   │   └── use-system-info.ts
+│   │   ├── pages/
+│   │   │   └── MonitorPage.tsx # Diagnóstico del entorno, en /monitor
 │   │   └── types.ts
 │   └── lots/                   # Ejemplo de funcionalidad futura
 │       ├── api/
