@@ -1,29 +1,17 @@
-import { useEffect, type ReactNode } from 'react'
-import { useAuth } from 'react-oidc-context'
+import type { ReactNode } from 'react'
+import { Navigate, useLocation } from 'react-router'
+import { useAuth } from '../hooks/use-auth'
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
-  const auth = useAuth()
+  const { isLoading, session } = useAuth()
+  const location = useLocation()
 
-  useEffect(() => {
-    if (!auth.isLoading && !auth.isAuthenticated && !auth.error) {
-      auth.signinRedirect()
-    }
-  }, [auth])
-
-  if (auth.error) {
-    return (
-      <p className="p-6 text-sm text-destructive" role="alert">
-        No se pudo validar la sesión: {auth.error.message}
-      </p>
-    )
-  }
-
-  if (auth.isLoading) {
+  if (isLoading) {
     return <p className="p-6 text-sm text-muted-foreground">Verificando sesión...</p>
   }
 
-  if (!auth.isAuthenticated) {
-    return <p className="p-6 text-sm text-muted-foreground">Redirigiendo al inicio de sesión...</p>
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 
   return children

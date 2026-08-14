@@ -130,9 +130,13 @@ mano en ese realm.
 Desde ahí hay que cambiar al realm `loteosapp` (selector arriba a la
 izquierda) para ver los clients y roles importados.
 
-### Crear un usuario para probar el login
+### Crear un usuario de Keycloak para probar la API
 
-El realm no trae usuarios cargados. Para probar el flujo de login:
+El login de la app ya no pasa por Keycloak (ver [Backend y
+frontend](#backend-y-frontend) más abajo). Un usuario del realm sirve
+únicamente para obtener un token con el que llamar al backend a mano, hasta
+que [#103](https://github.com/LoteoApp/LoteosAPP/issues/103) corte la
+validación a Supabase. El realm no trae usuarios cargados:
 
 1. Consola admin → realm `loteosapp` → **Users** → **Add user**.
 2. Cargar username/email → **Create**.
@@ -143,21 +147,36 @@ El realm no trae usuarios cargados. Para probar el flujo de login:
 
 ### Backend y frontend
 
-El backend valida los tokens que emite Keycloak (JWKS del realm) vía
+El backend todavía valida los tokens que emite Keycloak (JWKS del realm) vía
 `KEYCLOAK_ISSUER`/`KEYCLOAK_AUDIENCE`; ver [Variables de
-entorno](#variables-de-entorno) más abajo. El login/logout del frontend usa
-el cliente `supabase-js` (`AppAuthProvider`, `VITE_SUPABASE_URL`/
-`VITE_SUPABASE_ANON_KEY`) contra el proyecto de Supabase. La migración de
-`RequireAuth`/`AuthStatus` y demás consumidores de sesión a Supabase está en
-curso (épica #100); hasta que se complete, esos componentes siguen
-integrados contra `react-oidc-context`.
+entorno](#variables-de-entorno) más abajo. El corte del backend a Supabase es
+la tarea [#103](https://github.com/LoteoApp/LoteosAPP/issues/103).
+
+El frontend ya está enteramente sobre Supabase: `AppAuthProvider`
+(`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`) publica la sesión en un
+`AuthContext`, y `RequireAuth`, `AuthStatus` y `UserMenu` la consumen desde
+`features/auth/hooks/use-auth.ts`. Como Supabase no tiene pantalla de login
+hosteada, el ingreso es un formulario propio de email y contraseña en `/login`;
+`RequireAuth` manda ahí a quien no tenga sesión y recuerda la ruta pedida para
+volver después del ingreso.
+
+### Crear un usuario de Supabase para probar el login
+
+Dashboard de Supabase → **Authentication > Users** → **Add user > Create new
+user**, con **Auto Confirm User** activado. Ese usuario ya puede ingresar por
+`/login`. El alta desde el backend (`AdminClient.CreateUser`) genera además una
+contraseña temporal y guarda el rol de dominio en `app_metadata.role`.
 
 ## Supabase (en migración desde Keycloak)
 
-Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). Por ahora solo
-existe el proyecto y las credenciales; el driver de backend, el frontend y
-`compose.yaml` todavía usan Keycloak (tareas
-[#102](https://github.com/LoteoApp/LoteosAPP/issues/102)-[#108](https://github.com/LoteoApp/LoteosAPP/issues/108)).
+Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). El frontend ya
+usa Supabase de punta a punta y el driver de backend existe
+(`internal/infrastructure/auth/supabase`) pero todavía no está cableado;
+`compose.yaml` y el backend siguen levantando Keycloak (tareas
+[#102](https://github.com/LoteoApp/LoteosAPP/issues/102),
+[#103](https://github.com/LoteoApp/LoteosAPP/issues/103),
+[#105](https://github.com/LoteoApp/LoteosAPP/issues/105) y
+[#108](https://github.com/LoteoApp/LoteosAPP/issues/108)).
 
 - **Proyecto**: `https://iahqjtpzkntzxoiykhjg.supabase.co` (entorno de
   desarrollo), creado con una cuenta Gmail dedicada al proyecto.
@@ -172,6 +191,19 @@ existe el proyecto y las credenciales; el driver de backend, el frontend y
   `.env.example` para las claves esperadas). Para CI/producción, cuando
   aplique, van como secrets de GitHub Actions (ver
   [ci.md](ci.md#secretos-y-credenciales)), no en `compose.yaml`.
+- **Frontend fuera de Compose**: el `.env` de la raíz alcanza para
+  `docker compose up`, que mapea `SUPABASE_URL`/`SUPABASE_ANON_KEY` a las
+  `VITE_*` que lee Vite. Corriendo `pnpm --filter @loteos/frontend dev` por
+  separado ese mapeo no existe, así que hace falta un `apps/frontend/.env`
+  (también gitignorado) con los nombres ya prefijados:
+
+  ```text
+  VITE_SUPABASE_URL=...
+  VITE_SUPABASE_ANON_KEY=...
+  ```
+
+  Sin `VITE_SUPABASE_ANON_KEY` el cliente arranca con la clave vacía y todo
+  intento de login falla.
 - **Acceso al proyecto**: invitar como miembro de la organización de
   Supabase en vez de compartir la contraseña de la cuenta Gmail.
 

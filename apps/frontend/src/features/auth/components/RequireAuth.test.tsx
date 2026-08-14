@@ -1,82 +1,76 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useAuth } from 'react-oidc-context'
+import { createMemoryRouter, RouterProvider, useLocation } from 'react-router'
+import type { Session } from '@supabase/supabase-js'
 import RequireAuth from './RequireAuth'
+import { AuthContext, type AuthContextValue } from '../hooks/use-auth'
 
-vi.mock('react-oidc-context', () => ({
-  useAuth: vi.fn(),
-}))
+function LoginScreen() {
+  const location = useLocation()
+  const from = (location.state as { from?: string } | null)?.from
 
-const useAuthMock = vi.mocked(useAuth)
+  return <p>Inicio de sesión desde {from ?? 'ninguna ruta'}</p>
+}
+
+function renderProtectedRoute(auth: Partial<AuthContextValue>) {
+  const value: AuthContextValue = {
+    isLoading: false,
+    session: null,
+    user: null,
+    error: null,
+    login: vi.fn(),
+    logout: vi.fn(),
+    ...auth,
+  }
+
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/lotes',
+        element: (
+          <RequireAuth>
+            <p>Contenido protegido</p>
+          </RequireAuth>
+        ),
+      },
+      { path: '/login', element: <LoginScreen /> },
+    ],
+    { initialEntries: ['/lotes'] },
+  )
+
+  return render(
+    <AuthContext.Provider value={value}>
+      <RouterProvider router={router} />
+    </AuthContext.Provider>,
+  )
+}
 
 describe('RequireAuth', () => {
   it('shows a loading message while the session is being verified', () => {
-    useAuthMock.mockReturnValue({
-      isLoading: true,
-      isAuthenticated: false,
-    } as unknown as ReturnType<typeof useAuth>)
-
-    render(
-      <RequireAuth>
-        <p>Contenido protegido</p>
-      </RequireAuth>,
-    )
+    renderProtectedRoute({ isLoading: true })
 
     expect(screen.getByText('Verificando sesión...')).toBeInTheDocument()
     expect(screen.queryByText('Contenido protegido')).not.toBeInTheDocument()
   })
 
-  it('redirects to sign-in when there is no session', () => {
-    const signinRedirect = vi.fn()
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      isAuthenticated: false,
-      error: undefined,
-      signinRedirect,
-    } as unknown as ReturnType<typeof useAuth>)
+  it('sends the visitor to the login page when there is no session', async () => {
+    renderProtectedRoute({ session: null })
 
-    render(
-      <RequireAuth>
-        <p>Contenido protegido</p>
-      </RequireAuth>,
-    )
-
-    expect(signinRedirect).toHaveBeenCalledOnce()
-    expect(screen.getByText('Redirigiendo al inicio de sesión...')).toBeInTheDocument()
+    expect(await screen.findByText(/Inicio de sesión/)).toBeInTheDocument()
+    expect(screen.queryByText('Contenido protegido')).not.toBeInTheDocument()
   })
 
-  it('renders the protected content once authenticated', () => {
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      isAuthenticated: true,
-      error: undefined,
-    } as unknown as ReturnType<typeof useAuth>)
+  it('remembers the requested route so the login page can return to it', async () => {
+    renderProtectedRoute({ session: null })
 
-    render(
-      <RequireAuth>
-        <p>Contenido protegido</p>
-      </RequireAuth>,
-    )
+    expect(
+      await screen.findByText('Inicio de sesión desde /lotes'),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the protected content once there is a session', () => {
+    renderProtectedRoute({ session: {} as Session })
 
     expect(screen.getByText('Contenido protegido')).toBeInTheDocument()
-  })
-
-  it('shows an error instead of redirecting when the session check fails', () => {
-    const signinRedirect = vi.fn()
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      isAuthenticated: false,
-      error: new Error('jwks no disponible'),
-      signinRedirect,
-    } as unknown as ReturnType<typeof useAuth>)
-
-    render(
-      <RequireAuth>
-        <p>Contenido protegido</p>
-      </RequireAuth>,
-    )
-
-    expect(screen.getByRole('alert')).toHaveTextContent('jwks no disponible')
-    expect(signinRedirect).not.toHaveBeenCalled()
   })
 })

@@ -1,15 +1,25 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { useAuth } from 'react-oidc-context'
+import { describe, expect, it, vi } from 'vitest'
+import type { User } from '@supabase/supabase-js'
 import AppLayout from './AppLayout'
+import {
+  AuthContext,
+  type AuthContextValue,
+} from '../features/auth/hooks/use-auth'
 
-vi.mock('react-oidc-context', () => ({
-  useAuth: vi.fn(),
-}))
-
-const useAuthMock = vi.mocked(useAuth)
+const authValue: AuthContextValue = {
+  isLoading: false,
+  session: null,
+  user: {
+    email: 'leonel@loteosapp.com',
+    user_metadata: { full_name: 'Leonel Zorzoli' },
+  } as unknown as User,
+  error: null,
+  login: vi.fn(),
+  logout: vi.fn().mockResolvedValue(undefined),
+}
 
 const sectionLabels = [
   'Lotes',
@@ -20,18 +30,6 @@ const sectionLabels = [
   'Usuarios',
   'Inmobiliaria',
 ]
-
-beforeEach(() => {
-  useAuthMock.mockReturnValue({
-    signoutRedirect: vi.fn(),
-    user: {
-      profile: {
-        preferred_username: 'lzorzoli',
-        email: 'leonel@loteosapp.com',
-      },
-    },
-  } as unknown as ReturnType<typeof useAuth>)
-})
 
 function stubDesktopMatchMedia(initialMatches = true) {
   const listeners = new Set<(event: { matches: boolean }) => void>()
@@ -76,7 +74,11 @@ function renderLayoutAt(path: string) {
     { initialEntries: [path] },
   )
 
-  return render(<RouterProvider router={router} />)
+  return render(
+    <AuthContext.Provider value={authValue}>
+      <RouterProvider router={router} />
+    </AuthContext.Provider>,
+  )
 }
 
 describe('AppLayout', () => {

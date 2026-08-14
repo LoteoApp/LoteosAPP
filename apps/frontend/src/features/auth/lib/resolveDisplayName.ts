@@ -1,12 +1,15 @@
-import type { UserProfile } from 'oidc-client-ts'
+type DisplayNameSource = {
+  email?: string | null
+  user_metadata?: { full_name?: string | null } | null
+}
 
 export function resolveDisplayName(
-  profile: Pick<UserProfile, 'preferred_username' | 'name' | 'email'> | undefined,
+  user: DisplayNameSource | null | undefined,
   fallback = '',
 ): string {
   return (
-    [profile?.preferred_username, profile?.name, profile?.email].find(
-      (value) => !!value,
+    [user?.user_metadata?.full_name, user?.email].find(
+      (value): value is string => typeof value === 'string' && value !== '',
     ) ?? fallback
   )
 }
