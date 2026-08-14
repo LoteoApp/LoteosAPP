@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 
 @theme inline {
+  --breakpoint-md: 48rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
