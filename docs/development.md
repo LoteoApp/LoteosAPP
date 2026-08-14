@@ -152,6 +152,29 @@ el cliente `supabase-js` (`AppAuthProvider`, `VITE_SUPABASE_URL`/
 curso (épica #100); hasta que se complete, esos componentes siguen
 integrados contra `react-oidc-context`.
 
+## Supabase (en migración desde Keycloak)
+
+Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). Por ahora solo
+existe el proyecto y las credenciales; el driver de backend, el frontend y
+`compose.yaml` todavía usan Keycloak (tareas
+[#102](https://github.com/LoteoApp/LoteosAPP/issues/102)-[#108](https://github.com/LoteoApp/LoteosAPP/issues/108)).
+
+- **Proyecto**: `https://iahqjtpzkntzxoiykhjg.supabase.co` (entorno de
+  desarrollo), creado con una cuenta Gmail dedicada al proyecto.
+- **Claves**:
+  - `anon`/`publishable`: pensada para el cliente, no es secreta. Se guarda
+    igual en `.env` local (gitignorado) en vez de hardcodearla en el repo.
+  - `service_role`: bypassea RLS, es secreta. Se obtiene manualmente desde
+    el dashboard de Supabase (**Project Settings > API keys**) — no se expone
+    vía MCP a propósito. Nunca se commitea ni se pega en docs/chat; solo vive
+    en el `.env` local de quien la necesite.
+- **Dónde se guardan**: `.env` en la raíz del repo (gitignorado, ver
+  `.env.example` para las claves esperadas). Para CI/producción, cuando
+  aplique, van como secrets de GitHub Actions (ver
+  [ci.md](ci.md#secretos-y-credenciales)), no en `compose.yaml`.
+- **Acceso al proyecto**: invitar como miembro de la organización de
+  Supabase en vez de compartir la contraseña de la cuenta Gmail.
+
 ## Variables de entorno
 
 Compose usa estos valores por defecto:
