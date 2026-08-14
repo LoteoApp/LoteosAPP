@@ -42,12 +42,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
       PORT: 8080
       FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
-      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8081}/realms/${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_JWKS_BASE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_AUDIENCE: ${KEYCLOAK_BACKEND_CLIENT:-loteosapp-backend}
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-loteosapp-backend-dev-secret}
+      VITE_SUPABASE_URL: ${SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -63,8 +59,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      keycloak:
-        condition: service_healthy
 
   frontend:
     build:
@@ -74,9 +68,6 @@ services:
     command: ["pnpm", "--filter", "@loteos/frontend", "dev", "--host", "0.0.0.0"]
     environment:
       VITE_API_URL: http://localhost:${BACKEND_PORT:-8080}
-      VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_PORT:-8081}
-      VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
-      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT:-loteosapp-frontend}
       VITE_SUPABASE_URL: ${SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     ports:
@@ -89,49 +80,8 @@ services:
       backend:
         condition: service_healthy
 
-  keycloak-db:
-    image: postgres:18-alpine
-    environment:
-      POSTGRES_DB: ${KEYCLOAK_DB:-keycloak}
-      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
-    volumes:
-      - keycloak_postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -q -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB:-keycloak}"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 5s
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.5.2
-    command: ["start-dev", "--import-realm"]
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB:-keycloak}
-      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      KC_HEALTH_ENABLED: "true"
-      KC_HOSTNAME: localhost
-    ports:
-      - "${KEYCLOAK_PORT:-8081}:8080"
-    volumes:
-      - ./keycloak/realm-loteosapp.json:/opt/keycloak/data/import/realm-loteosapp.json:ro
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.0 200' <&3"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-    depends_on:
-      keycloak-db:
-        condition: service_healthy
 
 volumes:
   frontend_app_node_modules:
   frontend_node_modules:
   postgres_data:
-  keycloak_postgres_data:
