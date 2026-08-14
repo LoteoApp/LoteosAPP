@@ -77,6 +77,8 @@ services:
       VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_PORT:-8081}
       VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
       VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT:-loteosapp-frontend}
+      VITE_SUPABASE_URL: ${SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:

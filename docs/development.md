@@ -146,8 +146,34 @@ El realm no trae usuarios cargados. Para probar el flujo de login:
 El backend valida los tokens que emite Keycloak (JWKS del realm) vía
 `KEYCLOAK_ISSUER`/`KEYCLOAK_AUDIENCE`; ver [Variables de
 entorno](#variables-de-entorno) más abajo. El login/logout del frontend usa
-`react-oidc-context` contra el client `loteosapp-frontend`
-(`VITE_KEYCLOAK_URL`/`VITE_KEYCLOAK_REALM`/`VITE_KEYCLOAK_CLIENT_ID`).
+el cliente `supabase-js` (`AppAuthProvider`, `VITE_SUPABASE_URL`/
+`VITE_SUPABASE_ANON_KEY`) contra el proyecto de Supabase. La migración de
+`RequireAuth`/`AuthStatus` y demás consumidores de sesión a Supabase está en
+curso (épica #100); hasta que se complete, esos componentes siguen
+integrados contra `react-oidc-context`.
+
+## Supabase (en migración desde Keycloak)
+
+Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). Por ahora solo
+existe el proyecto y las credenciales; el driver de backend, el frontend y
+`compose.yaml` todavía usan Keycloak (tareas
+[#102](https://github.com/LoteoApp/LoteosAPP/issues/102)-[#108](https://github.com/LoteoApp/LoteosAPP/issues/108)).
+
+- **Proyecto**: `https://iahqjtpzkntzxoiykhjg.supabase.co` (entorno de
+  desarrollo), creado con una cuenta Gmail dedicada al proyecto.
+- **Claves**:
+  - `anon`/`publishable`: pensada para el cliente, no es secreta. Se guarda
+    igual en `.env` local (gitignorado) en vez de hardcodearla en el repo.
+  - `service_role`: bypassea RLS, es secreta. Se obtiene manualmente desde
+    el dashboard de Supabase (**Project Settings > API keys**) — no se expone
+    vía MCP a propósito. Nunca se commitea ni se pega en docs/chat; solo vive
+    en el `.env` local de quien la necesite.
+- **Dónde se guardan**: `.env` en la raíz del repo (gitignorado, ver
+  `.env.example` para las claves esperadas). Para CI/producción, cuando
+  aplique, van como secrets de GitHub Actions (ver
+  [ci.md](ci.md#secretos-y-credenciales)), no en `compose.yaml`.
+- **Acceso al proyecto**: invitar como miembro de la organización de
+  Supabase en vez de compartir la contraseña de la cuenta Gmail.
 
 ## Variables de entorno
 
@@ -185,14 +211,22 @@ KEYCLOAK_REALM=loteosapp
 KEYCLOAK_CLIENT_SECRET=loteosapp-backend-dev-secret
 ```
 
-El frontend, al correr en el navegador, necesita la URL de Keycloak
-publicada en el host en lugar del nombre interno del servicio:
+El frontend, al correr en el navegador, necesita la URL y la clave pública
+(publishable) del proyecto de Supabase:
 
 ```text
-VITE_KEYCLOAK_URL=http://localhost:8081
-VITE_KEYCLOAK_REALM=loteosapp
-VITE_KEYCLOAK_CLIENT_ID=loteosapp-frontend
+VITE_SUPABASE_URL=https://<proyecto>.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
 ```
+
+Usar la clave `sb_publishable_...` (Project Settings → API Keys), no la
+legacy `anon` en formato JWT: la legacy comparte el JWT secret del proyecto
+con la `service_role`, así que rotarla obliga a rotar también la
+`service_role`; la publishable rota de forma independiente. `VITE_SUPABASE_ANON_KEY`
+es obligatoria en un build de producción (`env.ts` tira error si falta).
+Estos valores no tienen un default de Compose (dependen del proyecto de
+Supabase de cada entorno); se toman de `SUPABASE_URL`/`SUPABASE_ANON_KEY` en
+el `.env` local (épica #100).
 
 El backend recibe internamente esta conexión a PostgreSQL:
 
