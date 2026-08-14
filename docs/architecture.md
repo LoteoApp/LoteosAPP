@@ -109,6 +109,13 @@ vacíos antes de que exista una funcionalidad que los necesite.
   token. También implementa `gateway.IdentityProvider` contra la Admin REST
   API de Keycloak (alta/baja de usuarios, asignación de rol de realm),
   autenticándose con las credenciales de servicio del client del backend.
+- `internal/infrastructure/auth/supabase`: adaptador equivalente para
+  Supabase Auth, construido durante la migración documentada en la épica
+  #100. Valida el JWT contra el JWKS del proyecto y expone el rol de dominio
+  leído de `app_metadata.role`. Implementa `gateway.IdentityProvider` contra
+  la Admin REST API de Supabase, autenticándose con la `service_role` key.
+  Todavía no está conectado a `dependencies` ni a `middleware`; coexiste sin
+  cablear hasta el corte que reemplace a `keycloak`.
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/keycloak` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
@@ -188,10 +195,19 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ```text
 apps/frontend/src/
 ├── app/
-│   ├── App.tsx
-│   ├── router.tsx              # Cuando existan varias rutas
+│   ├── router.tsx
+│   ├── AppLayout.tsx           # Sidebar + header + área de contenido
+│   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
+│   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Keycloak
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
+│   ├── auth/
+│   │   ├── components/
+│   │   │   ├── AppAuthProvider.tsx
+│   │   │   ├── AuthStatus.tsx
+│   │   │   └── RequireAuth.tsx # Guarda las rutas protegidas del router
+│   │   └── config/
+│   │       └── oidc-config.ts
 │   ├── system-status/
 │   │   ├── api/
 │   │   │   └── get-system-info.ts
@@ -199,6 +215,8 @@ apps/frontend/src/
 │   │   │   └── DatabaseStatus.tsx
 │   │   ├── hooks/
 │   │   │   └── use-system-info.ts
+│   │   ├── pages/
+│   │   │   └── MonitorPage.tsx # Diagnóstico del entorno, en /monitor
 │   │   └── types.ts
 │   └── lots/                   # Ejemplo de funcionalidad futura
 │       ├── api/

@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import LegalPage from './LegalPage'
+import AgenciesPage from './AgenciesPage'
 
-describe('LegalPage', () => {
+describe('AgenciesPage', () => {
   it('renders the section heading', () => {
-    render(<LegalPage />)
+    render(<AgenciesPage />)
 
     expect(
-      screen.getByRole('heading', { name: 'Documentación legal' }),
+      screen.getByRole('heading', { name: 'Inmobiliaria' }),
     ).toBeInTheDocument()
   })
 })
