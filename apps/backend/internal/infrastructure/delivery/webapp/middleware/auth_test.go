@@ -9,24 +9,24 @@ import (
 	"reflect"
 	"testing"
 
-	"loteosapp/backend/internal/infrastructure/auth/keycloak"
+	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
 )
 
 type verifierStub struct {
-	principal keycloak.Principal
+	principal supabase.Principal
 	err       error
 }
 
-func (stub verifierStub) Verify(context.Context, string) (keycloak.Principal, error) {
+func (stub verifierStub) Verify(context.Context, string) (supabase.Principal, error) {
 	return stub.principal, stub.err
 }
 
 func TestRequireAuth(t *testing.T) {
 	t.Parallel()
 
-	wantPrincipal := keycloak.Principal{Subject: "user-123", Roles: []string{"administrador"}}
+	wantPrincipal := supabase.Principal{Subject: "user-123", Roles: []string{"administrador"}}
 
 	tests := []struct {
 		name           string
@@ -69,7 +69,7 @@ func TestRequireAuth(t *testing.T) {
 			t.Parallel()
 
 			nextCalled := false
-			var gotPrincipal keycloak.Principal
+			var gotPrincipal supabase.Principal
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 				gotPrincipal, _ = middleware.PrincipalFromContext(r.Context())
