@@ -93,7 +93,7 @@ describe('UserMenu', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('still closes the menu when signing out fails', async () => {
+  it('keeps the menu open and shows an error when signing out fails', async () => {
     renderUserMenu({
       logout: vi.fn().mockRejectedValue(new Error('sesión ya cerrada')),
     })
@@ -105,8 +105,11 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Cerrar sesión' }))
 
     expect(
-      screen.queryByRole('menuitem', { name: 'Cerrar sesión' }),
-    ).not.toBeInTheDocument()
+      screen.getByRole('menuitem', { name: 'Cerrar sesión' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('alert'),
+    ).toHaveTextContent('No se pudo cerrar sesión: sesión ya cerrada')
   })
 
   it('closes the menu when clicking outside of it', async () => {

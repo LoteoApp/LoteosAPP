@@ -6,6 +6,7 @@ import { resolveDisplayName } from '../features/auth/lib/resolveDisplayName'
 export default function UserMenu() {
   const { user, logout } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,9 +36,18 @@ export default function UserMenu() {
   const displayName = resolveDisplayName(user, 'Usuario')
   const email = user?.email
 
-  function handleSignOut() {
-    setIsOpen(false)
-    logout().catch(() => {})
+  async function handleSignOut() {
+    setSignOutError(null)
+    try {
+      await logout()
+      setIsOpen(false)
+    } catch (error) {
+      setSignOutError(
+        error instanceof Error
+          ? `No se pudo cerrar sesión: ${error.message}`
+          : 'No se pudo cerrar sesión. Probá de nuevo.',
+      )
+    }
   }
 
   return (
@@ -80,11 +90,21 @@ export default function UserMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={handleSignOut}
+            onClick={() => {
+              handleSignOut().catch(() => {})
+            }}
             className="block w-full px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground"
           >
             Cerrar sesión
           </button>
+          {signOutError && (
+            <p
+              role="alert"
+              className="px-3 py-2 text-xs text-destructive"
+            >
+              {signOutError}
+            </p>
+          )}
         </div>
       )}
     </div>
