@@ -294,6 +294,64 @@ app → features → shared
 - Antes de dar por terminado un componente nuevo, probarlo al menos en un
   viewport angosto (~375px de ancho) además del tamaño de escritorio.
 
+### Seguridad del frontend
+
+`supabase-js` guarda la sesión (access y refresh token) en `localStorage`.
+Sin ninguna mitigación, un XSS en el frontend puede leer esos tokens
+directamente vía JS y obtener una sesión completa. Como capa de defensa en
+profundidad, un `<meta http-equiv="Content-Security-Policy">` inyectado en
+build time restringe de dónde puede cargar scripts/estilos/conexiones la
+app.
+
+La política la arma `apps/frontend/vite-plugins/content-security-policy.ts`
+(función pura `buildContentSecurityPolicy`, con test unitario al lado) y la
+inyecta un plugin de Vite vía el hook `transformIndexHtml` — no vive escrita
+a mano en `index.html`, para que no se pueda desincronizar del resto de la
+configuración:
+
+```text
+default-src 'self';
+script-src 'self';
+style-src 'self' ['unsafe-inline' solo en dev];
+img-src 'self' data:;
+font-src 'self';
+connect-src 'self' <VITE_SUPABASE_URL exacta> <VITE_API_URL exacta>;
+base-uri 'self';
+form-action 'self';
+object-src 'none';
+```
+
+- Va por `<meta>` porque hoy no existe ningún servidor de producción para el
+  frontend (no hay `Dockerfile` de prod, ni nginx, ni `vite preview` en uso;
+  solo `vite dev` en desarrollo) — no hay dónde emitir un header HTTP
+  todavía.
+- `connect-src` usa los orígenes **exactos** de `VITE_SUPABASE_URL` y
+  `VITE_API_URL` (los mismos defaults que `shared/config/env.ts`, vía
+  `shared/config/env-defaults.ts` — una sola fuente de verdad). No hay
+  wildcard `*.supabase.co`: cualquiera puede crear un proyecto Supabase
+  gratis en ese dominio, así que un wildcard habilitaría exfiltrar la
+  sesión del `localStorage` a un proyecto ajeno — exactamente lo que esta
+  política busca evitar.
+- `style-src` relaja a `'unsafe-inline'` únicamente en dev (`command ===
+  'serve'`): Vite inyecta el CSS de Tailwind como un `<style>` inline para
+  el hot-reload. En el build de producción el CSS sale a un archivo
+  externo (`<link rel="stylesheet">`), así que la excepción no aplica y
+  queda excluida.
+- `script-src` no necesita ninguna excepción en ningún entorno: la app solo
+  carga scripts externos (`<script type="module" src="...">`), tanto en dev
+  (`@vite/client`) como en el bundle de producción.
+- Como el placeholder ya no depende de que Vite reemplace `%VAR%` en HTML
+  estático, no hay forma de que quede sin resolver: la función siempre
+  recibe un valor (el de la variable de entorno o el default de
+  `env-defaults.ts`).
+- **Falta `frame-ancestors`** (y `report-uri`/`report-to`/`sandbox`): el
+  spec de CSP ignora esas directivas cuando la política llega por `<meta>`
+  en vez de header HTTP. Junto con `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy` y HSTS, quedan pendientes para
+  cuando exista un servidor de producción real que pueda emitir headers —
+  no se agrega ese servidor solo para esto, sería infraestructura
+  anticipada sin que el hosting esté decidido.
+
 ## Reglas comunes
 
 - Usar el mismo vocabulario para una entidad en base de datos, backend,
