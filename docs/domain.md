@@ -7,10 +7,15 @@ se organiza el código de cada funcionalidad.
 
 ## Entidades principales
 
-- **Loteo**: nombre, ubicación, descripción, archivo DXF de origen.
-- **Manzana**: pertenece a un loteo; hasta 4 calles asociadas.
-- **Lote**: pertenece a una manzana; número (del DXF), precio, superficie,
-  características, estado.
+- **Loteo**: nombre, ubicación, descripción, archivo DXF de origen; límite
+  general como polígono (capa `LOTEO` del DXF).
+- **Manzana**: pertenece a un loteo; polígono (capa `MANZANA` del DXF);
+  hasta 4 calles asociadas.
+- **Lote**: pertenece a una manzana; polígono (capa `LOTES` del DXF); número
+  asignado manualmente en el sistema, precio, superficie, características,
+  estado.
+- **Calle**: pertenece a un loteo; polígono (capa `CALLE` del DXF); nombre
+  asignado manualmente en el sistema.
 - **Cliente**: nombre y apellido, DNI, celular, mail. No tiene acceso al
   sistema. Puede tener múltiples lotes en distintos estados (en compra, en
   financiación, finalizados).
@@ -32,9 +37,12 @@ se organiza el código de cada funcionalidad.
 1. Formulario inicial: nombre, ubicación, descripción breve.
 2. Carga opcional del archivo DXF (ver [Estructura del DXF](#estructura-requerida-del-archivo-dxf)).
 3. Carga opcional de fotos, planos u otra información complementaria.
-4. Del DXF se extraen los polígonos de manzanas y lotes junto con el número de
-   lote, usado para vincular información cargada después.
-5. Los nombres de calles no se extraen del DXF; se cargan manualmente tras
+4. El DXF se parsea en el frontend al momento de la carga: se extraen los
+   polígonos de loteo, manzanas, lotes y calles (capas `LOTEO`, `MANZANA`,
+   `LOTES` y `CALLE`) y se envían al backend junto con el archivo original.
+   El backend no parsea el DXF; solo valida y persiste la geometría recibida.
+5. Las capas son solo geometría, sin texto: el número de cada lote y el
+   nombre de cada calle no se extraen del DXF; se cargan manualmente tras
    visualizar el plano.
 6. Visualización con navegación por capas: loteo → manzana → lote.
 7. Carga de datos por lote (clic sobre el lote): precio, superficie,
@@ -143,16 +151,24 @@ stateDiagram-v2
 
 ## Estructura requerida del archivo DXF
 
-- Capa obligatoria: `MENSURA`, con la totalidad del loteo (manzanas y lotes).
-- Cada manzana y cada lote: polilínea cerrada e independiente, sin
-  interrupciones, superposiciones ni geometría abierta.
-- Múltiples polígonos: cada uno como poligonal cerrada individual.
-- El identificador de cada lote debe estar asociado gráficamente a su
-  polígono.
-- Las calles pueden representarse como espacios entre manzanas; sus nombres
-  se cargan manualmente en el sistema.
+- Cuatro capas obligatorias, cada una solo geometría (sin texto/etiquetas):
+  - `LOTEO`: límite general del loteo, como polígono cerrado único.
+  - `MANZANA`: cada manzana es una polilínea cerrada independiente.
+  - `LOTES`: cada lote/parcela es una polilínea cerrada independiente.
+  - `CALLE`: cada calle es una polilínea cerrada independiente.
+- Todos los polígonos (loteo, manzanas, lotes, calles): cerrados e
+  independientes, sin interrupciones, superposiciones ni geometría abierta.
+- Como las capas no traen texto, el número de cada lote y el nombre de cada
+  calle no se pueden asociar automáticamente al polígono; se asignan
+  manualmente en el sistema tras visualizar el plano.
 - Capas `MEJORA`, `LM`, `REMANENTE` o `PARCELARIO`: no obligatorias.
-- Solo se procesa la información de la capa `MENSURA`.
+- Solo se procesa la información de las capas `LOTEO`, `MANZANA`, `LOTES` y
+  `CALLE`. El parser acepta también las variantes en singular/plural
+  `MANZANAS`, `LOTE` y `CALLES`, ya que distintos agrimensores nombran las
+  capas de forma distinta.
+- El parseo del archivo ocurre en el frontend (no en el backend); el backend
+  recibe la geometría ya extraída, junto con el archivo DXF original para
+  almacenarlo como fuente.
 
 ### Georreferenciación
 
