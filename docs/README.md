@@ -17,6 +17,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
   mínimos, ubicación de tests y comandos para ejecutar las suites.
 - [Integración continua](ci.md): jobs del workflow de GitHub Actions, cuándo
   corre cada uno y su relación con la auditoría de dependencias.
+- [Secrets con Doppler](secrets.md): setup del CLI, cómo correr comandos con
+  secrets inyectados y cómo administrar valores por config.
 
 ## Regla de mantenimiento
 
