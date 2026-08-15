@@ -1,23 +1,35 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useAuth } from 'react-oidc-context'
+import { MemoryRouter } from 'react-router'
 import MonitorPage from './MonitorPage'
+import {
+  AuthContext,
+  type AuthContextValue,
+} from '../../auth/hooks/use-auth'
 
-vi.mock('react-oidc-context', () => ({
-  useAuth: vi.fn(),
-}))
-
-const useAuthMock = vi.mocked(useAuth)
+const authValue: AuthContextValue = {
+  isLoading: true,
+  session: null,
+  user: null,
+  error: null,
+  login: vi.fn(),
+  logout: vi.fn(),
+}
 
 describe('MonitorPage', () => {
   it('renders the environment diagnostic heading', () => {
-    useAuthMock.mockReturnValue({ isLoading: true } as ReturnType<typeof useAuth>)
     vi.stubGlobal(
       'fetch',
       vi.fn<typeof fetch>().mockReturnValue(new Promise(() => {})),
     )
 
-    render(<MonitorPage />)
+    render(
+      <AuthContext.Provider value={authValue}>
+        <MemoryRouter>
+          <MonitorPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
 
     expect(
       screen.getByRole('heading', { name: 'Diagnóstico del entorno' }),

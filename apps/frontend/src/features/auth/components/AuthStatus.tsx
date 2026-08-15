@@ -1,32 +1,37 @@
-import { useAuth } from 'react-oidc-context'
-import { Button } from '../../../shared/ui/button'
+import { Link } from 'react-router'
+import { Button, buttonVariants } from '../../../shared/ui/button'
+import { useAuth } from '../hooks/use-auth'
 import { resolveDisplayName } from '../lib/resolveDisplayName'
 
 export default function AuthStatus() {
-  const auth = useAuth()
+  const { isLoading, user, error, logout } = useAuth()
 
-  if (auth.isLoading) {
+  if (isLoading) {
     return <p className="text-sm text-muted-foreground">Verificando sesión...</p>
   }
 
-  if (auth.error) {
+  if (error) {
     return (
       <div className="flex items-center gap-3 text-sm text-destructive" role="alert">
-        <span>No se pudo validar la sesión: {auth.error.message}</span>
-        <Button type="button" variant="outline" onClick={() => auth.signinRedirect()}>
+        <span>No se pudo validar la sesión: {error.message}</span>
+        <Link to="/login" className={buttonVariants({ variant: 'outline' })}>
           Reintentar
-        </Button>
+        </Link>
       </div>
     )
   }
 
-  if (auth.isAuthenticated) {
-    const displayName = resolveDisplayName(auth.user?.profile)
-
+  if (user) {
     return (
       <div className="flex items-center gap-3 text-sm">
-        <span className="text-foreground">{displayName}</span>
-        <Button type="button" variant="outline" onClick={() => auth.signoutRedirect()}>
+        <span className="text-foreground">{resolveDisplayName(user)}</span>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            logout().catch(() => {})
+          }}
+        >
           Cerrar sesión
         </Button>
       </div>
@@ -34,8 +39,8 @@ export default function AuthStatus() {
   }
 
   return (
-    <Button type="button" onClick={() => auth.signinRedirect()}>
+    <Link to="/login" className={buttonVariants()}>
       Iniciar sesión
-    </Button>
+    </Link>
   )
 }

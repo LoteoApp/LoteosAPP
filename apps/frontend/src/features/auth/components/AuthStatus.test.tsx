@@ -1,71 +1,78 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { useAuth } from 'react-oidc-context'
+import { MemoryRouter } from 'react-router'
+import type { User } from '@supabase/supabase-js'
 import AuthStatus from './AuthStatus'
+import { AuthContext, type AuthContextValue } from '../hooks/use-auth'
 
-vi.mock('react-oidc-context', () => ({
-  useAuth: vi.fn(),
-}))
+function renderAuthStatus(auth: Partial<AuthContextValue>) {
+  const value: AuthContextValue = {
+    isLoading: false,
+    session: null,
+    user: null,
+    error: null,
+    login: vi.fn(),
+    logout: vi.fn().mockResolvedValue(undefined),
+    ...auth,
+  }
 
-const useAuthMock = vi.mocked(useAuth)
+  render(
+    <AuthContext.Provider value={value}>
+      <MemoryRouter>
+        <AuthStatus />
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  )
+
+  return value
+}
 
 describe('AuthStatus', () => {
   it('shows a loading message while the session is being verified', () => {
-    useAuthMock.mockReturnValue({ isLoading: true } as ReturnType<typeof useAuth>)
-
-    render(<AuthStatus />)
+    renderAuthStatus({ isLoading: true })
 
     expect(screen.getByText('Verificando sesión...')).toBeInTheDocument()
   })
 
-  it('lets the user retry sign-in after a session error', async () => {
-    const signinRedirect = vi.fn()
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      error: new Error('token inválido'),
-      signinRedirect,
-    } as unknown as ReturnType<typeof useAuth>)
-
-    render(<AuthStatus />)
+  it('lets the user retry from the login page after a session error', () => {
+    renderAuthStatus({ error: new Error('token inválido') })
 
     expect(screen.getByRole('alert')).toHaveTextContent('token inválido')
-    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
-
-    expect(signinRedirect).toHaveBeenCalledOnce()
+    expect(screen.getByRole('link', { name: 'Reintentar' })).toHaveAttribute(
+      'href',
+      '/login',
+    )
   })
 
   it('shows the signed-in user and logs out on click', async () => {
-    const signoutRedirect = vi.fn()
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      error: undefined,
-      isAuthenticated: true,
-      user: { profile: { preferred_username: 'lzapata' } },
-      signoutRedirect,
-    } as unknown as ReturnType<typeof useAuth>)
+    const { logout } = renderAuthStatus({
+      user: { email: 'lzapata@loteosapp.com' } as User,
+    })
 
-    render(<AuthStatus />)
-
-    expect(screen.getByText('lzapata')).toBeInTheDocument()
+    expect(screen.getByText('lzapata@loteosapp.com')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
 
-    expect(signoutRedirect).toHaveBeenCalledOnce()
+    expect(logout).toHaveBeenCalledOnce()
   })
 
-  it('offers to sign in when there is no session', async () => {
-    const signinRedirect = vi.fn()
-    useAuthMock.mockReturnValue({
-      isLoading: false,
-      error: undefined,
-      isAuthenticated: false,
-      signinRedirect,
-    } as unknown as ReturnType<typeof useAuth>)
+  it('keeps the session visible when logging out fails', async () => {
+    renderAuthStatus({
+      user: { email: 'lzapata@loteosapp.com' } as User,
+      logout: vi.fn().mockRejectedValue(new Error('sesión ya cerrada')),
+    })
 
-    render(<AuthStatus />)
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(screen.getByText('lzapata@loteosapp.com')).toBeInTheDocument()
+  })
 
-    expect(signinRedirect).toHaveBeenCalledOnce()
+  it('links to the login page when there is no session', () => {
+    renderAuthStatus({ user: null })
+
+    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute(
+      'href',
+      '/login',
+    )
   })
 })

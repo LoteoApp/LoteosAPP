@@ -198,7 +198,7 @@ apps/frontend/src/
 │   ├── router.tsx
 │   ├── AppLayout.tsx           # Sidebar + header + área de contenido
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
-│   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Keycloak
+│   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
 │   ├── auth/
@@ -206,8 +206,15 @@ apps/frontend/src/
 │   │   │   ├── AppAuthProvider.tsx
 │   │   │   ├── AuthStatus.tsx
 │   │   │   └── RequireAuth.tsx # Guarda las rutas protegidas del router
-│   │   └── config/
-│   │       └── oidc-config.ts
+│   │   ├── config/
+│   │   │   └── supabase-client.ts
+│   │   ├── hooks/
+│   │   │   └── use-auth.ts     # AuthContext con sesión, login y logout
+│   │   ├── lib/
+│   │   │   ├── describeAuthError.ts  # Traduce el error de Supabase al usuario
+│   │   │   └── resolveDisplayName.ts
+│   │   └── pages/
+│   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
 │   ├── system-status/
 │   │   ├── api/
 │   │   │   └── get-system-info.ts
