@@ -1,7 +1,14 @@
 import { Helper } from 'dxf'
-import type { DxfLayer, DxfPoint, DxfPolygon } from '../types'
+import type { DxfLayer, DxfParseResult, DxfPoint, DxfPolygon, DxfValidationIssue } from '../types'
+import { distance, isSimplePolygon, polygonsOverlap } from './polygonGeometry'
 
 const CLOSED_POLYGON_TYPES = new Set(['LWPOLYLINE', 'POLYLINE'])
+
+// Surveyors commonly close a ring by redrawing back to the start point
+// instead of ticking the CAD tool's "closed" flag (DXF group 70), so the
+// flag alone under-detects closed rings. Treat a gap this small (survey
+// precision, ~1cm) between the first and last vertex as closed too.
+const CLOSING_GAP_TOLERANCE = 0.01
 
 // Guards against pathologically large files (many entities to denormalise/tessellate).
 const MAX_DXF_LENGTH = 20_000_000
@@ -96,17 +103,53 @@ function toVertices(value: unknown): DxfPoint[] | null {
   return vertices
 }
 
-// toPolylines() closes rings by repeating the first vertex at the end;
+// toPolylines() closes rings by repeating the first vertex at the end (for
+// flag-closed entities) or the source file already redraws back to the
+// start point (for gap-closed ones, see CLOSING_GAP_TOLERANCE); either way,
 // drop that duplicate to keep each vertex represented once.
 function dedupeClosingVertex(vertices: DxfPoint[]): DxfPoint[] {
   if (vertices.length < 2) return vertices
   const first = vertices[0]
   const last = vertices[vertices.length - 1]
-  if (first.x === last.x && first.y === last.y) return vertices.slice(0, -1)
+  if (distance(first, last) <= CLOSING_GAP_TOLERANCE) return vertices.slice(0, -1)
   return vertices
 }
 
-export function parseDxf(fileContent: string): DxfPolygon[] {
+function isRingClosed(entityClosed: boolean, vertices: DxfPoint[]): boolean {
+  if (entityClosed) return true
+  if (vertices.length < 2) return false
+  return distance(vertices[0], vertices[vertices.length - 1]) <= CLOSING_GAP_TOLERANCE
+}
+
+function findOverlapIssues(polygons: DxfPolygon[]): DxfValidationIssue[] {
+  const issues: DxfValidationIssue[] = []
+  const byLayer = new Map<DxfLayer, DxfPolygon[]>()
+  for (const polygon of polygons) {
+    const group = byLayer.get(polygon.layer)
+    if (group) group.push(polygon)
+    else byLayer.set(polygon.layer, [polygon])
+  }
+
+  for (const [layer, group] of byLayer) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        if (!polygonsOverlap(group[i].vertices, group[j].vertices)) continue
+        issues.push({
+          code: 'OVERLAPPING',
+          layer,
+          message: `Dos polígonos de la capa ${layer} se superponen.`,
+          handle: group[i].handle,
+          polygonId: group[i].id,
+          relatedPolygonId: group[j].id,
+        })
+      }
+    }
+  }
+
+  return issues
+}
+
+export function parseDxf(fileContent: string): DxfParseResult {
   if (fileContent.length > MAX_DXF_LENGTH) {
     throw new DxfParseError('El archivo DXF supera el tamaño máximo permitido.')
   }
@@ -128,26 +171,58 @@ export function parseDxf(fileContent: string): DxfPolygon[] {
   }
 
   const polygons: DxfPolygon[] = []
+  const issues: DxfValidationIssue[] = []
   let nextId = 0
   for (let i = 0; i < entities.length; i++) {
     const entity = entities[i]
     if (typeof entity.type !== 'string' || !CLOSED_POLYGON_TYPES.has(entity.type)) continue
-    if (entity.closed !== true) continue
 
+    // Layers outside LOTEO/MANZANA/LOTES/CALLE aren't part of the domain
+    // (e.g. MEJORA, LM); stay silent about them, only relevant layers are
+    // validated.
     const layer = normalizeLayer(entity.layer)
     if (!layer) continue
 
+    const handle = typeof entity.handle === 'string' ? entity.handle : null
+
     const rawVertices = toVertices(polylines[i]?.vertices)
     if (!rawVertices) continue
-    const vertices = dedupeClosingVertex(rawVertices)
-    if (vertices.length < 3) continue
 
-    polygons.push({
-      id: `${layer}-${nextId++}`,
-      layer,
-      handle: typeof entity.handle === 'string' ? entity.handle : null,
-      vertices,
-    })
+    if (!isRingClosed(entity.closed === true, rawVertices)) {
+      issues.push({
+        code: 'OPEN_GEOMETRY',
+        layer,
+        message: `La geometría de la capa ${layer} no está cerrada.`,
+        handle,
+        polygonId: null,
+      })
+      continue
+    }
+
+    const vertices = dedupeClosingVertex(rawVertices)
+    if (vertices.length < 3) {
+      issues.push({
+        code: 'DEGENERATE_POLYGON',
+        layer,
+        message: `La geometría de la capa ${layer} tiene menos de 3 vértices.`,
+        handle,
+        polygonId: null,
+      })
+      continue
+    }
+
+    if (!isSimplePolygon(vertices)) {
+      issues.push({
+        code: 'SELF_INTERSECTING',
+        layer,
+        message: `El polígono de la capa ${layer} tiene lados que se cruzan entre sí.`,
+        handle,
+        polygonId: null,
+      })
+      continue
+    }
+
+    polygons.push({ id: `${layer}-${nextId++}`, layer, handle, vertices })
   }
 
   if (polygons.length === 0) {
@@ -156,5 +231,7 @@ export function parseDxf(fileContent: string): DxfPolygon[] {
     )
   }
 
-  return polygons
+  issues.push(...findOverlapIssues(polygons))
+
+  return { polygons, issues }
 }

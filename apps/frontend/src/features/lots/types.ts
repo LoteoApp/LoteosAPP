@@ -14,3 +14,26 @@ export type DxfPolygon = {
   handle: string | null
   vertices: DxfPoint[]
 }
+
+export type DxfValidationIssueCode =
+  | 'OPEN_GEOMETRY'
+  | 'DEGENERATE_POLYGON'
+  | 'SELF_INTERSECTING'
+  | 'OVERLAPPING'
+
+export type DxfValidationIssue = {
+  code: DxfValidationIssueCode
+  layer: DxfLayer
+  message: string
+  handle: string | null
+  // null when the entity was discarded before a DxfPolygon could be built
+  // (open geometry, too few vertices).
+  polygonId: string | null
+  // Present only for OVERLAPPING: the other polygon in the pair.
+  relatedPolygonId?: string
+}
+
+export type DxfParseResult = {
+  polygons: DxfPolygon[]
+  issues: DxfValidationIssue[]
+}
