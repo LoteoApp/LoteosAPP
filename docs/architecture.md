@@ -323,5 +323,14 @@ secundario de iniciar cada réplica del backend.
   copiando su código fuente cuando haga falta.
 - Go para el backend.
 - PostgreSQL con `pgxpool` para persistencia.
-- Goose y archivos SQL versionados para migraciones.
+- Goose y archivos SQL versionados para migraciones, también contra la base
+  administrada de Supabase ([#126](https://github.com/LoteoApp/LoteosAPP/issues/126)):
+  no se usa el sistema de migraciones propio de Supabase, para no tener dos
+  fuentes de verdad del esquema. El SQL Editor y el Table Editor del dashboard
+  de Supabase no se usan para cambiar el esquema, ni siquiera puntualmente:
+  todo cambio entra como migración Goose revisada en PR. Es una convención de
+  equipo, no algo forzado por Supabase: el proyecto usa una única cuenta
+  compartida entre los desarrolladores, así que el rol **Read Only** de
+  Supabase (que sí bloquearía esto a nivel de plataforma) no aplica — depende
+  de logins individuales y además solo existe en los planes Team/Enterprise.
 - Arquitectura modular por funcionalidad en ambas aplicaciones.
