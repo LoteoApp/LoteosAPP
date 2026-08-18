@@ -20,14 +20,13 @@ docker compose up --build
 
 La secuencia de inicio es:
 
-1. `db` y `keycloak-db` inician PostgreSQL (bases separadas) y esperan su
-   health check.
+1. `db` inicia PostgreSQL y espera su health check.
 2. `migrate` aplica las migraciones pendientes y termina con código 0.
-3. `keycloak` inicia e importa el realm `loteosapp` desde
-   `keycloak/realm-loteosapp.json`.
-4. `backend` inicia la API cuando la base, las migraciones y Keycloak están
-   listos.
-5. `frontend` inicia Vite cuando el backend está saludable.
+3. `backend` inicia la API cuando la base y las migraciones están listas.
+4. `frontend` inicia Vite cuando el backend está saludable.
+
+La autenticación no es un servicio local: el backend y el frontend hablan
+con el proyecto de Supabase configurado en el `.env` de la raíz.
 
 Para ejecutar en segundo plano:
 
@@ -58,8 +57,8 @@ El segundo comando es destructivo para los datos locales de PostgreSQL.
 | `frontend` | `http://localhost:5173` | Vite con recarga en caliente |
 | `backend` | `http://localhost:8080` | API Go |
 | `db` | `localhost:5432` | PostgreSQL de la aplicación |
-| `keycloak` | `http://localhost:8081` | Consola admin y endpoints OIDC |
-| `keycloak-db` | interno (sin puerto publicado) | PostgreSQL dedicado a Keycloak |
+| `keycloak` | `http://localhost:8081` | En desuso; se elimina en [#102](https://github.com/LoteoApp/LoteosAPP/issues/102) |
+| `keycloak-db` | interno (sin puerto publicado) | En desuso; se elimina en [#102](https://github.com/LoteoApp/LoteosAPP/issues/102) |
 
 Endpoints operativos del backend:
 
@@ -68,8 +67,8 @@ Endpoints operativos del backend:
 - `GET /api/v1/system`: devuelve el diagnóstico del backend y la base durante
   el desarrollo.
 - `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
-  usuario nuevo en Keycloak y en Postgres, devuelve una contraseña temporal
-  de un solo uso.
+  usuario nuevo en Supabase Auth y en Postgres, devuelve una contraseña
+  temporal de un solo uso.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 
@@ -107,75 +106,26 @@ docker compose up --build
 El puerto interno del backend continúa siendo `8080`; solo cambia el puerto
 publicado en el host.
 
-## Keycloak (autenticación)
+## Autenticación (Supabase Auth)
 
-`docker compose up --build` levanta Keycloak con un realm ya configurado para
-la aplicación, sin pasos manuales.
+Backend y frontend están enteramente sobre Supabase Auth. No hay servicio de
+identidad en Compose: ambos hablan con el proyecto de Supabase configurado en
+el `.env` de la raíz.
 
-### Qué trae el realm
+### Backend
 
-Al arrancar, el contenedor `keycloak` importa
-`keycloak/realm-loteosapp.json` (flag `--import-realm`) con:
+`internal/infrastructure/auth/supabase` valida cada Bearer token contra el
+JWKS que publica el proyecto (`SUPABASE_URL`) y lee el rol de dominio de
+`app_metadata.role`. El alta de usuarios usa la Admin REST API con la
+`service_role` key.
 
-- **Realm** `loteosapp`, con el login en español
-  (`internationalizationEnabled`, `defaultLocale: es`).
-- **Clients**:
-  - `loteosapp-frontend`: público, con PKCE (S256), pensado para el flujo
-    Authorization Code de la SPA (`redirectUris: http://localhost:5173/*`).
-  - `loteosapp-backend`: confidencial (`client-secret`,
-    `loteosapp-backend-dev-secret` — solo para desarrollo local, mismo
-    criterio que el resto de las credenciales de `compose.yaml`), con
-    service accounts habilitado para llamadas servidor-a-servidor.
-- **Realm roles**, uno por cada rol de dominio documentado en
-  [domain.md](domain.md#usuarios-y-roles): `administrador`, `administrativo`,
-  `agrimensor`, `escribano`, `inmobiliaria`.
+El proceso no arranca si falta `SUPABASE_URL` o `SUPABASE_SERVICE_ROLE_KEY`:
+es preferible fallar en el arranque a servir una API con la verificación de
+tokens mal configurada.
 
-El import usa la estrategia `IGNORE_EXISTING`: si el realm ya existe (por
-ejemplo, porque el volumen `keycloak_postgres_data` es de una corrida
-anterior), el archivo se ignora y no pisa cambios hechos a mano desde la
-consola. Para que una edición de `realm-loteosapp.json` se aplique sobre un
-entorno que ya lo tenía importado, hay que borrar ese volumen y volver a
-levantar:
+### Frontend
 
-```powershell
-docker compose down
-docker volume rm loteosapp_keycloak_postgres_data
-docker compose up --build
-```
-
-Esto es destructivo: borra también los usuarios y cualquier cambio hecho a
-mano en ese realm.
-
-### Consola de administración
-
-`http://localhost:8081`, realm `master`, usuario/contraseña
-`KEYCLOAK_ADMIN_USER`/`KEYCLOAK_ADMIN_PASSWORD` (por defecto `admin`/`admin`).
-Desde ahí hay que cambiar al realm `loteosapp` (selector arriba a la
-izquierda) para ver los clients y roles importados.
-
-### Crear un usuario de Keycloak para probar la API
-
-El login de la app ya no pasa por Keycloak (ver [Backend y
-frontend](#backend-y-frontend) más abajo). Un usuario del realm sirve
-únicamente para obtener un token con el que llamar al backend a mano, hasta
-que [#103](https://github.com/LoteoApp/LoteosAPP/issues/103) corte la
-validación a Supabase. El realm no trae usuarios cargados:
-
-1. Consola admin → realm `loteosapp` → **Users** → **Add user**.
-2. Cargar username/email → **Create**.
-3. Pestaña **Credentials** → **Set password**. Si se deja el toggle
-   **Temporary** activado, Keycloak va a pedir cambiarla en el primer login
-   (funciona igual, es un paso extra).
-4. Opcional, pestaña **Role mapping** → asignar uno de los roles de dominio.
-
-### Backend y frontend
-
-El backend todavía valida los tokens que emite Keycloak (JWKS del realm) vía
-`KEYCLOAK_ISSUER`/`KEYCLOAK_AUDIENCE`; ver [Variables de
-entorno](#variables-de-entorno) más abajo. El corte del backend a Supabase es
-la tarea [#103](https://github.com/LoteoApp/LoteosAPP/issues/103).
-
-El frontend ya está enteramente sobre Supabase: `AppAuthProvider`
+`AppAuthProvider`
 (`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`) publica la sesión en un
 `AuthContext`, y `RequireAuth`, `AuthStatus` y `UserMenu` la consumen desde
 `features/auth/hooks/use-auth.ts`. Como Supabase no tiene pantalla de login
@@ -190,16 +140,13 @@ user**, con **Auto Confirm User** activado. Ese usuario ya puede ingresar por
 `/login`. El alta desde el backend (`AdminClient.CreateUser`) genera además una
 contraseña temporal y guarda el rol de dominio en `app_metadata.role`.
 
-## Supabase (en migración desde Keycloak)
+## Proyecto de Supabase
 
-Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). El frontend ya
-usa Supabase de punta a punta y el driver de backend existe
-(`internal/infrastructure/auth/supabase`) pero todavía no está cableado;
-`compose.yaml` y el backend siguen levantando Keycloak (tareas
-[#102](https://github.com/LoteoApp/LoteosAPP/issues/102),
-[#103](https://github.com/LoteoApp/LoteosAPP/issues/103),
-[#105](https://github.com/LoteoApp/LoteosAPP/issues/105) y
-[#108](https://github.com/LoteoApp/LoteosAPP/issues/108)).
+Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). Queda
+pendiente sacar los servicios `keycloak`/`keycloak-db` de `compose.yaml`
+([#102](https://github.com/LoteoApp/LoteosAPP/issues/102)), que ya no los usa
+nadie, y documentar el mapeo de roles de dominio
+([#105](https://github.com/LoteoApp/LoteosAPP/issues/105)).
 
 - **Proyecto**: `https://iahqjtpzkntzxoiykhjg.supabase.co` (entorno de
   desarrollo), creado con una cuenta Gmail dedicada al proyecto.
@@ -241,30 +188,20 @@ POSTGRES_PASSWORD=loteosapp
 POSTGRES_PORT=5432
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
-KEYCLOAK_PORT=8081
-KEYCLOAK_REALM=loteosapp
-KEYCLOAK_BACKEND_CLIENT=loteosapp-backend
-KEYCLOAK_FRONTEND_CLIENT=loteosapp-frontend
-KEYCLOAK_ADMIN_USER=admin
-KEYCLOAK_ADMIN_PASSWORD=admin
-KEYCLOAK_DB=keycloak
-KEYCLOAK_DB_USER=keycloak
-KEYCLOAK_DB_PASSWORD=keycloak
 ```
 
-El backend recibe internamente la URL de Keycloak (resuelve `keycloak` por
-nombre de servicio dentro de la red de Compose) para validar tokens, y
-necesita además llamar a la Admin REST API de Keycloak (alta de usuarios),
-autenticándose con las credenciales del client `loteosapp-backend`:
+El backend necesita el proyecto de Supabase para validar tokens y para dar de
+alta usuarios por la Admin REST API. Ninguna de las dos tiene default: si
+falta alguna, el proceso falla al arrancar.
 
 ```text
-KEYCLOAK_ISSUER=http://keycloak:8080/realms/loteosapp
-KEYCLOAK_JWKS_BASE_URL=http://keycloak:8080/realms/loteosapp
-KEYCLOAK_AUDIENCE=loteosapp-backend
-KEYCLOAK_BASE_URL=http://keycloak:8080
-KEYCLOAK_REALM=loteosapp
-KEYCLOAK_CLIENT_SECRET=loteosapp-backend-dev-secret
+SUPABASE_URL=https://<proyecto>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
 ```
+
+La `service_role` key bypassea RLS y habilita la administración completa de
+usuarios: va únicamente en el `.env` local (gitignorado) o en un secret de
+CI, nunca en `compose.yaml` ni en la documentación.
 
 El frontend, al correr en el navegador, necesita la URL y la clave pública
 (publishable) del proyecto de Supabase:

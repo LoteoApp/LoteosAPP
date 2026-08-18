@@ -52,7 +52,8 @@ apps/backend/
 │       ├── environments/
 │       │   └── config.go
 │       ├── auth/
-│       │   └── keycloak/
+│       │   └── supabase/
+│       │       ├── admin.go
 │       │       └── verifier.go
 │       ├── repository/
 │       │   └── postgres/
@@ -104,20 +105,14 @@ vacíos antes de que exista una funcionalidad que los necesite.
   los contratos de `gateway`.
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
-- `internal/infrastructure/auth/keycloak`: valida el JWT (Bearer token)
-  emitido por Keycloak contra su JWKS y extrae el `sub` y los roles del
-  token. También implementa `gateway.IdentityProvider` contra la Admin REST
-  API de Keycloak (alta/baja de usuarios, asignación de rol de realm),
-  autenticándose con las credenciales de servicio del client del backend.
-- `internal/infrastructure/auth/supabase`: adaptador equivalente para
-  Supabase Auth, construido durante la migración documentada en la épica
-  #100. Valida el JWT contra el JWKS del proyecto y expone el rol de dominio
-  leído de `app_metadata.role`. Implementa `gateway.IdentityProvider` contra
-  la Admin REST API de Supabase, autenticándose con la `service_role` key.
-  Todavía no está conectado a `dependencies` ni a `middleware`; coexiste sin
-  cablear hasta el corte que reemplace a `keycloak`.
+- `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
+  emitido por Supabase Auth contra el JWKS del proyecto y extrae el `sub`,
+  el email y el rol de dominio leído de `app_metadata.role`. También
+  implementa `gateway.IdentityProvider` contra la Admin REST API de
+  Supabase (alta/baja de usuarios), autenticándose con la `service_role`
+  key.
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
-  validación de `auth/keycloak` a un middleware HTTP; rechaza requests sin
+  validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
@@ -141,14 +136,14 @@ flowchart LR
     app --> route["infrastructure/delivery/webapp/route"]
     app --> server["infrastructure/delivery/webapp/server"]
     deps --> repo["infrastructure/repository/postgres"]
-    deps --> keycloak["infrastructure/auth/keycloak"]
+    deps --> supabase["infrastructure/auth/supabase"]
     route --> handler["infrastructure/delivery/webapp/handler"]
     route --> middleware["infrastructure/delivery/webapp/middleware"]
-    middleware --> keycloak
+    middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecase["business/usecase"]
     repo -.implementa.-> gateway["business/gateway"]
-    keycloak -.implementa.-> gateway
+    supabase -.implementa.-> gateway
     usecase --> gateway
     usecase --> domain["business/domain"]
     gateway --> domain

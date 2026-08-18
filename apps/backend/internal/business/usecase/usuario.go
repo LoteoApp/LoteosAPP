@@ -40,20 +40,20 @@ func (service *UserService) CreateUser(
 		return domain.Usuario{}, "", domain.ErrRolInvalido
 	}
 
-	keycloakID, temporaryPassword, err := service.identity.CreateUser(ctx, email, rol)
+	authProviderID, temporaryPassword, err := service.identity.CreateUser(ctx, email, rol)
 	if err != nil {
 		return domain.Usuario{}, "", err
 	}
 
 	usuario, err := service.repository.Create(ctx, domain.Usuario{
-		KeycloakID: keycloakID,
-		Email:      email,
-		Rol:        rol,
+		AuthProviderID: authProviderID,
+		Email:          email,
+		Rol:            rol,
 	})
 	if err != nil {
-		if deleteErr := service.identity.DeleteUser(ctx, keycloakID); deleteErr != nil {
+		if deleteErr := service.identity.DeleteUser(ctx, authProviderID); deleteErr != nil {
 			slog.ErrorContext(ctx, "compensating identity provider delete failed after local persistence error",
-				"keycloak_id", keycloakID, "error", deleteErr)
+				"auth_provider_id", authProviderID, "error", deleteErr)
 		}
 		return domain.Usuario{}, "", err
 	}

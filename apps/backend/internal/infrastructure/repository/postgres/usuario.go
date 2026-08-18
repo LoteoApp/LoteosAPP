@@ -25,11 +25,11 @@ func (repository *UserRepository) Create(ctx context.Context, usuario domain.Usu
 	var created domain.Usuario
 
 	err := repository.pool.QueryRow(ctx, `
-		INSERT INTO usuarios (keycloak_id, email, rol)
+		INSERT INTO usuarios (auth_provider_id, email, rol)
 		VALUES ($1::uuid, $2, $3)
-		RETURNING id::text, keycloak_id::text, email, nombre, apellido, rol, perfil_completo, created_at
-	`, usuario.KeycloakID, usuario.Email, usuario.Rol).Scan(
-		&created.ID, &created.KeycloakID, &created.Email, &created.Nombre,
+		RETURNING id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, created_at
+	`, usuario.AuthProviderID, usuario.Email, usuario.Rol).Scan(
+		&created.ID, &created.AuthProviderID, &created.Email, &created.Nombre,
 		&created.Apellido, &created.Rol, &created.PerfilCompleto, &created.CreatedAt,
 	)
 	if err != nil {
@@ -43,15 +43,15 @@ func (repository *UserRepository) Create(ctx context.Context, usuario domain.Usu
 	return created, nil
 }
 
-func (repository *UserRepository) FindByKeycloakID(ctx context.Context, keycloakID string) (domain.Usuario, error) {
+func (repository *UserRepository) FindByAuthProviderID(ctx context.Context, authProviderID string) (domain.Usuario, error) {
 	var usuario domain.Usuario
 
 	err := repository.pool.QueryRow(ctx, `
-		SELECT id::text, keycloak_id::text, email, nombre, apellido, rol, perfil_completo, created_at
+		SELECT id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, created_at
 		FROM usuarios
-		WHERE keycloak_id = $1::uuid
-	`, keycloakID).Scan(
-		&usuario.ID, &usuario.KeycloakID, &usuario.Email, &usuario.Nombre,
+		WHERE auth_provider_id = $1::uuid
+	`, authProviderID).Scan(
+		&usuario.ID, &usuario.AuthProviderID, &usuario.Email, &usuario.Nombre,
 		&usuario.Apellido, &usuario.Rol, &usuario.PerfilCompleto, &usuario.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -64,16 +64,16 @@ func (repository *UserRepository) FindByKeycloakID(ctx context.Context, keycloak
 	return usuario, nil
 }
 
-func (repository *UserRepository) UpdateProfile(ctx context.Context, keycloakID, nombre, apellido string) (domain.Usuario, error) {
+func (repository *UserRepository) UpdateProfile(ctx context.Context, authProviderID, nombre, apellido string) (domain.Usuario, error) {
 	var usuario domain.Usuario
 
 	err := repository.pool.QueryRow(ctx, `
 		UPDATE usuarios
 		SET nombre = $2, apellido = $3, perfil_completo = true, updated_at = now()
-		WHERE keycloak_id = $1::uuid
-		RETURNING id::text, keycloak_id::text, email, nombre, apellido, rol, perfil_completo, created_at
-	`, keycloakID, nombre, apellido).Scan(
-		&usuario.ID, &usuario.KeycloakID, &usuario.Email, &usuario.Nombre,
+		WHERE auth_provider_id = $1::uuid
+		RETURNING id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, created_at
+	`, authProviderID, nombre, apellido).Scan(
+		&usuario.ID, &usuario.AuthProviderID, &usuario.Email, &usuario.Nombre,
 		&usuario.Apellido, &usuario.Rol, &usuario.PerfilCompleto, &usuario.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
