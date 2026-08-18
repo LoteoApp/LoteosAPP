@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"loteosapp/backend/internal/business/domain"
-	"loteosapp/backend/internal/infrastructure/auth/keycloak"
+	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
@@ -47,11 +47,11 @@ func (stub *userServiceStub) CompleteProfile(_ context.Context, subject, nombre,
 }
 
 type userVerifierStub struct {
-	principal keycloak.Principal
+	principal supabase.Principal
 	err       error
 }
 
-func (stub userVerifierStub) Verify(context.Context, string) (keycloak.Principal, error) {
+func (stub userVerifierStub) Verify(context.Context, string) (supabase.Principal, error) {
 	return stub.principal, stub.err
 }
 
@@ -99,7 +99,7 @@ func TestUserHandlerCreate(t *testing.T) {
 			createUsuario:      domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolAdministrativo},
 			createTempPassword: "temp-pass-123",
 		}
-		verifier := userVerifierStub{principal: keycloak.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
 		recorder := performUserRequest(t, service, verifier, http.MethodPost, "/api/v1/usuarios", "valid-token",
 			map[string]string{"email": "ana@example.com", "rol": domain.RolAdministrativo})
@@ -145,7 +145,7 @@ func TestUserHandlerCreate(t *testing.T) {
 		t.Parallel()
 
 		service := &userServiceStub{}
-		verifier := userVerifierStub{principal: keycloak.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
 		recorder := performUserRequest(t, service, verifier, http.MethodPost, "/api/v1/usuarios", "valid-token", "not-json")
 
@@ -178,7 +178,7 @@ func TestUserHandlerCreate(t *testing.T) {
 				t.Parallel()
 
 				service := &userServiceStub{createErr: test.err}
-				verifier := userVerifierStub{principal: keycloak.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
+				verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
 				recorder := performUserRequest(t, service, verifier, http.MethodPost, "/api/v1/usuarios", "valid-token",
 					map[string]string{"email": "ana@example.com", "rol": domain.RolAdministrativo})
@@ -211,7 +211,7 @@ func TestUserHandlerCompleteProfile(t *testing.T) {
 		service := &userServiceStub{
 			completeUsuario: domain.Usuario{ID: "u-1", Nombre: "Ana", Apellido: "Gómez", PerfilCompleto: true},
 		}
-		verifier := userVerifierStub{principal: keycloak.Principal{Subject: "user-1", Roles: []string{domain.RolAgrimensor}}}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAgrimensor}}}
 
 		recorder := performUserRequest(t, service, verifier, http.MethodPatch, "/api/v1/usuarios/me", "valid-token",
 			map[string]string{"nombre": "Ana", "apellido": "Gómez"})
@@ -260,7 +260,7 @@ func TestUserHandlerCompleteProfile(t *testing.T) {
 				t.Parallel()
 
 				service := &userServiceStub{completeErr: test.err}
-				verifier := userVerifierStub{principal: keycloak.Principal{Subject: "user-1"}}
+				verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1"}}
 
 				recorder := performUserRequest(t, service, verifier, http.MethodPatch, "/api/v1/usuarios/me", "valid-token",
 					map[string]string{"nombre": "Ana", "apellido": "Gómez"})

@@ -42,12 +42,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
       PORT: 8080
       FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
-      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8081}/realms/${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_JWKS_BASE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_AUDIENCE: ${KEYCLOAK_BACKEND_CLIENT:-loteosapp-backend}
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-loteosapp}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-loteosapp-backend-dev-secret}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -63,8 +59,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      keycloak:
-        condition: service_healthy
 
   frontend:
     build:

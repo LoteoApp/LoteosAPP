@@ -31,16 +31,16 @@ func TestUserRepository(t *testing.T) {
 
 	repository := postgres.NewUserRepository(pool)
 
-	t.Run("create and find by keycloak id", func(t *testing.T) {
-		keycloakID := newUUID(t)
+	t.Run("create and find by auth provider id", func(t *testing.T) {
+		authProviderID := newUUID(t)
 		email := newEmail(t)
 
 		created, err := repository.Create(context.Background(), domain.Usuario{
-			KeycloakID: keycloakID,
-			Email:      email,
-			Rol:        domain.RolAdministrativo,
+			AuthProviderID: authProviderID,
+			Email:          email,
+			Rol:            domain.RolAdministrativo,
 		})
-		t.Cleanup(func() { deleteUsuario(t, pool, keycloakID) })
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
@@ -54,60 +54,60 @@ func TestUserRepository(t *testing.T) {
 			t.Error("Create() should set created_at")
 		}
 
-		found, err := repository.FindByKeycloakID(context.Background(), keycloakID)
+		found, err := repository.FindByAuthProviderID(context.Background(), authProviderID)
 		if err != nil {
-			t.Fatalf("FindByKeycloakID() error = %v", err)
+			t.Fatalf("FindByAuthProviderID() error = %v", err)
 		}
 		if found.Email != email || found.Rol != domain.RolAdministrativo {
-			t.Errorf("FindByKeycloakID() = %#v", found)
+			t.Errorf("FindByAuthProviderID() = %#v", found)
 		}
 	})
 
 	t.Run("create rejects duplicate email", func(t *testing.T) {
 		email := newEmail(t)
-		firstKeycloakID := newUUID(t)
+		firstAuthProviderID := newUUID(t)
 
 		_, err := repository.Create(context.Background(), domain.Usuario{
-			KeycloakID: firstKeycloakID,
-			Email:      email,
-			Rol:        domain.RolAdministrativo,
+			AuthProviderID: firstAuthProviderID,
+			Email:          email,
+			Rol:            domain.RolAdministrativo,
 		})
-		t.Cleanup(func() { deleteUsuario(t, pool, firstKeycloakID) })
+		t.Cleanup(func() { deleteUsuario(t, pool, firstAuthProviderID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
 		_, err = repository.Create(context.Background(), domain.Usuario{
-			KeycloakID: newUUID(t),
-			Email:      email,
-			Rol:        domain.RolAgrimensor,
+			AuthProviderID: newUUID(t),
+			Email:          email,
+			Rol:            domain.RolAgrimensor,
 		})
 		if !errors.Is(err, domain.ErrEmailEnUso) {
 			t.Fatalf("Create() error = %v, want %v", err, domain.ErrEmailEnUso)
 		}
 	})
 
-	t.Run("find by keycloak id not found", func(t *testing.T) {
-		_, err := repository.FindByKeycloakID(context.Background(), newUUID(t))
+	t.Run("find by auth provider id not found", func(t *testing.T) {
+		_, err := repository.FindByAuthProviderID(context.Background(), newUUID(t))
 		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-			t.Fatalf("FindByKeycloakID() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+			t.Fatalf("FindByAuthProviderID() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
 		}
 	})
 
 	t.Run("update profile", func(t *testing.T) {
-		keycloakID := newUUID(t)
+		authProviderID := newUUID(t)
 
 		_, err := repository.Create(context.Background(), domain.Usuario{
-			KeycloakID: keycloakID,
-			Email:      newEmail(t),
-			Rol:        domain.RolEscribano,
+			AuthProviderID: authProviderID,
+			Email:          newEmail(t),
+			Rol:            domain.RolEscribano,
 		})
-		t.Cleanup(func() { deleteUsuario(t, pool, keycloakID) })
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		updated, err := repository.UpdateProfile(context.Background(), keycloakID, "Ana", "Gómez")
+		updated, err := repository.UpdateProfile(context.Background(), authProviderID, "Ana", "Gómez")
 		if err != nil {
 			t.Fatalf("UpdateProfile() error = %v", err)
 		}
@@ -127,9 +127,9 @@ func TestUserRepository(t *testing.T) {
 	})
 }
 
-func deleteUsuario(t *testing.T, pool *pgxpool.Pool, keycloakID string) {
+func deleteUsuario(t *testing.T, pool *pgxpool.Pool, authProviderID string) {
 	t.Helper()
-	if _, err := pool.Exec(context.Background(), `DELETE FROM usuarios WHERE keycloak_id = $1::uuid`, keycloakID); err != nil {
+	if _, err := pool.Exec(context.Background(), `DELETE FROM usuarios WHERE auth_provider_id = $1::uuid`, authProviderID); err != nil {
 		t.Errorf("cleanup delete usuario: %v", err)
 	}
 }
