@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { contentSecurityPolicyPlugin } from './vite-plugins/content-security-policy'
-import { DEFAULT_API_URL, DEFAULT_SUPABASE_URL } from './src/shared/config/env-defaults'
+import { DEFAULT_API_URL, DEFAULT_SUPABASE_URL, resolveUrl } from './src/shared/config/env-defaults'
 
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
@@ -14,8 +14,8 @@ export default defineConfig(({ mode, command }) => {
       react(),
       tailwindcss(),
       contentSecurityPolicyPlugin({
-        apiUrl: env.VITE_API_URL || DEFAULT_API_URL,
-        supabaseUrl: env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+        apiUrl: resolveUrl(env.VITE_API_URL, DEFAULT_API_URL),
+        supabaseUrl: resolveUrl(env.VITE_SUPABASE_URL, DEFAULT_SUPABASE_URL),
         isDev: command === 'serve',
       }),
     ],

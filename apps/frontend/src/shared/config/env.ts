@@ -1,11 +1,8 @@
-import { DEFAULT_API_URL, DEFAULT_SUPABASE_URL } from './env-defaults'
+import { DEFAULT_API_URL, DEFAULT_SUPABASE_URL, resolveUrl } from './env-defaults'
 
-export const apiUrl = (import.meta.env.VITE_API_URL ?? DEFAULT_API_URL).replace(/\/$/, '')
+export const apiUrl = resolveUrl(import.meta.env.VITE_API_URL, DEFAULT_API_URL)
 
-export const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? DEFAULT_SUPABASE_URL).replace(
-  /\/$/,
-  '',
-)
+export const supabaseUrl = resolveUrl(import.meta.env.VITE_SUPABASE_URL, DEFAULT_SUPABASE_URL)
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 
 if (import.meta.env.PROD && !supabaseAnonKey) {
