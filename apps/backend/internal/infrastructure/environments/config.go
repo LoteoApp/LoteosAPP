@@ -1,17 +1,16 @@
 package environments
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 type Server struct {
-	DatabaseURL          string
-	FrontendOrigin       string
-	Port                 string
-	KeycloakIssuer       string
-	KeycloakJWKSBaseURL  string
-	KeycloakAudience     string
-	KeycloakBaseURL      string
-	KeycloakRealm        string
-	KeycloakClientSecret string
+	DatabaseURL            string
+	FrontendOrigin         string
+	Port                   string
+	SupabaseURL            string
+	SupabaseServiceRoleKey string
 }
 
 type Migration struct {
@@ -19,18 +18,28 @@ type Migration struct {
 	MigrationsDir string
 }
 
-func LoadServer() Server {
-	return Server{
-		DatabaseURL:          envOrDefault("DATABASE_URL", defaultDatabaseURL),
-		FrontendOrigin:       envOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
-		Port:                 envOrDefault("PORT", "8080"),
-		KeycloakIssuer:       envOrDefault("KEYCLOAK_ISSUER", defaultKeycloakIssuer),
-		KeycloakJWKSBaseURL:  envOrDefault("KEYCLOAK_JWKS_BASE_URL", defaultKeycloakIssuer),
-		KeycloakAudience:     envOrDefault("KEYCLOAK_AUDIENCE", defaultKeycloakAudience),
-		KeycloakBaseURL:      envOrDefault("KEYCLOAK_BASE_URL", defaultKeycloakBaseURL),
-		KeycloakRealm:        envOrDefault("KEYCLOAK_REALM", defaultKeycloakRealm),
-		KeycloakClientSecret: envOrDefault("KEYCLOAK_CLIENT_SECRET", defaultKeycloakClientSecret),
+// LoadServer reads the server configuration from the environment. The
+// Supabase settings have no fallback: the service_role key grants full
+// administrative access to the auth project, so it must always come from
+// the environment and never from a value committed to the repository.
+func LoadServer() (Server, error) {
+	supabaseURL, err := requiredEnv("SUPABASE_URL")
+	if err != nil {
+		return Server{}, err
 	}
+
+	serviceRoleKey, err := requiredEnv("SUPABASE_SERVICE_ROLE_KEY")
+	if err != nil {
+		return Server{}, err
+	}
+
+	return Server{
+		DatabaseURL:            envOrDefault("DATABASE_URL", defaultDatabaseURL),
+		FrontendOrigin:         envOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
+		Port:                   envOrDefault("PORT", "8080"),
+		SupabaseURL:            supabaseURL,
+		SupabaseServiceRoleKey: serviceRoleKey,
+	}, nil
 }
 
 func LoadMigration() Migration {
@@ -48,10 +57,13 @@ func envOrDefault(name, fallback string) string {
 	return fallback
 }
 
-const defaultDatabaseURL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"
+func requiredEnv(name string) (string, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return "", fmt.Errorf("%s must be set", name)
+	}
 
-const defaultKeycloakIssuer = "http://localhost:8081/realms/loteosapp"
-const defaultKeycloakAudience = "loteosapp-backend"
-const defaultKeycloakBaseURL = "http://localhost:8081"
-const defaultKeycloakRealm = "loteosapp"
-const defaultKeycloakClientSecret = "loteosapp-backend-dev-secret"
+	return value, nil
+}
+
+const defaultDatabaseURL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"

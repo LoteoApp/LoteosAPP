@@ -16,7 +16,7 @@ var (
 
 type Usuario struct {
 	ID             string    `json:"id"`
-	KeycloakID     string    `json:"-"`
+	AuthProviderID string    `json:"-"`
 	Email          string    `json:"email"`
 	Nombre         string    `json:"nombre"`
 	Apellido       string    `json:"apellido"`
