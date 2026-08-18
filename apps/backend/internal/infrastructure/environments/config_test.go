@@ -8,7 +8,8 @@ import (
 )
 
 func TestLoadServer(t *testing.T) {
-	t.Run("reads supabase settings and applies defaults", func(t *testing.T) {
+	t.Run("reads required settings and applies defaults", func(t *testing.T) {
+		t.Setenv("DATABASE_URL", "postgres://user:pass@pooler.supabase.com:5432/postgres")
 		t.Setenv("SUPABASE_URL", "https://project.supabase.co")
 		t.Setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
 
@@ -17,6 +18,9 @@ func TestLoadServer(t *testing.T) {
 			t.Fatalf("LoadServer() error = %v", err)
 		}
 
+		if cfg.DatabaseURL != "postgres://user:pass@pooler.supabase.com:5432/postgres" {
+			t.Errorf("DatabaseURL = %q", cfg.DatabaseURL)
+		}
 		if cfg.SupabaseURL != "https://project.supabase.co" {
 			t.Errorf("SupabaseURL = %q, want %q", cfg.SupabaseURL, "https://project.supabase.co")
 		}
@@ -29,15 +33,12 @@ func TestLoadServer(t *testing.T) {
 		if cfg.FrontendOrigin != "http://localhost:5173" {
 			t.Errorf("FrontendOrigin = %q, want %q", cfg.FrontendOrigin, "http://localhost:5173")
 		}
-		if cfg.DatabaseURL == "" {
-			t.Error("DatabaseURL is empty, want the local development default")
-		}
 	})
 
 	t.Run("overrides defaults from the environment", func(t *testing.T) {
+		t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/loteosapp")
 		t.Setenv("SUPABASE_URL", "https://project.supabase.co")
 		t.Setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
-		t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/loteosapp")
 		t.Setenv("FRONTEND_ORIGIN", "https://app.loteosapp.com")
 		t.Setenv("PORT", "9090")
 
@@ -59,28 +60,38 @@ func TestLoadServer(t *testing.T) {
 
 	missing := []struct {
 		name         string
+		databaseURL  string
 		url          string
 		serviceRole  string
 		wantInErrMsg string
 	}{
 		{
+			name:         "missing database url",
+			url:          "https://project.supabase.co",
+			serviceRole:  "service-role-key",
+			wantInErrMsg: "DATABASE_URL",
+		},
+		{
 			name:         "missing supabase url",
+			databaseURL:  "postgres://user:pass@pooler.supabase.com:5432/postgres",
 			serviceRole:  "service-role-key",
 			wantInErrMsg: "SUPABASE_URL",
 		},
 		{
 			name:         "missing service role key",
+			databaseURL:  "postgres://user:pass@pooler.supabase.com:5432/postgres",
 			url:          "https://project.supabase.co",
 			wantInErrMsg: "SUPABASE_SERVICE_ROLE_KEY",
 		},
 		{
-			name:         "missing both",
-			wantInErrMsg: "SUPABASE_URL",
+			name:         "missing all",
+			wantInErrMsg: "DATABASE_URL",
 		},
 	}
 
 	for _, tt := range missing {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", tt.databaseURL)
 			t.Setenv("SUPABASE_URL", tt.url)
 			t.Setenv("SUPABASE_SERVICE_ROLE_KEY", tt.serviceRole)
 
@@ -97,13 +108,18 @@ func TestLoadServer(t *testing.T) {
 
 func TestLoadMigration(t *testing.T) {
 	t.Run("applies defaults", func(t *testing.T) {
-		cfg := environments.LoadMigration()
+		t.Setenv("DATABASE_URL", "postgres://user:pass@pooler.supabase.com:5432/postgres")
+
+		cfg, err := environments.LoadMigration()
+		if err != nil {
+			t.Fatalf("LoadMigration() error = %v", err)
+		}
 
 		if cfg.MigrationsDir != "migrations" {
 			t.Errorf("MigrationsDir = %q, want %q", cfg.MigrationsDir, "migrations")
 		}
-		if cfg.DatabaseURL == "" {
-			t.Error("DatabaseURL is empty, want the local development default")
+		if cfg.DatabaseURL != "postgres://user:pass@pooler.supabase.com:5432/postgres" {
+			t.Errorf("DatabaseURL = %q", cfg.DatabaseURL)
 		}
 	})
 
@@ -111,7 +127,10 @@ func TestLoadMigration(t *testing.T) {
 		t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/loteosapp")
 		t.Setenv("MIGRATIONS_DIR", "/workspace/migrations")
 
-		cfg := environments.LoadMigration()
+		cfg, err := environments.LoadMigration()
+		if err != nil {
+			t.Fatalf("LoadMigration() error = %v", err)
+		}
 
 		if cfg.DatabaseURL != "postgres://user:pass@db:5432/loteosapp" {
 			t.Errorf("DatabaseURL = %q", cfg.DatabaseURL)
@@ -120,9 +139,22 @@ func TestLoadMigration(t *testing.T) {
 			t.Errorf("MigrationsDir = %q", cfg.MigrationsDir)
 		}
 	})
+
+	t.Run("missing database url", func(t *testing.T) {
+		t.Setenv("DATABASE_URL", "")
+
+		_, err := environments.LoadMigration()
+		if err == nil {
+			t.Fatal("LoadMigration() error = nil, want an error")
+		}
+		if !strings.Contains(err.Error(), "DATABASE_URL") {
+			t.Errorf("LoadMigration() error = %q, want it to mention DATABASE_URL", err)
+		}
+	})
 }
 
 func TestLoadServerDoesNotLeakCredentials(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://user:pass@pooler.supabase.com:5432/postgres")
 	t.Setenv("SUPABASE_URL", "")
 	t.Setenv("SUPABASE_SERVICE_ROLE_KEY", "super-secret-service-role-key")
 

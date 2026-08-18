@@ -20,9 +20,8 @@ Las prioridades son:
 ```mermaid
 flowchart LR
     frontend["Frontend React/Vite"] -->|HTTP| backend["Backend Go"]
-    backend -->|pgxpool| db["PostgreSQL"]
+    backend -->|pgxpool| db["PostgreSQL (Supabase)"]
     migrate["Goose migrate"] -->|aplica SQL| db
-    db -->|healthcheck| migrate
     migrate -->|service_completed_successfully| backend
     backend -->|healthcheck| frontend
 ```
@@ -303,11 +302,14 @@ app → features → shared
 
 ## Flujo de arranque local
 
-`compose.yaml` define cuatro servicios:
+`compose.yaml` define cuatro servicios. Tres están activos; `db` sigue
+levantándose con `docker compose up` pero ya no respalda a nadie y se retira
+en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128) (ver
+[development.md](development.md#arrancar-todo-con-docker)):
 
-- `db`: PostgreSQL con volumen persistente y health check `pg_isready`.
-- `migrate`: aplica las migraciones pendientes y termina correctamente.
-- `backend`: inicia la API después de la base y las migraciones.
+- `migrate`: aplica las migraciones pendientes contra la base de Supabase y
+  termina correctamente.
+- `backend`: inicia la API después de las migraciones.
 - `frontend`: inicia Vite después de que el backend esté saludable.
 
 Las migraciones son un proceso separado. Nunca se ejecutan como efecto

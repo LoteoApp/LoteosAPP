@@ -20,13 +20,16 @@ docker compose up --build
 
 La secuencia de inicio es:
 
-1. `db` inicia PostgreSQL y espera su health check.
-2. `migrate` aplica las migraciones pendientes y termina con código 0.
-3. `backend` inicia la API cuando la base y las migraciones están listas.
-4. `frontend` inicia Vite cuando el backend está saludable.
+1. `migrate` aplica las migraciones pendientes contra Supabase y termina con
+   código 0.
+2. `backend` inicia la API cuando las migraciones están listas.
+3. `frontend` inicia Vite cuando el backend está saludable.
 
-La autenticación no es un servicio local: el backend y el frontend hablan
-con el proyecto de Supabase configurado en el `.env` de la raíz.
+Ni la autenticación ni la base de datos de la aplicación son servicios
+locales: el backend, `migrate` y el frontend hablan con el proyecto de
+Supabase configurado en el `.env` de la raíz ([#127](https://github.com/LoteoApp/LoteosAPP/issues/127)).
+El servicio `db` de Compose sigue arriba pero ya no lo usa nadie; se elimina
+en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128).
 
 Para ejecutar en segundo plano:
 
@@ -40,15 +43,18 @@ Para detenerlo:
 docker compose down
 ```
 
-`docker compose down` conserva el volumen `postgres_data`. Para eliminarlo y
-reiniciar la base desde cero:
-
 ```powershell
 docker compose down -v
-docker compose up --build
 ```
 
-El segundo comando es destructivo para los datos locales de PostgreSQL.
+Elimina también el volumen `postgres_data` del servicio `db`, que ya no
+respalda a `backend` ni a `migrate` ([#127](https://github.com/LoteoApp/LoteosAPP/issues/127))
+y se retira en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128): hoy
+no borra ni resetea la base real de la aplicación, que vive en Supabase y es
+compartida por todo el equipo. No hay equivalente local de "resetear la base
+desde cero"; usar `goose down`/`goose up` (ver
+[database.md](database.md#avanzar-o-retroceder-manualmente)) contra Supabase,
+con cuidado, para retroceder cambios.
 
 ## Servicios y puertos
 
@@ -56,7 +62,7 @@ El segundo comando es destructivo para los datos locales de PostgreSQL.
 | --- | --- | --- |
 | `frontend` | `http://localhost:5173` | Vite con recarga en caliente |
 | `backend` | `http://localhost:8080` | API Go |
-| `db` | `localhost:5432` | PostgreSQL de la aplicación |
+| `db` | `localhost:5432` | En desuso; se elimina en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128) |
 
 Endpoints operativos del backend:
 
@@ -155,13 +161,13 @@ pendiente documentar el mapeo de roles de dominio
 Compose usa estos valores por defecto:
 
 ```text
-POSTGRES_DB=loteosapp
-POSTGRES_USER=loteosapp
-POSTGRES_PASSWORD=loteosapp
-POSTGRES_PORT=5432
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
 ```
+
+`POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_PORT` solo los usa
+el servicio `db`, que ya no respalda a `backend` ni a `migrate` y se elimina
+en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128).
 
 El backend necesita el proyecto de Supabase para validar tokens y para dar de
 alta usuarios por la Admin REST API. Ninguna de las dos tiene default: si
@@ -193,16 +199,14 @@ Estos valores no tienen un default de Compose (dependen del proyecto de
 Supabase de cada entorno); se toman de `SUPABASE_URL`/`SUPABASE_ANON_KEY` en
 el `.env` local (épica #100).
 
-El backend recibe internamente esta conexión a PostgreSQL:
+El backend y `migrate` necesitan la base de Supabase
+([#127](https://github.com/LoteoApp/LoteosAPP/issues/127)). Ver
+[database.md § Conexión a Supabase](database.md#conexión-a-supabase) para el
+detalle del pooler y por qué el modo, el `sslmode` y el tamaño del pool
+importan.
 
 ```text
-postgres://loteosapp:loteosapp@db:5432/loteosapp?sslmode=disable
-```
-
-Desde el host se usa `localhost` en lugar de `db`:
-
-```text
-postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable
+DATABASE_URL=postgres://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 ## Trabajar sin Docker para frontend o backend
@@ -227,13 +231,29 @@ Al editar `apps/frontend/src/`, el navegador debe actualizarse sin reiniciar el
 contenedor. El polling consume algo más de CPU; si el proyecto se mueve a un
 entorno con eventos de archivos confiables, se puede quitar esa configuración.
 
-Para trabajar con el backend en el host, primero debe estar PostgreSQL
-disponible y debe configurarse `DATABASE_URL`:
+Para trabajar con el backend en el host, con `DATABASE_URL` (y las
+`SUPABASE_*`) inyectadas por Doppler:
 
 ```powershell
-$env:DATABASE_URL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"
 cd apps/backend
-go run ./cmd/server
+doppler run -- go run ./cmd/server
+```
+
+Como la base y la autenticación son de Supabase, todo el entorno puede correr
+sin Docker: el backend con el comando de arriba y el frontend con
+`pnpm --filter @loteos/frontend dev`. El frontend no necesita Doppler porque
+lee `apps/frontend/.env` (Vite solo expone variables con prefijo `VITE_`, y en
+Doppler los secrets están sin ese prefijo).
+
+Fuera de Compose nadie aplica las migraciones: no hay un servicio `migrate`
+que corra antes del backend, así que las pendientes se aplican a mano. El
+default de `MIGRATIONS_DIR` es `migrations` relativo al directorio actual, que
+desde `apps/backend` no resuelve:
+
+```powershell
+cd apps/backend
+$env:MIGRATIONS_DIR = "$(Resolve-Path ../../migrations)"
+doppler run -- go run ./cmd/migrate
 ```
 
 El contenedor del frontend tiene recarga en caliente. El contenedor del
