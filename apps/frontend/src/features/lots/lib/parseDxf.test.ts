@@ -116,7 +116,7 @@ describe('parseDxf', () => {
       lwpolyline({ layer: 'CALLE', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons, issues } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(4)
     expect(polygons.map((polygon) => polygon.layer).sort()).toEqual([
@@ -125,6 +125,7 @@ describe('parseDxf', () => {
       'LOTES',
       'MANZANA',
     ])
+    expect(issues).toEqual([])
   })
 
   it('keeps the DXF handle when present and returns null otherwise', () => {
@@ -133,7 +134,7 @@ describe('parseDxf', () => {
       lwpolyline({ layer: 'MANZANA', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons } = parseDxf(dxf)
 
     expect(polygons.find((polygon) => polygon.layer === 'LOTEO')?.handle).toBe('2A')
     expect(polygons.find((polygon) => polygon.layer === 'MANZANA')?.handle).toBeNull()
@@ -142,7 +143,9 @@ describe('parseDxf', () => {
   it('returns the polygon vertices in order', () => {
     const dxf = dxfDocument(lwpolyline({ layer: 'LOTES', closed: true, points: square }))
 
-    const [polygon] = parseDxf(dxf)
+    const {
+      polygons: [polygon],
+    } = parseDxf(dxf)
 
     expect(polygon.vertices).toEqual([
       { x: 0, y: 0 },
@@ -158,7 +161,7 @@ describe('parseDxf', () => {
       lwpolyline({ layer: 'CALLES', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons } = parseDxf(dxf)
 
     expect(polygons.map((polygon) => polygon.layer).sort()).toEqual(['CALLE', 'MANZANA'])
   })
@@ -169,25 +172,89 @@ describe('parseDxf', () => {
       lwpolyline({ layer: 'LOTES', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons, issues } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(1)
     expect(polygons[0].layer).toBe('LOTES')
+    expect(issues).toEqual([])
   })
 
-  it('ignores open polylines', () => {
+  it('reports open polylines on relevant layers as an issue instead of the polygon', () => {
     const dxf = dxfDocument(
       lwpolyline({ layer: 'LOTES', closed: false, points: square }),
       lwpolyline({ layer: 'CALLE', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons, issues } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(1)
     expect(polygons[0].layer).toBe('CALLE')
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'OPEN_GEOMETRY', layer: 'LOTES', polygonId: null }),
+    ])
   })
 
-  it('ignores degenerate polygons with fewer than 3 vertices', () => {
+  it('treats a ring redrawn back to its start point (no closed flag) as closed within survey tolerance', () => {
+    // Real DXF files from surveyors close a ring by tracing back to the
+    // start point instead of ticking the CAD tool's "closed" flag; the
+    // gap between first and last vertex is float noise, not a real break.
+    const dxf = dxfDocument(
+      lwpolyline({
+        layer: 'LOTES',
+        closed: false,
+        points: [
+          [5454366.141711058, 6486276.574564104],
+          [5454374.856759446, 6486325.809185373],
+          [5454355.16291094, 6486329.295204728],
+          [5454346.447862548, 6486280.060583459],
+          [5454366.141711059, 6486276.574564104],
+        ],
+      }),
+    )
+
+    const { polygons, issues } = parseDxf(dxf)
+
+    expect(polygons).toHaveLength(1)
+    expect(polygons[0].vertices).toHaveLength(4)
+    expect(issues).toEqual([])
+  })
+
+  it('keeps flagging a gap larger than the closing tolerance as open', () => {
+    const dxf = dxfDocument(
+      lwpolyline({
+        layer: 'LOTES',
+        closed: false,
+        points: [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 0.05],
+        ],
+      }),
+      lwpolyline({ layer: 'CALLE', closed: true, points: square }),
+    )
+
+    const { polygons, issues } = parseDxf(dxf)
+
+    expect(polygons).toHaveLength(1)
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'OPEN_GEOMETRY', layer: 'LOTES', polygonId: null }),
+    ])
+  })
+
+  it('does not report open geometry on layers outside the domain', () => {
+    const dxf = dxfDocument(
+      lwpolyline({ layer: 'MEJORA', closed: false, points: square }),
+      lwpolyline({ layer: 'CALLE', closed: true, points: square }),
+    )
+
+    const { polygons, issues } = parseDxf(dxf)
+
+    expect(polygons).toHaveLength(1)
+    expect(issues).toEqual([])
+  })
+
+  it('reports degenerate polygons with fewer than 3 vertices as an issue', () => {
     const dxf = dxfDocument(
       lwpolyline({
         layer: 'LOTES',
@@ -200,9 +267,88 @@ describe('parseDxf', () => {
       lwpolyline({ layer: 'LOTES', closed: true, points: square }),
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons, issues } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(1)
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'DEGENERATE_POLYGON', layer: 'LOTES', polygonId: null }),
+    ])
+  })
+
+  it('reports self-intersecting polygons as an issue instead of the polygon', () => {
+    const bowtie: Point[] = [
+      [0, 0],
+      [10, 10],
+      [10, 0],
+      [0, 10],
+    ]
+    const dxf = dxfDocument(
+      lwpolyline({ layer: 'LOTES', closed: true, points: bowtie }),
+      lwpolyline({ layer: 'CALLE', closed: true, points: square }),
+    )
+
+    const { polygons, issues } = parseDxf(dxf)
+
+    expect(polygons).toHaveLength(1)
+    expect(polygons[0].layer).toBe('CALLE')
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'SELF_INTERSECTING', layer: 'LOTES', polygonId: null }),
+    ])
+  })
+
+  it('reports overlapping polygons within the same layer', () => {
+    const overlapping: Point[] = [
+      [5, 5],
+      [15, 5],
+      [15, 15],
+      [5, 15],
+    ]
+    const dxf = dxfDocument(
+      lwpolyline({ layer: 'LOTES', closed: true, points: square }),
+      lwpolyline({ layer: 'LOTES', closed: true, points: overlapping }),
+    )
+
+    const { polygons, issues } = parseDxf(dxf)
+
+    expect(polygons).toHaveLength(2)
+    expect(issues).toEqual([expect.objectContaining({ code: 'OVERLAPPING', layer: 'LOTES' })])
+  })
+
+  it('does not report a lot nested inside a block as overlapping (different layers)', () => {
+    const dxf = dxfDocument(
+      lwpolyline({ layer: 'MANZANA', closed: true, points: square }),
+      lwpolyline({
+        layer: 'LOTES',
+        closed: true,
+        points: [
+          [2, 2],
+          [8, 2],
+          [8, 8],
+          [2, 8],
+        ],
+      }),
+    )
+
+    const { issues } = parseDxf(dxf)
+
+    expect(issues).toEqual([])
+  })
+
+  it('does not report adjacent polygons that only share an edge as overlapping', () => {
+    const neighbor: Point[] = [
+      [10, 0],
+      [20, 0],
+      [20, 10],
+      [10, 10],
+    ]
+    const dxf = dxfDocument(
+      lwpolyline({ layer: 'LOTES', closed: true, points: square }),
+      lwpolyline({ layer: 'LOTES', closed: true, points: neighbor }),
+    )
+
+    const { issues } = parseDxf(dxf)
+
+    expect(issues).toEqual([])
   })
 
   it('throws DxfParseError when no valid polygons are found', () => {
@@ -217,7 +363,9 @@ describe('parseDxf', () => {
       [insert({ block: 'LOTE_BLOCK', layer: 'LOTES', x: 1000, y: 2000, scaleX: 2, scaleY: 2 })],
     )
 
-    const [polygon] = parseDxf(dxf)
+    const {
+      polygons: [polygon],
+    } = parseDxf(dxf)
 
     expect(polygon.vertices).toEqual([
       { x: 1000, y: 2000 },
@@ -233,7 +381,7 @@ describe('parseDxf', () => {
       [insert({ block: 'LOTE_BLOCK', layer: 'LOTES', x: 0, y: 0, columnCount: 2, rowCount: 2 })],
     )
 
-    const polygons = parseDxf(dxf)
+    const { polygons } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(4)
     expect(polygons.every((polygon) => polygon.handle === 'AA')).toBe(true)
@@ -276,7 +424,9 @@ describe('parseDxf', () => {
     ].join('\n')
     const dxf = dxfDocument(lines)
 
-    const [polygon] = parseDxf(dxf)
+    const {
+      polygons: [polygon],
+    } = parseDxf(dxf)
 
     expect(polygon.vertices.length).toBeGreaterThan(3)
     expect(polygon.vertices.some((v) => v.y < -1)).toBe(true)
@@ -311,7 +461,7 @@ describe('parseDxf', () => {
     ].join('\n')
     const dxf = dxfDocument(lines, lwpolyline({ layer: 'LOTES', closed: true, points: square }))
 
-    const polygons = parseDxf(dxf)
+    const { polygons } = parseDxf(dxf)
 
     expect(polygons).toHaveLength(1)
   })
