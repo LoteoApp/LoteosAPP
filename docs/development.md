@@ -57,8 +57,6 @@ El segundo comando es destructivo para los datos locales de PostgreSQL.
 | `frontend` | `http://localhost:5173` | Vite con recarga en caliente |
 | `backend` | `http://localhost:8080` | API Go |
 | `db` | `localhost:5432` | PostgreSQL de la aplicación |
-| `keycloak` | `http://localhost:8081` | En desuso; se elimina en [#102](https://github.com/LoteoApp/LoteosAPP/issues/102) |
-| `keycloak-db` | interno (sin puerto publicado) | En desuso; se elimina en [#102](https://github.com/LoteoApp/LoteosAPP/issues/102) |
 
 Endpoints operativos del backend:
 
@@ -143,9 +141,7 @@ contraseña temporal y guarda el rol de dominio en `app_metadata.role`.
 ## Proyecto de Supabase
 
 Épica [#100](https://github.com/LoteoApp/LoteosAPP/issues/100). Queda
-pendiente sacar los servicios `keycloak`/`keycloak-db` de `compose.yaml`
-([#102](https://github.com/LoteoApp/LoteosAPP/issues/102)), que ya no los usa
-nadie, y documentar el mapeo de roles de dominio
+pendiente documentar el mapeo de roles de dominio
 ([#105](https://github.com/LoteoApp/LoteosAPP/issues/105)).
 
 - **Proyecto**: `https://iahqjtpzkntzxoiykhjg.supabase.co` (entorno de
