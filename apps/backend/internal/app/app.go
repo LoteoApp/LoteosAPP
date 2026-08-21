@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"loteosapp/backend/internal/infrastructure/auth/keycloak"
+	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/dependencies"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/server"
@@ -19,11 +19,14 @@ import (
 type App struct {
 	server   *http.Server
 	pool     *pgxpool.Pool
-	verifier *keycloak.Verifier
+	verifier *supabase.Verifier
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg := environments.LoadServer()
+	cfg, err := environments.LoadServer()
+	if err != nil {
+		return nil, err
+	}
 
 	container, err := dependencies.New(ctx, cfg)
 	if err != nil {
