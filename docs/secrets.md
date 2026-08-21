@@ -2,8 +2,8 @@
 
 El proyecto usa [Doppler](https://doppler.com) como fuente compartida de
 secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-etc.). Reemplaza pasar `.env` por chat o email: cada dev se autentica con su
-propia cuenta y lee los valores actuales desde Doppler.
+`DATABASE_URL`, etc.). Reemplaza pasar `.env` por chat o email: cada dev se
+autentica con su propia cuenta y lee los valores actuales desde Doppler.
 
 `.env` local sigue existiendo para quien prefiera no usar el CLI (ver
 `.env.example`), pero Doppler es la fuente de verdad: si un valor cambia, se

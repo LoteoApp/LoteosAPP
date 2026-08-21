@@ -1,36 +1,38 @@
 # LoteosAPP
 
-Monorepo de LoteosAPP con una aplicación React/Vite, una API Go y PostgreSQL.
+Monorepo de LoteosAPP con una aplicación React/Vite y una API Go. La base de
+datos y la autenticación son el proyecto administrado de Supabase. Compose
+todavía define un servicio `db` con PostgreSQL, pero ya no lo usa nadie y se
+retira en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128).
 
 ## Inicio rápido
 
 Requisitos:
 
 - Docker Desktop con Docker Compose.
+- [Doppler CLI](https://doppler.com) para los secrets (`SUPABASE_URL`,
+  `DATABASE_URL`, etc.), ver [docs/secrets.md](docs/secrets.md).
 - Node.js 20.19+ y pnpm 10+ para trabajar con el frontend fuera de Docker.
 - Go 1.26+ para trabajar con el backend fuera de Docker.
 
 Para levantar todo el entorno de desarrollo:
 
 ```powershell
-docker compose up --build
+doppler run -- docker compose up --build
 ```
 
-El comando inicia PostgreSQL, aplica las migraciones pendientes, inicia el
-backend y finalmente inicia el frontend.
+El comando aplica las migraciones pendientes contra la base de Supabase,
+inicia el backend y finalmente inicia el frontend.
 
 Servicios disponibles:
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8080
 - Liveness: http://localhost:8080/healthz
-- Readiness de PostgreSQL: http://localhost:8080/readyz
+- Readiness de la base: http://localhost:8080/readyz
 - Diagnóstico de conexión: http://localhost:8080/api/v1/system
-- PostgreSQL: `localhost:5432`
 
-Las credenciales locales por defecto son `loteosapp` / `loteosapp` para la base
-`loteosapp`. Se pueden sobrescribir con `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_PORT`, `BACKEND_PORT` y `FRONTEND_PORT`.
+Se pueden sobrescribir `BACKEND_PORT` y `FRONTEND_PORT`.
 
 ## Comandos frecuentes
 
@@ -41,11 +43,8 @@ docker compose ps
 # Ver logs de un servicio
 docker compose logs -f backend
 
-# Detener contenedores y conservar los datos de PostgreSQL
+# Detener contenedores
 docker compose down
-
-# Detener y eliminar también el volumen de PostgreSQL (borra los datos locales)
-docker compose down -v
 
 # Verificar el frontend sin Docker
 pnpm install
@@ -64,7 +63,7 @@ apps/
 ├── backend/       # API Go y comandos de migración
 └── frontend/      # React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 docs/              # Documentación técnica
-migrations/        # Migraciones SQL versionadas de PostgreSQL
+migrations/        # Migraciones SQL versionadas de PostgreSQL (Supabase)
 compose.yaml       # Entorno completo de desarrollo
 ```
 
@@ -73,6 +72,7 @@ compose.yaml       # Entorno completo de desarrollo
 - [Índice de documentación](docs/README.md)
 - [Desarrollo y Docker Compose](docs/development.md)
 - [PostgreSQL y migraciones](docs/database.md)
+- [Secrets con Doppler](docs/secrets.md)
 - [Arquitectura y estructura](docs/architecture.md)
 - [Pruebas y cobertura](docs/testing.md)
 - [Integración continua](docs/ci.md)
