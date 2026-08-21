@@ -109,7 +109,11 @@ vacíos antes de que exista una funcionalidad que los necesite.
   el email y el rol de dominio leído de `app_metadata.role`. También
   implementa `gateway.IdentityProvider` contra la Admin REST API de
   Supabase (alta/baja de usuarios), autenticándose con la `service_role`
-  key.
+  key. Los 5 roles de dominio (`administrador`, `administrativo`,
+  `agrimensor`, `escribano`, `inmobiliaria`, ver `internal/business/domain`)
+  son los mismos que tenía el realm de Keycloak: no hubo remapeo de nombres
+  al migrar, solo cambio de transporte (`realm_access.roles` en el JWT de
+  Keycloak → `app_metadata.role`, un único string, en el de Supabase).
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
@@ -383,5 +387,14 @@ secundario de iniciar cada réplica del backend.
   copiando su código fuente cuando haga falta.
 - Go para el backend.
 - PostgreSQL con `pgxpool` para persistencia.
-- Goose y archivos SQL versionados para migraciones.
+- Goose y archivos SQL versionados para migraciones, también contra la base
+  administrada de Supabase ([#126](https://github.com/LoteoApp/LoteosAPP/issues/126)):
+  no se usa el sistema de migraciones propio de Supabase, para no tener dos
+  fuentes de verdad del esquema. El SQL Editor y el Table Editor del dashboard
+  de Supabase no se usan para cambiar el esquema, ni siquiera puntualmente:
+  todo cambio entra como migración Goose revisada en PR. Es una convención de
+  equipo, no algo forzado por Supabase: el proyecto usa una única cuenta
+  compartida entre los desarrolladores, así que el rol **Read Only** de
+  Supabase (que sí bloquearía esto a nivel de plataforma) no aplica — depende
+  de logins individuales y además solo existe en los planes Team/Enterprise.
 - Arquitectura modular por funcionalidad en ambas aplicaciones.
