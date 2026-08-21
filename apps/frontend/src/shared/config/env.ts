@@ -1,11 +1,8 @@
-export const apiUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(
-  /\/$/,
-  '',
-)
+import { DEFAULT_API_URL, DEFAULT_SUPABASE_URL, resolveUrl } from './env-defaults'
 
-export const supabaseUrl = (
-  import.meta.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-).replace(/\/$/, '')
+export const apiUrl = resolveUrl(import.meta.env.VITE_API_URL, DEFAULT_API_URL)
+
+export const supabaseUrl = resolveUrl(import.meta.env.VITE_SUPABASE_URL, DEFAULT_SUPABASE_URL)
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 
 if (import.meta.env.PROD && !supabaseAnonKey) {

@@ -70,6 +70,29 @@ Endpoints operativos del backend:
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 
+### Content-Security-Policy del frontend
+
+Un plugin de Vite (`apps/frontend/vite-plugins/content-security-policy.ts`)
+inyecta un `<meta http-equiv="Content-Security-Policy">` en build time —
+mitigación en capas contra XSS, dado que `supabase-js` guarda la sesión en
+`localStorage` ([#112](https://github.com/LoteoApp/LoteosAPP/issues/112)).
+Detalle y justificación de cada directiva en
+[architecture.md](architecture.md#seguridad-del-frontend).
+
+`connect-src` cubre dos orígenes, tomados de las mismas variables que usa el
+resto del frontend:
+
+- `VITE_SUPABASE_URL` (origen exacto, sin wildcard — un wildcard
+  `*.supabase.co` dejaría pasar cualquier proyecto Supabase ajeno).
+- `VITE_API_URL` — el mismo origen del backend documentado en la tabla de
+  arriba.
+
+Si ninguna de las dos está seteada, el plugin usa los mismos defaults que
+`shared/config/env.ts` (`shared/config/env-defaults.ts`), así que nunca
+queda un placeholder sin resolver ni una política rota por falta de
+variable — a diferencia de escribir la política a mano en `index.html` con
+sustitución `%VAR%` de Vite.
+
 Si un puerto está ocupado, se puede cambiar sin editar Compose:
 
 ```powershell
