@@ -110,7 +110,11 @@ vacíos antes de que exista una funcionalidad que los necesite.
   el email y el rol de dominio leído de `app_metadata.role`. También
   implementa `gateway.IdentityProvider` contra la Admin REST API de
   Supabase (alta/baja de usuarios), autenticándose con la `service_role`
-  key.
+  key. Los 5 roles de dominio (`administrador`, `administrativo`,
+  `agrimensor`, `escribano`, `inmobiliaria`, ver `internal/business/domain`)
+  son los mismos que tenía el realm de Keycloak: no hubo remapeo de nombres
+  al migrar, solo cambio de transporte (`realm_access.roles` en el JWT de
+  Keycloak → `app_metadata.role`, un único string, en el de Supabase).
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
