@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>LoteosAPP — Diagrama de entidades v3</title>
+  <style>
+    body { margin: 0; background: #f7f7f5; color: #222; font-family: ui-sans-serif, system-ui, sans-serif; }
+    header { padding: 16px 24px 8px; }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    p { margin: 0; font-size: 13px; color: #555; max-width: 1100px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Diagrama de entidades v3</h1>
+  <p>
+    Tablas en plural. Timestamps: <code>fecha_creacion</code> / <code>fecha_modificacion</code>.
+    Campos marrones = PK/FK. Línea punteada = FK nullable.
+    Pata de gallo = 0..N, doble barra = 1, círculo = 0..1.
+  </p>
+</header>
+<div style="background:#ffffff; margin: 0 16px 24px; border: 1px solid #e4e4e4; overflow: auto;">
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
+    Diagrama entidad-relación de LoteosApp v3
+  </h2>
+  <div id="erd-root" style="position:relative;width:2000px;height:1750px;font-family:ui-sans-serif,system-ui,sans-serif;"></div>
+</div>
+<script>
+(function(){
+  var root = document.getElementById("erd-root");
+  var HEADER_H = 30, ROW_H = 22, BOX_W = 220;
+  var COL_HEAD = "#f3b3a6", COL_HEAD_TEXT = "#5c2a1f";
+  var COL_ROW_A = "#ffffff", COL_ROW_B = "#f2f2f2";
+  var COL_BORDER = "#b8b8b8", COL_TEXT = "#333333", COL_LINE = "#9aa0a8";
+  var ENUM_HEAD = "#cfe0f3", ENUM_HEAD_TEXT = "#1e3a5f";
+
+  var entities = [
+    {id:"usuarios", x:40, y:40, fields:["id", "auth_provider_id", "email", "nombre", "apellido", "rol", "inmobiliaria_id", "perfil_completo", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"inmobiliarias", x:40, y:354, fields:["id", "razon_social", "cuit", "telefono", "email", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"clientes", x:40, y:602, fields:["id", "nombre", "apellido", "dni", "celular", "email", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"usuario_loteos", x:40, y:872, fields:["id", "usuario_id", "loteo_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"inmobiliaria_loteos", x:40, y:1076, fields:["id", "inmobiliaria_id", "loteo_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"loteos", x:360, y:40, fields:["id", "nombre", "ubicacion", "descripcion", "faja", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"manzanas", x:360, y:398, fields:["id", "loteo_id", "numero", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"manzana_calles", x:360, y:712, fields:["id", "manzana_id", "calle_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"lotes", x:680, y:40, fields:["id", "manzana_id", "loteo_id", "numero", "precio", "moneda", "superficie", "caracteristicas", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"dxf_entidades", x:680, y:464, fields:["id", "loteo_id", "handle_dxf", "capa", "tipo", "propiedades", "geom", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"calles", x:680, y:756, fields:["id", "loteo_id", "dxf_entidad_id", "nombre", "tipo", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"archivos", x:1000, y:40, fields:["id", "loteo_id", "lote_id", "nombre", "nombre_original", "categoria", "tipo_documento", "url", "storage_key", "mime_type", "hash_sha256", "estado_procesamiento", "usuario_modificacion", "fecha", "fecha_procesamiento", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"reservas", x:1320, y:40, fields:["id", "lote_id", "cliente_id", "vendedor_id", "usuario_alta", "usuario_modificacion", "fecha_vencimiento", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"reserva_estados", x:1320, y:332, fields:["id", "reserva_id", "estado", "razon", "usuario_modificacion", "fecha_creacion"]},
+    {id:"ventas", x:1320, y:514, fields:["id", "lote_id", "cliente_id", "modalidad_pago", "monto", "moneda", "vendedor_id", "usuario_alta", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"venta_estados", x:1320, y:850, fields:["id", "venta_id", "estado", "razon", "usuario_modificacion", "fecha_creacion"]},
+    {id:"planes_pago", x:1640, y:40, fields:["id", "venta_id", "monto_entrega", "cantidad_cuotas", "tasa_interes", "periodicidad", "moneda", "usuario_modificacion", "fecha_entrega", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"lote_estados", x:1640, y:354, fields:["id", "lote_id", "estado", "usuario_modificacion", "fecha_creacion"]},
+    {id:"cuotas", x:1640, y:514, fields:["id", "plan_pago_id", "numero", "monto", "estado", "fecha_vencimiento", "fecha_pago", "usuario_modificacion", "fecha_creacion", "fecha_modificacion"]},
+    {id:"cargos_adicionales", x:1640, y:784, fields:["id", "cuota_id", "monto", "moneda", "tipo", "observacion", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]}
+  ];
+  var enums = [
+    {id:"usuarios.rol", x:40, y:1340, values:["administrador", "administrativo", "agrimensor", "escribano", "inmobiliaria"]},
+    {id:"ventas.modalidad_pago", x:280, y:1340, values:["contado", "financiado", "entrega_financiada"]},
+    {id:"venta_estados.estado", x:520, y:1340, values:["activa", "completada", "cancelada"]},
+    {id:"reserva_estados.estado", x:760, y:1340, values:["activa", "vencida", "cancelada", "convertida"]},
+    {id:"lote_estados.estado", x:1000, y:1340, values:["disponible", "reservado", "vendido", "finalizado"]},
+    {id:"cuotas.estado", x:1240, y:1340, values:["pendiente", "pagada", "vencida"]},
+    {id:"calles.tipo", x:1480, y:1340, values:["asfalto", "tierra", "brosa", "granito"]},
+    {id:"loteos.faja", x:1720, y:1340, values:["5", "6"]},
+    {id:"archivos.categoria", x:40, y:1510, values:["dxf", "foto", "plano", "documento_legal"]},
+    {id:"archivos.estado_procesamiento", x:280, y:1510, values:["pendiente", "procesado", "error"]}
+  ];
+  var notes = [
+    {id:"note_archivo", x:1000, y:486, w:220, h:56, text:"CHECK: exactamente uno de loteo_id o lote_id"},
+    {id:"note_integrity", x:1000, y:562, w:220, h:250, text:"Uniques: clientes.dni; lotes (loteo_id, numero); una reserva activa por lote; una venta activa por lote; usuario_loteos (usuario_id, loteo_id); inmobiliaria_loteos (inmobiliaria_id, loteo_id). loteo_id en lotes debe coincidir con manzanas.loteo_id. inmobiliaria_id en usuarios solo si rol = inmobiliaria. geom = polígono PostGIS (nullable si no hay DXF). reserva_estados, venta_estados y lote_estados son historial append-only (sin fecha_modificacion). usuario_alta y usuario_modificacion no se dibujan como arista."}
+  ];
+
+    var relations = [
+      ["manzanas","loteos","many","one",false],
+      ["manzana_calles","manzanas","many","one",false],
+      ["manzana_calles","calles","many","one",false],
+      ["lotes","manzanas","many","one",false],
+      ["lotes","loteos","many","one",false],
+      ["calles","loteos","many","one",false],
+      ["dxf_entidades","loteos","many","one",false],
+      ["loteos","dxf_entidades","zero-one","zero-one",true],
+      ["manzanas","dxf_entidades","zero-one","zero-one",true],
+      ["lotes","dxf_entidades","zero-one","zero-one",true],
+      ["calles","dxf_entidades","zero-one","zero-one",true],
+      ["archivos","loteos","many","zero-one",true],
+      ["archivos","lotes","many","zero-one",true],
+      ["usuarios","inmobiliarias","many","zero-one",true],
+      ["usuario_loteos","usuarios","many","one",false],
+      ["usuario_loteos","loteos","many","one",false],
+      ["inmobiliaria_loteos","inmobiliarias","many","one",false],
+      ["inmobiliaria_loteos","loteos","many","one",false],
+      ["reservas","lotes","many","one",false],
+      ["reservas","clientes","many","one",false],
+      ["reservas","usuarios","many","one",false],
+      ["reserva_estados","reservas","many","one",false],
+      ["ventas","lotes","many","one",false],
+      ["ventas","clientes","many","one",false],
+      ["ventas","usuarios","many","one",false],
+      ["venta_estados","ventas","many","one",false],
+      ["planes_pago","ventas","zero-one","one",true],
+      ["cuotas","planes_pago","many","one",false],
+      ["cargos_adicionales","cuotas","many","one",false],
+      ["lote_estados","lotes","many","one",false]
+    ];
+
+
+  var byId = {};
+  entities.forEach(function(e){
+    e.w = BOX_W;
+    e.h = HEADER_H + e.fields.length * ROW_H;
+    e.top = e.y; e.bottom = e.y + e.h;
+    e.left = e.x; e.right = e.x + e.w;
+    e.cx = e.x + e.w / 2;
+    e.cy = e.y + e.h / 2;
+    byId[e.id] = e;
+  });
+
+  var svgNS = "http://www.w3.org/2000/svg";
+  var svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("width", "2000");
+  svg.setAttribute("height", "1750");
+  svg.setAttribute("viewBox", "0 0 2000 1750");
+  svg.style.position = "absolute";
+  svg.style.left = "0"; svg.style.top = "0"; svg.style.zIndex = "1";
+  root.appendChild(svg);
+
+  function line(x1,y1,x2,y2,dashed){
+    var l = document.createElementNS(svgNS,"line");
+    l.setAttribute("x1",x1); l.setAttribute("y1",y1);
+    l.setAttribute("x2",x2); l.setAttribute("y2",y2);
+    l.setAttribute("stroke", COL_LINE);
+    l.setAttribute("stroke-width","1.4");
+    if (dashed) l.setAttribute("stroke-dasharray","5,4");
+    svg.appendChild(l);
+  }
+  function polyline(points, dashed){
+    for (var i=0;i<points.length-1;i++){
+      line(points[i][0],points[i][1],points[i+1][0],points[i+1][1], dashed);
+    }
+  }
+  function axis(dir){
+    if (dir==="N") return {ax:0, ay:-1, px:1, py:0};
+    if (dir==="S") return {ax:0, ay:1,  px:1, py:0};
+    if (dir==="E") return {ax:1, ay:0,  px:0, py:1};
+    return {ax:-1,ay:0,  px:0, py:1};
+  }
+  function endSymbol(x,y,dir,type){
+    var a = axis(dir);
+    function P(dist,perp){ return [x + a.ax*dist + a.px*perp, y + a.ay*dist + a.py*perp]; }
+    if (type==="one"){
+      [6,12].forEach(function(d){
+        var p1=P(d,-8), p2=P(d,8);
+        line(p1[0],p1[1],p2[0],p2[1]);
+      });
+    } else if (type==="zero-one"){
+      var b1=P(6,-8), b2=P(6,8);
+      line(b1[0],b1[1],b2[0],b2[1]);
+      var c=P(16,0);
+      var circle = document.createElementNS(svgNS,"circle");
+      circle.setAttribute("cx",c[0]); circle.setAttribute("cy",c[1]); circle.setAttribute("r","5");
+      circle.setAttribute("fill","#ffffff"); circle.setAttribute("stroke",COL_LINE); circle.setAttribute("stroke-width","1.4");
+      svg.appendChild(circle);
+    } else if (type==="many"){
+      var tip1=P(14,-8), tip2=P(14,8), tip3=P(14,0);
+      [tip1,tip2,tip3].forEach(function(t){ line(x,y,t[0],t[1]); });
+      var c2=P(22,0);
+      var circle2 = document.createElementNS(svgNS,"circle");
+      circle2.setAttribute("cx",c2[0]); circle2.setAttribute("cy",c2[1]); circle2.setAttribute("r","5");
+      circle2.setAttribute("fill","#ffffff"); circle2.setAttribute("stroke",COL_LINE); circle2.setAttribute("stroke-width","1.4");
+      svg.appendChild(circle2);
+    }
+  }
+
+  function sideFor(from, to){
+    var dx = to.cx - from.cx, dy = to.cy - from.cy;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0
+        ? {from:"E", to:"W", fx:from.right, fy:from.cy, tx:to.left, ty:to.cy}
+        : {from:"W", to:"E", fx:from.left, fy:from.cy, tx:to.right, ty:to.cy};
+    }
+    return dy >= 0
+      ? {from:"S", to:"N", fx:from.cx, fy:from.bottom, tx:to.cx, ty:to.top}
+      : {from:"N", to:"S", fx:from.cx, fy:from.top, tx:to.cx, ty:to.bottom};
+  }
+
+  function route(from, to){
+    var s = sideFor(from, to);
+    var points;
+    if (s.from === "E" || s.from === "W") {
+      var mid = (s.fx + s.tx) / 2;
+      points = [[s.fx,s.fy],[mid,s.fy],[mid,s.ty],[s.tx,s.ty]];
+    } else {
+      var midy = (s.fy + s.ty) / 2;
+      points = [[s.fx,s.fy],[s.fx,midy],[s.tx,midy],[s.tx,s.ty]];
+    }
+    return {points: points, fromDir: s.from, toDir: s.to};
+  }
+
+  relations.forEach(function(r){
+    var child = byId[r[0]], parent = byId[r[1]];
+    if (!child || !parent) return;
+    var routed = route(child, parent);
+    polyline(routed.points, r[4]);
+    endSymbol(routed.points[0][0], routed.points[0][1], routed.fromDir, r[2]);
+    endSymbol(routed.points[routed.points.length-1][0], routed.points[routed.points.length-1][1], routed.toDir, r[3]);
+  });
+
+  function box(x,y,w,h){
+    var el = document.createElement("div");
+    el.style.position = "absolute";
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    el.style.width = w + "px";
+    el.style.border = "1px solid " + COL_BORDER;
+    el.style.borderRadius = "4px";
+    el.style.overflow = "hidden";
+    el.style.zIndex = "2";
+    el.style.boxShadow = "0 1px 2px rgba(0,0,0,0.06)";
+    return el;
+  }
+  function header(text, bg, fg, h){
+    var el = document.createElement("div");
+    el.style.height = h + "px";
+    el.style.lineHeight = h + "px";
+    el.style.background = bg;
+    el.style.color = fg;
+    el.style.fontWeight = "700";
+    el.style.fontSize = "12px";
+    el.style.textAlign = "center";
+    el.style.borderBottom = "1px solid " + COL_BORDER;
+    el.style.padding = "0 4px";
+    el.style.whiteSpace = "nowrap";
+    el.style.overflow = "hidden";
+    el.style.textOverflow = "ellipsis";
+    el.textContent = text;
+    return el;
+  }
+
+  entities.forEach(function(e){
+    var el = box(e.x, e.y, e.w, e.h);
+    el.appendChild(header(e.id, COL_HEAD, COL_HEAD_TEXT, HEADER_H));
+    e.fields.forEach(function(f,i){
+      var row = document.createElement("div");
+      row.style.height = ROW_H + "px";
+      row.style.lineHeight = ROW_H + "px";
+      row.style.background = (i % 2 === 0) ? COL_ROW_A : COL_ROW_B;
+      row.style.fontFamily = "Consolas, 'SF Mono', Menlo, monospace";
+      row.style.fontSize = "11px";
+      var isId = f === "id";
+      var isFk = f.slice(-3) === "_id" || f === "auth_provider_id" || f === "usuario_modificacion" || f === "geom";
+      row.style.color = (isId || isFk) ? "#8a5a3a" : COL_TEXT;
+      row.style.fontWeight = isId ? "700" : "400";
+      row.style.padding = "0 10px";
+      row.style.borderBottom = "1px solid #ececec";
+      row.textContent = f;
+      el.appendChild(row);
+    });
+    root.appendChild(el);
+  });
+
+  enums.forEach(function(en){
+    var h = HEADER_H + en.values.length * 20;
+    var el = box(en.x, en.y, 220, h);
+    el.appendChild(header(en.id, ENUM_HEAD, ENUM_HEAD_TEXT, HEADER_H));
+    en.values.forEach(function(v,i){
+      var row = document.createElement("div");
+      row.style.height = "20px";
+      row.style.lineHeight = "20px";
+      row.style.background = (i % 2 === 0) ? COL_ROW_A : COL_ROW_B;
+      row.style.fontFamily = "Consolas, 'SF Mono', Menlo, monospace";
+      row.style.fontSize = "11px";
+      row.style.color = COL_TEXT;
+      row.style.padding = "0 10px";
+      row.style.borderBottom = "1px solid #ececec";
+      row.textContent = "'" + v + "'";
+      el.appendChild(row);
+    });
+    root.appendChild(el);
+  });
+
+  notes.forEach(function(n){
+    var el = document.createElement("div");
+    el.style.position = "absolute";
+    el.style.left = n.x + "px";
+    el.style.top = n.y + "px";
+    el.style.width = n.w + "px";
+    el.style.height = n.h + "px";
+    el.style.background = "#fff7e8";
+    el.style.border = "1px dashed #d6b656";
+    el.style.borderRadius = "6px";
+    el.style.color = "#5b4a24";
+    el.style.fontFamily = "Consolas, 'SF Mono', Menlo, monospace";
+    el.style.fontSize = "10px";
+    el.style.padding = "8px 10px";
+    el.style.boxSizing = "border-box";
+    el.style.zIndex = "2";
+    el.style.lineHeight = "1.35";
+    el.textContent = n.text;
+    root.appendChild(el);
+  });
+})();
+</script>
+</body>
+</html>

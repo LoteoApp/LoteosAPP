@@ -6,6 +6,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
 
 - [Dominio](domain.md): entidades, roles y permisos, reglas de negocio,
   ciclo de vida del lote y estructura requerida del archivo DXF.
+- [Diagrama de entidades v3](diagrama-entidades-v3.drawio): modelo relacional
+  ([vista HTML](diagrama-entidades-v3.html)).
 - [Desarrollo y Docker Compose](development.md): requisitos, arranque, puertos,
   variables de entorno, logs y resolución de problemas.
 - [PostgreSQL y migraciones](database.md): conexión desde Go, Goose, creación,
