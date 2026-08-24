@@ -13,10 +13,11 @@ import (
 )
 
 type Container struct {
-	Handler     *handler.Handler
-	UserHandler *handler.UserHandler
-	Pool        *pgxpool.Pool
-	Verifier    *supabase.Verifier
+	Handler       *handler.Handler
+	UserHandler   *handler.UserHandler
+	ClientHandler *handler.ClientHandler
+	Pool          *pgxpool.Pool
+	Verifier      *supabase.Verifier
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -40,10 +41,15 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	userService := usecase.NewUserService(userRepo, adminClient)
 	uh := handler.NewUserHandler(userService)
 
+	clientRepo := postgres.NewClientRepository(pool)
+	clientService := usecase.NewClientService(clientRepo, userRepo)
+	ch := handler.NewClientHandler(clientService)
+
 	return &Container{
-		Handler:     h,
-		UserHandler: uh,
-		Pool:        pool,
-		Verifier:    verifier,
+		Handler:       h,
+		UserHandler:   uh,
+		ClientHandler: ch,
+		Pool:          pool,
+		Verifier:      verifier,
 	}, nil
 }

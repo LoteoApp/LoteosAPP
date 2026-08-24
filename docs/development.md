@@ -75,6 +75,16 @@ Endpoints operativos del backend:
   temporal de un solo uso.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
+- `GET /api/v1/clientes` (roles `administrador`, `administrativo`,
+  `inmobiliaria`): lista los clientes activos. El parámetro opcional `buscar`
+  filtra por nombre, apellido o DNI.
+- `POST /api/v1/clientes` (mismos roles): da de alta un cliente. Nombre,
+  apellido y DNI son obligatorios; el DNI no puede repetirse entre clientes
+  activos.
+- `PATCH /api/v1/clientes/{id}` (mismos roles): modifica un cliente.
+- `DELETE /api/v1/clientes/{id}` (requiere rol `administrador`): da de baja al
+  cliente. Es una baja lógica (`fecha_baja`), que además libera su DNI para
+  un alta futura.
 
 ### Content-Security-Policy del frontend
 
