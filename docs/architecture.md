@@ -20,9 +20,8 @@ Las prioridades son:
 ```mermaid
 flowchart LR
     frontend["Frontend React/Vite"] -->|HTTP| backend["Backend Go"]
-    backend -->|pgxpool| db["PostgreSQL"]
+    backend -->|pgxpool| db["PostgreSQL (Supabase)"]
     migrate["Goose migrate"] -->|aplica SQL| db
-    db -->|healthcheck| migrate
     migrate -->|service_completed_successfully| backend
     backend -->|healthcheck| frontend
 ```
@@ -110,7 +109,11 @@ vacíos antes de que exista una funcionalidad que los necesite.
   el email y el rol de dominio leído de `app_metadata.role`. También
   implementa `gateway.IdentityProvider` contra la Admin REST API de
   Supabase (alta/baja de usuarios), autenticándose con la `service_role`
-  key.
+  key. Los 5 roles de dominio (`administrador`, `administrativo`,
+  `agrimensor`, `escribano`, `inmobiliaria`, ver `internal/business/domain`)
+  son los mismos que tenía el realm de Keycloak: no hubo remapeo de nombres
+  al migrar, solo cambio de transporte (`realm_access.roles` en el JWT de
+  Keycloak → `app_metadata.role`, un único string, en el de Supabase).
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
@@ -361,11 +364,14 @@ object-src 'none';
 
 ## Flujo de arranque local
 
-`compose.yaml` define cuatro servicios:
+`compose.yaml` define cuatro servicios. Tres están activos; `db` sigue
+levantándose con `docker compose up` pero ya no respalda a nadie y se retira
+en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128) (ver
+[development.md](development.md#arrancar-todo-con-docker)):
 
-- `db`: PostgreSQL con volumen persistente y health check `pg_isready`.
-- `migrate`: aplica las migraciones pendientes y termina correctamente.
-- `backend`: inicia la API después de la base y las migraciones.
+- `migrate`: aplica las migraciones pendientes contra la base de Supabase y
+  termina correctamente.
+- `backend`: inicia la API después de las migraciones.
 - `frontend`: inicia Vite después de que el backend esté saludable.
 
 Las migraciones son un proceso separado. Nunca se ejecutan como efecto
@@ -381,5 +387,14 @@ secundario de iniciar cada réplica del backend.
   copiando su código fuente cuando haga falta.
 - Go para el backend.
 - PostgreSQL con `pgxpool` para persistencia.
-- Goose y archivos SQL versionados para migraciones.
+- Goose y archivos SQL versionados para migraciones, también contra la base
+  administrada de Supabase ([#126](https://github.com/LoteoApp/LoteosAPP/issues/126)):
+  no se usa el sistema de migraciones propio de Supabase, para no tener dos
+  fuentes de verdad del esquema. El SQL Editor y el Table Editor del dashboard
+  de Supabase no se usan para cambiar el esquema, ni siquiera puntualmente:
+  todo cambio entra como migración Goose revisada en PR. Es una convención de
+  equipo, no algo forzado por Supabase: el proyecto usa una única cuenta
+  compartida entre los desarrolladores, así que el rol **Read Only** de
+  Supabase (que sí bloquearía esto a nivel de plataforma) no aplica — depende
+  de logins individuales y además solo existe en los planes Team/Enterprise.
 - Arquitectura modular por funcionalidad en ambas aplicaciones.

@@ -15,8 +15,8 @@ import (
 )
 
 // TestUserRepository is an integration test: it needs a real PostgreSQL
-// instance with migrations applied (see docker compose's db service) and is
-// skipped when DATABASE_URL is not set.
+// instance with migrations applied (see docs/database.md for the Supabase
+// pooler connection) and is skipped when DATABASE_URL is not set.
 func TestUserRepository(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

@@ -153,6 +153,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: docker compose config
+        env:
+          # Placeholder values: compose.yaml requires DATABASE_URL to be set so
+          # a real run fails fast instead of falling back to a local database.
+          # This job only validates the file, it never connects anywhere.
+          DATABASE_URL: postgres://user:password@localhost:5432/postgres?sslmode=require
         run: docker compose config
 
   main-source-branch:

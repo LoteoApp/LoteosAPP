@@ -23,14 +23,11 @@ services:
     working_dir: /app
     command: ["go", "run", "./cmd/migrate"]
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required, see docs/secrets.md}
       MIGRATIONS_DIR: /workspace/migrations
     volumes:
       - ./apps/backend:/app
       - ./migrations:/workspace/migrations:ro
-    depends_on:
-      db:
-        condition: service_healthy
 
   backend:
     build:
@@ -39,7 +36,7 @@ services:
     working_dir: /app
     command: ["go", "run", "./cmd/server"]
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required, see docs/secrets.md}
       PORT: 8080
       FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
       SUPABASE_URL: ${SUPABASE_URL}
@@ -48,6 +45,7 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - ./apps/backend:/app
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/readyz > /dev/null || exit 1"]
       interval: 5s
@@ -55,8 +53,6 @@ services:
       retries: 12
       start_period: 5s
     depends_on:
-      db:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 

@@ -18,11 +18,17 @@ type Migration struct {
 	MigrationsDir string
 }
 
-// LoadServer reads the server configuration from the environment. The
-// Supabase settings have no fallback: the service_role key grants full
-// administrative access to the auth project, so it must always come from
-// the environment and never from a value committed to the repository.
+// LoadServer reads the server configuration from the environment. DATABASE_URL
+// and the Supabase settings have no fallback: DATABASE_URL points at a shared
+// Supabase project (see docs/database.md), and the service_role key grants
+// full administrative access to the auth project, so both must always come
+// from the environment and never from a value committed to the repository.
 func LoadServer() (Server, error) {
+	databaseURL, err := requiredEnv("DATABASE_URL")
+	if err != nil {
+		return Server{}, err
+	}
+
 	supabaseURL, err := requiredEnv("SUPABASE_URL")
 	if err != nil {
 		return Server{}, err
@@ -34,7 +40,7 @@ func LoadServer() (Server, error) {
 	}
 
 	return Server{
-		DatabaseURL:            envOrDefault("DATABASE_URL", defaultDatabaseURL),
+		DatabaseURL:            databaseURL,
 		FrontendOrigin:         envOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
 		Port:                   envOrDefault("PORT", "8080"),
 		SupabaseURL:            supabaseURL,
@@ -42,11 +48,16 @@ func LoadServer() (Server, error) {
 	}, nil
 }
 
-func LoadMigration() Migration {
-	return Migration{
-		DatabaseURL:   envOrDefault("DATABASE_URL", defaultDatabaseURL),
-		MigrationsDir: envOrDefault("MIGRATIONS_DIR", "migrations"),
+func LoadMigration() (Migration, error) {
+	databaseURL, err := requiredEnv("DATABASE_URL")
+	if err != nil {
+		return Migration{}, err
 	}
+
+	return Migration{
+		DatabaseURL:   databaseURL,
+		MigrationsDir: envOrDefault("MIGRATIONS_DIR", "migrations"),
+	}, nil
 }
 
 func envOrDefault(name, fallback string) string {
@@ -65,5 +76,3 @@ func requiredEnv(name string) (string, error) {
 
 	return value, nil
 }
-
-const defaultDatabaseURL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"
