@@ -44,9 +44,14 @@ apps/backend/
 │   │   ├── domain/
 │   │   │   └── system.go
 │   │   ├── gateway/
-│   │   │   └── repository.go
+│   │   │   ├── repository.go
+│   │   │   └── gatewayfake/
+│   │   │       └── repository.go
 │   │   └── usecase/
-│   │       └── service.go
+│   │       ├── system/
+│   │       │   └── get_system_info.go
+│   │       └── users/
+│   │           └── create_user.go
 │   └── infrastructure/
 │       ├── environments/
 │       │   └── config.go
@@ -62,8 +67,15 @@ apps/backend/
 │           └── webapp/
 │               ├── dependencies/
 │               │   └── dependencies.go
+│               ├── dto/
+│               │   ├── system/
+│               │   │   └── status.go
+│               │   └── users/
+│               │       └── create_user.go
 │               ├── handler/
-│               │   └── handler.go
+│               │   ├── live.go
+│               │   ├── get_system_info.go
+│               │   └── create_user.go
 │               ├── middleware/
 │               │   └── auth.go
 │               ├── response/
@@ -99,9 +111,15 @@ vacíos antes de que exista una funcionalidad que los necesite.
   depender de HTTP ni de PostgreSQL.
 - `internal/business/gateway`: contratos (interfaces) que el negocio necesita de
   sus adaptadores, como `Repository`. Los casos de uso dependen de estos
-  contratos, nunca de una implementación concreta.
+  contratos, nunca de una implementación concreta. `gateway/gatewayfake`
+  contiene fakes de esos contratos para tests, ubicados junto a las
+  interfaces que implementan en vez de duplicarse en cada paquete de
+  `usecase`.
 - `internal/business/usecase`: casos de uso que orquestan el dominio a través de
-  los contratos de `gateway`.
+  los contratos de `gateway`, agrupados en subpaquetes por funcionalidad
+  (`usecase/system`, `usecase/users`). Cada caso de uso es una interfaz de un
+  solo método `Execute` junto con su implementación, definidas en el mismo
+  archivo (por ejemplo `usecase/users/create_user.go`).
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
 - `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
@@ -120,10 +138,34 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
   la apertura y configuración del pool de conexiones.
+- `internal/infrastructure/delivery/webapp/dto`: structs de request/response
+  HTTP, agrupados por feature (`dto/system`, `dto/users`) igual que
+  `usecase`. Cada subpaquete declara `package dto`; como el identificador de
+  paquete no tiene que coincidir con el nombre del directorio, no choca con
+  `usecase/system` ni `usecase/users` al importarse en el mismo archivo de
+  `handler`.
 - `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
-  llamadas del caso de uso y convierte el resultado en una respuesta.
+  llamadas del caso de uso, decodificando y codificando los tipos de `dto`, y
+  convierte el resultado en una respuesta. Cada ruta tiene su propio handler
+  independiente, con un único caso de uso como dependencia (por ejemplo
+  `CreateUserHandler` sólo conoce `users.CreateUser`); no hay un handler
+  compartido que agrupe varias rutas. Un handler implementa `HTTPHandler`
+  (`Handle(w, r) error`) en vez de escribir su propia respuesta de error: el
+  error del caso de uso (o de `decodeJSON`) simplemente se retorna, y
+  `Adapt(h, timeout)` lo convierte en `http.HandlerFunc` llamando a
+  `response.WriteError`. `Adapt` también acota `r.Context()` al `timeout`
+  antes de llamar a `Handle`, así que ningún handler arma su propio
+  `context.WithTimeout`; usa `request.Context()` directo. Un handler sin
+  ningún error posible (como `Live`) queda como función suelta, sin
+  envolverlo en un struct solo para cumplir la interfaz.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
-  consistentes, de éxito y de error.
+  consistentes, de éxito y de error. `WriteError` es el único lugar que
+  traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`
+  tal cual, loguea su `Cause` (si existe) sin exponerlo, y mapea su `Kind`
+  (una clasificación de negocio, no un status HTTP) a un status con una
+  función chica y cerrada. Un error que no sea `*domain.Error` se loguea y se
+  devuelve como 500 genérico, sin exponer el detalle interno. Los handlers no
+  arman ese mapeo por su cuenta.
 - `internal/infrastructure/delivery/webapp/route`: registra los endpoints HTTP
   sobre un `*http.ServeMux` a partir de los handlers.
 - `internal/infrastructure/delivery/webapp/server`: construye el `*http.Server`
@@ -144,11 +186,15 @@ flowchart LR
     route --> middleware["infrastructure/delivery/webapp/middleware"]
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
-    handler --> usecase["business/usecase"]
+    handler --> usecaseSystem["business/usecase/system"]
+    handler --> usecaseUsers["business/usecase/users"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
-    usecase --> gateway
-    usecase --> domain["business/domain"]
+    usecaseSystem --> gateway
+    usecaseUsers --> gateway
+    usecaseSystem --> domain["business/domain"]
+    usecaseUsers --> domain
+    response --> domain
     gateway --> domain
 ```
 
@@ -182,7 +228,7 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
   necesidad concreta.
 - Las transacciones se controlan desde el caso de uso cuando una operación de
   negocio requiera atomicidad.
-- Los servicios se prueban con implementaciones fake de sus contratos.
+- Los casos de uso se prueban con los fakes de `gateway/gatewayfake`.
 - Los handlers se prueban con `httptest`.
 - Los repositorios PostgreSQL se prueban como integración contra una base real.
 

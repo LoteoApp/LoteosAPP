@@ -34,7 +34,13 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux, container.Handler, container.UserHandler, container.Verifier)
+	route.RegisterRoutes(mux,
+		container.GetSystemInfoHandler,
+		container.CheckDatabaseReadinessHandler,
+		container.CreateUserHandler,
+		container.CompleteProfileHandler,
+		container.Verifier,
+	)
 
 	return &App{
 		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
