@@ -1,0 +1,42 @@
+package handler
+
+import (
+	"net/http"
+
+	"loteosapp/backend/internal/business/usecase/users"
+	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/users"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
+)
+
+type CreateUserHandler struct {
+	createUser users.CreateUser
+}
+
+func NewCreateUserHandler(createUser users.CreateUser) *CreateUserHandler {
+	return &CreateUserHandler{createUser: createUser}
+}
+
+// Handle handles the administrador-only user sign-up. It must run behind
+// middleware.RequireAuth.
+func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Request) error {
+	// PrincipalFromContext is always populated here: this handler only ever
+	// runs behind middleware.RequireAuth.
+	principal, _ := middleware.PrincipalFromContext(request.Context())
+
+	body, err := decodeJSON[dto.CreateUserRequest](request)
+	if err != nil {
+		return err
+	}
+
+	usuario, temporaryPassword, err := handler.createUser.Execute(request.Context(), principal.Roles, body.Email, body.Rol)
+	if err != nil {
+		return err
+	}
+
+	response.WriteJSON(w, http.StatusCreated, dto.CreateUserResponse{
+		Usuario:           usuario,
+		TemporaryPassword: temporaryPassword,
+	})
+	return nil
+}
