@@ -36,7 +36,7 @@ func (handler *CompleteProfileHandler) CompleteProfile(w http.ResponseWriter, re
 
 	usuario, err := handler.completeProfile.Execute(ctx, principal.Subject, body.Nombre, body.Apellido)
 	if err != nil {
-		writeUserError(w, request, "complete profile failed", err)
+		response.WriteError(w, request, "complete profile failed", err)
 		return
 	}
 

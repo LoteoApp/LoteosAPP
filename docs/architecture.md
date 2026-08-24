@@ -151,7 +151,12 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `CreateUserHandler` sólo conoce `users.CreateUser`); no hay un handler
   compartido que agrupe varias rutas.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
-  consistentes, de éxito y de error.
+  consistentes, de éxito y de error. `WriteError` es el único lugar que
+  traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`
+  tal cual, y mapea su `Kind` (una clasificación de negocio, no un status
+  HTTP) a un status con una función chica y cerrada. Un error que no sea
+  `*domain.Error` se loguea y se devuelve como 500 genérico, sin exponer el
+  detalle interno. Los handlers no arman ese mapeo por su cuenta.
 - `internal/infrastructure/delivery/webapp/route`: registra los endpoints HTTP
   sobre un `*http.ServeMux` a partir de los handlers.
 - `internal/infrastructure/delivery/webapp/server`: construye el `*http.Server`
@@ -180,6 +185,7 @@ flowchart LR
     usecaseUsers --> gateway
     usecaseSystem --> domain["business/domain"]
     usecaseUsers --> domain
+    response --> domain
     gateway --> domain
 ```
 

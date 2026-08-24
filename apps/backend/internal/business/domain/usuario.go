@@ -1,17 +1,14 @@
 package domain
 
-import (
-	"errors"
-	"time"
-)
+import "time"
 
 var (
-	ErrEmailEnUso          = errors.New("email ya está en uso")
-	ErrUsuarioNoEncontrado = errors.New("usuario no encontrado")
-	ErrNoAutorizado        = errors.New("no autorizado")
-	ErrEmailInvalido       = errors.New("email inválido")
-	ErrRolInvalido         = errors.New("rol inválido")
-	ErrPerfilInvalido      = errors.New("nombre y apellido son obligatorios")
+	ErrEmailEnUso          = &Error{Kind: KindConflict, Code: "email_in_use", Message: "El email ya está en uso"}
+	ErrUsuarioNoEncontrado = &Error{Kind: KindNotFound, Code: "user_not_found", Message: "Usuario no encontrado"}
+	ErrNoAutorizado        = &Error{Kind: KindForbidden, Code: "forbidden", Message: "No tenés permisos para esta acción"}
+	ErrEmailInvalido       = &Error{Kind: KindInvalid, Code: "invalid_email", Message: "Email inválido"}
+	ErrRolInvalido         = &Error{Kind: KindInvalid, Code: "invalid_rol", Message: "Rol inválido"}
+	ErrPerfilInvalido      = &Error{Kind: KindInvalid, Code: "invalid_profile", Message: "Nombre y apellido son obligatorios"}
 )
 
 type Usuario struct {

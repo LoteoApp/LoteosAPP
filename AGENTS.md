@@ -30,6 +30,14 @@
 - Follow the dependency rules documented in `docs/architecture.md`.
 - Backend domain and use cases (`internal/business`) must not depend on HTTP,
   PostgreSQL, or concrete `pgx` types.
+- Business errors a use case returns to a caller are `*domain.Error` (`Kind`,
+  `Code`, `Message`), not `errors.New(...)`. `Kind` is a business
+  classification (`KindInvalid`, `KindForbidden`, `KindConflict`,
+  `KindNotFound`), never an HTTP status. `response.WriteError` is the single
+  place that maps `Kind` to an HTTP status and writes `Code`/`Message`;
+  handlers call it directly instead of writing their own error-mapping
+  `switch`. Errors that aren't `*domain.Error` (unexpected failures) are
+  logged and hidden behind a generic 500.
 - Keep domain entities under `internal/business/domain`, contracts the
   business needs from its adapters (e.g. `Repository`) under
   `internal/business/gateway`, and use cases under `internal/business/usecase`.

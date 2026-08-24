@@ -36,7 +36,7 @@ func (handler *CreateUserHandler) Create(w http.ResponseWriter, request *http.Re
 
 	usuario, temporaryPassword, err := handler.createUser.Execute(ctx, principal.Roles, body.Email, body.Rol)
 	if err != nil {
-		writeUserError(w, request, "create user failed", err)
+		response.WriteError(w, request, "create user failed", err)
 		return
 	}
 
