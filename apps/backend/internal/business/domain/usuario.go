@@ -20,29 +20,7 @@ type Usuario struct {
 	Email          string    `json:"email"`
 	Nombre         string    `json:"nombre"`
 	Apellido       string    `json:"apellido"`
-	Rol            string    `json:"rol"`
+	Rol            Rol       `json:"rol"`
 	PerfilCompleto bool      `json:"perfilCompleto"`
 	CreatedAt      time.Time `json:"createdAt"`
-}
-
-// Roles de dominio documentados en docs/domain.md, sección "Usuarios y roles".
-const (
-	RolAdministrador  = "administrador"
-	RolAdministrativo = "administrativo"
-	RolAgrimensor     = "agrimensor"
-	RolEscribano      = "escribano"
-	RolInmobiliaria   = "inmobiliaria"
-)
-
-var rolesValidos = map[string]struct{}{
-	RolAdministrador:  {},
-	RolAdministrativo: {},
-	RolAgrimensor:     {},
-	RolEscribano:      {},
-	RolInmobiliaria:   {},
-}
-
-func RolValido(rol string) bool {
-	_, ok := rolesValidos[rol]
-	return ok
 }

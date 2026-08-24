@@ -5,7 +5,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"loteosapp/backend/internal/business/usecase"
+	"loteosapp/backend/internal/business/usecase/system"
+	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/environments"
@@ -13,10 +14,12 @@ import (
 )
 
 type Container struct {
-	Handler     *handler.Handler
-	UserHandler *handler.UserHandler
-	Pool        *pgxpool.Pool
-	Verifier    *supabase.Verifier
+	GetSystemInfoHandler          *handler.GetSystemInfoHandler
+	CheckDatabaseReadinessHandler *handler.CheckDatabaseReadinessHandler
+	CreateUserHandler             *handler.CreateUserHandler
+	CompleteProfileHandler        *handler.CompleteProfileHandler
+	Pool                          *pgxpool.Pool
+	Verifier                      *supabase.Verifier
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -32,18 +35,20 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	}
 
 	repo := postgres.NewRepository(pool)
-	service := usecase.NewService(repo)
-	h := handler.NewHandler(service)
+	getSystemInfoHandler := handler.NewGetSystemInfoHandler(system.NewGetSystemInfo(repo))
+	checkDatabaseReadinessHandler := handler.NewCheckDatabaseReadinessHandler(system.NewCheckDatabaseReadiness(repo))
 
 	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
 	userRepo := postgres.NewUserRepository(pool)
-	userService := usecase.NewUserService(userRepo, adminClient)
-	uh := handler.NewUserHandler(userService)
+	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
+	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
 	return &Container{
-		Handler:     h,
-		UserHandler: uh,
-		Pool:        pool,
-		Verifier:    verifier,
+		GetSystemInfoHandler:          getSystemInfoHandler,
+		CheckDatabaseReadinessHandler: checkDatabaseReadinessHandler,
+		CreateUserHandler:             createUserHandler,
+		CompleteProfileHandler:        completeProfileHandler,
+		Pool:                          pool,
+		Verifier:                      verifier,
 	}, nil
 }

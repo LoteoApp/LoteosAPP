@@ -23,16 +23,33 @@
 ## Architecture
 
 - Organize frontend code by feature. Organize backend code by technical layer
-  (`internal/business`, `internal/infrastructure`), not by feature.
+  (`internal/business`, `internal/infrastructure`), not by feature — except
+  `internal/business/usecase` and `internal/infrastructure/delivery/webapp/dto`,
+  which group use cases and HTTP DTOs into per-feature subpackages (e.g.
+  `usecase/users`, `usecase/system`, `dto/users`, `dto/system`).
 - Follow the dependency rules documented in `docs/architecture.md`.
 - Backend domain and use cases (`internal/business`) must not depend on HTTP,
   PostgreSQL, or concrete `pgx` types.
 - Keep domain entities under `internal/business/domain`, contracts the
   business needs from its adapters (e.g. `Repository`) under
   `internal/business/gateway`, and use cases under `internal/business/usecase`.
-  Use cases depend on `gateway` contracts, never on a concrete adapter.
+  Use cases depend on `gateway` contracts, never on a concrete adapter. Each
+  use case is a single-method `Execute` interface plus its implementation,
+  defined together in one file under its feature subpackage (e.g.
+  `usecase/users/create_user.go`).
 - Keep every adapter (persistence, environment configuration, HTTP delivery,
   HTTP server bootstrap) under `internal/infrastructure`.
+- Each HTTP route gets its own handler with a single use case as its only
+  dependency (e.g. `CreateUserHandler` depends only on `users.CreateUser`);
+  do not group multiple routes into one handler struct.
+- Keep HTTP request/response structs out of `handler`; define them under
+  `internal/infrastructure/delivery/webapp/dto/<feature>` instead. Each `dto`
+  subpackage declares `package dto` regardless of its directory name, so it
+  never collides with the matching `usecase` subpackage when both are
+  imported in the same handler file.
+- Decode request bodies with the shared generic `decodeJSON[T]` helper in
+  `internal/infrastructure/delivery/webapp/handler` instead of repeating
+  `json.NewDecoder(...).Decode(...)` per handler.
 - Keep the dependency injection container (IoC wiring: pool, repositories, use
   cases, handlers) under `internal/infrastructure/delivery/webapp/dependencies`.
   It only builds objects; it does not read configuration, register routes, or
@@ -64,7 +81,8 @@
 
 - Every new behavior and every bug fix must include tests in the same change.
 - Backend tests use Go's standard `testing` package and `net/http/httptest`; do not add assertion libraries without a concrete need.
-- Test backend business services with small fakes of their required interfaces, HTTP handlers through their observable request/response contract, and PostgreSQL repositories with integration tests against a real PostgreSQL instance.
+- Test backend use cases with small fakes of their required `gateway` interfaces, HTTP handlers through their observable request/response contract, and PostgreSQL repositories with integration tests against a real PostgreSQL instance.
+- Keep fakes for `gateway` contracts in `internal/business/gateway/gatewayfake`, next to the interfaces they implement, so every `usecase` subpackage reuses them instead of redefining fakes per feature.
 - Frontend tests use Vitest, React Testing Library, `@testing-library/jest-dom`, and `@testing-library/user-event` for user interactions.
 - Frontend tests must query and assert the UI as a user would; avoid testing internal state, implementation details, Tailwind classes, or private functions.
 - Keep tests next to the code under test using `*_test.go`, `*.test.ts`, or `*.test.tsx`.

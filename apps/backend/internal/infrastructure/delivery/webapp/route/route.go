@@ -8,12 +8,19 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, uh *handler.UserHandler, verifier *supabase.Verifier) {
-	mux.HandleFunc("GET /healthz", h.Live)
-	mux.HandleFunc("GET /readyz", h.Ready)
-	mux.HandleFunc("GET /api/v1/system", h.Info)
+func RegisterRoutes(
+	mux *http.ServeMux,
+	getSystemInfo *handler.GetSystemInfoHandler,
+	checkDatabaseReadiness *handler.CheckDatabaseReadinessHandler,
+	createUser *handler.CreateUserHandler,
+	completeProfile *handler.CompleteProfileHandler,
+	verifier *supabase.Verifier,
+) {
+	mux.HandleFunc("GET /healthz", handler.Live)
+	mux.HandleFunc("GET /readyz", checkDatabaseReadiness.Ready)
+	mux.HandleFunc("GET /api/v1/system", getSystemInfo.Info)
 
 	requireAuth := middleware.RequireAuth(verifier)
-	mux.Handle("POST /api/v1/usuarios", requireAuth(http.HandlerFunc(uh.Create)))
-	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(http.HandlerFunc(uh.CompleteProfile)))
+	mux.Handle("POST /api/v1/usuarios", requireAuth(http.HandlerFunc(createUser.Create)))
+	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(http.HandlerFunc(completeProfile.CompleteProfile)))
 }

@@ -7,7 +7,7 @@
     "build": "pnpm --filter @loteos/frontend build",
     "test": "pnpm test:backend && pnpm test:frontend",
     "test:backend": "cd apps/backend && go test ./...",
-    "test:backend:coverage": "cd apps/backend && go test -count=1 -coverprofile coverage.out ./internal/business/usecase ./internal/infrastructure/delivery/webapp/handler ./internal/infrastructure/delivery/webapp/middleware ./internal/infrastructure/auth/supabase ./internal/infrastructure/environments ./internal/infrastructure/repository/postgres && go tool cover -func coverage.out",
+    "test:backend:coverage": "cd apps/backend && go test -count=1 -coverprofile coverage.out ./internal/business/domain ./internal/business/usecase/system ./internal/business/usecase/users ./internal/infrastructure/delivery/webapp/handler ./internal/infrastructure/delivery/webapp/middleware ./internal/infrastructure/auth/supabase ./internal/infrastructure/environments ./internal/infrastructure/repository/postgres && go tool cover -func coverage.out",
     "test:frontend": "pnpm --filter @loteos/frontend test",
     "test:frontend:coverage": "pnpm --filter @loteos/frontend test:coverage",
     "test:coverage": "pnpm test:backend:coverage && pnpm test:frontend:coverage",
