@@ -1,0 +1,1086 @@
+<mxfile host="Electron">
+  <diagram name="Entidades v3" id="loteos-erd-v3">
+    <mxGraphModel dx="2216" dy="1029" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1750" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t_usuarios" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="294" width="220" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_h" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="usuarios" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f0" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f1" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="auth_provider_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f2" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="email" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f3" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f4" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="apellido" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f5" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="rol" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f6" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="inmobiliaria_id" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f7" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="perfil_completo" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f8" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f9" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f10" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuarios_f11" parent="t_usuarios" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="228" width="220" x="40" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_h" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="inmobiliarias" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f0" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f1" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="razon_social" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f2" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="cuit" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f3" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="telefono" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f4" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="email" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f5" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f6" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f7" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliarias_f8" parent="t_inmobiliarias" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="250" width="220" x="1210" y="1070" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_h" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="clientes" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f0" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f1" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f2" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="apellido" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f3" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="dni" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f4" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="celular" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f5" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="email" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f6" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f7" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f8" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_clientes_f9" parent="t_clientes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="184" width="220" x="40" y="872" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_h" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="usuario_loteos" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f0" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f1" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f2" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f3" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f4" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f5" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_usuario_loteos_f6" parent="t_usuario_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="184" width="220" x="40" y="1076" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_h" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="inmobiliaria_loteos" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f0" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f1" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="inmobiliaria_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f2" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f3" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f4" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f5" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_inmobiliaria_loteos_f6" parent="t_inmobiliaria_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="338" width="220" x="360" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_h" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="loteos" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f0" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f1" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f2" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="ubicacion" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f3" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="descripcion" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f4" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="faja" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f5" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="dxf_entidad_id" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f6" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_agua" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f7" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_cloaca" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f8" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_luz" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f9" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_gas" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f10" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f11" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f12" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="294" as="geometry" />
+        </mxCell>
+        <mxCell id="t_loteos_f13" parent="t_loteos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="316" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="294" width="220" x="360" y="398" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_h" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="manzanas" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f0" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f1" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f2" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="numero" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f3" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="dxf_entidad_id" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f4" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_agua" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f5" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_cloaca" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f6" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_luz" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f7" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_gas" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f8" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f9" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f10" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzanas_f11" parent="t_manzanas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="184" width="220" x="360" y="712" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_h" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="manzana_calles" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f0" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f1" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="manzana_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f2" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="calle_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f3" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f4" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f5" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_manzana_calles_f6" parent="t_manzana_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" edge="1" parent="t_manzana_calles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-20" y="458.06" />
+              <mxPoint x="-20" y="-392.06" />
+            </Array>
+            <mxPoint x="-100" y="458.02882352941174" as="sourcePoint" />
+            <mxPoint x="-10" y="-392" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t_lotes" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="404" width="220" x="680" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_h" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="lotes" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f0" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f1" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="manzana_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f2" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f3" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="numero" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f4" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="precio" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f5" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="moneda" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f6" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="superficie" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f7" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="caracteristicas" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f8" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="dxf_entidad_id" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f9" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_agua" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f10" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_cloaca" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f11" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_luz" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f12" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tiene_gas" vertex="1">
+          <mxGeometry height="22" width="220" y="294" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f13" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="316" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f14" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="338" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f15" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lotes_f16" parent="t_lotes" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="382" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="272" width="220" x="680" y="464" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_h" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="dxf_entidades" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f0" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f1" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f2" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="handle_dxf" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f3" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="capa" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f4" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tipo" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f5" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="propiedades" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f6" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="geom" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f7" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f8" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f9" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dxf_entidades_f10" parent="t_dxf_entidades" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="228" width="220" x="680" y="756" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_h" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="calles" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f0" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f1" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f2" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="dxf_entidad_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f3" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f4" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tipo" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f5" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f6" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f7" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_calles_f8" parent="t_calles" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="426" width="220" x="1000" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_h" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="archivos" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f0" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f1" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="loteo_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f2" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="lote_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f3" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f4" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="nombre_original" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f5" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="categoria" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f6" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tipo_documento" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f7" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="url" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f8" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="storage_key" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f9" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="mime_type" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f10" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="hash_sha256" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f11" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="estado_procesamiento" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f12" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="294" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f13" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha" vertex="1">
+          <mxGeometry height="22" width="220" y="316" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f14" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_procesamiento" vertex="1">
+          <mxGeometry height="22" width="220" y="338" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f15" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f16" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="382" as="geometry" />
+        </mxCell>
+        <mxCell id="t_archivos_f17" parent="t_archivos" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="250" width="220" x="1320" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_h" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="reservas" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f0" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f1" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="lote_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f2" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="cliente_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f3" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="vendedor_id" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f4" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_alta" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f5" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f6" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_vencimiento" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f7" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f8" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reservas_f9" parent="t_reservas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="162" width="220" x="1320" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_h" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="reserva_estados" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f0" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f1" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="reserva_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f2" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="estado" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f3" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="razon" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f4" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_reserva_estados_f5" parent="t_reserva_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="294" width="220" x="1320" y="514" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_h" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="ventas" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f0" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f1" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="lote_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f2" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="cliente_id" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f3" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="modalidad_pago" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f4" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="monto" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f5" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="moneda" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f6" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="vendedor_id" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f7" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_alta" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f8" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f9" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f10" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ventas_f11" parent="t_ventas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="162" width="220" x="1320" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_h" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="venta_estados" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f0" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f1" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="venta_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f2" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="estado" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f3" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="razon" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f4" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_venta_estados_f5" parent="t_venta_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="294" width="220" x="1640" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_h" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="planes_pago" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f0" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f1" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="venta_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f2" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="monto_entrega" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f3" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="cantidad_cuotas" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f4" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tasa_interes" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f5" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="periodicidad" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f6" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="moneda" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f7" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f8" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_entrega" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f9" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f10" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="t_planes_pago_f11" parent="t_planes_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="272" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="140" width="220" x="1640" y="354" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_h" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="lote_estados" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_f0" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_f1" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="lote_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_f2" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="estado" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_f3" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_lote_estados_f4" parent="t_lote_estados" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="250" width="220" x="1640" y="514" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_h" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="cuotas" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f0" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f1" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="plan_pago_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f2" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="numero" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f3" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="monto" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f4" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="estado" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f5" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_vencimiento" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f6" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_pago" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f7" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f8" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cuotas_f9" parent="t_cuotas" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="250" width="220" x="1640" y="784" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_h" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f3b3a6;strokeColor=#b8b8b8;fontColor=#5c2a1f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="cargos_adicionales" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f0" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=1;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="id" vertex="1">
+          <mxGeometry height="22" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f1" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="cuota_id" vertex="1">
+          <mxGeometry height="22" width="220" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f2" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="monto" vertex="1">
+          <mxGeometry height="22" width="220" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f3" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="moneda" vertex="1">
+          <mxGeometry height="22" width="220" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f4" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="tipo" vertex="1">
+          <mxGeometry height="22" width="220" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f5" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="observacion" vertex="1">
+          <mxGeometry height="22" width="220" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f6" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#8a5a3a;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="usuario_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="162" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f7" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_baja" vertex="1">
+          <mxGeometry height="22" width="220" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f8" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_creacion" vertex="1">
+          <mxGeometry height="22" width="220" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cargos_adicionales_f9" parent="t_cargos_adicionales" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontStyle=0;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="fecha_modificacion" vertex="1">
+          <mxGeometry height="22" width="220" y="228" as="geometry" />
+        </mxCell>
+        <mxCell id="note_archivo" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7e8;strokeColor=#d6b656;fontColor=#5b4a24;fontFamily=Consolas;fontSize=10;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;dashed=1;" value="CHECK: exactamente uno de loteo_id o lote_id" vertex="1">
+          <mxGeometry height="56" width="220" x="1000" y="486" as="geometry" />
+        </mxCell>
+        <mxCell id="note_integrity" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7e8;strokeColor=#d6b656;fontColor=#5b4a24;fontFamily=Consolas;fontSize=10;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;dashed=1;" value="Uniques: clientes.dni; lotes (loteo_id, numero); una reserva activa por lote; una venta activa por lote; usuario_loteos (usuario_id, loteo_id); inmobiliaria_loteos (inmobiliaria_id, loteo_id). loteo_id en lotes debe coincidir con manzanas.loteo_id. inmobiliaria_id en usuarios solo si rol = inmobiliaria. geom = polígono PostGIS (nullable si no hay DXF). reserva_estados, venta_estados y lote_estados son historial append-only (sin fecha_modificacion). usuario_alta y usuario_modificacion no se dibujan como arista." vertex="1">
+          <mxGeometry height="250" width="220" x="1000" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#333333;" value="Valores posibles de los campos enum" vertex="1">
+          <mxGeometry height="18" width="900" x="40" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="130" width="220" x="40" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_h" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="usuarios.rol" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_v0" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;administrador&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_v1" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;administrativo&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_v2" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;agrimensor&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_v3" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;escribano&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_usuarios_rol_v4" parent="lg_usuarios_rol" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;inmobiliaria&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ventas_modalidad_pago" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="90" width="220" x="280" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ventas_modalidad_pago_h" parent="lg_ventas_modalidad_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="ventas.modalidad_pago" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ventas_modalidad_pago_v0" parent="lg_ventas_modalidad_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;contado&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ventas_modalidad_pago_v1" parent="lg_ventas_modalidad_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;financiado&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ventas_modalidad_pago_v2" parent="lg_ventas_modalidad_pago" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;entrega_financiada&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_venta_estados_estado" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="90" width="220" x="520" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_venta_estados_estado_h" parent="lg_venta_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="venta_estados.estado" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_venta_estados_estado_v0" parent="lg_venta_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;activa&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_venta_estados_estado_v1" parent="lg_venta_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;completada&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_venta_estados_estado_v2" parent="lg_venta_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;cancelada&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="110" width="220" x="760" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado_h" parent="lg_reserva_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="reserva_estados.estado" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado_v0" parent="lg_reserva_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;activa&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado_v1" parent="lg_reserva_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;vencida&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado_v2" parent="lg_reserva_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;cancelada&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_reserva_estados_estado_v3" parent="lg_reserva_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;convertida&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="110" width="220" x="1000" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado_h" parent="lg_lote_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="lote_estados.estado" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado_v0" parent="lg_lote_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;disponible&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado_v1" parent="lg_lote_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;reservado&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado_v2" parent="lg_lote_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;vendido&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lote_estados_estado_v3" parent="lg_lote_estados_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;finalizado&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_cuotas_estado" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="90" width="220" x="1240" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_cuotas_estado_h" parent="lg_cuotas_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="cuotas.estado" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_cuotas_estado_v0" parent="lg_cuotas_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;pendiente&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_cuotas_estado_v1" parent="lg_cuotas_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;pagada&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_cuotas_estado_v2" parent="lg_cuotas_estado" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;vencida&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="110" width="220" x="1480" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo_h" parent="lg_calles_tipo" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="calles.tipo" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo_v0" parent="lg_calles_tipo" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;asfalto&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo_v1" parent="lg_calles_tipo" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;tierra&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo_v2" parent="lg_calles_tipo" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;brosa&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_calles_tipo_v3" parent="lg_calles_tipo" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;granito&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_loteos_faja" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="70" width="220" x="1720" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_loteos_faja_h" parent="lg_loteos_faja" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="loteos.faja" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_loteos_faja_v0" parent="lg_loteos_faja" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;5&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_loteos_faja_v1" parent="lg_loteos_faja" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;6&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="110" width="220" x="40" y="1510" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria_h" parent="lg_archivos_categoria" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="archivos.categoria" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria_v0" parent="lg_archivos_categoria" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;dxf&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria_v1" parent="lg_archivos_categoria" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;foto&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria_v2" parent="lg_archivos_categoria" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;plano&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_categoria_v3" parent="lg_archivos_categoria" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;documento_legal&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_estado_procesamiento" connectable="0" parent="1" style="group" vertex="1">
+          <mxGeometry height="90" width="220" x="280" y="1510" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_estado_procesamiento_h" parent="lg_archivos_estado_procesamiento" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#cfe0f3;strokeColor=#b8b8b8;fontColor=#1e3a5f;fontStyle=1;fontSize=12;align=center;verticalAlign=middle;" value="archivos.estado_procesamiento" vertex="1">
+          <mxGeometry height="30" width="220" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_estado_procesamiento_v0" parent="lg_archivos_estado_procesamiento" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;pendiente&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_estado_procesamiento_v1" parent="lg_archivos_estado_procesamiento" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#f2f2f2;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;procesado&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_archivos_estado_procesamiento_v2" parent="lg_archivos_estado_procesamiento" style="rounded=0;whiteSpace=nowrap;html=1;fillColor=#ffffff;strokeColor=#ececec;fontColor=#333333;fontFamily=Consolas;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" value="&#39;error&#39;" vertex="1">
+          <mxGeometry height="20" width="220" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="card1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#333333;" value="pata de gallo = cero o muchos     || = obligatorio (1)     |o = opcional (0 o 1)     línea punteada = FK nullable. Tablas en plural. Timestamps: fecha_creacion / fecha_modificacion." vertex="1">
+          <mxGeometry height="18" width="1600" x="40" y="1680" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="t_manzanas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="t_manzana_calles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_manzanas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="t_manzana_calles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_calles">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="t_lotes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_manzanas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="t_lotes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="t_calles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="940.06" />
+              <mxPoint x="310" y="209" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="t_dxf_entidades" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="599.94" />
+              <mxPoint x="610" y="209" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="t_loteos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_dxf_entidades">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="660" y="209" />
+              <mxPoint x="660" y="599.94" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="t_manzanas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_dxf_entidades">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="t_lotes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_dxf_entidades">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="t_calles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_dxf_entidades">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="t_archivos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="930" y="253" />
+              <mxPoint x="930" y="40.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="t_archivos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_lotes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="t_usuarios" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;dashed=1;curved=0;" target="t_inmobiliarias">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="t_usuario_loteos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_usuarios">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="930.06" />
+              <mxPoint x="280" y="187" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="t_usuario_loteos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_loteos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="320" y="964.06" />
+              <mxPoint x="320" y="209" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="t_inmobiliaria_loteos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_inmobiliarias">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="10" y="1168.06" />
+              <mxPoint x="10" y="468.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e19" edge="1" parent="1" source="t_reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_lotes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" edge="1" parent="1" source="t_reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_clientes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="176.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e21" edge="1" parent="1" source="t_reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_usuarios">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1430" y="30.06" />
+              <mxPoint x="150" y="30.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e23" edge="1" parent="1" source="t_reserva_estados" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_reservas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" edge="1" parent="1" source="t_ventas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_lotes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="549.94" />
+              <mxPoint x="920" y="242.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e25" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_clientes_h">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1290" y="736.06" />
+            </Array>
+            <mxPoint x="1320" y="735.998823529412" as="sourcePoint" />
+            <mxPoint x="261" y="790.94" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e26" edge="1" parent="1" source="t_ventas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_usuarios">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="672.06" />
+              <mxPoint x="1260" y="20.06" />
+              <mxPoint x="290" y="20.06" />
+              <mxPoint x="290" y="187" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e28" edge="1" parent="1" source="t_venta_estados" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_ventas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e29" edge="1" parent="1" source="t_planes_pago" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmandOne;endFill=0;dashed=1;curved=0;" target="t_ventas">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1580" y="187" />
+              <mxPoint x="1580" y="672.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e30" edge="1" parent="1" source="t_cuotas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_planes_pago">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e31" edge="1" parent="1" source="t_cargos_adicionales" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_cuotas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e32" edge="1" parent="1" source="t_lote_estados" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9aa0a8;strokeWidth=1.4;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;dashed=0;curved=0;" target="t_lotes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="5whYZLJaLSRCHMDT6h_k-2" edge="1" parent="1" source="t_manzanas_h" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="t_loteos_f13" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
