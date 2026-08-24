@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import LotsPage from './LotsPage'
@@ -23,26 +23,28 @@ const square: Array<[number, number]> = [
 ]
 
 describe('LotsPage', () => {
-  it('renders the loteo form and empty viewer', () => {
+  it('renders the loteo form with the plan pending, DXF optional', () => {
     render(<LotsPage />)
 
-    expect(screen.getByRole('heading', { name: 'Loteos' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Nuevo loteo' })).toBeInTheDocument()
+    expect(screen.getByText('Plano pendiente')).toBeInTheDocument()
     expect(screen.getByLabelText('Nombre')).toBeInTheDocument()
-    expect(screen.getByLabelText('Ubicación')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ubicación/Ciudad')).toBeInTheDocument()
+    expect(screen.getByLabelText('Inmobiliarias')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Seleccionar todas' })).toBeInTheDocument()
     expect(screen.getByLabelText('Descripción')).toBeInTheDocument()
     expect(screen.getByLabelText('Archivo DXF')).toBeInTheDocument()
-    expect(
-      screen.getByText('El plano aparece acá cuando cargues un DXF.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Todavía no hay plano')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar loteo' })).toBeDisabled()
 
-    const fileInput = screen.getByLabelText('Archivo DXF')
     const nameInput = screen.getByLabelText('Nombre')
+    const fileInput = screen.getByLabelText('Archivo DXF')
     expect(
-      fileInput.compareDocumentPosition(nameInput) & Node.DOCUMENT_POSITION_FOLLOWING,
+      nameInput.compareDocumentPosition(fileInput) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
 
-  it('draws a DXF and hides a layer when its toggle is turned off', async () => {
+  it('draws a DXF, marks the plan as loaded and hides a layer when its toggle is turned off', async () => {
     const user = userEvent.setup()
     render(<LotsPage />)
 
@@ -59,18 +61,22 @@ describe('LotsPage', () => {
     )
     await user.upload(screen.getByLabelText('Archivo DXF'), file)
 
-    const svg = await screen.findByRole('img', { name: 'Plano del loteo' })
+    expect(await screen.findByText('Plano cargado')).toBeInTheDocument()
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
     expect(svg.querySelector('[aria-label="Manzana"]')).not.toBeNull()
-    expect(screen.getByText('plano.dxf')).toBeInTheDocument()
+    expect(screen.getByText('Cargado desde plano.dxf.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Manzana' }))
     expect(svg.querySelector('[aria-label="Manzana"]')).toBeNull()
     expect(svg.querySelector('[aria-label="Loteo"]')).not.toBeNull()
+  })
 
-    fireEvent.change(screen.getByLabelText('Archivo DXF'), { target: { files: [] } })
-    expect(
-      screen.getByText('El plano aparece acá cuando cargues un DXF.'),
-    ).toBeInTheDocument()
+  it('lets the loteo be saved with data only, without a DXF', () => {
+    render(<LotsPage />)
+
+    expect(screen.getByText('Plano pendiente')).toBeInTheDocument()
+    expect(screen.getByText('Opcional. Lo carga quien tenga el DXF.')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Plano del loteo' })).not.toBeInTheDocument()
   })
 
   it('shows an error when the DXF has no usable polygons', async () => {
@@ -83,9 +89,8 @@ describe('LotsPage', () => {
     await user.upload(screen.getByLabelText('Archivo DXF'), file)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo leer el DXF')
-    expect(
-      screen.getByText('El plano aparece acá cuando cargues un DXF.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Todavía no hay plano')).toBeInTheDocument()
+    expect(screen.getByText('Plano pendiente')).toBeInTheDocument()
   })
 
   it('shows a warning when the DXF has overlapping lots', async () => {
@@ -106,5 +111,27 @@ describe('LotsPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Avisos de geometría')
     expect(screen.getByRole('img', { name: 'Plano del loteo' })).toBeInTheDocument()
+  })
+
+  it('discards the entered data and the loaded plan', async () => {
+    const user = userEvent.setup()
+    render(<LotsPage />)
+
+    await user.type(screen.getByLabelText('Nombre'), 'Las Acacias')
+    await user.click(screen.getByRole('button', { name: 'Seleccionar todas' }))
+    const file = new File(
+      [dxfDocument(lwpolyline('LOTES', square))],
+      'plano.dxf',
+      { type: 'application/dxf' },
+    )
+    await user.upload(screen.getByLabelText('Archivo DXF'), file)
+    expect(await screen.findByText('Plano cargado')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(screen.getByLabelText('Nombre')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Seleccionar todas' })).toBeInTheDocument()
+    expect(screen.getByText('Plano pendiente')).toBeInTheDocument()
+    expect(screen.getByText('Todavía no hay plano')).toBeInTheDocument()
   })
 })

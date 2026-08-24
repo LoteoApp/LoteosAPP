@@ -1,11 +1,13 @@
 import { Field, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
 import { Textarea } from '../../../shared/ui/textarea'
+import InmobiliariasField from './InmobiliariasField'
 
 export type LoteoFieldValues = {
   nombre: string
   ubicacion: string
   descripcion: string
+  inmobiliariaIds: string[]
 }
 
 type LoteoFieldsProps = {
@@ -14,7 +16,7 @@ type LoteoFieldsProps = {
 }
 
 export default function LoteoFields({ values, onChange }: LoteoFieldsProps) {
-  function update<Key extends keyof LoteoFieldValues>(key: Key, value: string) {
+  function update<Key extends keyof LoteoFieldValues>(key: Key, value: LoteoFieldValues[Key]) {
     onChange({ ...values, [key]: value })
   }
 
@@ -32,7 +34,7 @@ export default function LoteoFields({ values, onChange }: LoteoFieldsProps) {
       </Field>
 
       <Field>
-        <FieldLabel htmlFor="loteo-ubicacion">Ubicación</FieldLabel>
+        <FieldLabel htmlFor="loteo-ubicacion">Ubicación/Ciudad</FieldLabel>
         <Input
           id="loteo-ubicacion"
           name="ubicacion"
@@ -41,6 +43,11 @@ export default function LoteoFields({ values, onChange }: LoteoFieldsProps) {
           autoComplete="off"
         />
       </Field>
+
+      <InmobiliariasField
+        selectedIds={values.inmobiliariaIds}
+        onChange={(inmobiliariaIds) => update('inmobiliariaIds', inmobiliariaIds)}
+      />
 
       <Field>
         <FieldLabel htmlFor="loteo-descripcion">Descripción</FieldLabel>
