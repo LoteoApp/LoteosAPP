@@ -14,10 +14,10 @@ type Repository struct {
 	PingErr     error
 }
 
-func (repository Repository) Snapshot(context.Context) (domain.DatabaseInfo, domain.PoolInfo, error) {
+func (repository *Repository) Snapshot(context.Context) (domain.DatabaseInfo, domain.PoolInfo, error) {
 	return repository.Database, repository.Pool, repository.SnapshotErr
 }
 
-func (repository Repository) Ping(context.Context) error {
+func (repository *Repository) Ping(context.Context) error {
 	return repository.PingErr
 }

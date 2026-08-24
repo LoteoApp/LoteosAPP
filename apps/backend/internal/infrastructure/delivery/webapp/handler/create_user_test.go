@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
@@ -40,7 +41,7 @@ func performCreateUserRequest(t *testing.T, createUser *createUserStub, verifier
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
-	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(h)))
+	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(h, 5*time.Second)))
 
 	return performRequest(t, mux, http.MethodPost, "/api/v1/usuarios", token, body)
 }

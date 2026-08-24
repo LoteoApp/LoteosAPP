@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"loteosapp/backend/internal/business/usecase/system"
 	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/system"
@@ -19,10 +17,7 @@ func NewCheckDatabaseReadinessHandler(checkDatabaseReadiness system.CheckDatabas
 }
 
 func (handler *CheckDatabaseReadinessHandler) Handle(w http.ResponseWriter, request *http.Request) error {
-	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Second)
-	defer cancel()
-
-	if err := handler.checkDatabaseReadiness.Execute(ctx); err != nil {
+	if err := handler.checkDatabaseReadiness.Execute(request.Context()); err != nil {
 		return err
 	}
 

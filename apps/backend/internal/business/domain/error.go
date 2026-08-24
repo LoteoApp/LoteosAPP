@@ -1,15 +1,16 @@
 package domain
 
 // Kind classifies a business error by the kind of failure it represents,
-// independent of any delivery mechanism (HTTP, gRPC, CLI, ...).
-type Kind int
+// independent of any delivery mechanism (HTTP, gRPC, CLI, ...). It's a
+// string, not an iota int, so it reads directly in logs.
+type Kind string
 
 const (
-	KindInvalid Kind = iota
-	KindForbidden
-	KindConflict
-	KindNotFound
-	KindUnavailable
+	KindInvalid     Kind = "invalid"
+	KindForbidden   Kind = "forbidden"
+	KindConflict    Kind = "conflict"
+	KindNotFound    Kind = "not_found"
+	KindUnavailable Kind = "unavailable"
 )
 
 // Error is a business error with a stable Code and a user-facing Message,

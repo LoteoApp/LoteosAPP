@@ -12,7 +12,7 @@ import (
 func TestGetSystemInfoBuildsConnectedSnapshot(t *testing.T) {
 	t.Parallel()
 
-	getSystemInfo := NewGetSystemInfo(gatewayfake.Repository{
+	getSystemInfo := NewGetSystemInfo(&gatewayfake.Repository{
 		Database: domain.DatabaseInfo{DatabaseName: "loteosapp"},
 		Pool:     domain.PoolInfo{MaxConnections: 10},
 	})
@@ -40,7 +40,7 @@ func TestGetSystemInfoPropagatesRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("database unavailable")
-	getSystemInfo := NewGetSystemInfo(gatewayfake.Repository{SnapshotErr: wantErr})
+	getSystemInfo := NewGetSystemInfo(&gatewayfake.Repository{SnapshotErr: wantErr})
 
 	if _, err := getSystemInfo.Execute(context.Background()); !errors.Is(err, wantErr) {
 		t.Errorf("Execute() error = %v, want %v", err, wantErr)

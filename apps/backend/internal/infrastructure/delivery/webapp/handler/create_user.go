@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"loteosapp/backend/internal/business/usecase/users"
 	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/users"
@@ -31,10 +29,7 @@ func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
-	defer cancel()
-
-	usuario, temporaryPassword, err := handler.createUser.Execute(ctx, principal.Roles, body.Email, body.Rol)
+	usuario, temporaryPassword, err := handler.createUser.Execute(request.Context(), principal.Roles, body.Email, body.Rol)
 	if err != nil {
 		return err
 	}

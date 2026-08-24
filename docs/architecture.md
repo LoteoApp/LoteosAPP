@@ -151,10 +151,13 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `CreateUserHandler` sólo conoce `users.CreateUser`); no hay un handler
   compartido que agrupe varias rutas. Un handler implementa `HTTPHandler`
   (`Handle(w, r) error`) en vez de escribir su propia respuesta de error: el
-  error del caso de uso (o de `decodeJSON`) simplemente se retorna, y `Adapt`
-  lo convierte en `http.HandlerFunc` llamando a `response.WriteError`. Un
-  handler sin ningún error posible (como `Live`) queda como función suelta,
-  sin envolverlo en un struct solo para cumplir la interfaz.
+  error del caso de uso (o de `decodeJSON`) simplemente se retorna, y
+  `Adapt(h, timeout)` lo convierte en `http.HandlerFunc` llamando a
+  `response.WriteError`. `Adapt` también acota `r.Context()` al `timeout`
+  antes de llamar a `Handle`, así que ningún handler arma su propio
+  `context.WithTimeout`; usa `request.Context()` directo. Un handler sin
+  ningún error posible (como `Live`) queda como función suelta, sin
+  envolverlo en un struct solo para cumplir la interfaz.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
   consistentes, de éxito y de error. `WriteError` es el único lugar que
   traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`

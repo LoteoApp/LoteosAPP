@@ -1,11 +1,10 @@
 package handler
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"loteosapp/backend/internal/business/usecase/system"
+	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/system"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
 )
 
@@ -18,14 +17,11 @@ func NewGetSystemInfoHandler(getSystemInfo system.GetSystemInfo) *GetSystemInfoH
 }
 
 func (handler *GetSystemInfoHandler) Handle(w http.ResponseWriter, request *http.Request) error {
-	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Second)
-	defer cancel()
-
-	info, err := handler.getSystemInfo.Execute(ctx)
+	info, err := handler.getSystemInfo.Execute(request.Context())
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusOK, info)
+	response.WriteJSON(w, http.StatusOK, dto.GetSystemInfoResponse{Info: info})
 	return nil
 }

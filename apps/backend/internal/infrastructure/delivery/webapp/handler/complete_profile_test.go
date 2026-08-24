@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
@@ -38,7 +39,7 @@ func performCompleteProfileRequest(t *testing.T, completeProfile *completeProfil
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
-	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(h)))
+	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(h, 5*time.Second)))
 
 	return performRequest(t, mux, http.MethodPatch, "/api/v1/usuarios/me", token, body)
 }

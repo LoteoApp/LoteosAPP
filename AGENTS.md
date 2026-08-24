@@ -55,9 +55,12 @@
   `handler.HTTPHandler` (`Handle(w, r) error`) instead of writing its own
   error response: it returns the use case's error (or its own `decodeJSON`
   error) and lets `handler.Adapt` translate it via `response.WriteError`.
-  `route.go` registers `handler.Adapt(h)`, not the handler's method directly.
-  A handler with no failure path (e.g. `Live`) stays a plain
-  `func(w, r)` — don't wrap it in a struct just to satisfy the interface.
+  `Adapt(h, timeout)` also bounds `r.Context()` to `timeout` before calling
+  `Handle`, so a handler never sets up its own `context.WithTimeout`; it
+  just uses `request.Context()`. `route.go` registers `handler.Adapt(h,
+  timeout)` per route, not the handler's method directly. A handler with no
+  failure path (e.g. `Live`) stays a plain `func(w, r)` — don't wrap it in a
+  struct just to satisfy the interface.
 - Keep HTTP request/response structs out of `handler`; define them under
   `internal/infrastructure/delivery/webapp/dto/<feature>` instead. Each `dto`
   subpackage declares `package dto` regardless of its directory name, so it

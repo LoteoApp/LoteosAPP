@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"loteosapp/backend/internal/business/usecase/users"
 	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/users"
@@ -31,14 +29,11 @@ func (handler *CompleteProfileHandler) Handle(w http.ResponseWriter, request *ht
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
-	defer cancel()
-
-	usuario, err := handler.completeProfile.Execute(ctx, principal.Subject, body.Nombre, body.Apellido)
+	usuario, err := handler.completeProfile.Execute(request.Context(), principal.Subject, body.Nombre, body.Apellido)
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusOK, usuario)
+	response.WriteJSON(w, http.StatusOK, dto.CompleteProfileResponse{Usuario: usuario})
 	return nil
 }
