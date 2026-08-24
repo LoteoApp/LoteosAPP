@@ -2,10 +2,10 @@ import { useCallback, useState } from 'react'
 import type { LoteoFieldValues } from '../components/LoteoFields'
 
 const EMPTY_FIELDS: LoteoFieldValues = {
-  nombre: '',
-  ubicacion: '',
-  descripcion: '',
-  inmobiliariaIds: [],
+  name: '',
+  location: '',
+  description: '',
+  agencyIds: [],
 }
 
 export type UseLoteoFieldsResult = {

@@ -7,10 +7,10 @@ describe('useLoteoFields', () => {
     const { result } = renderHook(() => useLoteoFields())
 
     expect(result.current.values).toEqual({
-      nombre: '',
-      ubicacion: '',
-      descripcion: '',
-      inmobiliariaIds: [],
+      name: '',
+      location: '',
+      description: '',
+      agencyIds: [],
     })
   })
 
@@ -19,18 +19,18 @@ describe('useLoteoFields', () => {
 
     act(() => {
       result.current.onChange({
-        nombre: 'Las Acacias',
-        ubicacion: 'Cañuelas',
-        descripcion: 'Segunda etapa',
-        inmobiliariaIds: ['inm-altamira'],
+        name: 'Las Acacias',
+        location: 'Cañuelas',
+        description: 'Segunda etapa',
+        agencyIds: ['inm-altamira'],
       })
     })
 
     expect(result.current.values).toEqual({
-      nombre: 'Las Acacias',
-      ubicacion: 'Cañuelas',
-      descripcion: 'Segunda etapa',
-      inmobiliariaIds: ['inm-altamira'],
+      name: 'Las Acacias',
+      location: 'Cañuelas',
+      description: 'Segunda etapa',
+      agencyIds: ['inm-altamira'],
     })
   })
 
@@ -39,10 +39,10 @@ describe('useLoteoFields', () => {
 
     act(() => {
       result.current.onChange({
-        nombre: 'Las Acacias',
-        ubicacion: 'Cañuelas',
-        descripcion: 'Segunda etapa',
-        inmobiliariaIds: ['inm-altamira'],
+        name: 'Las Acacias',
+        location: 'Cañuelas',
+        description: 'Segunda etapa',
+        agencyIds: ['inm-altamira'],
       })
     })
     act(() => {
@@ -50,10 +50,10 @@ describe('useLoteoFields', () => {
     })
 
     expect(result.current.values).toEqual({
-      nombre: '',
-      ubicacion: '',
-      descripcion: '',
-      inmobiliariaIds: [],
+      name: '',
+      location: '',
+      description: '',
+      agencyIds: [],
     })
   })
 })

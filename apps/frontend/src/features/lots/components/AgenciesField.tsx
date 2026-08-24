@@ -11,65 +11,65 @@ import {
   ComboboxValue,
 } from '../../../shared/ui/combobox'
 import { Field, FieldDescription, FieldLabel } from '../../../shared/ui/field'
-import { listInmobiliarias, type Inmobiliaria } from '../api/list-inmobiliarias'
+import { listAgencies, type Agency } from '../api/list-agencies'
 
-type InmobiliariasFieldProps = {
+type AgenciesFieldProps = {
   selectedIds: readonly string[]
   onChange: (ids: string[]) => void
-  inmobiliarias?: readonly Inmobiliaria[]
+  agencies?: readonly Agency[]
 }
 
-export default function InmobiliariasField({
+export default function AgenciesField({
   selectedIds,
   onChange,
-  inmobiliarias = listInmobiliarias(),
-}: InmobiliariasFieldProps) {
-  const selected = inmobiliarias.filter((item) => selectedIds.includes(item.id))
-  const allSelected = inmobiliarias.length > 0 && selected.length === inmobiliarias.length
+  agencies = listAgencies(),
+}: AgenciesFieldProps) {
+  const selected = agencies.filter((item) => selectedIds.includes(item.id))
+  const allSelected = agencies.length > 0 && selected.length === agencies.length
 
-  function handleValueChange(next: Inmobiliaria[]) {
+  function handleValueChange(next: Agency[]) {
     onChange(next.map((item) => item.id))
   }
 
   function handleToggleAll() {
-    onChange(allSelected ? [] : inmobiliarias.map((item) => item.id))
+    onChange(allSelected ? [] : agencies.map((item) => item.id))
   }
 
   return (
     <Field>
       <div className="flex items-center justify-between gap-2">
-        <FieldLabel htmlFor="loteo-inmobiliarias">Inmobiliarias</FieldLabel>
+        <FieldLabel htmlFor="loteo-agencies">Inmobiliarias</FieldLabel>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="min-h-11 md:h-7 md:min-h-7"
           onClick={handleToggleAll}
-          disabled={inmobiliarias.length === 0}
+          disabled={agencies.length === 0}
         >
           {allSelected ? 'Quitar todas' : 'Seleccionar todas'}
         </Button>
       </div>
       <Combobox
-        items={[...inmobiliarias]}
+        items={[...agencies]}
         multiple
         value={[...selected]}
         onValueChange={handleValueChange}
-        itemToStringLabel={(item) => item.razonSocial}
+        itemToStringLabel={(item) => item.businessName}
         itemToStringValue={(item) => item.id}
         isItemEqualToValue={(a, b) => a.id === b.id}
       >
         <ComboboxChips className="min-h-11 md:min-h-8">
           <ComboboxValue>
-            {(value: Inmobiliaria[]) => (
+            {(value: Agency[]) => (
               <>
                 {value.map((item) => (
-                  <ComboboxChip key={item.id} aria-label={item.razonSocial}>
-                    {item.razonSocial}
+                  <ComboboxChip key={item.id} aria-label={item.businessName}>
+                    {item.businessName}
                   </ComboboxChip>
                 ))}
                 <ComboboxChipsInput
-                  id="loteo-inmobiliarias"
+                  id="loteo-agencies"
                   placeholder={value.length > 0 ? 'Buscar' : 'Buscar inmobiliaria'}
                   autoComplete="off"
                 />
@@ -80,9 +80,9 @@ export default function InmobiliariasField({
         <ComboboxContent>
           <ComboboxEmpty>No hay inmobiliarias con ese nombre.</ComboboxEmpty>
           <ComboboxList>
-            {(item: Inmobiliaria) => (
+            {(item: Agency) => (
               <ComboboxItem key={item.id} value={item} className="min-h-11 md:min-h-8">
-                {item.razonSocial}
+                {item.businessName}
               </ComboboxItem>
             )}
           </ComboboxList>

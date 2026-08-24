@@ -2,20 +2,20 @@ import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { Inmobiliaria } from '../api/list-inmobiliarias'
-import InmobiliariasField from './InmobiliariasField'
+import type { Agency } from '../api/list-agencies'
+import AgenciesField from './AgenciesField'
 
-const catalog: Inmobiliaria[] = [
-  { id: 'inm-1', razonSocial: 'Inmobiliaria San Martín' },
-  { id: 'inm-2', razonSocial: 'Lotes del Sur' },
-  { id: 'inm-3', razonSocial: 'Altamira Propiedades' },
+const catalog: Agency[] = [
+  { id: 'inm-1', businessName: 'Inmobiliaria San Martín' },
+  { id: 'inm-2', businessName: 'Lotes del Sur' },
+  { id: 'inm-3', businessName: 'Altamira Propiedades' },
 ]
 
 function Harness({ initialIds = [] as string[] }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(initialIds)
   return (
-    <InmobiliariasField
-      inmobiliarias={catalog}
+    <AgenciesField
+      agencies={catalog}
       selectedIds={selectedIds}
       onChange={setSelectedIds}
     />
@@ -26,8 +26,8 @@ async function openList(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByLabelText('Inmobiliarias'))
 }
 
-describe('InmobiliariasField', () => {
-  it('lets the user search by name and pick more than one inmobiliaria', async () => {
+describe('AgenciesField', () => {
+  it('lets the user search by name and pick more than one agency', async () => {
     const user = userEvent.setup()
     render(<Harness />)
 
@@ -46,7 +46,7 @@ describe('InmobiliariasField', () => {
     expect(screen.getByLabelText('Altamira Propiedades')).toBeInTheDocument()
   })
 
-  it('selects every inmobiliaria and then clears the selection', async () => {
+  it('selects every agency and then clears the selection', async () => {
     const user = userEvent.setup()
     render(<Harness />)
 
@@ -73,7 +73,7 @@ describe('InmobiliariasField', () => {
     expect(screen.getByText('No hay inmobiliarias con ese nombre.')).toBeInTheDocument()
   })
 
-  it('removes a selected inmobiliaria from its chip', async () => {
+  it('removes a selected agency from its chip', async () => {
     const user = userEvent.setup()
     render(<Harness initialIds={['inm-2']} />)
 
@@ -82,12 +82,12 @@ describe('InmobiliariasField', () => {
     expect(screen.queryByLabelText('Lotes del Sur')).not.toBeInTheDocument()
   })
 
-  it('disables select all when there are no inmobiliarias', () => {
+  it('disables select all when there are no agencies', () => {
     function EmptyHarness() {
       const [selectedIds, setSelectedIds] = useState<string[]>([])
       return (
-        <InmobiliariasField
-          inmobiliarias={[]}
+        <AgenciesField
+          agencies={[]}
           selectedIds={selectedIds}
           onChange={setSelectedIds}
         />

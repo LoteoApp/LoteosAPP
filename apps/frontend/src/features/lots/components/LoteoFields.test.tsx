@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 import LoteoFields, { type LoteoFieldValues } from './LoteoFields'
 
 const empty: LoteoFieldValues = {
-  nombre: '',
-  ubicacion: '',
-  descripcion: '',
-  inmobiliariaIds: [],
+  name: '',
+  location: '',
+  description: '',
+  agencyIds: [],
 }
 
 function Harness() {

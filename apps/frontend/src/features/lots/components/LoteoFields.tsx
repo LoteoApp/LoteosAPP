@@ -1,13 +1,13 @@
 import { Field, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
 import { Textarea } from '../../../shared/ui/textarea'
-import InmobiliariasField from './InmobiliariasField'
+import AgenciesField from './AgenciesField'
 
 export type LoteoFieldValues = {
-  nombre: string
-  ubicacion: string
-  descripcion: string
-  inmobiliariaIds: string[]
+  name: string
+  location: string
+  description: string
+  agencyIds: string[]
 }
 
 type LoteoFieldsProps = {
@@ -23,39 +23,39 @@ export default function LoteoFields({ values, onChange }: LoteoFieldsProps) {
   return (
     <div className="flex flex-col gap-3">
       <Field>
-        <FieldLabel htmlFor="loteo-nombre">Nombre</FieldLabel>
+        <FieldLabel htmlFor="loteo-name">Nombre</FieldLabel>
         <Input
-          id="loteo-nombre"
-          name="nombre"
-          value={values.nombre}
-          onChange={(event) => update('nombre', event.target.value)}
+          id="loteo-name"
+          name="name"
+          value={values.name}
+          onChange={(event) => update('name', event.target.value)}
           autoComplete="off"
         />
       </Field>
 
       <Field>
-        <FieldLabel htmlFor="loteo-ubicacion">Ubicación/Ciudad</FieldLabel>
+        <FieldLabel htmlFor="loteo-location">Ubicación/Ciudad</FieldLabel>
         <Input
-          id="loteo-ubicacion"
-          name="ubicacion"
-          value={values.ubicacion}
-          onChange={(event) => update('ubicacion', event.target.value)}
+          id="loteo-location"
+          name="location"
+          value={values.location}
+          onChange={(event) => update('location', event.target.value)}
           autoComplete="off"
         />
       </Field>
 
-      <InmobiliariasField
-        selectedIds={values.inmobiliariaIds}
-        onChange={(inmobiliariaIds) => update('inmobiliariaIds', inmobiliariaIds)}
+      <AgenciesField
+        selectedIds={values.agencyIds}
+        onChange={(agencyIds) => update('agencyIds', agencyIds)}
       />
 
       <Field>
-        <FieldLabel htmlFor="loteo-descripcion">Descripción</FieldLabel>
+        <FieldLabel htmlFor="loteo-description">Descripción</FieldLabel>
         <Textarea
-          id="loteo-descripcion"
-          name="descripcion"
-          value={values.descripcion}
-          onChange={(event) => update('descripcion', event.target.value)}
+          id="loteo-description"
+          name="description"
+          value={values.description}
+          onChange={(event) => update('description', event.target.value)}
           rows={2}
         />
       </Field>
