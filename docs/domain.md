@@ -100,6 +100,8 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
   (`usuario_alta`).
 - Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
   inmobiliaria, la agencia se lee de `usuarios.inmobiliaria_id`.
+- Estado vigente en `reservas.estado_actual`; las transiciones se registran
+  solo en `reserva_estados`. Solo una reserva `activa` por lote.
 - Duración: 15 días, sin costo, sin registro de pago.
 - Al vencer sin concretar venta, el lote vuelve a estar disponible
   automáticamente.
@@ -111,6 +113,8 @@ Cargada por administrador o administrativo (`usuario_alta`):
 - lote vendido, cliente comprador;
 - vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
   agencia se lee de `usuarios.inmobiliaria_id`;
+- estado vigente en `ventas.estado_actual`; las transiciones se registran
+  solo en `venta_estados`. Una venta no cancelada por lote;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
   o entrega + financiación.
 

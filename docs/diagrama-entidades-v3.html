@@ -42,14 +42,14 @@
     {id:"inmobiliaria_loteos", x:40, y:1076, fields:["id", "inmobiliaria_id", "loteo_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"loteos", x:360, y:40, fields:["id", "nombre", "ubicacion", "descripcion", "faja", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"manzanas", x:360, y:398, fields:["id", "loteo_id", "numero", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
-    {id:"manzana_calles", x:360, y:712, fields:["id", "manzana_id", "calle_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"manzana_calles", x:360, y:712, fields:["id", "manzana_id", "calle_id", "loteo_id", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"lotes", x:680, y:40, fields:["id", "manzana_id", "loteo_id", "numero", "precio", "moneda", "superficie", "caracteristicas", "dxf_entidad_id", "tiene_agua", "tiene_cloaca", "tiene_luz", "tiene_gas", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"dxf_entidades", x:680, y:464, fields:["id", "loteo_id", "handle_dxf", "capa", "tipo", "propiedades", "geom", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"calles", x:680, y:756, fields:["id", "loteo_id", "dxf_entidad_id", "nombre", "tipo", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"archivos", x:1000, y:40, fields:["id", "loteo_id", "lote_id", "nombre", "nombre_original", "categoria", "tipo_documento", "url", "storage_key", "mime_type", "hash_sha256", "estado_procesamiento", "usuario_modificacion", "fecha", "fecha_procesamiento", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
-    {id:"reservas", x:1320, y:40, fields:["id", "lote_id", "cliente_id", "vendedor_id", "usuario_alta", "usuario_modificacion", "fecha_vencimiento", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"reservas", x:1320, y:40, fields:["id", "lote_id", "cliente_id", "vendedor_id", "usuario_alta", "estado_actual", "usuario_modificacion", "fecha_vencimiento", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"reserva_estados", x:1320, y:332, fields:["id", "reserva_id", "estado", "razon", "usuario_modificacion", "fecha_creacion"]},
-    {id:"ventas", x:1320, y:514, fields:["id", "lote_id", "cliente_id", "modalidad_pago", "monto", "moneda", "vendedor_id", "usuario_alta", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
+    {id:"ventas", x:1320, y:514, fields:["id", "lote_id", "cliente_id", "modalidad_pago", "monto", "moneda", "vendedor_id", "usuario_alta", "estado_actual", "usuario_modificacion", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"venta_estados", x:1320, y:850, fields:["id", "venta_id", "estado", "razon", "usuario_modificacion", "fecha_creacion"]},
     {id:"planes_pago", x:1640, y:40, fields:["id", "venta_id", "monto_entrega", "cantidad_cuotas", "tasa_interes", "periodicidad", "moneda", "usuario_modificacion", "fecha_entrega", "fecha_baja", "fecha_creacion", "fecha_modificacion"]},
     {id:"lote_estados", x:1640, y:354, fields:["id", "lote_id", "estado", "usuario_modificacion", "fecha_creacion"]},
@@ -61,6 +61,7 @@
     {id:"ventas.modalidad_pago", x:280, y:1340, values:["contado", "financiado", "entrega_financiada"]},
     {id:"venta_estados.estado", x:520, y:1340, values:["activa", "completada", "cancelada"]},
     {id:"reserva_estados.estado", x:760, y:1340, values:["activa", "vencida", "cancelada", "convertida"]},
+    {id:"reservas.estado_actual", x:760, y:1510, values:["activa", "vencida", "cancelada", "convertida"]},
     {id:"lote_estados.estado", x:1000, y:1340, values:["disponible", "reservado", "vendido", "finalizado"]},
     {id:"cuotas.estado", x:1240, y:1340, values:["pendiente", "pagada", "vencida"]},
     {id:"calles.tipo", x:1480, y:1340, values:["asfalto", "tierra", "brosa", "granito"]},
@@ -70,7 +71,7 @@
   ];
   var notes = [
     {id:"note_archivo", x:1000, y:486, w:220, h:56, text:"CHECK: exactamente uno de loteo_id o lote_id"},
-    {id:"note_integrity", x:1000, y:562, w:220, h:250, text:"Uniques: clientes.dni; lotes (loteo_id, numero); una reserva activa por lote; una venta activa por lote; usuario_loteos (usuario_id, loteo_id); inmobiliaria_loteos (inmobiliaria_id, loteo_id). loteo_id en lotes debe coincidir con manzanas.loteo_id. inmobiliaria_id en usuarios solo si rol = inmobiliaria. geom = polígono PostGIS (nullable si no hay DXF). reserva_estados, venta_estados y lote_estados son historial append-only (sin fecha_modificacion). usuario_alta y usuario_modificacion no se dibujan como arista."}
+    {id:"note_integrity", x:1000, y:562, w:220, h:250, text:"Uniques: clientes.dni; lotes (loteo_id, numero); una reserva con estado_actual=activa por lote; una venta no cancelada por lote; usuario_loteos (usuario_id, loteo_id); inmobiliaria_loteos (inmobiliaria_id, loteo_id). FKs compuestas (id, loteo_id) en manzana/calle/lote/dxf y manzana_calles. inmobiliaria_id en usuarios: CHECK diferido a otra migración tras backfill. geom = polígono PostGIS calificado al schema de la extensión. estado_actual solo cambia vía historial; el historial es append-only. usuario_alta y usuario_modificacion no se dibujan como arista."}
   ];
 
     var relations = [
