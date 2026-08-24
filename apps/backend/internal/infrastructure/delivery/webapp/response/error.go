@@ -10,11 +10,15 @@ import (
 
 // WriteError maps err to an HTTP response. A *domain.Error is written using
 // its own Code, Message and Kind (translated to a status via statusForKind);
-// any other error is logged with logMsg and hidden behind a generic 500, so
-// internal details never reach the client.
+// its Cause, if any, is logged with logMsg for observability without being
+// exposed to the client. Any other error is logged with logMsg and hidden
+// behind a generic 500, so internal details never reach the client.
 func WriteError(w http.ResponseWriter, request *http.Request, logMsg string, err error) {
 	var domainErr *domain.Error
 	if errors.As(err, &domainErr) {
+		if domainErr.Cause != nil {
+			slog.ErrorContext(request.Context(), logMsg, "error", domainErr.Cause)
+		}
 		WriteJSON(w, statusForKind(domainErr.Kind), ErrorResponse{
 			Code: domainErr.Code, Message: domainErr.Message,
 		})
@@ -27,10 +31,6 @@ func WriteError(w http.ResponseWriter, request *http.Request, logMsg string, err
 	})
 }
 
-func WriteBadRequest(w http.ResponseWriter, code, message string) {
-	WriteJSON(w, http.StatusBadRequest, ErrorResponse{Code: code, Message: message})
-}
-
 func statusForKind(kind domain.Kind) int {
 	switch kind {
 	case domain.KindInvalid:
@@ -41,6 +41,8 @@ func statusForKind(kind domain.Kind) int {
 		return http.StatusConflict
 	case domain.KindNotFound:
 		return http.StatusNotFound
+	case domain.KindUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

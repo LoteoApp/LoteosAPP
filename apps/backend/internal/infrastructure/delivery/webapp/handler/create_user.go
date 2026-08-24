@@ -19,16 +19,16 @@ func NewCreateUserHandler(createUser users.CreateUser) *CreateUserHandler {
 	return &CreateUserHandler{createUser: createUser}
 }
 
-// Create handles the administrador-only user sign-up. It must run behind
+// Handle handles the administrador-only user sign-up. It must run behind
 // middleware.RequireAuth.
-func (handler *CreateUserHandler) Create(w http.ResponseWriter, request *http.Request) {
+func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	// PrincipalFromContext is always populated here: this handler only ever
 	// runs behind middleware.RequireAuth.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 
-	body, ok := decodeJSON[dto.CreateUserRequest](w, request)
-	if !ok {
-		return
+	body, err := decodeJSON[dto.CreateUserRequest](request)
+	if err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
@@ -36,12 +36,12 @@ func (handler *CreateUserHandler) Create(w http.ResponseWriter, request *http.Re
 
 	usuario, temporaryPassword, err := handler.createUser.Execute(ctx, principal.Roles, body.Email, body.Rol)
 	if err != nil {
-		response.WriteError(w, request, "create user failed", err)
-		return
+		return err
 	}
 
 	response.WriteJSON(w, http.StatusCreated, dto.CreateUserResponse{
 		Usuario:           usuario,
 		TemporaryPassword: temporaryPassword,
 	})
+	return nil
 }

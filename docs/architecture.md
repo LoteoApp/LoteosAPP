@@ -149,14 +149,20 @@ vacíos antes de que exista una funcionalidad que los necesite.
   convierte el resultado en una respuesta. Cada ruta tiene su propio handler
   independiente, con un único caso de uso como dependencia (por ejemplo
   `CreateUserHandler` sólo conoce `users.CreateUser`); no hay un handler
-  compartido que agrupe varias rutas.
+  compartido que agrupe varias rutas. Un handler implementa `HTTPHandler`
+  (`Handle(w, r) error`) en vez de escribir su propia respuesta de error: el
+  error del caso de uso (o de `decodeJSON`) simplemente se retorna, y `Adapt`
+  lo convierte en `http.HandlerFunc` llamando a `response.WriteError`. Un
+  handler sin ningún error posible (como `Live`) queda como función suelta,
+  sin envolverlo en un struct solo para cumplir la interfaz.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
   consistentes, de éxito y de error. `WriteError` es el único lugar que
   traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`
-  tal cual, y mapea su `Kind` (una clasificación de negocio, no un status
-  HTTP) a un status con una función chica y cerrada. Un error que no sea
-  `*domain.Error` se loguea y se devuelve como 500 genérico, sin exponer el
-  detalle interno. Los handlers no arman ese mapeo por su cuenta.
+  tal cual, loguea su `Cause` (si existe) sin exponerlo, y mapea su `Kind`
+  (una clasificación de negocio, no un status HTTP) a un status con una
+  función chica y cerrada. Un error que no sea `*domain.Error` se loguea y se
+  devuelve como 500 genérico, sin exponer el detalle interno. Los handlers no
+  arman ese mapeo por su cuenta.
 - `internal/infrastructure/delivery/webapp/route`: registra los endpoints HTTP
   sobre un `*http.ServeMux` a partir de los handlers.
 - `internal/infrastructure/delivery/webapp/server`: construye el `*http.Server`

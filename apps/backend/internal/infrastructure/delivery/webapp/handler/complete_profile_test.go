@@ -38,7 +38,7 @@ func performCompleteProfileRequest(t *testing.T, completeProfile *completeProfil
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
-	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(http.HandlerFunc(h.CompleteProfile)))
+	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(h)))
 
 	return performRequest(t, mux, http.MethodPatch, "/api/v1/usuarios/me", token, body)
 }

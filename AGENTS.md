@@ -31,13 +31,15 @@
 - Backend domain and use cases (`internal/business`) must not depend on HTTP,
   PostgreSQL, or concrete `pgx` types.
 - Business errors a use case returns to a caller are `*domain.Error` (`Kind`,
-  `Code`, `Message`), not `errors.New(...)`. `Kind` is a business
-  classification (`KindInvalid`, `KindForbidden`, `KindConflict`,
-  `KindNotFound`), never an HTTP status. `response.WriteError` is the single
-  place that maps `Kind` to an HTTP status and writes `Code`/`Message`;
-  handlers call it directly instead of writing their own error-mapping
-  `switch`. Errors that aren't `*domain.Error` (unexpected failures) are
-  logged and hidden behind a generic 500.
+  `Code`, `Message`, optional `Cause`), not `errors.New(...)`. `Kind` is a
+  business classification (`KindInvalid`, `KindForbidden`, `KindConflict`,
+  `KindNotFound`, `KindUnavailable`), never an HTTP status. Set `Cause` to
+  the underlying error (e.g. a PostgreSQL failure) when one exists, so it can
+  be logged without exposing it in `Message`. `response.WriteError` is the
+  single place that maps `Kind` to an HTTP status, writes `Code`/`Message`,
+  and logs `Cause`; handlers never write their own error-mapping `switch`.
+  Errors that aren't `*domain.Error` (unexpected failures) are logged and
+  hidden behind a generic 500.
 - Keep domain entities under `internal/business/domain`, contracts the
   business needs from its adapters (e.g. `Repository`) under
   `internal/business/gateway`, and use cases under `internal/business/usecase`.
@@ -49,7 +51,13 @@
   HTTP server bootstrap) under `internal/infrastructure`.
 - Each HTTP route gets its own handler with a single use case as its only
   dependency (e.g. `CreateUserHandler` depends only on `users.CreateUser`);
-  do not group multiple routes into one handler struct.
+  do not group multiple routes into one handler struct. A handler implements
+  `handler.HTTPHandler` (`Handle(w, r) error`) instead of writing its own
+  error response: it returns the use case's error (or its own `decodeJSON`
+  error) and lets `handler.Adapt` translate it via `response.WriteError`.
+  `route.go` registers `handler.Adapt(h)`, not the handler's method directly.
+  A handler with no failure path (e.g. `Live`) stays a plain
+  `func(w, r)` — don't wrap it in a struct just to satisfy the interface.
 - Keep HTTP request/response structs out of `handler`; define them under
   `internal/infrastructure/delivery/webapp/dto/<feature>` instead. Each `dto`
   subpackage declares `package dto` regardless of its directory name, so it
@@ -57,7 +65,8 @@
   imported in the same handler file.
 - Decode request bodies with the shared generic `decodeJSON[T]` helper in
   `internal/infrastructure/delivery/webapp/handler` instead of repeating
-  `json.NewDecoder(...).Decode(...)` per handler.
+  `json.NewDecoder(...).Decode(...)` per handler; it returns a `*domain.Error`
+  on failure instead of writing the response itself.
 - Keep the dependency injection container (IoC wiring: pool, repositories, use
   cases, handlers) under `internal/infrastructure/delivery/webapp/dependencies`.
   It only builds objects; it does not read configuration, register routes, or

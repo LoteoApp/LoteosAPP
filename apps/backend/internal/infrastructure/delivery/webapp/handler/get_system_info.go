@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -18,19 +17,15 @@ func NewGetSystemInfoHandler(getSystemInfo system.GetSystemInfo) *GetSystemInfoH
 	return &GetSystemInfoHandler{getSystemInfo: getSystemInfo}
 }
 
-func (handler *GetSystemInfoHandler) Info(w http.ResponseWriter, request *http.Request) {
+func (handler *GetSystemInfoHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Second)
 	defer cancel()
 
 	info, err := handler.getSystemInfo.Execute(ctx)
 	if err != nil {
-		slog.ErrorContext(request.Context(), "database diagnostic failed", "error", err)
-		response.WriteJSON(w, http.StatusServiceUnavailable, response.ErrorResponse{
-			Code:    "database_diagnostic_failed",
-			Message: "No se pudo consultar PostgreSQL",
-		})
-		return
+		return err
 	}
 
 	response.WriteJSON(w, http.StatusOK, info)
+	return nil
 }

@@ -40,7 +40,7 @@ func performCreateUserRequest(t *testing.T, createUser *createUserStub, verifier
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
-	mux.Handle("POST /api/v1/usuarios", requireAuth(http.HandlerFunc(h.Create)))
+	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(h)))
 
 	return performRequest(t, mux, http.MethodPost, "/api/v1/usuarios", token, body)
 }

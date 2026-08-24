@@ -19,16 +19,16 @@ func NewCompleteProfileHandler(completeProfile users.CompleteProfile) *CompleteP
 	return &CompleteProfileHandler{completeProfile: completeProfile}
 }
 
-// CompleteProfile lets the authenticated caller fill in their own profile.
-// It must run behind middleware.RequireAuth.
-func (handler *CompleteProfileHandler) CompleteProfile(w http.ResponseWriter, request *http.Request) {
+// Handle lets the authenticated caller fill in their own profile. It must
+// run behind middleware.RequireAuth.
+func (handler *CompleteProfileHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	// PrincipalFromContext is always populated here: this handler only ever
 	// runs behind middleware.RequireAuth.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 
-	body, ok := decodeJSON[dto.CompleteProfileRequest](w, request)
-	if !ok {
-		return
+	body, err := decodeJSON[dto.CompleteProfileRequest](request)
+	if err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
@@ -36,9 +36,9 @@ func (handler *CompleteProfileHandler) CompleteProfile(w http.ResponseWriter, re
 
 	usuario, err := handler.completeProfile.Execute(ctx, principal.Subject, body.Nombre, body.Apellido)
 	if err != nil {
-		response.WriteError(w, request, "complete profile failed", err)
-		return
+		return err
 	}
 
 	response.WriteJSON(w, http.StatusOK, usuario)
+	return nil
 }

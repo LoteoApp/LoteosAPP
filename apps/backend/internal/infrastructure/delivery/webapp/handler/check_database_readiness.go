@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -19,18 +18,14 @@ func NewCheckDatabaseReadinessHandler(checkDatabaseReadiness system.CheckDatabas
 	return &CheckDatabaseReadinessHandler{checkDatabaseReadiness: checkDatabaseReadiness}
 }
 
-func (handler *CheckDatabaseReadinessHandler) Ready(w http.ResponseWriter, request *http.Request) {
+func (handler *CheckDatabaseReadinessHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := handler.checkDatabaseReadiness.Execute(ctx); err != nil {
-		slog.ErrorContext(request.Context(), "database readiness check failed", "error", err)
-		response.WriteJSON(w, http.StatusServiceUnavailable, response.ErrorResponse{
-			Code:    "database_unavailable",
-			Message: "La base de datos no está disponible",
-		})
-		return
+		return err
 	}
 
 	response.WriteJSON(w, http.StatusOK, dto.StatusResponse{Status: "ok"})
+	return nil
 }

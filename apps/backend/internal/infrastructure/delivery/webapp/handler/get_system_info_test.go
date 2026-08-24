@@ -57,7 +57,12 @@ func TestInfoRoute(t *testing.T) {
 func TestInfoRouteHidesInternalErrors(t *testing.T) {
 	t.Parallel()
 
-	recorder := performSystemInfoRequest(getSystemInfoStub{err: errors.New("connection password leaked")})
+	recorder := performSystemInfoRequest(getSystemInfoStub{err: &domain.Error{
+		Kind:    domain.KindUnavailable,
+		Code:    "database_diagnostic_failed",
+		Message: "No se pudo consultar PostgreSQL",
+		Cause:   errors.New("connection password leaked"),
+	}})
 
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)

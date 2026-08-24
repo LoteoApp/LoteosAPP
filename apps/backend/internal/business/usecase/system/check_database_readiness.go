@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 
+	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/gateway"
 )
 
@@ -21,5 +22,13 @@ func NewCheckDatabaseReadiness(repository gateway.Repository) CheckDatabaseReadi
 }
 
 func (useCase *checkDatabaseReadinessUseCase) Execute(ctx context.Context) error {
-	return useCase.repository.Ping(ctx)
+	if err := useCase.repository.Ping(ctx); err != nil {
+		return &domain.Error{
+			Kind:    domain.KindUnavailable,
+			Code:    "database_unavailable",
+			Message: "La base de datos no está disponible",
+			Cause:   err,
+		}
+	}
+	return nil
 }

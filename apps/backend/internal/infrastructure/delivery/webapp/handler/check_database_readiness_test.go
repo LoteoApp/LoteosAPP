@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
 )
@@ -29,8 +30,13 @@ func TestReadyRoute(t *testing.T) {
 	}{
 		{name: "database reachable", wantStatus: http.StatusOK},
 		{
-			name:       "database unavailable",
-			err:        errors.New("database unavailable"),
+			name: "database unavailable",
+			err: &domain.Error{
+				Kind:    domain.KindUnavailable,
+				Code:    "database_unavailable",
+				Message: "La base de datos no está disponible",
+				Cause:   errors.New("database unavailable"),
+			},
 			wantStatus: http.StatusServiceUnavailable,
 		},
 	}

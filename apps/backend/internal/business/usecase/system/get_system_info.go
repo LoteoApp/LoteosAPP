@@ -25,7 +25,12 @@ func NewGetSystemInfo(repository gateway.Repository) GetSystemInfo {
 func (useCase *getSystemInfoUseCase) Execute(ctx context.Context) (domain.Info, error) {
 	database, pool, err := useCase.repository.Snapshot(ctx)
 	if err != nil {
-		return domain.Info{}, err
+		return domain.Info{}, &domain.Error{
+			Kind:    domain.KindUnavailable,
+			Code:    "database_diagnostic_failed",
+			Message: "No se pudo consultar PostgreSQL",
+			Cause:   err,
+		}
 	}
 
 	database.Connected = true
