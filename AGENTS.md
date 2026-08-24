@@ -89,6 +89,13 @@
 
 ## Pull Requests
 
+GitHub pre-carga `.github/pull_request_template.md` al abrir un PR desde la web.
+Desde la CLI se pasa explícitamente:
+
+```powershell
+gh pr create --template .github/pull_request_template.md
+```
+
 Every PR description must include:
 
 ```
@@ -107,7 +114,19 @@ Migraciones agregadas o modificadas, si aplica.
 ## Capturas
 
 Agregar capturas si hay cambios visuales.
+
+## Issue
+
+Closes #NNN
 ```
+
+La línea `Closes #NNN` es obligatoria: sin ella el issue queda huérfano del PR y
+hay que actualizar el board a mano. Si el PR avanza un issue pero no lo termina,
+usar `Refs #NNN`.
+
+Como los PR van contra `develop`, GitHub no cierra el issue al mergear; lo cierra
+recién cuando `develop` llega a `main`. La línea sirve igual, porque deja el PR
+enlazado en el issue desde el momento en que se abre.
 
 Antes de pushear, revisar si el cambio deja desactualizada la documentación existente
 (`README.md`, `docs/`) y actualizarla en el mismo PR.
