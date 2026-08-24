@@ -2,11 +2,8 @@ export type DxfLayer = 'LOTEO' | 'MANZANA' | 'LOTES' | 'CALLE'
 
 export const DXF_LAYERS: readonly DxfLayer[] = ['LOTEO', 'MANZANA', 'LOTES', 'CALLE']
 
-export const DXF_LAYER_LABELS: Record<DxfLayer, string> = {
-  LOTEO: 'Loteo',
-  MANZANA: 'Manzana',
-  LOTES: 'Lotes',
-  CALLE: 'Calle',
+export function isDxfLayer(value: string): value is DxfLayer {
+  return (DXF_LAYERS as readonly string[]).includes(value)
 }
 
 export type DxfPoint = {

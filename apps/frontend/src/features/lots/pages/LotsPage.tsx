@@ -13,6 +13,11 @@ import DxfViewer from '../components/DxfViewer'
 import LoteoFields, { type LoteoFieldValues } from '../components/LoteoFields'
 import { DXF_LAYERS, type DxfLayer, type DxfParseResult } from '../types'
 
+type DxfState =
+  | { status: 'empty' }
+  | { status: 'loaded'; result: DxfParseResult; fileName: string }
+  | { status: 'error'; message: string }
+
 const emptyFields: LoteoFieldValues = {
   nombre: '',
   ubicacion: '',
@@ -21,36 +26,13 @@ const emptyFields: LoteoFieldValues = {
 
 export default function LotsPage() {
   const [fields, setFields] = useState<LoteoFieldValues>(emptyFields)
-  const [parseResult, setParseResult] = useState<DxfParseResult | null>(null)
-  const [parseError, setParseError] = useState<string | null>(null)
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [dxf, setDxf] = useState<DxfState>({ status: 'empty' })
   const [visibleLayers, setVisibleLayers] = useState<ReadonlySet<DxfLayer>>(
     () => new Set(DXF_LAYERS),
   )
 
-  const polygons = parseResult?.polygons ?? []
-  const issues = parseResult?.issues ?? []
-
-  const dxfField = (
-    <DxfFileField
-      fileName={fileName}
-      onParsed={(result, name) => {
-        setParseResult(result)
-        setParseError(null)
-        setFileName(name)
-      }}
-      onError={(message) => {
-        setParseResult(null)
-        setParseError(message)
-        setFileName(null)
-      }}
-      onCleared={() => {
-        setParseResult(null)
-        setParseError(null)
-        setFileName(null)
-      }}
-    />
-  )
+  const polygons = dxf.status === 'loaded' ? dxf.result.polygons : []
+  const issues = dxf.status === 'loaded' ? dxf.result.issues : []
 
   return (
     <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[20rem_minmax(0,1fr)] md:grid-rows-[auto_auto_1fr] md:gap-x-6 md:gap-y-3">
@@ -62,8 +44,16 @@ export default function LotsPage() {
       </header>
 
       <div className="flex min-h-0 flex-col gap-2 md:col-start-1 md:row-start-3">
-        {dxfField}
-        <DxfParseAlerts error={parseError} issues={issues} />
+        <DxfFileField
+          fileName={dxf.status === 'loaded' ? dxf.fileName : null}
+          onParsed={(result, fileName) => setDxf({ status: 'loaded', result, fileName })}
+          onError={(message) => setDxf({ status: 'error', message })}
+          onCleared={() => setDxf({ status: 'empty' })}
+        />
+        <DxfParseAlerts
+          error={dxf.status === 'error' ? dxf.message : null}
+          issues={issues}
+        />
       </div>
 
       <div className="flex min-h-0 flex-col gap-2 md:col-start-2 md:row-start-2 md:row-span-2">

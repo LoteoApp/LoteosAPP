@@ -34,8 +34,25 @@ describe('DxfParseAlerts', () => {
   })
 
   it('renders nothing when there is nothing to report', () => {
-    render(<DxfParseAlerts error={null} issues={[]} />)
+    const { container } = render(<DxfParseAlerts error={null} issues={[]} />)
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('caps the list and counts the rest', () => {
+    const issues: DxfValidationIssue[] = Array.from({ length: 25 }, (_, index) => ({
+      code: 'OVERLAPPING',
+      layer: 'LOTES',
+      message: `Aviso ${index}`,
+      handle: null,
+      polygonId: String(index),
+    }))
+
+    render(<DxfParseAlerts error={null} issues={issues} />)
+
+    expect(screen.getByText('Aviso 19')).toBeInTheDocument()
+    expect(screen.queryByText('Aviso 20')).not.toBeInTheDocument()
+    expect(screen.getByText('Y 5 avisos más.')).toBeInTheDocument()
   })
 })

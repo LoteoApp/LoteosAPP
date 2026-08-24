@@ -18,6 +18,7 @@ const MAX_DXF_LENGTH = 20_000_000
 // rows*columns times with no upper bound, so an attacker-crafted file of a
 // few KB can request millions of clones and hang the tab.
 const MAX_INSERT_ARRAY_COUNT = 10_000
+const MAX_OVERLAP_ISSUES = 200
 
 // Surveyors name the layer in singular or plural (e.g. "CALLE" vs "CALLES");
 // normalize to the domain's canonical form.
@@ -121,6 +122,9 @@ function isRingClosed(entityClosed: boolean, vertices: DxfPoint[]): boolean {
   return distance(vertices[0], vertices[vertices.length - 1]) <= CLOSING_GAP_TOLERANCE
 }
 
+// The overlap search is quadratic per layer, so a plan with thousands of lots
+// can produce millions of pairs. Stop at the cap: the list is a warning, not
+// an inventory, and past this point it only costs time and memory.
 function findOverlapIssues(polygons: DxfPolygon[]): DxfValidationIssue[] {
   const issues: DxfValidationIssue[] = []
   const byLayer = new Map<DxfLayer, DxfPolygon[]>()
@@ -133,6 +137,7 @@ function findOverlapIssues(polygons: DxfPolygon[]): DxfValidationIssue[] {
   for (const [layer, group] of byLayer) {
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
+        if (issues.length >= MAX_OVERLAP_ISSUES) return issues
         if (!polygonsOverlap(group[i].vertices, group[j].vertices)) continue
         issues.push({
           code: 'OVERLAPPING',

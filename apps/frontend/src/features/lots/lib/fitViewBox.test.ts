@@ -45,13 +45,48 @@ describe('fitViewBox', () => {
 })
 
 describe('zoomViewBox', () => {
+  const fitted = { x: 0, y: 0, width: 10, height: 10 }
+
   it('zooms around the center', () => {
-    expect(zoomViewBox({ x: 0, y: 0, width: 10, height: 10 }, 0.5)).toEqual({
+    expect(zoomViewBox({ x: 0, y: 0, width: 10, height: 10 }, 0.5, fitted)).toEqual({
       x: 2.5,
       y: 2.5,
       width: 5,
       height: 5,
     })
+  })
+
+  it('keeps the focused point in place', () => {
+    const zoomed = zoomViewBox({ x: 0, y: 0, width: 10, height: 10 }, 0.5, fitted, {
+      x: 0,
+      y: 1,
+    })
+
+    expect(zoomed).toEqual({ x: 0, y: 5, width: 5, height: 5 })
+  })
+
+  it('stops zooming in past the limit', () => {
+    let viewBox = fitted
+    for (let i = 0; i < 100; i++) {
+      viewBox = zoomViewBox(viewBox, 0.5, fitted)
+    }
+
+    expect(viewBox.width).toBeCloseTo(fitted.width / 50)
+    expect(viewBox.height).toBeCloseTo(fitted.height / 50)
+  })
+
+  it('stops zooming out past the limit', () => {
+    let viewBox = fitted
+    for (let i = 0; i < 100; i++) {
+      viewBox = zoomViewBox(viewBox, 2, fitted)
+    }
+
+    expect(viewBox.width).toBeCloseTo(fitted.width * 20)
+    expect(viewBox.height).toBeCloseTo(fitted.height * 20)
+  })
+
+  it('falls back to the fitted box when the current one has no span', () => {
+    expect(zoomViewBox({ x: 0, y: 0, width: 0, height: 0 }, 0.5, fitted)).toEqual(fitted)
   })
 })
 

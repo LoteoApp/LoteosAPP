@@ -1,5 +1,6 @@
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/toggle-group'
-import { DXF_LAYER_LABELS, DXF_LAYERS, type DxfLayer } from '../types'
+import { DXF_LAYER_LABELS } from '../lib/dxfLayerLabels'
+import { DXF_LAYERS, isDxfLayer, type DxfLayer } from '../types'
 
 type DxfLayerTogglesProps = {
   visibleLayers: ReadonlySet<DxfLayer>
@@ -33,8 +34,4 @@ export default function DxfLayerToggles({
       ))}
     </ToggleGroup>
   )
-}
-
-function isDxfLayer(value: string): value is DxfLayer {
-  return (DXF_LAYERS as readonly string[]).includes(value)
 }

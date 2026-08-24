@@ -123,7 +123,7 @@ describe('DxfViewer', () => {
     expect(svg.getAttribute('viewBox')).toBe(before)
   })
 
-  it('refits the drawing when the visible layers change', async () => {
+  it('keeps the current view when the visible layers change', async () => {
     const user = userEvent.setup()
     const { rerender } = render(
       <DxfViewer polygons={polygons} visibleLayers={new Set(['LOTEO'])} />,
@@ -135,6 +135,73 @@ describe('DxfViewer', () => {
     rerender(<DxfViewer polygons={polygons} visibleLayers={new Set(['LOTES'])} />)
     expect(
       screen.getByRole('img', { name: 'Plano del loteo' }).getAttribute('viewBox'),
-    ).not.toBe(zoomed)
+    ).toBe(zoomed)
+  })
+
+  it('refits the drawing when a new set of polygons arrives', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <DxfViewer polygons={polygons} visibleLayers={new Set(DXF_LAYERS)} />,
+    )
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+    const fitted = svg.getAttribute('viewBox')
+    await user.click(screen.getByRole('button', { name: 'Acercar' }))
+    expect(svg.getAttribute('viewBox')).not.toBe(fitted)
+
+    rerender(<DxfViewer polygons={[...polygons]} visibleLayers={new Set(DXF_LAYERS)} />)
+    expect(
+      screen.getByRole('img', { name: 'Plano del loteo' }).getAttribute('viewBox'),
+    ).toBe(fitted)
+  })
+
+  it('zooms with the wheel', () => {
+    render(<DxfViewer polygons={polygons} visibleLayers={new Set(DXF_LAYERS)} />)
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+    const before = svg.getAttribute('viewBox')
+
+    fireEvent.wheel(svg, { deltaY: 120 })
+
+    expect(svg.getAttribute('viewBox')).not.toBe(before)
+  })
+
+  it('zooms with the wheel when the geometry arrives after mounting', () => {
+    const { rerender } = render(
+      <DxfViewer polygons={[]} visibleLayers={new Set(DXF_LAYERS)} />,
+    )
+
+    rerender(<DxfViewer polygons={polygons} visibleLayers={new Set(DXF_LAYERS)} />)
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+    const before = svg.getAttribute('viewBox')
+
+    fireEvent.wheel(svg, { deltaY: 120 })
+
+    expect(svg.getAttribute('viewBox')).not.toBe(before)
+  })
+
+  it('zooms when two pointers spread apart', () => {
+    Element.prototype.setPointerCapture = vi.fn()
+    Element.prototype.releasePointerCapture = vi.fn()
+    Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(true)
+
+    render(<DxfViewer polygons={polygons} visibleLayers={new Set(DXF_LAYERS)} />)
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+    const before = svg.getAttribute('viewBox')
+
+    fireEvent.pointerDown(svg, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerDown(svg, { clientX: 10, clientY: 0, pointerId: 2 })
+    fireEvent.pointerMove(svg, { clientX: 20, clientY: 0, pointerId: 2 })
+    expect(svg.getAttribute('viewBox')).toBe(before)
+
+    fireEvent.pointerMove(svg, { clientX: 40, clientY: 0, pointerId: 2 })
+    const pinched = svg.getAttribute('viewBox')
+    expect(pinched).not.toBe(before)
+
+    const [, , width] = String(pinched).split(' ').map(Number)
+    const [, , widthBefore] = String(before).split(' ').map(Number)
+    expect(width).toBeLessThan(widthBefore)
   })
 })
