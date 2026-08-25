@@ -33,3 +33,20 @@ func (err *Error) Error() string {
 func (err *Error) Unwrap() error {
 	return err.Cause
 }
+
+// Is reports errors with the same Code as equivalent, so errors.Is matches a
+// sentinel against the copy WithCause returns.
+func (err *Error) Is(target error) bool {
+	other, ok := target.(*Error)
+
+	return ok && other.Code == err.Code
+}
+
+// WithCause returns a copy of err carrying cause, leaving the receiver
+// untouched so package-level sentinels stay safe to share.
+func (err *Error) WithCause(cause error) *Error {
+	withCause := *err
+	withCause.Cause = cause
+
+	return &withCause
+}

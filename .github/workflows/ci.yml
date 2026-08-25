@@ -154,10 +154,15 @@ jobs:
 
       - name: docker compose config
         env:
-          # Placeholder values: compose.yaml requires DATABASE_URL to be set so
-          # a real run fails fast instead of falling back to a local database.
-          # This job only validates the file, it never connects anywhere.
+          # Placeholder values: compose.yaml requires these to be set so a real
+          # run fails fast instead of falling back to a local database or an
+          # unconfigured bucket. This job only validates the file, it never
+          # connects anywhere.
           DATABASE_URL: postgres://user:password@localhost:5432/postgres?sslmode=require
+          CLOUDFLARE_R2_ENDPOINT: https://account-id.r2.cloudflarestorage.com
+          CLOUDFLARE_R2_BUCKET_NAME: loteos-files-ci
+          CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-access-key-id
+          CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-secret-access-key
         run: docker compose config
 
   main-source-branch:

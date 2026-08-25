@@ -5,12 +5,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/usecase/system"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/environments"
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
+	"loteosapp/backend/internal/infrastructure/storage/r2"
 )
 
 type Container struct {
@@ -20,6 +22,7 @@ type Container struct {
 	CompleteProfileHandler        *handler.CompleteProfileHandler
 	Pool                          *pgxpool.Pool
 	Verifier                      *supabase.Verifier
+	ObjectStorage                 gateway.ObjectStorage
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -29,6 +32,17 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	}
 
 	verifier, err := supabase.NewVerifier(ctx, cfg.SupabaseURL)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	objectStorage, err := r2.NewClient(r2.Config{
+		Endpoint:        cfg.Storage.Endpoint,
+		Bucket:          cfg.Storage.Bucket,
+		AccessKeyID:     cfg.Storage.AccessKeyID,
+		SecretAccessKey: cfg.Storage.SecretAccessKey,
+	})
 	if err != nil {
 		pool.Close()
 		return nil, err
@@ -50,5 +64,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		CompleteProfileHandler:        completeProfileHandler,
 		Pool:                          pool,
 		Verifier:                      verifier,
+		ObjectStorage:                 objectStorage,
 	}, nil
 }
