@@ -21,16 +21,17 @@ se organiza el código de cada funcionalidad.
   financiación, finalizados).
 - **Reserva**: vincula un cliente a un lote individual por 15 días, sin costo
   ni pago.
-- **Venta**: vincula lote, cliente, modalidad de pago (contado, financiado,
-  entrega + financiación) e inmobiliaria/referente si corresponde.
+- **Venta**: vincula lote, cliente, vendedor y modalidad de pago (contado,
+  financiado, entrega + financiación).
 - **Cuota**: pago periódico de una venta financiada; puede incluir
   impuesto municipal, impuesto provincial, cargo de inmobiliaria y otros.
 - **Usuario**: cuenta interna con rol y loteos asignados. Creado por el
   administrador (excepto el propio administrador).
 - **Inmobiliaria**: agencia externa (nombre, contacto) asociada a uno o más
-  loteos; se referencia desde Reserva y Venta como inmobiliaria
-  interviniente/referente. Es una entidad propia, distinta del rol de
-  usuario **Inmobiliaria** (ver [Usuarios y roles](#usuarios-y-roles)).
+  loteos. Es una entidad propia, distinta del rol de usuario
+  **Inmobiliaria** (ver [Usuarios y roles](#usuarios-y-roles)). Un usuario
+  con ese rol apunta a la agencia (`usuarios.inmobiliaria_id`). En reserva
+  y venta la agencia se obtiene del vendedor, no se guarda aparte.
 
 ## Alta y visualización de un loteo
 
@@ -56,10 +57,11 @@ se organiza el código de cada funcionalidad.
 ## Inmobiliarias
 
 Alta y gestión de inmobiliarias (agencias externas) asociadas a los loteos,
-desde el módulo **Inmobiliaria**. Se usan para completar el campo
-"inmobiliaria interviniente/referente" en [Reservas](#reservas) y
-[Venta](#venta). Campos y permisos de alta a definir en una futura
-iteración; el módulo está en construcción.
+desde el módulo **Inmobiliaria**. Los usuarios con rol inmobiliaria
+pertenecen a una agencia; esa es la inmobiliaria de una
+[reserva](#reservas) o [venta](#venta) a través del vendedor. Campos y
+permisos de alta a definir en una futura iteración; el módulo está en
+construcción.
 
 ## Usuarios y roles
 
@@ -94,17 +96,25 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 ## Reservas
 
 - Solo lotes individuales (no manzanas ni loteos completos).
-- Quién reserva: inmobiliaria, administrativo o administrador.
+- Quién reserva: inmobiliaria, administrativo o administrador
+  (`usuario_alta`).
+- Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
+  inmobiliaria, la agencia se lee de `usuarios.inmobiliaria_id`.
+- Estado vigente en `reservas.estado_actual`; las transiciones se registran
+  solo en `reserva_estados`. Solo una reserva `activa` por lote.
 - Duración: 15 días, sin costo, sin registro de pago.
 - Al vencer sin concretar venta, el lote vuelve a estar disponible
   automáticamente.
 
 ## Venta
 
-Cargada por administrador o administrativo:
+Cargada por administrador o administrativo (`usuario_alta`):
 
 - lote vendido, cliente comprador;
-- inmobiliaria interviniente y referente, si corresponde;
+- vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
+  agencia se lee de `usuarios.inmobiliaria_id`;
+- estado vigente en `ventas.estado_actual`; las transiciones se registran
+  solo en `venta_estados`. Una venta no cancelada por lote;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
   o entrega + financiación.
 

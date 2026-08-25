@@ -1,0 +1,145 @@
+package users
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway/gatewayfake"
+)
+
+func TestCreateUserRejectsNonAdministrador(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{"administrativo"}, "ana@example.com", domain.RolAdministrativo)
+
+	if !errors.Is(err, domain.ErrNoAutorizado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
+	}
+	if identity.CreateCalls != 0 {
+		t.Error("Execute() should not call identity provider when actor is not administrador")
+	}
+	if repository.CreateCalls != 0 {
+		t.Error("Execute() should not call repository when actor is not administrador")
+	}
+}
+
+func TestCreateUserRejectsInvalidRol(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "ana@example.com", "superadmin")
+
+	if !errors.Is(err, domain.ErrRolInvalido) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrRolInvalido)
+	}
+	if identity.CreateCalls != 0 {
+		t.Error("Execute() should not call identity provider when rol is invalid")
+	}
+}
+
+func TestCreateUserRejectsInvalidEmail(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "not-an-email", domain.RolAdministrativo)
+
+	if !errors.Is(err, domain.ErrEmailInvalido) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmailInvalido)
+	}
+	if identity.CreateCalls != 0 {
+		t.Error("Execute() should not call identity provider when email is invalid")
+	}
+}
+
+func TestCreateUserHappyPath(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	createUser := NewCreateUser(repository, identity)
+
+	usuario, tempPassword, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "ana@example.com", domain.RolAdministrativo)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if usuario.AuthProviderID != "sb-123" {
+		t.Errorf("Execute() auth provider id = %q, want %q", usuario.AuthProviderID, "sb-123")
+	}
+	if usuario.Email != "ana@example.com" {
+		t.Errorf("Execute() email = %q, want %q", usuario.Email, "ana@example.com")
+	}
+	if tempPassword != "temp-pass-123" {
+		t.Errorf("Execute() temporary password = %q, want %q", tempPassword, "temp-pass-123")
+	}
+	if repository.CreateCalls != 1 {
+		t.Errorf("Execute() repository.Create calls = %d, want 1", repository.CreateCalls)
+	}
+	if identity.DeleteCalls != 0 {
+		t.Error("Execute() should not compensate when persistence succeeds")
+	}
+}
+
+func TestCreateUserPropagatesIdentityProviderError(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{CreateErr: domain.ErrEmailEnUso}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "ana@example.com", domain.RolAdministrativo)
+
+	if !errors.Is(err, domain.ErrEmailEnUso) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmailEnUso)
+	}
+	if repository.CreateCalls != 0 {
+		t.Error("Execute() should not call repository when identity provider fails")
+	}
+}
+
+func TestCreateUserCompensatesWhenPersistenceFails(t *testing.T) {
+	t.Parallel()
+
+	persistErr := errors.New("insert failed")
+	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "ana@example.com", domain.RolAdministrativo)
+
+	if !errors.Is(err, persistErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, persistErr)
+	}
+	if identity.DeleteCalls != 1 {
+		t.Fatalf("Execute() identity.DeleteUser calls = %d, want 1", identity.DeleteCalls)
+	}
+	if identity.DeletedUserID != "sb-123" {
+		t.Errorf("Execute() compensated user id = %q, want %q", identity.DeletedUserID, "sb-123")
+	}
+}
+
+func TestCreateUserReturnsOriginalErrorWhenCompensationAlsoFails(t *testing.T) {
+	t.Parallel()
+
+	persistErr := errors.New("insert failed")
+	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", DeleteErr: errors.New("delete failed")}
+	createUser := NewCreateUser(repository, identity)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "ana@example.com", domain.RolAdministrativo)
+
+	if !errors.Is(err, persistErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, persistErr)
+	}
+}

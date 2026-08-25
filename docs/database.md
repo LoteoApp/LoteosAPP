@@ -130,8 +130,29 @@ Las migraciones están en:
 
 ```text
 migrations/
-└── 00001_init.sql
+├── 00001_init.sql
+├── 00002_create_usuarios.sql
+├── 00003_rename_keycloak_id_to_auth_provider_id.sql
+├── 00004_enable_rls_on_public_tables.sql
+└── 00005_create_entity_model.sql
 ```
+
+`00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
+y estados) y habilita RLS en cada tabla nueva, igual que `00004`. No edita
+migraciones ya aplicadas.
+
+- PostGIS: si no está instalada, se crea en `extensions`. Si ya existe (en
+  `extensions`, `gis` o `public`), se reutiliza `pg_extension.extnamespace` y
+  `geom` se declara con el tipo calificado (`schema.geometry(Polygon)`). El
+  `Down` no borra la extensión.
+- `usuarios.inmobiliaria_id` queda nullable, sin CHECK: no hay mapeo de
+  usuarios `inmobiliaria` existentes a agencias. La restricción
+  (inmobiliaria_id NOT NULL iff rol = inmobiliaria) va en una migración
+  posterior, después del backfill.
+- `reservas.estado_actual` y `ventas.estado_actual` solo cambian insertando
+  en el historial. Un trigger bloquea el UPDATE directo, las filas del
+  historial rechazan UPDATE, DELETE y TRUNCATE, y el alta crea la primera
+  fila `activa`.
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 

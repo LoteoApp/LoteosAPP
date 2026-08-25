@@ -23,16 +23,53 @@
 ## Architecture
 
 - Organize frontend code by feature. Organize backend code by technical layer
-  (`internal/business`, `internal/infrastructure`), not by feature.
+  (`internal/business`, `internal/infrastructure`), not by feature — except
+  `internal/business/usecase` and `internal/infrastructure/delivery/webapp/dto`,
+  which group use cases and HTTP DTOs into per-feature subpackages (e.g.
+  `usecase/users`, `usecase/system`, `dto/users`, `dto/system`).
 - Follow the dependency rules documented in `docs/architecture.md`.
 - Backend domain and use cases (`internal/business`) must not depend on HTTP,
   PostgreSQL, or concrete `pgx` types.
+- Business errors a use case returns to a caller are `*domain.Error` (`Kind`,
+  `Code`, `Message`, optional `Cause`), not `errors.New(...)`. `Kind` is a
+  business classification (`KindInvalid`, `KindForbidden`, `KindConflict`,
+  `KindNotFound`, `KindUnavailable`), never an HTTP status. Set `Cause` to
+  the underlying error (e.g. a PostgreSQL failure) when one exists, so it can
+  be logged without exposing it in `Message`. `response.WriteError` is the
+  single place that maps `Kind` to an HTTP status, writes `Code`/`Message`,
+  and logs `Cause`; handlers never write their own error-mapping `switch`.
+  Errors that aren't `*domain.Error` (unexpected failures) are logged and
+  hidden behind a generic 500.
 - Keep domain entities under `internal/business/domain`, contracts the
   business needs from its adapters (e.g. `Repository`) under
   `internal/business/gateway`, and use cases under `internal/business/usecase`.
-  Use cases depend on `gateway` contracts, never on a concrete adapter.
+  Use cases depend on `gateway` contracts, never on a concrete adapter. Each
+  use case is a single-method `Execute` interface plus its implementation,
+  defined together in one file under its feature subpackage (e.g.
+  `usecase/users/create_user.go`).
 - Keep every adapter (persistence, environment configuration, HTTP delivery,
   HTTP server bootstrap) under `internal/infrastructure`.
+- Each HTTP route gets its own handler with a single use case as its only
+  dependency (e.g. `CreateUserHandler` depends only on `users.CreateUser`);
+  do not group multiple routes into one handler struct. A handler implements
+  `handler.HTTPHandler` (`Handle(w, r) error`) instead of writing its own
+  error response: it returns the use case's error (or its own `decodeJSON`
+  error) and lets `handler.Adapt` translate it via `response.WriteError`.
+  `Adapt(h, timeout)` also bounds `r.Context()` to `timeout` before calling
+  `Handle`, so a handler never sets up its own `context.WithTimeout`; it
+  just uses `request.Context()`. `route.go` registers `handler.Adapt(h,
+  timeout)` per route, not the handler's method directly. A handler with no
+  failure path (e.g. `Live`) stays a plain `func(w, r)` — don't wrap it in a
+  struct just to satisfy the interface.
+- Keep HTTP request/response structs out of `handler`; define them under
+  `internal/infrastructure/delivery/webapp/dto/<feature>` instead. Each `dto`
+  subpackage declares `package dto` regardless of its directory name, so it
+  never collides with the matching `usecase` subpackage when both are
+  imported in the same handler file.
+- Decode request bodies with the shared generic `decodeJSON[T]` helper in
+  `internal/infrastructure/delivery/webapp/handler` instead of repeating
+  `json.NewDecoder(...).Decode(...)` per handler; it returns a `*domain.Error`
+  on failure instead of writing the response itself.
 - Keep the dependency injection container (IoC wiring: pool, repositories, use
   cases, handlers) under `internal/infrastructure/delivery/webapp/dependencies`.
   It only builds objects; it does not read configuration, register routes, or
@@ -64,7 +101,8 @@
 
 - Every new behavior and every bug fix must include tests in the same change.
 - Backend tests use Go's standard `testing` package and `net/http/httptest`; do not add assertion libraries without a concrete need.
-- Test backend business services with small fakes of their required interfaces, HTTP handlers through their observable request/response contract, and PostgreSQL repositories with integration tests against a real PostgreSQL instance.
+- Test backend use cases with small fakes of their required `gateway` interfaces, HTTP handlers through their observable request/response contract, and PostgreSQL repositories with integration tests against a real PostgreSQL instance.
+- Keep fakes for `gateway` contracts in `internal/business/gateway/gatewayfake`, next to the interfaces they implement, so every `usecase` subpackage reuses them instead of redefining fakes per feature.
 - Frontend tests use Vitest, React Testing Library, `@testing-library/jest-dom`, and `@testing-library/user-event` for user interactions.
 - Frontend tests must query and assert the UI as a user would; avoid testing internal state, implementation details, Tailwind classes, or private functions.
 - Keep tests next to the code under test using `*_test.go`, `*.test.ts`, or `*.test.tsx`.
@@ -89,6 +127,13 @@
 
 ## Pull Requests
 
+GitHub pre-carga `.github/pull_request_template.md` al abrir un PR desde la web.
+Desde la CLI se pasa explícitamente:
+
+```powershell
+gh pr create --template .github/pull_request_template.md
+```
+
 Every PR description must include:
 
 ```
@@ -107,7 +152,19 @@ Migraciones agregadas o modificadas, si aplica.
 ## Capturas
 
 Agregar capturas si hay cambios visuales.
+
+## Issue
+
+Closes #NNN
 ```
+
+La línea `Closes #NNN` es obligatoria: sin ella el issue queda huérfano del PR y
+hay que actualizar el board a mano. Si el PR avanza un issue pero no lo termina,
+usar `Refs #NNN`.
+
+Como los PR van contra `develop`, GitHub no cierra el issue al mergear; lo cierra
+recién cuando `develop` llega a `main`. La línea sirve igual, porque deja el PR
+enlazado en el issue desde el momento en que se abre.
 
 Antes de pushear, revisar si el cambio deja desactualizada la documentación existente
 (`README.md`, `docs/`) y actualizarla en el mismo PR.
