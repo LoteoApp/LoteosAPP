@@ -89,7 +89,7 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 
 ## Clientes
 
-- Alta y modificación: administrativo e inmobiliaria.
+- Alta y modificación: administrador, administrativo e inmobiliaria.
 - Baja: solo administrador.
 - Sin acceso al sistema.
 

@@ -117,9 +117,9 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `usecase`.
 - `internal/business/usecase`: casos de uso que orquestan el dominio a través de
   los contratos de `gateway`, agrupados en subpaquetes por funcionalidad
-  (`usecase/system`, `usecase/users`). Cada caso de uso es una interfaz de un
-  solo método `Execute` junto con su implementación, definidas en el mismo
-  archivo (por ejemplo `usecase/users/create_user.go`).
+  (`usecase/system`, `usecase/users`, `usecase/clients`). Cada caso de uso es
+  una interfaz de un solo método `Execute` junto con su implementación,
+  definidas en el mismo archivo (por ejemplo `usecase/users/create_user.go`).
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
 - `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
@@ -139,11 +139,11 @@ vacíos antes de que exista una funcionalidad que los necesite.
   persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
   la apertura y configuración del pool de conexiones.
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
-  HTTP, agrupados por feature (`dto/system`, `dto/users`) igual que
-  `usecase`. Cada subpaquete declara `package dto`; como el identificador de
-  paquete no tiene que coincidir con el nombre del directorio, no choca con
-  `usecase/system` ni `usecase/users` al importarse en el mismo archivo de
-  `handler`.
+  HTTP, agrupados por feature (`dto/system`, `dto/users`, `dto/clients`)
+  igual que `usecase`. Cada subpaquete declara `package dto`; como el
+  identificador de paquete no tiene que coincidir con el nombre del
+  directorio, no choca con `usecase/system`, `usecase/users` ni
+  `usecase/clients` al importarse en el mismo archivo de `handler`.
 - `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
   llamadas del caso de uso, decodificando y codificando los tipos de `dto`, y
   convierte el resultado en una respuesta. Cada ruta tiene su propio handler
@@ -188,12 +188,15 @@ flowchart LR
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseSystem["business/usecase/system"]
     handler --> usecaseUsers["business/usecase/users"]
+    handler --> usecaseClients["business/usecase/clients"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     usecaseSystem --> gateway
     usecaseUsers --> gateway
+    usecaseClients --> gateway
     usecaseSystem --> domain["business/domain"]
     usecaseUsers --> domain
+    usecaseClients --> domain
     response --> domain
     gateway --> domain
 ```

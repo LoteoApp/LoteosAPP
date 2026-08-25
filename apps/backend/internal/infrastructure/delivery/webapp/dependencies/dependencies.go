@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/system"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
@@ -18,6 +19,10 @@ type Container struct {
 	CheckDatabaseReadinessHandler *handler.CheckDatabaseReadinessHandler
 	CreateUserHandler             *handler.CreateUserHandler
 	CompleteProfileHandler        *handler.CompleteProfileHandler
+	CreateClientHandler           *handler.CreateClientHandler
+	UpdateClientHandler           *handler.UpdateClientHandler
+	DeleteClientHandler           *handler.DeleteClientHandler
+	ListClientsHandler            *handler.ListClientsHandler
 	Pool                          *pgxpool.Pool
 	Verifier                      *supabase.Verifier
 }
@@ -43,11 +48,21 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
+	clienteRepo := postgres.NewClienteRepository(pool)
+	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
+	updateClientHandler := handler.NewUpdateClientHandler(clients.NewUpdateClient(clienteRepo, userRepo))
+	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
+	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
+
 	return &Container{
 		GetSystemInfoHandler:          getSystemInfoHandler,
 		CheckDatabaseReadinessHandler: checkDatabaseReadinessHandler,
 		CreateUserHandler:             createUserHandler,
 		CompleteProfileHandler:        completeProfileHandler,
+		CreateClientHandler:           createClientHandler,
+		UpdateClientHandler:           updateClientHandler,
+		DeleteClientHandler:           deleteClientHandler,
+		ListClientsHandler:            listClientsHandler,
 		Pool:                          pool,
 		Verifier:                      verifier,
 	}, nil

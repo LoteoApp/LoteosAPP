@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	systemTimeout = 2 * time.Second
-	usersTimeout  = 5 * time.Second
+	systemTimeout  = 2 * time.Second
+	usersTimeout   = 5 * time.Second
+	clientsTimeout = 5 * time.Second
 )
 
 func RegisterRoutes(
@@ -20,6 +21,10 @@ func RegisterRoutes(
 	checkDatabaseReadiness *handler.CheckDatabaseReadinessHandler,
 	createUser *handler.CreateUserHandler,
 	completeProfile *handler.CompleteProfileHandler,
+	createClient *handler.CreateClientHandler,
+	updateClient *handler.UpdateClientHandler,
+	deleteClient *handler.DeleteClientHandler,
+	listClients *handler.ListClientsHandler,
 	verifier *supabase.Verifier,
 ) {
 	mux.HandleFunc("GET /healthz", handler.Live)
@@ -29,4 +34,9 @@ func RegisterRoutes(
 	requireAuth := middleware.RequireAuth(verifier)
 	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(createUser, usersTimeout)))
 	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(completeProfile, usersTimeout)))
+
+	mux.Handle("POST /api/v1/clientes", requireAuth(handler.Adapt(createClient, clientsTimeout)))
+	mux.Handle("PATCH /api/v1/clientes/{id}", requireAuth(handler.Adapt(updateClient, clientsTimeout)))
+	mux.Handle("DELETE /api/v1/clientes/{id}", requireAuth(handler.Adapt(deleteClient, clientsTimeout)))
+	mux.Handle("GET /api/v1/clientes", requireAuth(handler.Adapt(listClients, clientsTimeout)))
 }

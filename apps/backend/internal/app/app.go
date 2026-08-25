@@ -39,6 +39,10 @@ func New(ctx context.Context) (*App, error) {
 		container.CheckDatabaseReadinessHandler,
 		container.CreateUserHandler,
 		container.CompleteProfileHandler,
+		container.CreateClientHandler,
+		container.UpdateClientHandler,
+		container.DeleteClientHandler,
+		container.ListClientsHandler,
 		container.Verifier,
 	)
 
