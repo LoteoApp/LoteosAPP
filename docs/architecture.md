@@ -23,7 +23,7 @@ flowchart LR
     backend -->|pgxpool| db["PostgreSQL (Supabase)"]
     migrate["Goose migrate"] -->|aplica SQL| db
     migrate -->|service_completed_successfully| backend
-    backend -->|healthcheck| frontend
+    backend -->|service_started| frontend
 ```
 
 ## Backend
@@ -42,14 +42,12 @@ apps/backend/
 │   │   └── app.go
 │   ├── business/
 │   │   ├── domain/
-│   │   │   └── system.go
+│   │   │   └── usuario.go
 │   │   ├── gateway/
-│   │   │   ├── repository.go
+│   │   │   ├── usuario_repository.go
 │   │   │   └── gatewayfake/
-│   │   │       └── repository.go
+│   │   │       └── user_repository.go
 │   │   └── usecase/
-│   │       ├── system/
-│   │       │   └── get_system_info.go
 │   │       └── users/
 │   │           └── create_user.go
 │   └── infrastructure/
@@ -62,19 +60,15 @@ apps/backend/
 │       ├── repository/
 │       │   └── postgres/
 │       │       ├── pool.go
-│       │       └── repository.go
+│       │       └── usuario.go
 │       └── delivery/
 │           └── webapp/
 │               ├── dependencies/
 │               │   └── dependencies.go
 │               ├── dto/
-│               │   ├── system/
-│               │   │   └── status.go
 │               │   └── users/
 │               │       └── create_user.go
 │               ├── handler/
-│               │   ├── live.go
-│               │   ├── get_system_info.go
 │               │   └── create_user.go
 │               ├── middleware/
 │               │   └── auth.go
@@ -110,16 +104,16 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/business/domain`: entidades y tipos de valor del negocio, sin
   depender de HTTP ni de PostgreSQL.
 - `internal/business/gateway`: contratos (interfaces) que el negocio necesita de
-  sus adaptadores, como `Repository`. Los casos de uso dependen de estos
-  contratos, nunca de una implementación concreta. `gateway/gatewayfake`
-  contiene fakes de esos contratos para tests, ubicados junto a las
-  interfaces que implementan en vez de duplicarse en cada paquete de
-  `usecase`.
+  sus adaptadores, como `UserRepository` e `IdentityProvider`. Los casos de uso
+  dependen de estos contratos, nunca de una implementación concreta.
+  `gateway/gatewayfake` contiene fakes de esos contratos para tests, ubicados
+  junto a las interfaces que implementan en vez de duplicarse en cada paquete
+  de `usecase`.
 - `internal/business/usecase`: casos de uso que orquestan el dominio a través de
   los contratos de `gateway`, agrupados en subpaquetes por funcionalidad
-  (`usecase/system`, `usecase/users`). Cada caso de uso es una interfaz de un
-  solo método `Execute` junto con su implementación, definidas en el mismo
-  archivo (por ejemplo `usecase/users/create_user.go`).
+  (`usecase/users`). Cada caso de uso es una interfaz de un solo método
+  `Execute` junto con su implementación, definidas en el mismo archivo (por
+  ejemplo `usecase/users/create_user.go`).
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
 - `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
@@ -136,14 +130,13 @@ vacíos antes de que exista una funcionalidad que los necesite.
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
-  persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
-  la apertura y configuración del pool de conexiones.
+  persistencia (`gateway.UserRepository`) con `pgxpool` y SQL explícito, y
+  expone la apertura y configuración del pool de conexiones.
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
-  HTTP, agrupados por feature (`dto/system`, `dto/users`) igual que
-  `usecase`. Cada subpaquete declara `package dto`; como el identificador de
-  paquete no tiene que coincidir con el nombre del directorio, no choca con
-  `usecase/system` ni `usecase/users` al importarse en el mismo archivo de
-  `handler`.
+  HTTP, agrupados por feature (`dto/users`) igual que `usecase`. Cada
+  subpaquete declara `package dto`; como el identificador de paquete no
+  tiene que coincidir con el nombre del directorio, no choca con
+  `usecase/users` al importarse en el mismo archivo de `handler`.
 - `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
   llamadas del caso de uso, decodificando y codificando los tipos de `dto`, y
   convierte el resultado en una respuesta. Cada ruta tiene su propio handler
@@ -156,8 +149,8 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `response.WriteError`. `Adapt` también acota `r.Context()` al `timeout`
   antes de llamar a `Handle`, así que ningún handler arma su propio
   `context.WithTimeout`; usa `request.Context()` directo. Un handler sin
-  ningún error posible (como `Live`) queda como función suelta, sin
-  envolverlo en un struct solo para cumplir la interfaz.
+  ningún error posible queda como función suelta, sin envolverlo en un
+  struct solo para cumplir la interfaz.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
   consistentes, de éxito y de error. `WriteError` es el único lugar que
   traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`
@@ -186,14 +179,11 @@ flowchart LR
     route --> middleware["infrastructure/delivery/webapp/middleware"]
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
-    handler --> usecaseSystem["business/usecase/system"]
     handler --> usecaseUsers["business/usecase/users"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
-    usecaseSystem --> gateway
     usecaseUsers --> gateway
-    usecaseSystem --> domain["business/domain"]
-    usecaseUsers --> domain
+    usecaseUsers --> domain["business/domain"]
     response --> domain
     gateway --> domain
 ```
@@ -211,7 +201,6 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ### Convenciones HTTP
 
 - Los endpoints funcionales se publican bajo `/api/v1`.
-- Los health checks no se versionan, por ejemplo `/healthz` y `/readyz`.
 - Los handlers validan entrada, llaman al caso de uso y mapean la salida.
 - Los errores deben tener un formato consistente y no exponer detalles internos:
 
@@ -418,7 +407,7 @@ en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128) (ver
 - `migrate`: aplica las migraciones pendientes contra la base de Supabase y
   termina correctamente.
 - `backend`: inicia la API después de las migraciones.
-- `frontend`: inicia Vite después de que el backend esté saludable.
+- `frontend`: inicia Vite después de que el proceso del backend arrancó.
 
 Las migraciones son un proceso separado. Nunca se ejecutan como efecto
 secundario de iniciar cada réplica del backend.

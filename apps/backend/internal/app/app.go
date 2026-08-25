@@ -35,8 +35,6 @@ func New(ctx context.Context) (*App, error) {
 
 	mux := http.NewServeMux()
 	route.RegisterRoutes(mux,
-		container.GetSystemInfoHandler,
-		container.CheckDatabaseReadinessHandler,
 		container.CreateUserHandler,
 		container.CompleteProfileHandler,
 		container.Verifier,

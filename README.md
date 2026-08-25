@@ -28,9 +28,6 @@ Servicios disponibles:
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8080
-- Liveness: http://localhost:8080/healthz
-- Readiness de la base: http://localhost:8080/readyz
-- Diagnóstico de conexión: http://localhost:8080/api/v1/system
 
 Se pueden sobrescribir `BACKEND_PORT` y `FRONTEND_PORT`.
 
