@@ -142,9 +142,8 @@ describe('ClientsPage', () => {
     expect(screen.getByText('Ana María Pérez')).toBeInTheDocument()
   })
 
-  it('removes a client after confirming the baja', async () => {
+  it('removes a client after confirming the baja inline', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderClientsPage()
 
     await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
@@ -152,14 +151,16 @@ describe('ClientsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Crear cliente' }))
 
     await user.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    expect(screen.getByText('¿Confirmar baja?')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
 
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
     expect(screen.getByText('No hay clientes cargados todavía.')).toBeInTheDocument()
   })
 
-  it('keeps the client when the baja is not confirmed', async () => {
+  it('keeps the client when the inline baja confirmation is cancelled', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderClientsPage()
 
     await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
@@ -167,8 +168,11 @@ describe('ClientsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Crear cliente' }))
 
     await user.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
 
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('¿Confirmar baja?')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Dar de baja' })).toBeInTheDocument()
   })
 
   it('closes the form without saving when cancel is clicked', async () => {
