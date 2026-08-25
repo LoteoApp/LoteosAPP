@@ -108,11 +108,8 @@ desarrollo. Devuelve, sin incluir la contraseña ni la URL completa de conexión
 - Hora actual de PostgreSQL.
 - Conexiones máximas, totales, adquiridas, libres, creadas y cerradas del pool.
 
-El componente
-`apps/frontend/src/features/system-status/components/DatabaseStatus.tsx`
-consulta este endpoint a través de la capa `api` de su feature y muestra la
-información en la pantalla principal. Este endpoint es diagnóstico de
-desarrollo y debe revisarse antes de exponerlo en producción.
+Este endpoint es diagnóstico de desarrollo y debe revisarse antes de
+exponerlo en producción.
 
 ## Herramienta de migraciones
 
