@@ -1,11 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { Button } from '../../../shared/ui/button'
+import { Input } from '../../../shared/ui/input'
+import { Label } from '../../../shared/ui/label'
 import { useAuth } from '../hooks/use-auth'
 import { describeAuthError } from '../lib/describeAuthError'
-
-const fieldClassName =
-  'h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 // A "from" starting with "//" is resolved by the browser as an external host.
 function resolveRedirectPath(state: unknown): string {
@@ -62,10 +61,8 @@ export default function LoginPage() {
 
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-sm font-medium">
-              Correo electrónico
-            </label>
-            <input
+            <Label htmlFor="email">Correo electrónico</Label>
+            <Input
               id="email"
               type="email"
               name="email"
@@ -73,15 +70,12 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className={fieldClassName}
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-sm font-medium">
-              Contraseña
-            </label>
-            <input
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
               id="password"
               type="password"
               name="password"
@@ -89,7 +83,6 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className={fieldClassName}
             />
           </div>
 

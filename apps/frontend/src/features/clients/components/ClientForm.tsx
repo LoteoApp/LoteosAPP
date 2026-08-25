@@ -1,9 +1,9 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Button } from '../../../shared/ui/button'
+import { Input } from '../../../shared/ui/input'
+import { Label } from '../../../shared/ui/label'
+import { cn } from '../../../shared/lib/utils'
 import type { ClienteFormValues } from '../types'
-
-const fieldClassName =
-  'h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 const emptyValues: ClienteFormValues = {
   nombre: '',
@@ -12,6 +12,19 @@ const emptyValues: ClienteFormValues = {
   celular: '',
   email: '',
 }
+
+const FIELDS: ReadonlyArray<{
+  name: keyof ClienteFormValues
+  label: string
+  type?: string
+  full?: boolean
+}> = [
+  { name: 'nombre', label: 'Nombre' },
+  { name: 'apellido', label: 'Apellido' },
+  { name: 'dni', label: 'DNI' },
+  { name: 'celular', label: 'Celular', type: 'tel' },
+  { name: 'email', label: 'Correo electrónico', type: 'email', full: true },
+]
 
 type ClientFormProps = {
   initialValue?: ClienteFormValues
@@ -61,72 +74,21 @@ export default function ClientForm({
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit} aria-label="Datos del cliente">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="nombre" className="text-sm font-medium">
-            Nombre
-          </label>
-          <input
-            id="nombre"
-            name="nombre"
-            value={values.nombre}
-            onChange={handleChange('nombre')}
-            className={fieldClassName}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="apellido" className="text-sm font-medium">
-            Apellido
-          </label>
-          <input
-            id="apellido"
-            name="apellido"
-            value={values.apellido}
-            onChange={handleChange('apellido')}
-            className={fieldClassName}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="dni" className="text-sm font-medium">
-            DNI
-          </label>
-          <input
-            id="dni"
-            name="dni"
-            value={values.dni}
-            onChange={handleChange('dni')}
-            className={fieldClassName}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="celular" className="text-sm font-medium">
-            Celular
-          </label>
-          <input
-            id="celular"
-            name="celular"
-            type="tel"
-            value={values.celular}
-            onChange={handleChange('celular')}
-            className={fieldClassName}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5 sm:col-span-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            Correo electrónico
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={values.email}
-            onChange={handleChange('email')}
-            className={fieldClassName}
-          />
-        </div>
+        {FIELDS.map((field) => (
+          <div
+            key={field.name}
+            className={cn('flex flex-col gap-1.5', field.full && 'sm:col-span-2')}
+          >
+            <Label htmlFor={field.name}>{field.label}</Label>
+            <Input
+              id={field.name}
+              name={field.name}
+              type={field.type ?? 'text'}
+              value={values[field.name]}
+              onChange={handleChange(field.name)}
+            />
+          </div>
+        ))}
       </div>
 
       {error && (
