@@ -271,7 +271,7 @@ apps/frontend/src/
 │   │   └── types.ts
 │   └── lots/
 │       ├── api/
-│       │   └── list-inmobiliarias.ts  # Catálogo mock hasta el GET de inmobiliarias
+│       │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
 │       ├── components/                # Formulario, cards y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
