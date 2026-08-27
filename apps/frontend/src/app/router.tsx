@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import AppLayout from './AppLayout'
-import MonitorPage from '../features/system-status/pages/MonitorPage'
 import RequireAuth from '../features/auth/components/RequireAuth'
 import LoginPage from '../features/auth/pages/LoginPage'
 import LotsPage from '../features/lots/pages/LotsPage'
@@ -23,10 +22,6 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
-  },
-  {
-    path: '/monitor',
-    element: <MonitorPage />,
   },
   {
     element: (

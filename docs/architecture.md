@@ -248,16 +248,6 @@ apps/frontend/src/
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
-│   ├── system-status/
-│   │   ├── api/
-│   │   │   └── get-system-info.ts
-│   │   ├── components/
-│   │   │   └── DatabaseStatus.tsx
-│   │   ├── hooks/
-│   │   │   └── use-system-info.ts
-│   │   ├── pages/
-│   │   │   └── MonitorPage.tsx # Diagnóstico del entorno, en /monitor
-│   │   └── types.ts
 │   └── lots/                   # Ejemplo de funcionalidad futura
 │       ├── api/
 │       ├── components/
@@ -314,7 +304,7 @@ app → features → shared
 - Se favorece la composición de componentes y variantes explícitas frente a
   componentes configurados con numerosos booleanos.
 - Los tests se colocan junto al código probado con nombres como
-  `DatabaseStatus.test.tsx`.
+  `AuthStatus.test.tsx`.
 
 ### Diseño responsive
 
