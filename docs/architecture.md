@@ -269,11 +269,16 @@ apps/frontend/src/
 │   │   ├── pages/
 │   │   │   └── MonitorPage.tsx # Diagnóstico del entorno, en /monitor
 │   │   └── types.ts
-│   └── lots/                   # Ejemplo de funcionalidad futura
+│   └── lots/
 │       ├── api/
-│       ├── components/
-│       ├── pages/
+│       │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       ├── components/                # Formulario, cards y visor DXF
 │       ├── hooks/
+│       │   ├── use-loteo-fields.ts
+│       │   └── use-dxf-plan.ts
+│       ├── lib/                       # Parseo DXF a geometría SVG
+│       ├── pages/
+│       │   └── LotsPage.tsx           # Alta de loteo, en /lotes
 │       └── types.ts
 ├── shared/
 │   ├── api/
