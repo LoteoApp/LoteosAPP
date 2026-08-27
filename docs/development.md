@@ -205,6 +205,18 @@ La `service_role` key bypassea RLS y habilita la administración completa de
 usuarios: va únicamente en el `.env` local (gitignorado) o en un secret de
 CI, nunca en `compose.yaml` ni en la documentación.
 
+El backend también guarda los archivos que sube el usuario en un bucket de
+Cloudflare R2, con el mismo criterio: las cuatro variables son obligatorias y
+sin ellas el proceso no arranca. Ver
+[secrets.md](secrets.md#cloudflare-r2) para crear el bucket y el token.
+
+```text
+CLOUDFLARE_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+CLOUDFLARE_R2_BUCKET_NAME=loteos-files-dev
+CLOUDFLARE_R2_ACCESS_KEY_ID=...
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+```
+
 El frontend, al correr en el navegador, necesita la URL y la clave pública
 (publishable) del proyecto de Supabase:
 

@@ -45,8 +45,10 @@ apps/backend/
 │   │   │   └── system.go
 │   │   ├── gateway/
 │   │   │   ├── repository.go
+│   │   │   ├── object_storage.go
 │   │   │   └── gatewayfake/
-│   │   │       └── repository.go
+│   │   │       ├── repository.go
+│   │   │       └── object_storage.go
 │   │   └── usecase/
 │   │       ├── system/
 │   │       │   └── get_system_info.go
@@ -63,6 +65,9 @@ apps/backend/
 │       │   └── postgres/
 │       │       ├── pool.go
 │       │       └── repository.go
+│       ├── storage/
+│       │   └── r2/
+│       │       └── client.go
 │       └── delivery/
 │           └── webapp/
 │               ├── dependencies/
@@ -138,6 +143,10 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
   la apertura y configuración del pool de conexiones.
+- `internal/infrastructure/storage/r2`: implementa `gateway.ObjectStorage`
+  contra Cloudflare R2 a través de su API S3, con el SDK de AWS v2. Guarda,
+  lee y borra los archivos que sube el usuario (el DXF original del alta de
+  loteo, fotos y planos). Ver [almacenamiento de archivos](#almacenamiento-de-archivos).
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
   HTTP, agrupados por feature (`dto/system`, `dto/users`) igual que
   `usecase`. Cada subpaquete declara `package dto`; como el identificador de
@@ -182,6 +191,7 @@ flowchart LR
     app --> server["infrastructure/delivery/webapp/server"]
     deps --> repo["infrastructure/repository/postgres"]
     deps --> supabase["infrastructure/auth/supabase"]
+    deps --> storage["infrastructure/storage/r2"]
     route --> handler["infrastructure/delivery/webapp/handler"]
     route --> middleware["infrastructure/delivery/webapp/middleware"]
     middleware --> supabase
@@ -190,6 +200,7 @@ flowchart LR
     handler --> usecaseUsers["business/usecase/users"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
+    storage -.implementa.-> gateway
     usecaseSystem --> gateway
     usecaseUsers --> gateway
     usecaseSystem --> domain["business/domain"]
@@ -222,6 +233,86 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 }
 ```
 
+### Almacenamiento de archivos
+
+Los archivos que sube el usuario no van a PostgreSQL: van a un bucket de
+Cloudflare R2, y la base guarda la clave del objeto. El negocio los ve a
+través de `gateway.ObjectStorage`, un contrato de tres operaciones —`Put`,
+`Get`, `Delete`— que no menciona S3 ni Cloudflare, así que cambiar de
+proveedor es reemplazar el adaptador.
+
+Se eligió R2 sobre S3 porque no cobra egress, y se llega con el SDK de AWS v2
+porque R2 expone la API S3: firmar SigV4 a mano sería criptografía de
+autenticación propia, donde un error se paga en seguridad y no lo detecta un
+test. El cliente se arma con credenciales estáticas explícitas, sin
+`config.LoadDefaultConfig`, para que nunca tome credenciales del entorno ni
+del perfil `~/.aws` de quien corra el proceso.
+
+Decisiones del adaptador (`infrastructure/storage/r2`):
+
+- **Las claves se validan antes de salir a la red.** Se rechaza la clave
+  vacía, la que supera los 1024 bytes que admite S3, la que trae caracteres
+  de control y la que tiene un segmento vacío, `.` o `..`. Como las claves se
+  arman con nombres de archivo que elige el usuario, un `..` sin filtrar deja
+  escribir fuera del prefijo previsto.
+- **El endpoint se valida al construir el cliente.** Tiene que ser una URL
+  con host, sin credenciales embebidas ni query, y HTTPS: un `http://` mal
+  configurado mandaría los archivos y los headers firmados en claro. Se
+  admite HTTP solo contra loopback, que es a donde apuntan los tests.
+- **Los errores salen como `*domain.Error`.** Una clave ausente es
+  `ErrObjectNotFound`; cualquier otra falla del proveedor es
+  `ErrStorageUnavailable` con el error real en `Cause`, que `WriteError`
+  loguea sin mostrárselo a quien llamó. Un 403 por credenciales vencidas no
+  llega nunca al cuerpo de la respuesta.
+- **Los timeouts son por etapa, no globales.** Se acotan el dial, el
+  handshake TLS y la espera de headers; no la transferencia completa, que un
+  timeout global cortaría a mitad de una subida grande que va bien. El total
+  lo acota el `context` del handler.
+- **Los reintentos llegan hasta 3 con backoff de 2s como máximo.** El default
+  del SDK (20s) sobrevive al timeout del request que lo originó, así que el
+  reintento se convierte en un cuelgue que el usuario nunca ve resolverse.
+- **`Put` exige el tamaño y lo manda como `Content-Length`.** R2 necesita
+  saber la longitud de antemano: con un stream de largo desconocido, la
+  subida puede truncarse sin devolver error. Por eso el tamaño es un
+  parámetro del contrato y no algo que el adaptador deduzca.
+- **`Put` exige un `io.ReadSeeker`, no un `io.Reader`.** Firmar la request
+  implica hashear el payload y rebobinar, y un reintento lo reenvía desde el
+  principio; con un stream no seekable el SDK falla con `failed to compute
+  payload hash`. Quien tenga un cuerpo HTTP crudo debe materializarlo antes
+  —a archivo temporal o a memoria— y esa decisión, con su costo de memoria,
+  es de quien llama. El tipo del contrato lo vuelve un error de compilación
+  en vez de una falla en producción.
+- **Los checksums quedan en el default del SDK**, que agrega uno en cada
+  subida; se verificó contra el bucket real que R2 los acepta. No se afirma
+  nada sobre validación en la descarga: `Get` no pide `ChecksumMode`, así que
+  la integridad extremo a extremo todavía no está garantizada. Si hiciera
+  falta, se guarda un hash propio junto al archivo y se verifica al leer.
+
+Dos decisiones quedan abiertas hasta que haya un consumidor real
+([#12](https://github.com/LoteoApp/LoteosAPP/issues/12) y
+[#15](https://github.com/LoteoApp/LoteosAPP/issues/15)):
+
+- **Cómo se leen los archivos.** Hoy solo se puede a través del backend, que
+  es lo más simple y mantiene la autorización en un solo lugar. Si el costo
+  de proxear archivos grandes pesa, se evalúa URL firmada; el contrato tendría
+  que crecer una operación.
+- **El límite de tamaño por archivo.** Es una regla del negocio, así que va en
+  el caso de uso que reciba la subida, no en el adaptador. El frontend tiene
+  `MAX_DXF_LENGTH` (`features/lots/lib/parseDxf.ts`), que limita caracteres
+  del contenido parseado y no bytes del archivo, y de todas formas el backend
+  no puede confiar en una validación del cliente. El techo técnico ronda los
+  5 GiB —la doc de R2 dice 5 GiB en la página de límites y 4,995 GiB en las
+  notas al pie—: `Put` hace una sola request y R2 corta ahí las subidas de
+  una parte. Superarlo obliga a multipart, que el adaptador no implementa
+  porque ningún archivo del dominio se acerca. Si R2 igual la rechaza, el
+  adaptador traduce `EntityTooLarge` a `ErrInvalidObjectSize`, para que salga
+  como entrada inválida y no como un 503.
+
+Un límite de R2 a tener presente al armar las claves: **una escritura por
+segundo sobre la misma clave**. Mientras cada archivo tenga la suya, no
+aparece; se volvería un problema con un esquema que sobrescriba una clave fija
+(por ejemplo `loteos/<id>/original.dxf` reemplazado en cada reintento).
+
 ### Persistencia y pruebas
 
 - Se usa `pgx/v5/pgxpool` con SQL explícito; no se incorpora un ORM sin una
@@ -231,6 +322,9 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 - Los casos de uso se prueban con los fakes de `gateway/gatewayfake`.
 - Los handlers se prueban con `httptest`.
 - Los repositorios PostgreSQL se prueban como integración contra una base real.
+- El adaptador de R2 se prueba contra un S3 mínimo servido con `httptest`, que
+  cubre firma, subida, descarga, borrado y los errores del proveedor sin
+  depender de la red ni de credenciales reales.
 
 ## Frontend
 

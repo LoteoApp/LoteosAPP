@@ -87,6 +87,24 @@ Modo watch del frontend:
 pnpm --filter @loteos/frontend test:watch
 ```
 
+## Tests de integración
+
+Los tests que necesitan un servicio real se saltan solos cuando faltan sus
+variables de entorno, así que `pnpm test` y CI pasan sin ellos. Para
+ejecutarlos, correr la suite con los secrets inyectados:
+
+```powershell
+doppler run -- pnpm test:backend
+```
+
+| Test | Necesita | Qué hace |
+| --- | --- | --- |
+| `postgres.TestUserRepository` | `DATABASE_URL` | SQL real contra la base de Supabase con las migraciones aplicadas. |
+| `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
+
+El test de R2 escribe en el bucket del entorno y borra lo que escribió antes
+de terminar; no correrlo apuntando a un bucket de producción.
+
 El reporte HTML del frontend se genera en
 `apps/frontend/coverage/index.html`. El perfil de Go se genera en
 `apps/backend/coverage.out`; ambos están ignorados por Git.
