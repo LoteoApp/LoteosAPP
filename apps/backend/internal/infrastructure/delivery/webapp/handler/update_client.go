@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/usecase/clients"
 	dto "loteosapp/backend/internal/infrastructure/delivery/webapp/dto/clients"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -24,6 +25,9 @@ func (handler *UpdateClientHandler) Handle(w http.ResponseWriter, request *http.
 	// runs behind middleware.RequireAuth.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	id := request.PathValue("id")
+	if !isValidUUID(id) {
+		return domain.ErrClienteIDInvalido
+	}
 
 	body, err := decodeJSON[dto.UpdateClientRequest](request)
 	if err != nil {

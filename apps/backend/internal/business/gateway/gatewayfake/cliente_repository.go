@@ -15,6 +15,7 @@ type ClienteRepository struct {
 	UpdateCalls int
 	UpdateErr   error
 	Updated     domain.Cliente
+	UpdateInput domain.ClienteUpdate
 
 	SoftDeleteCalls  int
 	SoftDeleteErr    error
@@ -38,12 +39,25 @@ func (fake *ClienteRepository) Create(_ context.Context, cliente domain.Cliente)
 	return fake.Created, nil
 }
 
-func (fake *ClienteRepository) Update(_ context.Context, cliente domain.Cliente) (domain.Cliente, error) {
+func (fake *ClienteRepository) Update(_ context.Context, update domain.ClienteUpdate) (domain.Cliente, error) {
 	fake.UpdateCalls++
+	fake.UpdateInput = update
 	if fake.UpdateErr != nil {
 		return domain.Cliente{}, fake.UpdateErr
 	}
 	if fake.Updated.ID == "" {
+		cliente := domain.Cliente{ID: update.ID, UsuarioModificacion: update.UsuarioModificacion}
+		if update.Nombre != nil {
+			cliente.Nombre = *update.Nombre
+		}
+		if update.Apellido != nil {
+			cliente.Apellido = *update.Apellido
+		}
+		if update.DNI != nil {
+			cliente.DNI = *update.DNI
+		}
+		cliente.Celular = update.Celular
+		cliente.Email = update.Email
 		return cliente, nil
 	}
 	return fake.Updated, nil

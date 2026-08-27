@@ -50,13 +50,13 @@ func TestDeleteClientRoute(t *testing.T) {
 		deleteClient := &deleteClientStub{}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
 
-		recorder := performDeleteClientRequest(t, deleteClient, verifier, "valid-token", "client-1")
+		recorder := performDeleteClientRequest(t, deleteClient, verifier, "valid-token", validClientID)
 
 		if recorder.Code != http.StatusNoContent {
 			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusNoContent, recorder.Body.String())
 		}
-		if deleteClient.gotID != "client-1" {
-			t.Errorf("id passed to use case = %q, want %q", deleteClient.gotID, "client-1")
+		if deleteClient.gotID != validClientID {
+			t.Errorf("id passed to use case = %q, want %q", deleteClient.gotID, validClientID)
 		}
 		if deleteClient.gotSubject != "user-1" {
 			t.Errorf("subject passed to use case = %q, want %q", deleteClient.gotSubject, "user-1")
@@ -67,13 +67,37 @@ func TestDeleteClientRoute(t *testing.T) {
 		t.Parallel()
 
 		deleteClient := &deleteClientStub{}
-		recorder := performDeleteClientRequest(t, deleteClient, userVerifierStub{}, "", "client-1")
+		recorder := performDeleteClientRequest(t, deleteClient, userVerifierStub{}, "", validClientID)
 
 		if recorder.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
 		}
 		if deleteClient.called {
 			t.Error("use case should not be called without a token")
+		}
+	})
+
+	t.Run("rejects a non-uuid id before hitting the use case, without touching PostgreSQL", func(t *testing.T) {
+		t.Parallel()
+
+		deleteClient := &deleteClientStub{}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
+
+		recorder := performDeleteClientRequest(t, deleteClient, verifier, "valid-token", "not-a-uuid")
+
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+		}
+		if deleteClient.called {
+			t.Error("use case should not be called with a non-uuid id")
+		}
+
+		var got response.ErrorResponse
+		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if got.Code != "invalid_client_id" {
+			t.Errorf("error code = %q, want %q", got.Code, "invalid_client_id")
 		}
 	})
 
@@ -97,7 +121,7 @@ func TestDeleteClientRoute(t *testing.T) {
 				deleteClient := &deleteClientStub{err: test.err}
 				verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrativo}}}
 
-				recorder := performDeleteClientRequest(t, deleteClient, verifier, "valid-token", "client-1")
+				recorder := performDeleteClientRequest(t, deleteClient, verifier, "valid-token", validClientID)
 
 				if recorder.Code != test.wantStatus {
 					t.Fatalf("status = %d, want %d", recorder.Code, test.wantStatus)

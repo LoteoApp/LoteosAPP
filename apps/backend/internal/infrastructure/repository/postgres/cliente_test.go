@@ -12,9 +12,16 @@ import (
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
 )
 
+func clienteStrPtr(s string) *string {
+	return &s
+}
+
 // TestClienteRepository is an integration test: it needs a real PostgreSQL
 // instance with migrations applied (see docs/database.md for the Supabase
-// pooler connection) and is skipped when DATABASE_URL is not set.
+// pooler connection) and is skipped when DATABASE_URL is not set. Before
+// merging changes to this repository, run it against a real database
+// (`DATABASE_URL=... go test ./internal/infrastructure/repository/postgres/...`)
+// instead of relying on it having been skipped in CI.
 func TestClienteRepository(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -55,6 +62,19 @@ func TestClienteRepository(t *testing.T) {
 		}
 		if len(found) != 1 || found[0].ID != created.ID {
 			t.Errorf("List() = %#v", found)
+		}
+	})
+
+	t.Run("list with no matches returns an empty slice, not null", func(t *testing.T) {
+		found, err := repository.List(context.Background(), newUUID(t))
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if found == nil {
+			t.Error("List() should return an empty slice, not nil, when there are no matches")
+		}
+		if len(found) != 0 {
+			t.Errorf("List() = %#v, want no results", found)
 		}
 	})
 
@@ -103,7 +123,7 @@ func TestClienteRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("update", func(t *testing.T) {
+	t.Run("update replaces the fields that are present", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
 		created, err := repository.Create(context.Background(), domain.Cliente{
 			Nombre: "Ana", Apellido: "Perez", DNI: newUUID(t), UsuarioModificacion: actor,
@@ -114,8 +134,9 @@ func TestClienteRepository(t *testing.T) {
 		}
 
 		newDNI := newUUID(t)
-		updated, err := repository.Update(context.Background(), domain.Cliente{
-			ID: created.ID, Nombre: "Ana Maria", Apellido: "Perez", DNI: newDNI, UsuarioModificacion: actor,
+		updated, err := repository.Update(context.Background(), domain.ClienteUpdate{
+			ID: created.ID, Nombre: clienteStrPtr("Ana Maria"), Apellido: clienteStrPtr("Perez"), DNI: clienteStrPtr(newDNI),
+			UsuarioModificacion: actor,
 		})
 		if err != nil {
 			t.Fatalf("Update() error = %v", err)
@@ -125,9 +146,71 @@ func TestClienteRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("update leaves omitted fields unchanged", func(t *testing.T) {
+		actor := seedUsuario(t, pool)
+		celular := "1122334455"
+		dni := newUUID(t)
+		created, err := repository.Create(context.Background(), domain.Cliente{
+			Nombre: "Ana", Apellido: "Perez", DNI: dni, Celular: &celular, UsuarioModificacion: actor,
+		})
+		t.Cleanup(func() { deleteCliente(t, pool, created.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		// Only nombre is sent; apellido, dni and celular are omitted and
+		// must survive the update untouched.
+		updated, err := repository.Update(context.Background(), domain.ClienteUpdate{
+			ID: created.ID, Nombre: clienteStrPtr("Ana Maria"), UsuarioModificacion: actor,
+		})
+		if err != nil {
+			t.Fatalf("Update() error = %v", err)
+		}
+		if updated.Nombre != "Ana Maria" {
+			t.Errorf("Update() nombre = %q, want %q", updated.Nombre, "Ana Maria")
+		}
+		if updated.Apellido != "Perez" {
+			t.Errorf("Update() apellido = %q, want it unchanged (%q)", updated.Apellido, "Perez")
+		}
+		if updated.DNI != dni {
+			t.Errorf("Update() dni = %q, want it unchanged (%q)", updated.DNI, dni)
+		}
+		if updated.Celular == nil || *updated.Celular != celular {
+			t.Errorf("Update() celular = %v, want it unchanged (%q)", updated.Celular, celular)
+		}
+	})
+
+	t.Run("update rejects duplicate dni among active clients", func(t *testing.T) {
+		actor := seedUsuario(t, pool)
+		takenDNI := newUUID(t)
+
+		first, err := repository.Create(context.Background(), domain.Cliente{
+			Nombre: "Ana", Apellido: "Perez", DNI: takenDNI, UsuarioModificacion: actor,
+		})
+		t.Cleanup(func() { deleteCliente(t, pool, first.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		second, err := repository.Create(context.Background(), domain.Cliente{
+			Nombre: "Beto", Apellido: "Gomez", DNI: newUUID(t), UsuarioModificacion: actor,
+		})
+		t.Cleanup(func() { deleteCliente(t, pool, second.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		_, err = repository.Update(context.Background(), domain.ClienteUpdate{
+			ID: second.ID, DNI: clienteStrPtr(takenDNI), UsuarioModificacion: actor,
+		})
+		if !errors.Is(err, domain.ErrDNIEnUso) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrDNIEnUso)
+		}
+	})
+
 	t.Run("update not found", func(t *testing.T) {
-		_, err := repository.Update(context.Background(), domain.Cliente{
-			ID: newUUID(t), Nombre: "Ana", Apellido: "Perez", DNI: newUUID(t), UsuarioModificacion: seedUsuario(t, pool),
+		_, err := repository.Update(context.Background(), domain.ClienteUpdate{
+			ID: newUUID(t), Nombre: clienteStrPtr("Ana"), UsuarioModificacion: seedUsuario(t, pool),
 		})
 		if !errors.Is(err, domain.ErrClienteNoEncontrado) {
 			t.Fatalf("Update() error = %v, want %v", err, domain.ErrClienteNoEncontrado)

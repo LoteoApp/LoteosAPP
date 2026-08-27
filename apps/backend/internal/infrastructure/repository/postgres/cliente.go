@@ -11,6 +11,13 @@ import (
 	"loteosapp/backend/internal/business/domain"
 )
 
+// dniUniqueConstraint is the name of the unique index backing "one active
+// cliente per DNI" (see migrations/00005_create_entity_model.sql). Only a
+// 23505 violation on this specific constraint means "DNI ya está en uso";
+// any other unique violation on the clientes table is a different business
+// rule and must not be misreported as a duplicate DNI.
+const dniUniqueConstraint = "clientes_dni_idx"
+
 type ClienteRepository struct {
 	pool *pgxpool.Pool
 }
@@ -31,26 +38,31 @@ func (repository *ClienteRepository) Create(ctx context.Context, cliente domain.
 		&created.Celular, &created.Email, &created.FechaCreacion, &created.FechaModificacion,
 	)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
-			return domain.Cliente{}, domain.ErrDNIEnUso
-		}
-		return domain.Cliente{}, err
+		return domain.Cliente{}, mapClienteWriteError(err)
 	}
 
 	return created, nil
 }
 
-func (repository *ClienteRepository) Update(ctx context.Context, cliente domain.Cliente) (domain.Cliente, error) {
+// Update applies a partial change to an existing active cliente. A nil
+// field on update is left unchanged via COALESCE — that's what gives the
+// PATCH /api/v1/clientes/{id} route correct partial-update semantics
+// instead of silently wiping fields the caller didn't send.
+func (repository *ClienteRepository) Update(ctx context.Context, update domain.ClienteUpdate) (domain.Cliente, error) {
 	var updated domain.Cliente
 
 	err := repository.pool.QueryRow(ctx, `
 		UPDATE clientes
-		SET nombre = $2, apellido = $3, dni = $4, celular = $5, email = $6,
-			usuario_modificacion = $7::uuid, fecha_modificacion = now()
+		SET nombre = COALESCE($2, nombre),
+			apellido = COALESCE($3, apellido),
+			dni = COALESCE($4, dni),
+			celular = COALESCE($5, celular),
+			email = COALESCE($6, email),
+			usuario_modificacion = $7::uuid,
+			fecha_modificacion = now()
 		WHERE id = $1::uuid AND fecha_baja IS NULL
 		RETURNING id::text, nombre, apellido, dni, celular, email, fecha_creacion, fecha_modificacion
-	`, cliente.ID, cliente.Nombre, cliente.Apellido, cliente.DNI, cliente.Celular, cliente.Email, cliente.UsuarioModificacion).Scan(
+	`, update.ID, update.Nombre, update.Apellido, update.DNI, update.Celular, update.Email, update.UsuarioModificacion).Scan(
 		&updated.ID, &updated.Nombre, &updated.Apellido, &updated.DNI,
 		&updated.Celular, &updated.Email, &updated.FechaCreacion, &updated.FechaModificacion,
 	)
@@ -58,11 +70,7 @@ func (repository *ClienteRepository) Update(ctx context.Context, cliente domain.
 		return domain.Cliente{}, domain.ErrClienteNoEncontrado
 	}
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
-			return domain.Cliente{}, domain.ErrDNIEnUso
-		}
-		return domain.Cliente{}, err
+		return domain.Cliente{}, mapClienteWriteError(err)
 	}
 
 	return updated, nil
@@ -97,7 +105,9 @@ func (repository *ClienteRepository) List(ctx context.Context, search string) ([
 	}
 	defer rows.Close()
 
-	var clientes []domain.Cliente
+	// Initialized empty rather than nil so a search with no matches
+	// serializes as `"clientes": []`, not `"clientes": null`.
+	clientes := make([]domain.Cliente, 0)
 	for rows.Next() {
 		var cliente domain.Cliente
 		if err := rows.Scan(
@@ -113,4 +123,29 @@ func (repository *ClienteRepository) List(ctx context.Context, search string) ([
 	}
 
 	return clientes, nil
+}
+
+// mapClienteWriteError translates a PostgreSQL unique-violation on the
+// clientes table into the right domain error. Only pgErr.ConstraintName ==
+// dniUniqueConstraint means "DNI ya está en uso"; any other unique
+// violation is reported as a generic conflict with the original error kept
+// as Cause, instead of being misclassified as a duplicate DNI. Any
+// non-constraint error is returned unchanged so the caller can decide how
+// to classify it (e.g. wrap it as KindUnavailable).
+func mapClienteWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != uniqueViolationCode {
+		return err
+	}
+
+	if pgErr.ConstraintName == dniUniqueConstraint {
+		return domain.ErrDNIEnUso
+	}
+
+	return &domain.Error{
+		Kind:    domain.KindConflict,
+		Code:    "unique_violation",
+		Message: "El registro entra en conflicto con datos existentes",
+		Cause:   err,
+	}
 }

@@ -15,22 +15,24 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
 )
 
+const validClientID = "11111111-1111-1111-1111-111111111111"
+
 type updateClientStub struct {
 	cliente     domain.Cliente
 	err         error
 	called      bool
 	gotSubject  string
 	gotID       string
-	gotNombre   string
-	gotApellido string
-	gotDNI      string
+	gotNombre   *string
+	gotApellido *string
+	gotDNI      *string
 }
 
 func (stub *updateClientStub) Execute(
 	_ context.Context,
 	_ []string,
-	subject, id, nombre, apellido, dni string,
-	_, _ *string,
+	subject, id string,
+	nombre, apellido, dni, _, _ *string,
 ) (domain.Cliente, error) {
 	stub.called = true
 	stub.gotSubject = subject
@@ -60,21 +62,44 @@ func TestUpdateClientRoute(t *testing.T) {
 		t.Parallel()
 
 		updateClient := &updateClientStub{
-			cliente: domain.Cliente{ID: "client-1", Nombre: "Ana", Apellido: "Perez", DNI: "30111222"},
+			cliente: domain.Cliente{ID: validClientID, Nombre: "Ana", Apellido: "Perez", DNI: "30111222"},
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolInmobiliaria}}}
 
-		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", "client-1",
+		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", validClientID,
 			map[string]string{"nombre": "Ana", "apellido": "Perez", "dni": "30111222"})
 
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
 		}
-		if updateClient.gotID != "client-1" {
-			t.Errorf("id passed to use case = %q, want %q", updateClient.gotID, "client-1")
+		if updateClient.gotID != validClientID {
+			t.Errorf("id passed to use case = %q, want %q", updateClient.gotID, validClientID)
 		}
 		if updateClient.gotSubject != "user-1" {
 			t.Errorf("subject passed to use case = %q, want %q", updateClient.gotSubject, "user-1")
+		}
+		if updateClient.gotNombre == nil || *updateClient.gotNombre != "Ana" {
+			t.Errorf("nombre passed to use case = %v, want %q", updateClient.gotNombre, "Ana")
+		}
+	})
+
+	t.Run("passes omitted fields through as nil for a partial update", func(t *testing.T) {
+		t.Parallel()
+
+		updateClient := &updateClientStub{
+			cliente: domain.Cliente{ID: validClientID, Nombre: "Ana", Apellido: "Perez", DNI: "30111222"},
+		}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
+
+		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", validClientID,
+			map[string]string{"celular": "1122334455"})
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+		}
+		if updateClient.gotNombre != nil || updateClient.gotApellido != nil || updateClient.gotDNI != nil {
+			t.Errorf("omitted fields should reach the use case as nil: nombre=%v apellido=%v dni=%v",
+				updateClient.gotNombre, updateClient.gotApellido, updateClient.gotDNI)
 		}
 	})
 
@@ -82,7 +107,7 @@ func TestUpdateClientRoute(t *testing.T) {
 		t.Parallel()
 
 		updateClient := &updateClientStub{}
-		recorder := performUpdateClientRequest(t, updateClient, userVerifierStub{}, "", "client-1",
+		recorder := performUpdateClientRequest(t, updateClient, userVerifierStub{}, "", validClientID,
 			map[string]string{"nombre": "Ana", "apellido": "Perez", "dni": "30111222"})
 
 		if recorder.Code != http.StatusUnauthorized {
@@ -93,13 +118,38 @@ func TestUpdateClientRoute(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects a non-uuid id before hitting the use case", func(t *testing.T) {
+		t.Parallel()
+
+		updateClient := &updateClientStub{}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
+
+		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", "not-a-uuid",
+			map[string]string{"nombre": "Ana", "apellido": "Perez", "dni": "30111222"})
+
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+		}
+		if updateClient.called {
+			t.Error("use case should not be called with a non-uuid id")
+		}
+
+		var got response.ErrorResponse
+		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if got.Code != "invalid_client_id" {
+			t.Errorf("error code = %q, want %q", got.Code, "invalid_client_id")
+		}
+	})
+
 	t.Run("rejects an invalid JSON body", func(t *testing.T) {
 		t.Parallel()
 
 		updateClient := &updateClientStub{}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
 
-		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", "client-1", "not-json")
+		recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", validClientID, "not-json")
 
 		if recorder.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
@@ -130,7 +180,7 @@ func TestUpdateClientRoute(t *testing.T) {
 				updateClient := &updateClientStub{err: test.err}
 				verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
 
-				recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", "client-1",
+				recorder := performUpdateClientRequest(t, updateClient, verifier, "valid-token", validClientID,
 					map[string]string{"nombre": "Ana", "apellido": "Perez", "dni": "30111222"})
 
 				if recorder.Code != test.wantStatus {

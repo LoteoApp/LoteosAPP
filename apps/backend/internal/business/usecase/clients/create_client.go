@@ -47,10 +47,10 @@ func (useCase *createClientUseCase) Execute(
 
 	actor, err := useCase.users.FindByAuthProviderID(ctx, subject)
 	if err != nil {
-		return domain.Cliente{}, err
+		return domain.Cliente{}, wrapGatewayError(err)
 	}
 
-	return useCase.repository.Create(ctx, domain.Cliente{
+	created, err := useCase.repository.Create(ctx, domain.Cliente{
 		Nombre:              nombre,
 		Apellido:            apellido,
 		DNI:                 dni,
@@ -58,6 +58,11 @@ func (useCase *createClientUseCase) Execute(
 		Email:               email,
 		UsuarioModificacion: actor.ID,
 	})
+	if err != nil {
+		return domain.Cliente{}, wrapGatewayError(err)
+	}
+
+	return created, nil
 }
 
 // hasRole reports whether actorRoles contains any of allowed.

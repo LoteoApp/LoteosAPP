@@ -115,6 +115,28 @@ func TestCreateClientPropagatesRepositoryError(t *testing.T) {
 	}
 }
 
+func TestCreateClientWrapsUnexpectedRepositoryError(t *testing.T) {
+	t.Parallel()
+
+	rawErr := errors.New("connection refused")
+	repository := &gatewayfake.ClienteRepository{CreateErr: rawErr}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
+	createClient := NewCreateClient(repository, users)
+
+	_, err := createClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "Ana", "Perez", "30111222", nil, nil)
+
+	if !errors.Is(err, rawErr) {
+		t.Fatalf("Execute() error = %v, want it to wrap %v", err, rawErr)
+	}
+	var domainErr *domain.Error
+	if !errors.As(err, &domainErr) {
+		t.Fatalf("Execute() error = %v, want a *domain.Error", err)
+	}
+	if domainErr.Kind != domain.KindUnavailable {
+		t.Errorf("Execute() error kind = %q, want %q", domainErr.Kind, domain.KindUnavailable)
+	}
+}
+
 func TestCreateClientPropagatesActorResolutionError(t *testing.T) {
 	t.Parallel()
 

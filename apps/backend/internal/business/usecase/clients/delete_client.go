@@ -29,8 +29,8 @@ func (useCase *deleteClientUseCase) Execute(ctx context.Context, actorRoles []st
 
 	actor, err := useCase.users.FindByAuthProviderID(ctx, subject)
 	if err != nil {
-		return err
+		return wrapGatewayError(err)
 	}
 
-	return useCase.repository.SoftDelete(ctx, id, actor.ID)
+	return wrapGatewayError(useCase.repository.SoftDelete(ctx, id, actor.ID))
 }

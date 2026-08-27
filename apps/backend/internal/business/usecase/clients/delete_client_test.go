@@ -71,6 +71,28 @@ func TestDeleteClientPropagatesRepositoryError(t *testing.T) {
 	}
 }
 
+func TestDeleteClientWrapsUnexpectedRepositoryError(t *testing.T) {
+	t.Parallel()
+
+	rawErr := errors.New("connection refused")
+	repository := &gatewayfake.ClienteRepository{SoftDeleteErr: rawErr}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
+	deleteClient := NewDeleteClient(repository, users)
+
+	err := deleteClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "client-1")
+
+	if !errors.Is(err, rawErr) {
+		t.Fatalf("Execute() error = %v, want it to wrap %v", err, rawErr)
+	}
+	var domainErr *domain.Error
+	if !errors.As(err, &domainErr) {
+		t.Fatalf("Execute() error = %v, want a *domain.Error", err)
+	}
+	if domainErr.Kind != domain.KindUnavailable {
+		t.Errorf("Execute() error kind = %q, want %q", domainErr.Kind, domain.KindUnavailable)
+	}
+}
+
 func TestDeleteClientPropagatesActorResolutionError(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
@@ -22,6 +23,9 @@ func (handler *DeleteClientHandler) Handle(w http.ResponseWriter, request *http.
 	// runs behind middleware.RequireAuth.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	id := request.PathValue("id")
+	if !isValidUUID(id) {
+		return domain.ErrClienteIDInvalido
+	}
 
 	if err := handler.deleteClient.Execute(request.Context(), principal.Roles, principal.Subject, id); err != nil {
 		return err
