@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/gateway"
+	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/system"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
@@ -20,6 +21,8 @@ type Container struct {
 	CheckDatabaseReadinessHandler *handler.CheckDatabaseReadinessHandler
 	CreateUserHandler             *handler.CreateUserHandler
 	CompleteProfileHandler        *handler.CompleteProfileHandler
+	CreateLoteoHandler            *handler.CreateLoteoHandler
+	UpdateLoteHandler             *handler.UpdateLoteHandler
 	Pool                          *pgxpool.Pool
 	Verifier                      *supabase.Verifier
 	ObjectStorage                 gateway.ObjectStorage
@@ -57,11 +60,17 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
+	loteoRepo := postgres.NewLoteoRepository(pool)
+	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
+	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
+
 	return &Container{
 		GetSystemInfoHandler:          getSystemInfoHandler,
 		CheckDatabaseReadinessHandler: checkDatabaseReadinessHandler,
 		CreateUserHandler:             createUserHandler,
 		CompleteProfileHandler:        completeProfileHandler,
+		CreateLoteoHandler:            createLoteoHandler,
+		UpdateLoteHandler:             updateLoteHandler,
 		Pool:                          pool,
 		Verifier:                      verifier,
 		ObjectStorage:                 objectStorage,
