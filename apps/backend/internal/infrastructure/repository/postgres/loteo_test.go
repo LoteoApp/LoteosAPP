@@ -164,6 +164,30 @@ func TestLoteoRepository(t *testing.T) {
 		assertDxfEntities(t, pool, loteo.ID)
 	})
 
+	t.Run("create rejects an invalid actor id without storing the loteo", func(t *testing.T) {
+		name := "Loteo Invalid Actor " + newUUID(t)
+
+		_, err := repository.Create(context.Background(), "not-a-uuid", domain.NewLoteo{Name: name})
+		if err == nil {
+			t.Fatal("Create() error = nil, want an invalid actor id error")
+		}
+
+		assertLoteoNotStored(t, pool, name)
+	})
+
+	t.Run("create rolls back an invalid plan", func(t *testing.T) {
+		name := "Loteo Invalid Plan " + newUUID(t)
+		plan := testPlan()
+		plan.Lotes[0].ManzanaIndex = len(plan.Manzanas)
+
+		_, err := repository.Create(context.Background(), actor, domain.NewLoteo{Name: name, Plan: plan})
+		if err == nil {
+			t.Fatal("Create() error = nil, want an invalid manzana reference error")
+		}
+
+		assertLoteoNotStored(t, pool, name)
+	})
+
 	t.Run("update a lote", func(t *testing.T) {
 		loteo := createLoteoWithPlan(t, pool, repository, actor)
 		price := 150000.0
@@ -350,6 +374,18 @@ func assertDxfEntities(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 	}
 	if dxfEntityID == nil {
 		t.Error("Create() should point the loteo at its LOTEO entity")
+	}
+}
+
+func assertLoteoNotStored(t *testing.T, pool *pgxpool.Pool, name string) {
+	t.Helper()
+
+	var count int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM loteos WHERE nombre = $1`, name).Scan(&count); err != nil {
+		t.Fatalf("count loteos named %q: %v", name, err)
+	}
+	if count != 0 {
+		t.Errorf("stored %d loteos named %q after Create() failed", count, name)
 	}
 }
 
