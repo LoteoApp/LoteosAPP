@@ -47,7 +47,7 @@ func TestReadyRoute(t *testing.T) {
 
 			h := handler.NewCheckDatabaseReadinessHandler(checkDatabaseReadinessStub{err: test.err})
 			mux := http.NewServeMux()
-			route.RegisterRoutes(mux, nil, h, nil, nil, nil)
+			route.RegisterRoutes(mux, route.Handlers{CheckDatabaseReadiness: h}, nil)
 
 			request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			recorder := httptest.NewRecorder()

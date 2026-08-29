@@ -174,6 +174,11 @@ stateDiagram-v2
   - `CALLE`: cada calle es una polilínea cerrada independiente.
 - Todos los polígonos (loteo, manzanas, lotes, calles): cerrados e
   independientes, sin interrupciones, superposiciones ni geometría abierta.
+  Es un requisito del plano que entrega el agrimensor, y el backend lo verifica
+  solo en parte: rechaza el anillo abierto, colineal, de área nula o que se
+  cruza a sí mismo, pero **todavía no detecta superposiciones entre entidades
+  de una misma capa** (ver `docs/architecture.md` § Alta de loteo y
+  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17)).
 - Como las capas no traen texto, el número de cada lote y el nombre de cada
   calle no se pueden asociar automáticamente al polígono; se asignan
   manualmente en el sistema tras visualizar el plano.
@@ -183,8 +188,9 @@ stateDiagram-v2
   `MANZANAS`, `LOTE` y `CALLES`, ya que distintos agrimensores nombran las
   capas de forma distinta.
 - El parseo del archivo ocurre en el frontend (no en el backend); el backend
-  recibe la geometría ya extraída, junto con el archivo DXF original para
-  almacenarlo como fuente.
+  recibe la geometría ya extraída. El archivo DXF original todavía no se envía
+  ni se guarda: la fila en `archivos` y la subida a R2 entran juntas en
+  [#12](https://github.com/LoteoApp/LoteosAPP/issues/12).
 
 ### Georreferenciación
 
