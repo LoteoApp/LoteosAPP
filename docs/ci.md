@@ -17,13 +17,19 @@ push directo no hay una base con la que comparar.
 | --- | --- |
 | `build` | Typecheck, lint y build del frontend; `go vet` y build del backend. |
 | `test` | `pnpm test` (suite de frontend y backend, sin cobertura). |
-| `coverage` | `pnpm test:coverage`, aplicando los umbrales de cobertura definidos en `AGENTS.md`. |
+| `coverage` | `pnpm test:coverage`, aplicando los umbrales de cobertura definidos en `AGENTS.md` (`scripts/check-go-coverage.mjs` en el backend). |
 | `dependency-audit` | `pnpm audit` (frontend) y `govulncheck` (backend), buscando vulnerabilidades conocidas en todo el árbol de dependencias actual. |
 | `dependency-review` | Acción oficial de GitHub que revisa solo las dependencias nuevas o modificadas en el diff del PR. |
 | `compose-config` | `docker compose config`: valida sintaxis y variables de `compose.yaml` sin construir ni levantar contenedores. |
 
 `build`, `test`, `coverage` y `dependency-audit` corren en paralelo, cada uno
 en su propio runner.
+
+`test` y `coverage` levantan además un servicio `postgis/postgis` y aplican las
+migraciones con `go run ./cmd/migrate` antes de correr la suite. Es PostGIS y no
+PostgreSQL a secas porque el modelo de entidades guarda geometría: sin la
+extensión, los tests de integración del repositorio se saltarían y una consulta
+rota pasaría inadvertida.
 
 ## Relación entre `dependency-audit` y `dependency-review`
 

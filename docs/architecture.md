@@ -47,12 +47,18 @@ apps/backend/
 │   │   ├── gateway/
 │   │   │   ├── object_storage.go
 │   │   │   ├── usuario_repository.go
+│   │   │   ├── loteo_repository.go
 │   │   │   └── gatewayfake/
 │   │   │       ├── object_storage.go
-│   │   │       └── user_repository.go
+│   │   │       ├── user_repository.go
+│   │   │       └── loteo_repository.go
 │   │   └── usecase/
-│   │       └── users/
-│   │           └── create_user.go
+│   │       ├── users/
+│   │       │   └── create_user.go
+│   │       └── loteos/
+│   │           ├── create_loteo.go
+│   │           ├── update_lote.go
+│   │           └── errors.go
 │   └── infrastructure/
 │       ├── environments/
 │       │   └── config.go
@@ -63,7 +69,8 @@ apps/backend/
 │       ├── repository/
 │       │   └── postgres/
 │       │       ├── pool.go
-│       │       └── usuario.go
+│       │       ├── usuario.go
+│       │       └── loteo.go
 │       ├── storage/
 │       │   └── r2/
 │       │       └── client.go
@@ -72,10 +79,15 @@ apps/backend/
 │               ├── dependencies/
 │               │   └── dependencies.go
 │               ├── dto/
-│               │   └── users/
-│               │       └── create_user.go
+│               │   ├── users/
+│               │   │   └── create_user.go
+│               │   └── loteos/
+│               │       ├── create_loteo.go
+│               │       └── update_lote.go
 │               ├── handler/
-│               │   └── create_user.go
+│               │   ├── create_user.go
+│               │   ├── create_loteo.go
+│               │   └── update_lote.go
 │               ├── middleware/
 │               │   └── auth.go
 │               ├── response/
@@ -168,7 +180,12 @@ vacíos antes de que exista una funcionalidad que los necesite.
   (una clasificación de negocio, no un status HTTP) a un status con una
   función chica y cerrada. Un error que no sea `*domain.Error` se loguea y se
   devuelve como 500 genérico, sin exponer el detalle interno. Los handlers no
-  arman ese mapeo por su cuenta.
+  arman ese mapeo por su cuenta. Para que ese 500 genérico quede reservado a lo
+  verdaderamente inesperado, el caso de uso traduce en su borde lo que devuelve
+  el repositorio: un `*domain.Error` viaja tal cual y cualquier otra falla
+  (conexión caída, constraint sin mapear) sale como
+  `domain.ErrDatabaseUnavailable` con el error original en `Cause`, así una
+  caída de PostgreSQL responde 503 y no 500.
 - `internal/infrastructure/delivery/webapp/route`: registra los endpoints HTTP
   sobre un `*http.ServeMux` a partir de los handlers.
 - `internal/infrastructure/delivery/webapp/server`: construye el `*http.Server`
@@ -191,11 +208,14 @@ flowchart LR
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]
+    handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
     usecaseUsers --> gateway
+    usecaseLoteos --> gateway
     usecaseUsers --> domain["business/domain"]
+    usecaseLoteos --> domain
     response --> domain
     gateway --> domain
 ```
@@ -222,6 +242,89 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
   "message": "El lote solicitado no existe"
 }
 ```
+
+### Alta de loteo y persistencia de la geometría
+
+El DXF lo parsea el frontend; el backend recibe la geometría ya extraída, la
+valida y la persiste (`docs/domain.md` § Alta y visualización). Dos endpoints
+cubren eso:
+
+- `POST /api/v1/loteos` — alta del loteo con su plano. Solo **administrador**:
+  un agrimensor trabaja sobre loteos asignados, y un loteo que todavía no
+  existe no puede estarlo.
+- `PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}` — número, precio, moneda,
+  superficie y características de un lote, que no salen del DXF porque las
+  capas son solo geometría. **Administrador**, o **agrimensor** sobre un loteo
+  asignado (`usuario_loteos`).
+
+El cuerpo del alta lleva el formulario y, opcionalmente, `plano`: un polígono
+`loteo`, y las listas `manzanas`, `lotes` y `calles`. Un loteo puede darse de
+alta sin plano; si viene `plano`, el polígono de la capa `LOTEO` es
+obligatorio.
+
+Decisiones de este recorte:
+
+- **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma,
+  y resolverla por contención geométrica quedó descartado para esta
+  iteración. Cada manzana lleva una `ref` que eligió el cliente y cada lote
+  nombra la suya con `manzanaRef`. La referencia vive solo dentro del request:
+  el caso de uso la resuelve a una posición y no se persiste. Como el backend
+  no la verifica contra la geometría, sí verifica lo que puede: que cada
+  `ref` sea única y no vacía, y que todo `manzanaRef` apunte a una manzana
+  **del mismo plano**. Un request armado a mano no puede colgar lotes de la
+  manzana de otro loteo, pero sí puede asignarlos a la manzana equivocada
+  dentro del suyo; corregirlo es trabajo de la selección visual
+  ([#17](https://github.com/LoteoApp/LoteosAPP/issues/17)).
+- **La geometría viaja a PostgreSQL como WKT y entra por el cast implícito
+  `text → geometry`** que registra PostGIS. El repositorio no nombra ninguna
+  función ni tipo de PostGIS, así que no depende del `search_path` del rol:
+  hoy PostGIS vive en `extensions` y ese esquema está en el `search_path` por
+  default de Supabase, pero eso deja de ser una precondición cuando se separe
+  el rol de aplicación del de migraciones
+  ([#138](https://github.com/LoteoApp/LoteosAPP/issues/138)).
+- **El alta es una sola transacción.** Un plano que falla a mitad dejaría un
+  loteo con parte de sus manzanas y ninguna forma de saber cuáles faltan. Las
+  manzanas, los lotes y las calles se insertan con `pgx.Batch` —un round trip
+  por capa en vez de uno por polígono—, y cada polígono entra junto con su
+  fila de `dxf_entidades` en un único statement con CTE.
+- **El loteo y su entidad DXF se referencian mutuamente**
+  (`dxf_entidades.loteo_id` ↔ `loteos.dxf_entidad_id`), así que ninguna de las
+  dos filas puede nombrar a la otra al insertarse: van en dos statements más
+  un `UPDATE`. No se resuelve con un CTE porque un CTE que modifica datos no
+  ve las filas que insertó otro CTE del mismo statement.
+- **Los límites de tamaño son del caso de uso y del handler, no del
+  adaptador.** El handler acota el cuerpo antes de decodificar (16 MiB el alta,
+  32 KiB la carga de datos de un lote); el dominio acota los vértices por
+  polígono (1000), los polígonos por plano (25 000) y los vértices de todo el
+  plano (250 000). El tope de vértices por plano existe porque validar un
+  anillo es cuadrático en sus vértices: sin él, un plano con pocos polígonos
+  enormes haría mucho más trabajo que uno con muchos chicos.
+- **La validación geométrica llega hasta el anillo, no hasta la relación entre
+  anillos.** `Polygon.Normalize` rechaza anillos abiertos, con vértices
+  repetidos, colineales, de área nula o **que se cruzan a sí mismos**
+  (`self_intersecting_geometry`). Lo que **no** valida el backend es el
+  solapamiento entre entidades de una misma capa: es una relación entre
+  polígonos y resolverla bien pide índice espacial (`ST_Overlaps` sobre el
+  índice GiST, o un grid en memoria), no una comparación de todos contra todos
+  sobre hasta 25 000 polígonos. Queda para
+  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17), junto con la
+  contención lote → manzana.
+- **Los deadlines del servidor se derivan de la ruta más lenta.**
+  `route.MaxHandlerTimeout` es el timeout más alto registrado (el alta, 60 s) y
+  `server.New` lo recibe para calcular `ReadTimeout` y `WriteTimeout`. Si el
+  servidor cortara antes que el handler, una transacción podría confirmarse y
+  el cliente recibir una conexión cortada, y reintentar el alta duplicaría el
+  loteo.
+- **El archivo DXF original todavía no se guarda.** Este recorte deja metadata
+  y geometría; la fila en `archivos` y la subida a R2 entran juntas en
+  [#12](https://github.com/LoteoApp/LoteosAPP/issues/12), para no dejar una
+  fila apuntando a un `storage_key` que no existe.
+- **Las inmobiliarias del formulario no se persisten todavía**
+  (`inmobiliaria_loteos`): el catálogo del frontend es un mock hasta que
+  exista el endpoint de inmobiliarias.
+- **El precio se modela como `float64`.** `NUMERIC(14,2)` va y vuelve estable
+  a esas magnitudes y acá no se hace aritmética con dinero. Cuando aparezcan
+  cuotas y planes de pago hay que revisarlo.
 
 ### Almacenamiento de archivos
 

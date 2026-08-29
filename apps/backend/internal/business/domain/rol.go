@@ -25,3 +25,16 @@ func (rol Rol) Valido() bool {
 	_, ok := rolesValidos[rol]
 	return ok
 }
+
+// HasRole reports whether an actor carrying roles holds role. Supabase sends
+// a single role per user today, but the claim is read as a list so an extra
+// role in the token doesn't change how a permission is checked.
+func HasRole(roles []string, role string) bool {
+	for _, candidate := range roles {
+		if candidate == role {
+			return true
+		}
+	}
+
+	return false
+}

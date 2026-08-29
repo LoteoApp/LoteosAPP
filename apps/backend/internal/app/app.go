@@ -34,14 +34,15 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux,
-		container.CreateUserHandler,
-		container.CompleteProfileHandler,
-		container.Verifier,
-	)
+	route.RegisterRoutes(mux, route.Handlers{
+		CreateUser:      container.CreateUserHandler,
+		CompleteProfile: container.CompleteProfileHandler,
+		CreateLoteo:     container.CreateLoteoHandler,
+		UpdateLote:      container.UpdateLoteHandler,
+	}, container.Verifier)
 
 	return &App{
-		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
+		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux), route.MaxHandlerTimeout),
 		pool:     container.Pool,
 		verifier: container.Verifier,
 	}, nil

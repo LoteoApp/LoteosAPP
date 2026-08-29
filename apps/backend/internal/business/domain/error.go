@@ -13,6 +13,11 @@ const (
 	KindUnavailable Kind = "unavailable"
 )
 
+// ErrDatabaseUnavailable is what a use case returns when persistence failed
+// for a reason that isn't the caller's fault. The underlying failure travels
+// as Cause so it reaches the log without being shown to the caller.
+var ErrDatabaseUnavailable = &Error{Kind: KindUnavailable, Code: "database_unavailable", Message: "La base de datos no está disponible"}
+
 // Error is a business error with a stable Code and a user-facing Message,
 // classified by Kind so adapters can map it to their own representation
 // (e.g. an HTTP status) without domain knowing about that representation.

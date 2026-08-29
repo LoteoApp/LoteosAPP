@@ -32,7 +32,7 @@ func (useCase *createUserUseCase) Execute(
 	actorRoles []string,
 	email, rol string,
 ) (domain.Usuario, string, error) {
-	if !hasRole(actorRoles, domain.RolAdministrador) {
+	if !domain.HasRole(actorRoles, domain.RolAdministrador) {
 		return domain.Usuario{}, "", domain.ErrNoAutorizado
 	}
 
@@ -64,13 +64,4 @@ func (useCase *createUserUseCase) Execute(
 	}
 
 	return usuario, temporaryPassword, nil
-}
-
-func hasRole(roles []string, role string) bool {
-	for _, candidate := range roles {
-		if candidate == role {
-			return true
-		}
-	}
-	return false
 }
