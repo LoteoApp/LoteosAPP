@@ -83,7 +83,7 @@ export default function AppLayout() {
           <UserMenu />
         </header>
 
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
+        <main className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-8 md:py-10">
           <Outlet />
         </main>
       </div>
