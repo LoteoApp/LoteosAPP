@@ -13,6 +13,11 @@ const (
 	KindUnavailable Kind = "unavailable"
 )
 
+// ErrDatabaseUnavailable is what a use case returns when persistence failed
+// for a reason that isn't the caller's fault. The underlying failure travels
+// as Cause so it reaches the log without being shown to the caller.
+var ErrDatabaseUnavailable = &Error{Kind: KindUnavailable, Code: "database_unavailable", Message: "La base de datos no está disponible"}
+
 // Error is a business error with a stable Code and a user-facing Message,
 // classified by Kind so adapters can map it to their own representation
 // (e.g. an HTTP status) without domain knowing about that representation.
@@ -32,4 +37,21 @@ func (err *Error) Error() string {
 
 func (err *Error) Unwrap() error {
 	return err.Cause
+}
+
+// Is reports errors with the same Code as equivalent, so errors.Is matches a
+// sentinel against the copy WithCause returns.
+func (err *Error) Is(target error) bool {
+	other, ok := target.(*Error)
+
+	return ok && other.Code == err.Code
+}
+
+// WithCause returns a copy of err carrying cause, leaving the receiver
+// untouched so package-level sentinels stay safe to share.
+func (err *Error) WithCause(cause error) *Error {
+	withCause := *err
+	withCause.Cause = cause
+
+	return &withCause
 }

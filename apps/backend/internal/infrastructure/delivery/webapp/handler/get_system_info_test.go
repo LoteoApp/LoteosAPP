@@ -26,7 +26,7 @@ func (stub getSystemInfoStub) Execute(context.Context) (domain.Info, error) {
 func performSystemInfoRequest(stub getSystemInfoStub) *httptest.ResponseRecorder {
 	h := handler.NewGetSystemInfoHandler(stub)
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux, h, nil, nil, nil, nil, nil, nil, nil, nil)
+	route.RegisterRoutes(mux, route.Handlers{GetSystemInfo: h}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	recorder := httptest.NewRecorder()

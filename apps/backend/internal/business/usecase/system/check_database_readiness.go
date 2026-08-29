@@ -23,12 +23,7 @@ func NewCheckDatabaseReadiness(repository gateway.Repository) CheckDatabaseReadi
 
 func (useCase *checkDatabaseReadinessUseCase) Execute(ctx context.Context) error {
 	if err := useCase.repository.Ping(ctx); err != nil {
-		return &domain.Error{
-			Kind:    domain.KindUnavailable,
-			Code:    "database_unavailable",
-			Message: "La base de datos no está disponible",
-			Cause:   err,
-		}
+		return domain.ErrDatabaseUnavailable.WithCause(err)
 	}
 	return nil
 }

@@ -34,20 +34,21 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	mux := http.NewServeMux()
-	route.RegisterRoutes(mux,
-		container.GetSystemInfoHandler,
-		container.CheckDatabaseReadinessHandler,
-		container.CreateUserHandler,
-		container.CompleteProfileHandler,
-		container.CreateClientHandler,
-		container.UpdateClientHandler,
-		container.DeleteClientHandler,
-		container.ListClientsHandler,
-		container.Verifier,
-	)
+	route.RegisterRoutes(mux, route.Handlers{
+		GetSystemInfo:          container.GetSystemInfoHandler,
+		CheckDatabaseReadiness: container.CheckDatabaseReadinessHandler,
+		CreateUser:             container.CreateUserHandler,
+		CompleteProfile:        container.CompleteProfileHandler,
+		CreateClient:           container.CreateClientHandler,
+		UpdateClient:           container.UpdateClientHandler,
+		DeleteClient:           container.DeleteClientHandler,
+		ListClients:            container.ListClientsHandler,
+		CreateLoteo:            container.CreateLoteoHandler,
+		UpdateLote:             container.UpdateLoteHandler,
+	}, container.Verifier)
 
 	return &App{
-		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux)),
+		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux), route.MaxHandlerTimeout),
 		pool:     container.Pool,
 		verifier: container.Verifier,
 	}, nil

@@ -34,7 +34,8 @@ func TestEntityModelStateHistory(t *testing.T) {
 	db.SetMaxIdleConns(1)
 	t.Cleanup(func() { db.Close() })
 
-	schema := pgx.Identifier{newMigrationTestSchema(t)}.Sanitize()
+	schemaName := newMigrationTestSchema(t)
+	schema := pgx.Identifier{schemaName}.Sanitize()
 	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+schema); err != nil {
 		t.Fatalf("create test schema: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestEntityModelStateHistory(t *testing.T) {
 			t.Errorf("drop test schema: %v", err)
 		}
 	})
-	if _, err := db.ExecContext(ctx, "SET search_path TO "+schema+", public"); err != nil {
+	if _, err := db.ExecContext(ctx, "SET search_path TO "+schema); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
 
@@ -210,7 +211,7 @@ func TestEntityModelStateHistory(t *testing.T) {
 		t.Fatalf("roll back entity model migration: %v", err)
 	}
 	var entityModelRemoved bool
-	if err := db.QueryRowContext(ctx, "SELECT to_regclass('reservas') IS NULL").Scan(&entityModelRemoved); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT to_regclass($1) IS NULL", schemaName+".reservas").Scan(&entityModelRemoved); err != nil {
 		t.Fatalf("check entity model rollback: %v", err)
 	}
 	if !entityModelRemoved {

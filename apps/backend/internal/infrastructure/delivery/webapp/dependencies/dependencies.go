@@ -5,13 +5,16 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/usecase/clients"
+	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/system"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/environments"
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
+	"loteosapp/backend/internal/infrastructure/storage/r2"
 )
 
 type Container struct {
@@ -23,8 +26,11 @@ type Container struct {
 	UpdateClientHandler           *handler.UpdateClientHandler
 	DeleteClientHandler           *handler.DeleteClientHandler
 	ListClientsHandler            *handler.ListClientsHandler
+	CreateLoteoHandler            *handler.CreateLoteoHandler
+	UpdateLoteHandler             *handler.UpdateLoteHandler
 	Pool                          *pgxpool.Pool
 	Verifier                      *supabase.Verifier
+	ObjectStorage                 gateway.ObjectStorage
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -34,6 +40,17 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	}
 
 	verifier, err := supabase.NewVerifier(ctx, cfg.SupabaseURL)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	objectStorage, err := r2.NewClient(r2.Config{
+		Endpoint:        cfg.Storage.Endpoint,
+		Bucket:          cfg.Storage.Bucket,
+		AccessKeyID:     cfg.Storage.AccessKeyID,
+		SecretAccessKey: cfg.Storage.SecretAccessKey,
+	})
 	if err != nil {
 		pool.Close()
 		return nil, err
@@ -53,6 +70,9 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	updateClientHandler := handler.NewUpdateClientHandler(clients.NewUpdateClient(clienteRepo, userRepo))
 	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
 	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
+	loteoRepo := postgres.NewLoteoRepository(pool)
+	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
+	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
 
 	return &Container{
 		GetSystemInfoHandler:          getSystemInfoHandler,
@@ -63,7 +83,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		UpdateClientHandler:           updateClientHandler,
 		DeleteClientHandler:           deleteClientHandler,
 		ListClientsHandler:            listClientsHandler,
+		CreateLoteoHandler:            createLoteoHandler,
+		UpdateLoteHandler:             updateLoteHandler,
 		Pool:                          pool,
 		Verifier:                      verifier,
+		ObjectStorage:                 objectStorage,
 	}, nil
 }

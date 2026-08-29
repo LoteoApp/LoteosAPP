@@ -57,6 +57,25 @@ jobs:
   test:
     name: Test / frontend + backend
     runs-on: ubuntu-latest
+    # PostGIS, not plain PostgreSQL: the entity model stores geometry, and
+    # without the extension the repository integration tests would skip and
+    # hide a broken query behind a green run.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: loteos
+          POSTGRES_PASSWORD: loteos
+          POSTGRES_DB: loteos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loteos -d loteos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://loteos:loteos@localhost:5432/loteos?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 
@@ -74,6 +93,12 @@ jobs:
         with:
           go-version-file: apps/backend/go.mod
           cache-dependency-path: apps/backend/go.sum
+
+      - name: Apply migrations
+        working-directory: apps/backend
+        env:
+          MIGRATIONS_DIR: ${{ github.workspace }}/migrations
+        run: go run ./cmd/migrate
 
       - name: Run tests
         run: pnpm test
@@ -81,6 +106,24 @@ jobs:
   coverage:
     name: Coverage / frontend + backend (thresholds)
     runs-on: ubuntu-latest
+    # The repository package is only measured against a real database: see
+    # scripts/check-go-coverage.mjs.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: loteos
+          POSTGRES_PASSWORD: loteos
+          POSTGRES_DB: loteos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loteos -d loteos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://loteos:loteos@localhost:5432/loteos?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +141,12 @@ jobs:
         with:
           go-version-file: apps/backend/go.mod
           cache-dependency-path: apps/backend/go.sum
+
+      - name: Apply migrations
+        working-directory: apps/backend
+        env:
+          MIGRATIONS_DIR: ${{ github.workspace }}/migrations
+        run: go run ./cmd/migrate
 
       - name: Run coverage
         run: pnpm test:coverage
@@ -154,10 +203,15 @@ jobs:
 
       - name: docker compose config
         env:
-          # Placeholder values: compose.yaml requires DATABASE_URL to be set so
-          # a real run fails fast instead of falling back to a local database.
-          # This job only validates the file, it never connects anywhere.
+          # Placeholder values: compose.yaml requires these to be set so a real
+          # run fails fast instead of falling back to a local database or an
+          # unconfigured bucket. This job only validates the file, it never
+          # connects anywhere.
           DATABASE_URL: postgres://user:password@localhost:5432/postgres?sslmode=require
+          CLOUDFLARE_R2_ENDPOINT: https://account-id.r2.cloudflarestorage.com
+          CLOUDFLARE_R2_BUCKET_NAME: loteos-files-ci
+          CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-access-key-id
+          CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-secret-access-key
         run: docker compose config
 
   main-source-branch:

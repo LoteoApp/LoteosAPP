@@ -314,6 +314,26 @@ describe('parseDxf', () => {
     expect(issues).toEqual([expect.objectContaining({ code: 'OVERLAPPING', layer: 'LOTES' })])
   })
 
+  it('caps how many overlap warnings it reports', () => {
+    const entities = Array.from({ length: 25 }, (_, index) =>
+      lwpolyline({
+        layer: 'LOTES',
+        closed: true,
+        points: [
+          [index * 0.1, 0],
+          [index * 0.1 + 10, 0],
+          [index * 0.1 + 10, 10],
+          [index * 0.1, 10],
+        ],
+      }),
+    )
+
+    const { polygons, issues } = parseDxf(dxfDocument(...entities))
+
+    expect(polygons).toHaveLength(25)
+    expect(issues).toHaveLength(200)
+  })
+
   it('does not report a lot nested inside a block as overlapping (different layers)', () => {
     const dxf = dxfDocument(
       lwpolyline({ layer: 'MANZANA', closed: true, points: square }),
