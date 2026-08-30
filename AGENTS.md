@@ -26,7 +26,8 @@
   (`internal/business`, `internal/infrastructure`), not by feature — except
   `internal/business/usecase` and `internal/infrastructure/delivery/webapp/dto`,
   which group use cases and HTTP DTOs into per-feature subpackages (e.g.
-  `usecase/users`, `usecase/system`, `dto/users`, `dto/system`).
+  `usecase/users`, `dto/users`). Add further feature subpackages the same way
+  as new features arrive.
 - Follow the dependency rules documented in `docs/architecture.md`.
 - Backend domain and use cases (`internal/business`) must not depend on HTTP,
   PostgreSQL, or concrete `pgx` types.

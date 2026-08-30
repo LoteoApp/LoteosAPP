@@ -23,7 +23,7 @@ flowchart LR
     backend -->|pgxpool| db["PostgreSQL (Supabase)"]
     migrate["Goose migrate"] -->|aplica SQL| db
     migrate -->|service_completed_successfully| backend
-    backend -->|healthcheck| frontend
+    backend -->|service_started| frontend
 ```
 
 ## Backend
@@ -42,18 +42,17 @@ apps/backend/
 │   │   └── app.go
 │   ├── business/
 │   │   ├── domain/
-│   │   │   └── system.go
+│   │   │   ├── object.go
+│   │   │   └── usuario.go
 │   │   ├── gateway/
-│   │   │   ├── repository.go
 │   │   │   ├── object_storage.go
+│   │   │   ├── usuario_repository.go
 │   │   │   ├── loteo_repository.go
 │   │   │   └── gatewayfake/
-│   │   │       ├── repository.go
 │   │   │       ├── object_storage.go
+│   │   │       ├── user_repository.go
 │   │   │       └── loteo_repository.go
 │   │   └── usecase/
-│   │       ├── system/
-│   │       │   └── get_system_info.go
 │   │       ├── users/
 │   │       │   └── create_user.go
 │   │       └── loteos/
@@ -70,7 +69,7 @@ apps/backend/
 │       ├── repository/
 │       │   └── postgres/
 │       │       ├── pool.go
-│       │       ├── repository.go
+│       │       ├── usuario.go
 │       │       └── loteo.go
 │       ├── storage/
 │       │   └── r2/
@@ -80,16 +79,12 @@ apps/backend/
 │               ├── dependencies/
 │               │   └── dependencies.go
 │               ├── dto/
-│               │   ├── system/
-│               │   │   └── status.go
 │               │   ├── users/
 │               │   │   └── create_user.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
 │               │       └── update_lote.go
 │               ├── handler/
-│               │   ├── live.go
-│               │   ├── get_system_info.go
 │               │   ├── create_user.go
 │               │   ├── create_loteo.go
 │               │   └── update_lote.go
@@ -127,16 +122,16 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/business/domain`: entidades y tipos de valor del negocio, sin
   depender de HTTP ni de PostgreSQL.
 - `internal/business/gateway`: contratos (interfaces) que el negocio necesita de
-  sus adaptadores, como `Repository`. Los casos de uso dependen de estos
-  contratos, nunca de una implementación concreta. `gateway/gatewayfake`
-  contiene fakes de esos contratos para tests, ubicados junto a las
-  interfaces que implementan en vez de duplicarse en cada paquete de
-  `usecase`.
+  sus adaptadores, como `UserRepository` e `IdentityProvider`. Los casos de uso
+  dependen de estos contratos, nunca de una implementación concreta.
+  `gateway/gatewayfake` contiene fakes de esos contratos para tests, ubicados
+  junto a las interfaces que implementan en vez de duplicarse en cada paquete
+  de `usecase`.
 - `internal/business/usecase`: casos de uso que orquestan el dominio a través de
   los contratos de `gateway`, agrupados en subpaquetes por funcionalidad
-  (`usecase/system`, `usecase/users`). Cada caso de uso es una interfaz de un
-  solo método `Execute` junto con su implementación, definidas en el mismo
-  archivo (por ejemplo `usecase/users/create_user.go`).
+  (`usecase/users`). Cada caso de uso es una interfaz de un solo método
+  `Execute` junto con su implementación, definidas en el mismo archivo (por
+  ejemplo `usecase/users/create_user.go`).
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
 - `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
@@ -153,18 +148,17 @@ vacíos antes de que exista una funcionalidad que los necesite.
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
-  persistencia (`gateway.Repository`) con `pgxpool` y SQL explícito, y expone
-  la apertura y configuración del pool de conexiones.
+  persistencia (`gateway.UserRepository`) con `pgxpool` y SQL explícito, y
+  expone la apertura y configuración del pool de conexiones.
 - `internal/infrastructure/storage/r2`: implementa `gateway.ObjectStorage`
   contra Cloudflare R2 a través de su API S3, con el SDK de AWS v2. Guarda,
   lee y borra los archivos que sube el usuario (el DXF original del alta de
   loteo, fotos y planos). Ver [almacenamiento de archivos](#almacenamiento-de-archivos).
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
-  HTTP, agrupados por feature (`dto/system`, `dto/users`) igual que
-  `usecase`. Cada subpaquete declara `package dto`; como el identificador de
-  paquete no tiene que coincidir con el nombre del directorio, no choca con
-  `usecase/system` ni `usecase/users` al importarse en el mismo archivo de
-  `handler`.
+  HTTP, agrupados por feature (`dto/users`) igual que `usecase`. Cada
+  subpaquete declara `package dto`; como el identificador de paquete no
+  tiene que coincidir con el nombre del directorio, no choca con
+  `usecase/users` al importarse en el mismo archivo de `handler`.
 - `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
   llamadas del caso de uso, decodificando y codificando los tipos de `dto`, y
   convierte el resultado en una respuesta. Cada ruta tiene su propio handler
@@ -177,8 +171,8 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `response.WriteError`. `Adapt` también acota `r.Context()` al `timeout`
   antes de llamar a `Handle`, así que ningún handler arma su propio
   `context.WithTimeout`; usa `request.Context()` directo. Un handler sin
-  ningún error posible (como `Live`) queda como función suelta, sin
-  envolverlo en un struct solo para cumplir la interfaz.
+  ningún error posible queda como función suelta, sin envolverlo en un
+  struct solo para cumplir la interfaz.
 - `internal/infrastructure/delivery/webapp/response`: construye respuestas JSON
   consistentes, de éxito y de error. `WriteError` es el único lugar que
   traduce un `*domain.Error` a una respuesta HTTP: usa su `Code` y `Message`
@@ -213,17 +207,14 @@ flowchart LR
     route --> middleware["infrastructure/delivery/webapp/middleware"]
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
-    handler --> usecaseSystem["business/usecase/system"]
     handler --> usecaseUsers["business/usecase/users"]
     handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
-    usecaseSystem --> gateway
     usecaseUsers --> gateway
     usecaseLoteos --> gateway
-    usecaseSystem --> domain["business/domain"]
-    usecaseUsers --> domain
+    usecaseUsers --> domain["business/domain"]
     usecaseLoteos --> domain
     response --> domain
     gateway --> domain
@@ -242,7 +233,6 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ### Convenciones HTTP
 
 - Los endpoints funcionales se publican bajo `/api/v1`.
-- Los health checks no se versionan, por ejemplo `/healthz` y `/readyz`.
 - Los handlers validan entrada, llaman al caso de uso y mapean la salida.
 - Los errores deben tener un formato consistente y no exponer detalles internos:
 
@@ -456,16 +446,6 @@ apps/frontend/src/
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
-│   ├── system-status/
-│   │   ├── api/
-│   │   │   └── get-system-info.ts
-│   │   ├── components/
-│   │   │   └── DatabaseStatus.tsx
-│   │   ├── hooks/
-│   │   │   └── use-system-info.ts
-│   │   ├── pages/
-│   │   │   └── MonitorPage.tsx # Diagnóstico del entorno, en /monitor
-│   │   └── types.ts
 │   └── lots/
 │       ├── api/
 │       │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
@@ -527,7 +507,7 @@ app → features → shared
 - Se favorece la composición de componentes y variantes explícitas frente a
   componentes configurados con numerosos booleanos.
 - Los tests se colocan junto al código probado con nombres como
-  `DatabaseStatus.test.tsx`.
+  `AuthStatus.test.tsx`.
 
 ### Diseño responsive
 
@@ -620,7 +600,7 @@ en [#128](https://github.com/LoteoApp/LoteosAPP/issues/128) (ver
 - `migrate`: aplica las migraciones pendientes contra la base de Supabase y
   termina correctamente.
 - `backend`: inicia la API después de las migraciones.
-- `frontend`: inicia Vite después de que el backend esté saludable.
+- `frontend`: inicia Vite después de que el proceso del backend arrancó.
 
 Las migraciones son un proceso separado. Nunca se ejecutan como efecto
 secundario de iniciar cada réplica del backend.

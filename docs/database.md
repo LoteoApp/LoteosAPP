@@ -96,23 +96,14 @@ Después de agregar tablas conviene revisar los avisos del proyecto
 (**Advisors > Security** en el dashboard de Supabase), que marcan
 exactamente este problema.
 
-## Endpoint de diagnóstico
+## Validar el entorno
 
-El backend expone `GET /api/v1/system` para validar el entorno durante el
-desarrollo. Devuelve, sin incluir la contraseña ni la URL completa de conexión:
+Para confirmar que el backend pudo conectarse a la base durante el
+desarrollo, revisar sus logs:
 
-- Estado de conexión.
-- Versión completa de PostgreSQL.
-- Nombre de la base y usuario conectado.
-- Dirección y puerto del servidor.
-- Hora actual de PostgreSQL.
-- Conexiones máximas, totales, adquiridas, libres, creadas y cerradas del pool.
-
-El componente
-`apps/frontend/src/features/system-status/components/DatabaseStatus.tsx`
-consulta este endpoint a través de la capa `api` de su feature y muestra la
-información en la pantalla principal. Este endpoint es diagnóstico de
-desarrollo y debe revisarse antes de exponerlo en producción.
+```powershell
+docker compose logs backend
+```
 
 ## Herramienta de migraciones
 
