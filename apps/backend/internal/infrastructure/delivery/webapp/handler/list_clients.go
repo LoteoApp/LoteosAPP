@@ -26,7 +26,7 @@ func (handler *ListClientsHandler) Handle(w http.ResponseWriter, request *http.R
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	search := request.URL.Query().Get("q")
 
-	clientes, err := handler.listClients.Execute(request.Context(), principal.Roles, search)
+	clientes, err := handler.listClients.Execute(request.Context(), clients.ListClientsInput{ActorRoles: principal.Roles, Search: search})
 	if err != nil {
 		return err
 	}

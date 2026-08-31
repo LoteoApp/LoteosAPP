@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -22,10 +23,10 @@ type listClientsStub struct {
 	gotSearch     string
 }
 
-func (stub *listClientsStub) Execute(_ context.Context, actorRoles []string, search string) ([]domain.Cliente, error) {
+func (stub *listClientsStub) Execute(_ context.Context, input clients.ListClientsInput) ([]domain.Cliente, error) {
 	stub.called = true
-	stub.gotActorRoles = actorRoles
-	stub.gotSearch = search
+	stub.gotActorRoles = input.ActorRoles
+	stub.gotSearch = input.Search
 	return stub.clientes, stub.err
 }
 

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -97,9 +98,9 @@ func (repository *ClienteRepository) List(ctx context.Context, search string) ([
 		SELECT id::text, nombre, apellido, dni, celular, email, fecha_creacion, fecha_modificacion
 		FROM clientes
 		WHERE fecha_baja IS NULL
-			AND ($1 = '' OR nombre ILIKE '%' || $1 || '%' OR apellido ILIKE '%' || $1 || '%' OR dni ILIKE '%' || $1 || '%')
+			AND ($1 = '' OR nombre ILIKE $2 ESCAPE '\' OR apellido ILIKE $2 ESCAPE '\' OR dni ILIKE $2 ESCAPE '\')
 		ORDER BY apellido, nombre
-	`, search)
+	`, search, containsPattern(search))
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +131,9 @@ func (repository *ClienteRepository) List(ctx context.Context, search string) ([
 // dniUniqueConstraint means "DNI ya está en uso"; any other unique
 // violation is reported as a generic conflict with the original error kept
 // as Cause, instead of being misclassified as a duplicate DNI. Any
-// non-constraint error is returned unchanged so the caller can decide how
-// to classify it (e.g. wrap it as KindUnavailable).
+// non-constraint error is returned unchanged, so it reaches
+// response.WriteError as an unexpected failure: logged, hidden behind a
+// generic 500.
 func mapClienteWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != uniqueViolationCode {
@@ -148,4 +150,14 @@ func mapClienteWriteError(err error) error {
 		Message: "El registro entra en conflicto con datos existentes",
 		Cause:   err,
 	}
+}
+
+// likeWildcards escapes the characters LIKE/ILIKE treat as wildcards, so a
+// search for "%" matches a literal percent sign instead of every cliente.
+// The escape character itself has to be doubled, and matches the ESCAPE
+// clause of the queries using this pattern.
+var likeWildcards = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+func containsPattern(search string) string {
+	return "%" + likeWildcards.Replace(search) + "%"
 }

@@ -16,7 +16,10 @@ func TestCreateClientRejectsUnauthorizedRole(t *testing.T) {
 	users := &gatewayfake.UserRepository{}
 	createClient := NewCreateClient(repository, users)
 
-	_, err := createClient.Execute(context.Background(), []string{domain.RolAgrimensor}, "sb-1", "Ana", "Perez", "30111222", nil, nil)
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAgrimensor}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+	})
 
 	if !errors.Is(err, domain.ErrNoAutorizado) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
@@ -46,7 +49,10 @@ func TestCreateClientRejectsEmptyFields(t *testing.T) {
 			users := &gatewayfake.UserRepository{}
 			createClient := NewCreateClient(repository, users)
 
-			_, err := createClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", test.nombre, test.apellido, test.dni, nil, nil)
+			_, err := createClient.Execute(context.Background(), CreateClientInput{
+				ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+				Nombre: test.nombre, Apellido: test.apellido, DNI: test.dni,
+			})
 
 			if !errors.Is(err, domain.ErrClienteInvalido) {
 				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrClienteInvalido)
@@ -55,6 +61,26 @@ func TestCreateClientRejectsEmptyFields(t *testing.T) {
 				t.Error("Execute() should not call repository with invalid input")
 			}
 		})
+	}
+}
+
+func TestCreateClientRejectsInvalidEmail(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.ClienteRepository{}
+	users := &gatewayfake.UserRepository{}
+	createClient := NewCreateClient(repository, users)
+
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222", Email: ptr("ana.example.com"),
+	})
+
+	if !errors.Is(err, domain.ErrEmailInvalido) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmailInvalido)
+	}
+	if repository.CreateCalls != 0 {
+		t.Error("Execute() should not call repository with an invalid email")
 	}
 }
 
@@ -78,14 +104,22 @@ func TestCreateClientHappyPath(t *testing.T) {
 			users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 			createClient := NewCreateClient(repository, users)
 
-			celular := "1122334455"
-			email := "ana@example.com"
-			cliente, err := createClient.Execute(context.Background(), []string{test.rol}, "sb-1", " Ana ", " Perez ", " 30111222 ", &celular, &email)
+			cliente, err := createClient.Execute(context.Background(), CreateClientInput{
+				ActorRoles: []string{test.rol}, Subject: "sb-1",
+				Nombre: " Ana ", Apellido: " Perez ", DNI: " 30111222 ",
+				Celular: ptr(" 1122334455 "), Email: ptr("  ana@example.com  "),
+			})
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 			if cliente.Nombre != "Ana" || cliente.Apellido != "Perez" || cliente.DNI != "30111222" {
 				t.Errorf("Execute() cliente = %#v", cliente)
+			}
+			if cliente.Celular == nil || *cliente.Celular != "1122334455" {
+				t.Errorf("Execute() celular = %v, want it trimmed", cliente.Celular)
+			}
+			if cliente.Email == nil || *cliente.Email != "ana@example.com" {
+				t.Errorf("Execute() email = %v, want it trimmed", cliente.Email)
 			}
 			if cliente.UsuarioModificacion != "user-1" {
 				t.Errorf("Execute() usuario modificacion = %q, want %q", cliente.UsuarioModificacion, "user-1")
@@ -100,6 +134,26 @@ func TestCreateClientHappyPath(t *testing.T) {
 	}
 }
 
+func TestCreateClientDropsBlankOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.ClienteRepository{}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
+	createClient := NewCreateClient(repository, users)
+
+	cliente, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+		Celular: ptr("   "), Email: ptr(""),
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if cliente.Celular != nil || cliente.Email != nil {
+		t.Errorf("Execute() celular = %v, email = %v, want both absent", cliente.Celular, cliente.Email)
+	}
+}
+
 func TestCreateClientPropagatesRepositoryError(t *testing.T) {
 	t.Parallel()
 
@@ -108,47 +162,76 @@ func TestCreateClientPropagatesRepositoryError(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	createClient := NewCreateClient(repository, users)
 
-	_, err := createClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "Ana", "Perez", "30111222", nil, nil)
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+	})
 
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
 	}
 }
 
-func TestCreateClientWrapsUnexpectedRepositoryError(t *testing.T) {
+func TestCreateClientLeavesUnexpectedRepositoryErrorUnclassified(t *testing.T) {
 	t.Parallel()
 
-	rawErr := errors.New("connection refused")
+	rawErr := errors.New("syntax error at end of input")
 	repository := &gatewayfake.ClienteRepository{CreateErr: rawErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	createClient := NewCreateClient(repository, users)
 
-	_, err := createClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "Ana", "Perez", "30111222", nil, nil)
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+	})
 
 	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want it to wrap %v", err, rawErr)
+		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
 	}
 	var domainErr *domain.Error
-	if !errors.As(err, &domainErr) {
-		t.Fatalf("Execute() error = %v, want a *domain.Error", err)
+	if errors.As(err, &domainErr) {
+		t.Errorf("Execute() error = %v, want it unclassified so it surfaces as a 500", err)
 	}
-	if domainErr.Kind != domain.KindUnavailable {
-		t.Errorf("Execute() error kind = %q, want %q", domainErr.Kind, domain.KindUnavailable)
+}
+
+func TestCreateClientRejectsActorWithoutUsuario(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.ClienteRepository{}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado}
+	createClient := NewCreateClient(repository, users)
+
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+	})
+
+	if !errors.Is(err, domain.ErrActorNoAprovisionado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrActorNoAprovisionado)
+	}
+	if errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+		t.Error("Execute() should not answer a create with the not-found error of another feature")
+	}
+	if repository.CreateCalls != 0 {
+		t.Error("Execute() should not call repository when actor resolution fails")
 	}
 }
 
 func TestCreateClientPropagatesActorResolutionError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := domain.ErrUsuarioNoEncontrado
+	rawErr := errors.New("connection refused")
 	repository := &gatewayfake.ClienteRepository{}
-	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: wantErr}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: rawErr}
 	createClient := NewCreateClient(repository, users)
 
-	_, err := createClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "Ana", "Perez", "30111222", nil, nil)
+	_, err := createClient.Execute(context.Background(), CreateClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1",
+		Nombre: "Ana", Apellido: "Perez", DNI: "30111222",
+	})
 
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
+	if !errors.Is(err, rawErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
 	}
 	if repository.CreateCalls != 0 {
 		t.Error("Execute() should not call repository when actor resolution fails")

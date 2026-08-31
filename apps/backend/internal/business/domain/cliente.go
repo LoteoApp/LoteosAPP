@@ -7,6 +7,7 @@ var (
 	ErrDNIEnUso            = &Error{Kind: KindConflict, Code: "dni_in_use", Message: "El DNI ya está en uso"}
 	ErrClienteInvalido     = &Error{Kind: KindInvalid, Code: "invalid_client", Message: "Nombre, apellido y DNI son obligatorios"}
 	ErrClienteIDInvalido   = &Error{Kind: KindInvalid, Code: "invalid_client_id", Message: "ID de cliente inválido"}
+	ErrClienteSinCambios   = &Error{Kind: KindInvalid, Code: "empty_client_update", Message: "No se enviaron campos para modificar"}
 )
 
 type Cliente struct {

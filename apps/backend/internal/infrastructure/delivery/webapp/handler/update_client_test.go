@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -28,18 +29,13 @@ type updateClientStub struct {
 	gotDNI      *string
 }
 
-func (stub *updateClientStub) Execute(
-	_ context.Context,
-	_ []string,
-	subject, id string,
-	nombre, apellido, dni, _, _ *string,
-) (domain.Cliente, error) {
+func (stub *updateClientStub) Execute(_ context.Context, input clients.UpdateClientInput) (domain.Cliente, error) {
 	stub.called = true
-	stub.gotSubject = subject
-	stub.gotID = id
-	stub.gotNombre = nombre
-	stub.gotApellido = apellido
-	stub.gotDNI = dni
+	stub.gotSubject = input.Subject
+	stub.gotID = input.ID
+	stub.gotNombre = input.Nombre
+	stub.gotApellido = input.Apellido
+	stub.gotDNI = input.DNI
 	return stub.cliente, stub.err
 }
 
@@ -171,6 +167,8 @@ func TestUpdateClientRoute(t *testing.T) {
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
 			{name: "client not found", err: domain.ErrClienteNoEncontrado, wantStatus: http.StatusNotFound, wantCode: "client_not_found"},
 			{name: "dni in use", err: domain.ErrDNIEnUso, wantStatus: http.StatusConflict, wantCode: "dni_in_use"},
+			{name: "empty update", err: domain.ErrClienteSinCambios, wantStatus: http.StatusBadRequest, wantCode: "empty_client_update"},
+			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
 		}
 
 		for _, test := range tests {

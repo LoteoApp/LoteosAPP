@@ -29,10 +29,15 @@ func (handler *CreateClientHandler) Handle(w http.ResponseWriter, request *http.
 		return err
 	}
 
-	cliente, err := handler.createClient.Execute(
-		request.Context(), principal.Roles, principal.Subject,
-		body.Nombre, body.Apellido, body.DNI, body.Celular, body.Email,
-	)
+	cliente, err := handler.createClient.Execute(request.Context(), clients.CreateClientInput{
+		ActorRoles: principal.Roles,
+		Subject:    principal.Subject,
+		Nombre:     body.Nombre,
+		Apellido:   body.Apellido,
+		DNI:        body.DNI,
+		Celular:    body.Celular,
+		Email:      body.Email,
+	})
 	if err != nil {
 		return err
 	}

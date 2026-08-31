@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -29,20 +30,15 @@ type createClientStub struct {
 	gotEmail      *string
 }
 
-func (stub *createClientStub) Execute(
-	_ context.Context,
-	actorRoles []string,
-	subject, nombre, apellido, dni string,
-	celular, email *string,
-) (domain.Cliente, error) {
+func (stub *createClientStub) Execute(_ context.Context, input clients.CreateClientInput) (domain.Cliente, error) {
 	stub.called = true
-	stub.gotActorRoles = actorRoles
-	stub.gotSubject = subject
-	stub.gotNombre = nombre
-	stub.gotApellido = apellido
-	stub.gotDNI = dni
-	stub.gotCelular = celular
-	stub.gotEmail = email
+	stub.gotActorRoles = input.ActorRoles
+	stub.gotSubject = input.Subject
+	stub.gotNombre = input.Nombre
+	stub.gotApellido = input.Apellido
+	stub.gotDNI = input.DNI
+	stub.gotCelular = input.Celular
+	stub.gotEmail = input.Email
 	return stub.cliente, stub.err
 }
 
@@ -140,6 +136,8 @@ func TestCreateClientRoute(t *testing.T) {
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
 			{name: "invalid client", err: domain.ErrClienteInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_client"},
 			{name: "dni in use", err: domain.ErrDNIEnUso, wantStatus: http.StatusConflict, wantCode: "dni_in_use"},
+			{name: "invalid email", err: domain.ErrEmailInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_email"},
+			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 

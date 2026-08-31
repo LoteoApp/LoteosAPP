@@ -27,7 +27,8 @@ func (handler *DeleteClientHandler) Handle(w http.ResponseWriter, request *http.
 		return domain.ErrClienteIDInvalido
 	}
 
-	if err := handler.deleteClient.Execute(request.Context(), principal.Roles, principal.Subject, id); err != nil {
+	input := clients.DeleteClientInput{ActorRoles: principal.Roles, Subject: principal.Subject, ID: id}
+	if err := handler.deleteClient.Execute(request.Context(), input); err != nil {
 		return err
 	}
 

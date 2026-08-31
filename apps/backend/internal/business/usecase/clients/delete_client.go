@@ -7,10 +7,16 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
+type DeleteClientInput struct {
+	ActorRoles []string
+	Subject    string
+	ID         string
+}
+
 // DeleteClient gives a cliente de baja (soft delete). Only callers with the
 // administrador role may do this.
 type DeleteClient interface {
-	Execute(ctx context.Context, actorRoles []string, subject, id string) error
+	Execute(ctx context.Context, input DeleteClientInput) error
 }
 
 type deleteClientUseCase struct {
@@ -22,15 +28,15 @@ func NewDeleteClient(repository gateway.ClienteRepository, users gateway.UserRep
 	return &deleteClientUseCase{repository: repository, users: users}
 }
 
-func (useCase *deleteClientUseCase) Execute(ctx context.Context, actorRoles []string, subject, id string) error {
-	if !hasRole(actorRoles, domain.RolAdministrador) {
+func (useCase *deleteClientUseCase) Execute(ctx context.Context, input DeleteClientInput) error {
+	if !hasRole(input.ActorRoles, domain.RolAdministrador) {
 		return domain.ErrNoAutorizado
 	}
 
-	actor, err := useCase.users.FindByAuthProviderID(ctx, subject)
+	actorID, err := resolveActorID(ctx, useCase.users, input.Subject)
 	if err != nil {
-		return wrapGatewayError(err)
+		return err
 	}
 
-	return wrapGatewayError(useCase.repository.SoftDelete(ctx, id, actor.ID))
+	return useCase.repository.SoftDelete(ctx, input.ID, actorID)
 }

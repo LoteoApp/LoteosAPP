@@ -8,15 +8,23 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
+// CreateClientInput carries the fields of a new cliente. It's a struct and
+// not a list of parameters so nombre, apellido and dni can't be swapped at
+// a call site without the compiler noticing.
+type CreateClientInput struct {
+	ActorRoles []string
+	Subject    string
+	Nombre     string
+	Apellido   string
+	DNI        string
+	Celular    *string
+	Email      *string
+}
+
 // CreateClient registers a new cliente. Only callers with the
 // administrador, administrativo or inmobiliaria role may do this.
 type CreateClient interface {
-	Execute(
-		ctx context.Context,
-		actorRoles []string,
-		subject, nombre, apellido, dni string,
-		celular, email *string,
-	) (domain.Cliente, error)
+	Execute(ctx context.Context, input CreateClientInput) (domain.Cliente, error)
 }
 
 type createClientUseCase struct {
@@ -28,26 +36,27 @@ func NewCreateClient(repository gateway.ClienteRepository, users gateway.UserRep
 	return &createClientUseCase{repository: repository, users: users}
 }
 
-func (useCase *createClientUseCase) Execute(
-	ctx context.Context,
-	actorRoles []string,
-	subject, nombre, apellido, dni string,
-	celular, email *string,
-) (domain.Cliente, error) {
-	if !hasRole(actorRoles, domain.RolAdministrador, domain.RolAdministrativo, domain.RolInmobiliaria) {
+func (useCase *createClientUseCase) Execute(ctx context.Context, input CreateClientInput) (domain.Cliente, error) {
+	if !hasRole(input.ActorRoles, domain.RolAdministrador, domain.RolAdministrativo, domain.RolInmobiliaria) {
 		return domain.Cliente{}, domain.ErrNoAutorizado
 	}
 
-	nombre = strings.TrimSpace(nombre)
-	apellido = strings.TrimSpace(apellido)
-	dni = strings.TrimSpace(dni)
+	nombre := strings.TrimSpace(input.Nombre)
+	apellido := strings.TrimSpace(input.Apellido)
+	dni := strings.TrimSpace(input.DNI)
 	if nombre == "" || apellido == "" || dni == "" {
 		return domain.Cliente{}, domain.ErrClienteInvalido
 	}
 
-	actor, err := useCase.users.FindByAuthProviderID(ctx, subject)
+	celular := trimOptional(input.Celular)
+	email := trimOptional(input.Email)
+	if err := validateOptionalEmail(email); err != nil {
+		return domain.Cliente{}, err
+	}
+
+	actorID, err := resolveActorID(ctx, useCase.users, input.Subject)
 	if err != nil {
-		return domain.Cliente{}, wrapGatewayError(err)
+		return domain.Cliente{}, err
 	}
 
 	created, err := useCase.repository.Create(ctx, domain.Cliente{
@@ -56,23 +65,11 @@ func (useCase *createClientUseCase) Execute(
 		DNI:                 dni,
 		Celular:             celular,
 		Email:               email,
-		UsuarioModificacion: actor.ID,
+		UsuarioModificacion: actorID,
 	})
 	if err != nil {
-		return domain.Cliente{}, wrapGatewayError(err)
+		return domain.Cliente{}, err
 	}
 
 	return created, nil
-}
-
-// hasRole reports whether actorRoles contains any of allowed.
-func hasRole(actorRoles []string, allowed ...string) bool {
-	for _, role := range actorRoles {
-		for _, want := range allowed {
-			if role == want {
-				return true
-			}
-		}
-	}
-	return false
 }

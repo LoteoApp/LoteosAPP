@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -22,10 +23,10 @@ type deleteClientStub struct {
 	gotID      string
 }
 
-func (stub *deleteClientStub) Execute(_ context.Context, _ []string, subject, id string) error {
+func (stub *deleteClientStub) Execute(_ context.Context, input clients.DeleteClientInput) error {
 	stub.called = true
-	stub.gotSubject = subject
-	stub.gotID = id
+	stub.gotSubject = input.Subject
+	stub.gotID = input.ID
 	return stub.err
 }
 

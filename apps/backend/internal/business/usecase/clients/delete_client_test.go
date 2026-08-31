@@ -22,7 +22,9 @@ func TestDeleteClientRejectsNonAdministrador(t *testing.T) {
 			users := &gatewayfake.UserRepository{}
 			deleteClient := NewDeleteClient(repository, users)
 
-			err := deleteClient.Execute(context.Background(), []string{rol}, "sb-1", "client-1")
+			err := deleteClient.Execute(context.Background(), DeleteClientInput{
+				ActorRoles: []string{rol}, Subject: "sb-1", ID: "client-1",
+			})
 
 			if !errors.Is(err, domain.ErrNoAutorizado) {
 				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
@@ -41,7 +43,9 @@ func TestDeleteClientHappyPath(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteClient := NewDeleteClient(repository, users)
 
-	err := deleteClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "client-1")
+	err := deleteClient.Execute(context.Background(), DeleteClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "client-1",
+	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -64,47 +68,69 @@ func TestDeleteClientPropagatesRepositoryError(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteClient := NewDeleteClient(repository, users)
 
-	err := deleteClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "client-1")
+	err := deleteClient.Execute(context.Background(), DeleteClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "client-1",
+	})
 
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
 	}
 }
 
-func TestDeleteClientWrapsUnexpectedRepositoryError(t *testing.T) {
+func TestDeleteClientLeavesUnexpectedRepositoryErrorUnclassified(t *testing.T) {
 	t.Parallel()
 
-	rawErr := errors.New("connection refused")
+	rawErr := errors.New("syntax error at end of input")
 	repository := &gatewayfake.ClienteRepository{SoftDeleteErr: rawErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteClient := NewDeleteClient(repository, users)
 
-	err := deleteClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "client-1")
+	err := deleteClient.Execute(context.Background(), DeleteClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "client-1",
+	})
 
 	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want it to wrap %v", err, rawErr)
+		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
 	}
 	var domainErr *domain.Error
-	if !errors.As(err, &domainErr) {
-		t.Fatalf("Execute() error = %v, want a *domain.Error", err)
+	if errors.As(err, &domainErr) {
+		t.Errorf("Execute() error = %v, want it unclassified so it surfaces as a 500", err)
 	}
-	if domainErr.Kind != domain.KindUnavailable {
-		t.Errorf("Execute() error kind = %q, want %q", domainErr.Kind, domain.KindUnavailable)
+}
+
+func TestDeleteClientRejectsActorWithoutUsuario(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.ClienteRepository{}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado}
+	deleteClient := NewDeleteClient(repository, users)
+
+	err := deleteClient.Execute(context.Background(), DeleteClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "client-1",
+	})
+
+	if !errors.Is(err, domain.ErrActorNoAprovisionado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrActorNoAprovisionado)
+	}
+	if repository.SoftDeleteCalls != 0 {
+		t.Error("Execute() should not call repository when actor resolution fails")
 	}
 }
 
 func TestDeleteClientPropagatesActorResolutionError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := domain.ErrUsuarioNoEncontrado
+	rawErr := errors.New("connection refused")
 	repository := &gatewayfake.ClienteRepository{}
-	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: wantErr}
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: rawErr}
 	deleteClient := NewDeleteClient(repository, users)
 
-	err := deleteClient.Execute(context.Background(), []string{domain.RolAdministrador}, "sb-1", "client-1")
+	err := deleteClient.Execute(context.Background(), DeleteClientInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "client-1",
+	})
 
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
+	if !errors.Is(err, rawErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
 	}
 	if repository.SoftDeleteCalls != 0 {
 		t.Error("Execute() should not call repository when actor resolution fails")

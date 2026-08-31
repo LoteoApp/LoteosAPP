@@ -21,7 +21,9 @@ func TestListClientsRejectsUnauthorizedRole(t *testing.T) {
 			repository := &gatewayfake.ClienteRepository{}
 			listClients := NewListClients(repository)
 
-			_, err := listClients.Execute(context.Background(), []string{rol}, "perez")
+			_, err := listClients.Execute(context.Background(), ListClientsInput{
+				ActorRoles: []string{rol}, Search: "perez",
+			})
 
 			if !errors.Is(err, domain.ErrNoAutorizado) {
 				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
@@ -46,7 +48,9 @@ func TestListClientsHappyPath(t *testing.T) {
 			repository := &gatewayfake.ClienteRepository{ListResult: want}
 			listClients := NewListClients(repository)
 
-			got, err := listClients.Execute(context.Background(), []string{rol}, " perez ")
+			got, err := listClients.Execute(context.Background(), ListClientsInput{
+				ActorRoles: []string{rol}, Search: " perez ",
+			})
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
@@ -67,30 +71,31 @@ func TestListClientsPropagatesRepositoryError(t *testing.T) {
 	repository := &gatewayfake.ClienteRepository{ListErr: wantErr}
 	listClients := NewListClients(repository)
 
-	_, err := listClients.Execute(context.Background(), []string{domain.RolAdministrador}, "")
+	_, err := listClients.Execute(context.Background(), ListClientsInput{
+		ActorRoles: []string{domain.RolAdministrador},
+	})
 
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
 	}
 }
 
-func TestListClientsWrapsUnexpectedRepositoryError(t *testing.T) {
+func TestListClientsLeavesUnexpectedRepositoryErrorUnclassified(t *testing.T) {
 	t.Parallel()
 
-	rawErr := errors.New("connection refused")
+	rawErr := errors.New("syntax error at end of input")
 	repository := &gatewayfake.ClienteRepository{ListErr: rawErr}
 	listClients := NewListClients(repository)
 
-	_, err := listClients.Execute(context.Background(), []string{domain.RolAdministrador}, "")
+	_, err := listClients.Execute(context.Background(), ListClientsInput{
+		ActorRoles: []string{domain.RolAdministrador},
+	})
 
 	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want it to wrap %v", err, rawErr)
+		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
 	}
 	var domainErr *domain.Error
-	if !errors.As(err, &domainErr) {
-		t.Fatalf("Execute() error = %v, want a *domain.Error", err)
-	}
-	if domainErr.Kind != domain.KindUnavailable {
-		t.Errorf("Execute() error kind = %q, want %q", domainErr.Kind, domain.KindUnavailable)
+	if errors.As(err, &domainErr) {
+		t.Errorf("Execute() error = %v, want it unclassified so it surfaces as a 500", err)
 	}
 }

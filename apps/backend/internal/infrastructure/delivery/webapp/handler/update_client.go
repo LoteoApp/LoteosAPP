@@ -34,10 +34,16 @@ func (handler *UpdateClientHandler) Handle(w http.ResponseWriter, request *http.
 		return err
 	}
 
-	cliente, err := handler.updateClient.Execute(
-		request.Context(), principal.Roles, principal.Subject, id,
-		body.Nombre, body.Apellido, body.DNI, body.Celular, body.Email,
-	)
+	cliente, err := handler.updateClient.Execute(request.Context(), clients.UpdateClientInput{
+		ActorRoles: principal.Roles,
+		Subject:    principal.Subject,
+		ID:         id,
+		Nombre:     body.Nombre,
+		Apellido:   body.Apellido,
+		DNI:        body.DNI,
+		Celular:    body.Celular,
+		Email:      body.Email,
+	})
 	if err != nil {
 		return err
 	}

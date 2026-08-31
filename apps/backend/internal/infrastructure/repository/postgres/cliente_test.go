@@ -17,11 +17,10 @@ func clienteStrPtr(s string) *string {
 }
 
 // TestClienteRepository is an integration test: it needs a real PostgreSQL
-// instance with migrations applied (see docs/database.md for the Supabase
-// pooler connection) and is skipped when DATABASE_URL is not set. Before
-// merging changes to this repository, run it against a real database
-// (`DATABASE_URL=... go test ./internal/infrastructure/repository/postgres/...`)
-// instead of relying on it having been skipped in CI.
+// instance with migrations applied (see docs/database.md) and is skipped
+// when DATABASE_URL is not set. CI sets it, so this runs on every pull
+// request; locally, run it with
+// `DATABASE_URL=... go test ./internal/infrastructure/repository/postgres/...`.
 func TestClienteRepository(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -75,6 +74,29 @@ func TestClienteRepository(t *testing.T) {
 		}
 		if len(found) != 0 {
 			t.Errorf("List() = %#v, want no results", found)
+		}
+	})
+
+	t.Run("search treats ILIKE wildcards as literal characters", func(t *testing.T) {
+		created, err := repository.Create(context.Background(), domain.Cliente{
+			Nombre: "Ana", Apellido: "Perez", DNI: newUUID(t),
+			UsuarioModificacion: seedUsuario(t, pool),
+		})
+		t.Cleanup(func() { deleteCliente(t, pool, created.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		for _, search := range []string{"%", "_"} {
+			found, err := repository.List(context.Background(), search)
+			if err != nil {
+				t.Fatalf("List(%q) error = %v", search, err)
+			}
+			for _, cliente := range found {
+				if cliente.ID == created.ID {
+					t.Errorf("List(%q) matched every cliente, want the wildcard treated as a literal", search)
+				}
+			}
 		}
 	})
 
