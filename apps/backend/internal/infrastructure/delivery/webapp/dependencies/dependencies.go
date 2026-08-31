@@ -7,6 +7,7 @@ import (
 
 	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/usecase/loteos"
+	"loteosapp/backend/internal/business/usecase/surveyors"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
@@ -16,13 +17,17 @@ import (
 )
 
 type Container struct {
-	CreateUserHandler      *handler.CreateUserHandler
-	CompleteProfileHandler *handler.CompleteProfileHandler
-	CreateLoteoHandler     *handler.CreateLoteoHandler
-	UpdateLoteHandler      *handler.UpdateLoteHandler
-	Pool                   *pgxpool.Pool
-	Verifier               *supabase.Verifier
-	ObjectStorage          gateway.ObjectStorage
+	CreateUserHandler         *handler.CreateUserHandler
+	CompleteProfileHandler    *handler.CompleteProfileHandler
+	CreateSurveyorHandler     *handler.CreateSurveyorHandler
+	ListSurveyorsHandler      *handler.ListSurveyorsHandler
+	UpdateSurveyorHandler     *handler.UpdateSurveyorHandler
+	DeactivateSurveyorHandler *handler.DeactivateSurveyorHandler
+	CreateLoteoHandler        *handler.CreateLoteoHandler
+	UpdateLoteHandler         *handler.UpdateLoteHandler
+	Pool                      *pgxpool.Pool
+	Verifier                  *supabase.Verifier
+	ObjectStorage             gateway.ObjectStorage
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -53,17 +58,26 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
+	createSurveyorHandler := handler.NewCreateSurveyorHandler(surveyors.NewCreateSurveyor(userRepo, adminClient))
+	listSurveyorsHandler := handler.NewListSurveyorsHandler(surveyors.NewListSurveyors(userRepo))
+	updateSurveyorHandler := handler.NewUpdateSurveyorHandler(surveyors.NewUpdateSurveyor(userRepo))
+	deactivateSurveyorHandler := handler.NewDeactivateSurveyorHandler(surveyors.NewDeactivateSurveyor(userRepo))
+
 	loteoRepo := postgres.NewLoteoRepository(pool)
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
 
 	return &Container{
-		CreateUserHandler:      createUserHandler,
-		CompleteProfileHandler: completeProfileHandler,
-		CreateLoteoHandler:     createLoteoHandler,
-		UpdateLoteHandler:      updateLoteHandler,
-		Pool:                   pool,
-		Verifier:               verifier,
-		ObjectStorage:          objectStorage,
+		CreateUserHandler:         createUserHandler,
+		CompleteProfileHandler:    completeProfileHandler,
+		CreateSurveyorHandler:     createSurveyorHandler,
+		ListSurveyorsHandler:      listSurveyorsHandler,
+		UpdateSurveyorHandler:     updateSurveyorHandler,
+		DeactivateSurveyorHandler: deactivateSurveyorHandler,
+		CreateLoteoHandler:        createLoteoHandler,
+		UpdateLoteHandler:         updateLoteHandler,
+		Pool:                      pool,
+		Verifier:                  verifier,
+		ObjectStorage:             objectStorage,
 	}, nil
 }

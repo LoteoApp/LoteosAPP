@@ -35,10 +35,14 @@ func New(ctx context.Context) (*App, error) {
 
 	mux := http.NewServeMux()
 	route.RegisterRoutes(mux, route.Handlers{
-		CreateUser:      container.CreateUserHandler,
-		CompleteProfile: container.CompleteProfileHandler,
-		CreateLoteo:     container.CreateLoteoHandler,
-		UpdateLote:      container.UpdateLoteHandler,
+		CreateUser:         container.CreateUserHandler,
+		CompleteProfile:    container.CompleteProfileHandler,
+		CreateSurveyor:     container.CreateSurveyorHandler,
+		ListSurveyors:      container.ListSurveyorsHandler,
+		UpdateSurveyor:     container.UpdateSurveyorHandler,
+		DeactivateSurveyor: container.DeactivateSurveyorHandler,
+		CreateLoteo:        container.CreateLoteoHandler,
+		UpdateLote:         container.UpdateLoteHandler,
 	}, container.Verifier)
 
 	return &App{
