@@ -8,6 +8,7 @@ import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersPage from '../features/users/pages/UsersPage'
+import SurveyorsPage from '../features/surveyors/pages/SurveyorsPage'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage'
 
 export const router = createBrowserRouter([
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: '/usuarios',
         element: <UsersPage />,
+      },
+      {
+        path: '/agrimensores',
+        element: <SurveyorsPage />,
       },
       {
         path: '/inmobiliaria',

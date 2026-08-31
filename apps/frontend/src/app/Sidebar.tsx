@@ -4,16 +4,20 @@ import {
   CalendarCheck,
   Handshake,
   LandPlot,
+  Ruler,
   UserCog,
   Users,
   Wallet,
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router'
+import { useAuth } from '../features/auth/hooks/use-auth'
+import { getUserRole, ROLE, type DomainRole } from '../shared/auth/roles'
 
 type NavItem = {
   to: string
   label: string
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  onlyForRole?: DomainRole
 }
 
 const navItems: NavItem[] = [
@@ -23,6 +27,7 @@ const navItems: NavItem[] = [
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog },
+  { to: '/agrimensores', label: 'Agrimensores', icon: Ruler, onlyForRole: ROLE.administrador },
   { to: '/inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
 ]
 
@@ -32,6 +37,10 @@ type SidebarProps = {
 }
 
 export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
+  const { user } = useAuth()
+  const role = getUserRole(user)
+  const visibleItems = navItems.filter((item) => !item.onlyForRole || item.onlyForRole === role)
+
   return (
     <aside
       id="app-sidebar"
@@ -51,7 +60,7 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
 
       <nav className="w-64 flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {visibleItems.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}

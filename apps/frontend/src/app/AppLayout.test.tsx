@@ -60,7 +60,7 @@ function stubDesktopMatchMedia(initialMatches = true) {
   }
 }
 
-function renderLayoutAt(path: string) {
+function renderLayoutAt(path: string, role: string | null = null) {
   const router = createMemoryRouter(
     [
       {
@@ -74,8 +74,15 @@ function renderLayoutAt(path: string) {
     { initialEntries: [path] },
   )
 
+  const value: AuthContextValue = role
+    ? {
+        ...authValue,
+        user: { ...authValue.user, app_metadata: { role } } as unknown as User,
+      }
+    : authValue
+
   return render(
-    <AuthContext.Provider value={authValue}>
+    <AuthContext.Provider value={value}>
       <RouterProvider router={router} />
     </AuthContext.Provider>,
   )
@@ -88,6 +95,23 @@ describe('AppLayout', () => {
     for (const label of sectionLabels) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
+  })
+
+  it('shows the agrimensores section only to an administrador', () => {
+    renderLayoutAt('/lotes', 'administrador')
+
+    expect(screen.getByRole('link', { name: 'Agrimensores' })).toHaveAttribute(
+      'href',
+      '/agrimensores',
+    )
+  })
+
+  it('hides the agrimensores section from other roles', () => {
+    renderLayoutAt('/lotes', 'agrimensor')
+
+    expect(
+      screen.queryByRole('link', { name: 'Agrimensores' }),
+    ).not.toBeInTheDocument()
   })
 
   it('marks the current section as the active tab', () => {
