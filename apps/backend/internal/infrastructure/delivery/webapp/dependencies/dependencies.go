@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/gateway"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
@@ -18,6 +19,10 @@ import (
 type Container struct {
 	CreateUserHandler      *handler.CreateUserHandler
 	CompleteProfileHandler *handler.CompleteProfileHandler
+	CreateClientHandler    *handler.CreateClientHandler
+	UpdateClientHandler    *handler.UpdateClientHandler
+	DeleteClientHandler    *handler.DeleteClientHandler
+	ListClientsHandler     *handler.ListClientsHandler
 	CreateLoteoHandler     *handler.CreateLoteoHandler
 	UpdateLoteHandler      *handler.UpdateLoteHandler
 	Pool                   *pgxpool.Pool
@@ -53,6 +58,11 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
+	clienteRepo := postgres.NewClienteRepository(pool)
+	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
+	updateClientHandler := handler.NewUpdateClientHandler(clients.NewUpdateClient(clienteRepo, userRepo))
+	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
+	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
 	loteoRepo := postgres.NewLoteoRepository(pool)
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
@@ -60,6 +70,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	return &Container{
 		CreateUserHandler:      createUserHandler,
 		CompleteProfileHandler: completeProfileHandler,
+		CreateClientHandler:    createClientHandler,
+		UpdateClientHandler:    updateClientHandler,
+		DeleteClientHandler:    deleteClientHandler,
+		ListClientsHandler:     listClientsHandler,
 		CreateLoteoHandler:     createLoteoHandler,
 		UpdateLoteHandler:      updateLoteHandler,
 		Pool:                   pool,

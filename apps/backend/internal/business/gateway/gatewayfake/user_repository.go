@@ -14,6 +14,11 @@ type UserRepository struct {
 
 	UpdateProfileCalls int
 	UpdateProfileErr   error
+
+	FindByAuthProviderIDCalls   int
+	FindByAuthProviderIDErr     error
+	FindByAuthProviderIDResult  domain.Usuario
+	FindByAuthProviderIDSubject string
 }
 
 func (fake *UserRepository) Create(_ context.Context, usuario domain.Usuario) (domain.Usuario, error) {
@@ -27,8 +32,13 @@ func (fake *UserRepository) Create(_ context.Context, usuario domain.Usuario) (d
 	return fake.Created, nil
 }
 
-func (fake *UserRepository) FindByAuthProviderID(context.Context, string) (domain.Usuario, error) {
-	return domain.Usuario{}, nil
+func (fake *UserRepository) FindByAuthProviderID(_ context.Context, authProviderID string) (domain.Usuario, error) {
+	fake.FindByAuthProviderIDCalls++
+	fake.FindByAuthProviderIDSubject = authProviderID
+	if fake.FindByAuthProviderIDErr != nil {
+		return domain.Usuario{}, fake.FindByAuthProviderIDErr
+	}
+	return fake.FindByAuthProviderIDResult, nil
 }
 
 func (fake *UserRepository) UpdateProfile(_ context.Context, authProviderID, nombre, apellido string) (domain.Usuario, error) {

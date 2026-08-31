@@ -95,8 +95,10 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 
 ## Clientes
 
-- Alta y modificación: administrativo e inmobiliaria.
+- Alta y modificación: administrador, administrativo e inmobiliaria.
 - Baja: solo administrador.
+- Listado y búsqueda: administrador, administrativo e inmobiliaria. Agrimensor
+  y escribano no acceden al directorio de clientes.
 - Sin acceso al sistema.
 
 ## Reservas

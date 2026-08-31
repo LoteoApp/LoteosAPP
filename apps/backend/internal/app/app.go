@@ -37,6 +37,10 @@ func New(ctx context.Context) (*App, error) {
 	route.RegisterRoutes(mux, route.Handlers{
 		CreateUser:      container.CreateUserHandler,
 		CompleteProfile: container.CompleteProfileHandler,
+		CreateClient:    container.CreateClientHandler,
+		UpdateClient:    container.UpdateClientHandler,
+		DeleteClient:    container.DeleteClientHandler,
+		ListClients:     container.ListClientsHandler,
 		CreateLoteo:     container.CreateLoteoHandler,
 		UpdateLote:      container.UpdateLoteHandler,
 	}, container.Verifier)
