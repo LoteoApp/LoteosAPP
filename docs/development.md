@@ -23,7 +23,9 @@ La secuencia de inicio es:
 1. `migrate` aplica las migraciones pendientes contra Supabase y termina con
    código 0.
 2. `backend` inicia la API cuando las migraciones están listas.
-3. `frontend` inicia Vite cuando el backend está saludable.
+3. `frontend` inicia Vite cuando el proceso del backend arrancó (sin esperar
+   ninguna verificación de salud; ver `docker compose logs backend` si el
+   backend no llega a conectarse a la base).
 
 Ni la autenticación ni la base de datos de la aplicación son servicios
 locales: el backend, `migrate` y el frontend hablan con el proyecto de
@@ -66,10 +68,6 @@ con cuidado, para retroceder cambios.
 
 Endpoints operativos del backend:
 
-- `GET /healthz`: confirma que el proceso HTTP está activo.
-- `GET /readyz`: confirma que el backend puede conectarse con PostgreSQL.
-- `GET /api/v1/system`: devuelve el diagnóstico del backend y la base durante
-  el desarrollo.
 - `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
   usuario nuevo en Supabase Auth y en Postgres, devuelve una contraseña
   temporal de un solo uso.

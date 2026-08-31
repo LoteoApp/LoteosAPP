@@ -24,7 +24,7 @@ func TestWithCORS(t *testing.T) {
 		t.Parallel()
 
 		var called bool
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/loteos", nil)
 		request.Header.Set("Origin", frontendOrigin)
 		recorder := httptest.NewRecorder()
 
@@ -46,7 +46,7 @@ func TestWithCORS(t *testing.T) {
 		t.Parallel()
 
 		var called bool
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/loteos", nil)
 		request.Header.Set("Origin", "http://evil.example")
 		recorder := httptest.NewRecorder()
 
@@ -84,7 +84,7 @@ func TestWithCORS(t *testing.T) {
 		t.Parallel()
 
 		var called bool
-		request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/loteos", nil)
 		recorder := httptest.NewRecorder()
 
 		server.WithCORS(frontendOrigin, okHandler(&called)).ServeHTTP(recorder, request)

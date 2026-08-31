@@ -8,7 +8,6 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/loteos"
-	"loteosapp/backend/internal/business/usecase/system"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
@@ -18,19 +17,17 @@ import (
 )
 
 type Container struct {
-	GetSystemInfoHandler          *handler.GetSystemInfoHandler
-	CheckDatabaseReadinessHandler *handler.CheckDatabaseReadinessHandler
-	CreateUserHandler             *handler.CreateUserHandler
-	CompleteProfileHandler        *handler.CompleteProfileHandler
-	CreateClientHandler           *handler.CreateClientHandler
-	UpdateClientHandler           *handler.UpdateClientHandler
-	DeleteClientHandler           *handler.DeleteClientHandler
-	ListClientsHandler            *handler.ListClientsHandler
-	CreateLoteoHandler            *handler.CreateLoteoHandler
-	UpdateLoteHandler             *handler.UpdateLoteHandler
-	Pool                          *pgxpool.Pool
-	Verifier                      *supabase.Verifier
-	ObjectStorage                 gateway.ObjectStorage
+	CreateUserHandler      *handler.CreateUserHandler
+	CompleteProfileHandler *handler.CompleteProfileHandler
+	CreateClientHandler    *handler.CreateClientHandler
+	UpdateClientHandler    *handler.UpdateClientHandler
+	DeleteClientHandler    *handler.DeleteClientHandler
+	ListClientsHandler     *handler.ListClientsHandler
+	CreateLoteoHandler     *handler.CreateLoteoHandler
+	UpdateLoteHandler      *handler.UpdateLoteHandler
+	Pool                   *pgxpool.Pool
+	Verifier               *supabase.Verifier
+	ObjectStorage          gateway.ObjectStorage
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -56,10 +53,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		return nil, err
 	}
 
-	repo := postgres.NewRepository(pool)
-	getSystemInfoHandler := handler.NewGetSystemInfoHandler(system.NewGetSystemInfo(repo))
-	checkDatabaseReadinessHandler := handler.NewCheckDatabaseReadinessHandler(system.NewCheckDatabaseReadiness(repo))
-
 	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
 	userRepo := postgres.NewUserRepository(pool)
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
@@ -75,18 +68,16 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
 
 	return &Container{
-		GetSystemInfoHandler:          getSystemInfoHandler,
-		CheckDatabaseReadinessHandler: checkDatabaseReadinessHandler,
-		CreateUserHandler:             createUserHandler,
-		CompleteProfileHandler:        completeProfileHandler,
-		CreateClientHandler:           createClientHandler,
-		UpdateClientHandler:           updateClientHandler,
-		DeleteClientHandler:           deleteClientHandler,
-		ListClientsHandler:            listClientsHandler,
-		CreateLoteoHandler:            createLoteoHandler,
-		UpdateLoteHandler:             updateLoteHandler,
-		Pool:                          pool,
-		Verifier:                      verifier,
-		ObjectStorage:                 objectStorage,
+		CreateUserHandler:      createUserHandler,
+		CompleteProfileHandler: completeProfileHandler,
+		CreateClientHandler:    createClientHandler,
+		UpdateClientHandler:    updateClientHandler,
+		DeleteClientHandler:    deleteClientHandler,
+		ListClientsHandler:     listClientsHandler,
+		CreateLoteoHandler:     createLoteoHandler,
+		UpdateLoteHandler:      updateLoteHandler,
+		Pool:                   pool,
+		Verifier:               verifier,
+		ObjectStorage:          objectStorage,
 	}, nil
 }
