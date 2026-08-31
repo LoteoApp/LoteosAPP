@@ -60,6 +60,18 @@ func TestEntityModelStateHistory(t *testing.T) {
 		t.Fatalf("apply migrations: %v", err)
 	}
 
+	var activeDxfIndexPresent bool
+	if err := db.QueryRowContext(
+		ctx,
+		"SELECT to_regclass($1) IS NOT NULL",
+		schemaName+".archivos_loteo_active_dxf_idx",
+	).Scan(&activeDxfIndexPresent); err != nil {
+		t.Fatalf("check active DXF index: %v", err)
+	}
+	if !activeDxfIndexPresent {
+		t.Fatal("active DXF unique index was not created")
+	}
+
 	seedEntityModelStateFixtures(t, ctx, db)
 
 	t.Run("seeds initial state", func(t *testing.T) {
@@ -207,8 +219,8 @@ func TestEntityModelStateHistory(t *testing.T) {
 		assertIntegrityViolation(t, err)
 	})
 
-	if _, err := provider.Down(ctx); err != nil {
-		t.Fatalf("roll back entity model migration: %v", err)
+	if _, err := provider.DownTo(ctx, 4); err != nil {
+		t.Fatalf("roll back entity model migrations: %v", err)
 	}
 	var entityModelRemoved bool
 	if err := db.QueryRowContext(ctx, "SELECT to_regclass($1) IS NULL", schemaName+".reservas").Scan(&entityModelRemoved); err != nil {

@@ -7,7 +7,7 @@ import type { DxfParseResult } from '../types'
 
 type DxfFileFieldProps = {
   fileName: string | null
-  onParsed: (result: DxfParseResult, fileName: string) => void
+  onParsed: (result: DxfParseResult, file: File) => void
   onError: (message: string) => void
   onCleared: () => void
 }
@@ -27,7 +27,7 @@ export default function DxfFileField({
 
     try {
       const result = await readDxfFile(file)
-      onParsed(result, file.name)
+      onParsed(result, file)
     } catch (error) {
       const message =
         error instanceof DxfParseError

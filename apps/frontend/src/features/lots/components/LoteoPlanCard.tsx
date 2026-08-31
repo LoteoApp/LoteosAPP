@@ -21,7 +21,7 @@ type LoteoPlanCardProps = {
   polygons: DxfPolygon[]
   visibleLayers: ReadonlySet<DxfLayer>
   onVisibleLayersChange: (layers: ReadonlySet<DxfLayer>) => void
-  onParsed: (result: DxfParseResult, fileName: string) => void
+  onParsed: (result: DxfParseResult, file: File) => void
   onError: (message: string) => void
   onCleared: () => void
   className?: string

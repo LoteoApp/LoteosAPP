@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router'
 import AppLayout from './AppLayout'
 import RequireAuth from '../features/auth/components/RequireAuth'
 import LoginPage from '../features/auth/pages/LoginPage'
-import LotsPage from '../features/lots/pages/LotsPage'
+import LotsRoute from './LotsRoute'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
@@ -32,7 +32,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/lotes',
-        element: <LotsPage />,
+        element: <LotsRoute />,
       },
       {
         path: '/clientes',

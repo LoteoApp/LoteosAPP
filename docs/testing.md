@@ -114,7 +114,7 @@ doppler run -- pnpm test:backend
 | Test | Necesita | Qué hace |
 | --- | --- | --- |
 | `postgres.TestUserRepository` | `DATABASE_URL` | SQL real contra la base de Supabase con las migraciones aplicadas. |
-| `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote y consulta de asignación. Verifica que la geometría llegue a la columna PostGIS. |
+| `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS y que exista un solo archivo DXF activo. |
 | `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
 
 Los dos tests de PostgreSQL borran lo que crearon. El test de R2 escribe en el

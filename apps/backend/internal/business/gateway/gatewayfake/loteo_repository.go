@@ -24,6 +24,16 @@ type LoteoRepository struct {
 	AssignedErr  error
 	AssignedCall int
 
+	Exists      bool
+	ExistsErr   error
+	ExistsCalls int
+
+	RecordDxfFileCalls    int
+	RecordDxfFileErr      error
+	RecordedDxfLoteoID    string
+	RecordedDxfFile       domain.NewLoteoDxfFile
+	RecordedDxfFileResult domain.LoteoDxfFile
+
 	ActorAuthProviderID string
 }
 
@@ -72,4 +82,38 @@ func (fake *LoteoRepository) IsAssignedToLoteo(context.Context, string, string) 
 	}
 
 	return fake.Assigned, nil
+}
+
+func (fake *LoteoRepository) LoteoExists(context.Context, string) (bool, error) {
+	fake.ExistsCalls++
+	if fake.ExistsErr != nil {
+		return false, fake.ExistsErr
+	}
+
+	return fake.Exists, nil
+}
+
+func (fake *LoteoRepository) RecordDxfFile(
+	_ context.Context,
+	actorAuthProviderID, loteoID string,
+	file domain.NewLoteoDxfFile,
+) (domain.LoteoDxfFile, error) {
+	fake.RecordDxfFileCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.RecordedDxfLoteoID = loteoID
+	fake.RecordedDxfFile = file
+	if fake.RecordDxfFileErr != nil {
+		return domain.LoteoDxfFile{}, fake.RecordDxfFileErr
+	}
+	if fake.RecordedDxfFileResult.ID == "" {
+		return domain.LoteoDxfFile{
+			ID:           "archivo-1",
+			StorageKey:   file.StorageKey,
+			OriginalName: file.OriginalName,
+			MimeType:     file.MimeType,
+			Sha256:       file.Sha256,
+		}, nil
+	}
+
+	return fake.RecordedDxfFileResult, nil
 }

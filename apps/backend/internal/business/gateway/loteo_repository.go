@@ -24,4 +24,15 @@ type LoteoRepository interface {
 	// answers only that question: what an assignment allows is a decision
 	// for the use case.
 	IsAssignedToLoteo(ctx context.Context, authProviderID, loteoID string) (bool, error)
+
+	// LoteoExists reports whether a loteo with that id exists and is not soft
+	// deleted. It lets a caller fail before doing work (e.g. an upload) for a
+	// loteo that can't receive it.
+	LoteoExists(ctx context.Context, loteoID string) (bool, error)
+
+	// RecordDxfFile records the original DXF of a loteo in the archivos table,
+	// superseding any DXF already recorded for it. The bytes must already be
+	// in object storage under file.StorageKey. It returns
+	// domain.ErrLoteoNotFound when loteoID names no loteo.
+	RecordDxfFile(ctx context.Context, actorAuthProviderID, loteoID string, file domain.NewLoteoDxfFile) (domain.LoteoDxfFile, error)
 }

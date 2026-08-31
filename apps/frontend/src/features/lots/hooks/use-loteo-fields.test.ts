@@ -10,7 +10,6 @@ describe('useLoteoFields', () => {
       name: '',
       location: '',
       description: '',
-      agencyIds: [],
     })
   })
 
@@ -22,7 +21,6 @@ describe('useLoteoFields', () => {
         name: 'Las Acacias',
         location: 'Cañuelas',
         description: 'Segunda etapa',
-        agencyIds: ['inm-altamira'],
       })
     })
 
@@ -30,7 +28,6 @@ describe('useLoteoFields', () => {
       name: 'Las Acacias',
       location: 'Cañuelas',
       description: 'Segunda etapa',
-      agencyIds: ['inm-altamira'],
     })
   })
 
@@ -42,7 +39,6 @@ describe('useLoteoFields', () => {
         name: 'Las Acacias',
         location: 'Cañuelas',
         description: 'Segunda etapa',
-        agencyIds: ['inm-altamira'],
       })
     })
     act(() => {
@@ -53,7 +49,6 @@ describe('useLoteoFields', () => {
       name: '',
       location: '',
       description: '',
-      agencyIds: [],
     })
   })
 })

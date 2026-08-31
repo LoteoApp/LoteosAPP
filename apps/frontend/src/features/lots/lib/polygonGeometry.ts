@@ -83,7 +83,7 @@ function segmentsCrossProperly(p1: DxfPoint, p2: DxfPoint, p3: DxfPoint, p4: Dxf
   return o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4
 }
 
-function pointInPolygon(point: DxfPoint, vertices: DxfPoint[]): boolean {
+export function pointInPolygon(point: DxfPoint, vertices: DxfPoint[]): boolean {
   let inside = false
   for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
     const vi = vertices[i]
@@ -101,7 +101,7 @@ function pointInPolygon(point: DxfPoint, vertices: DxfPoint[]): boolean {
 // property line), which makes point-in-polygon undefined right where it's
 // evaluated. The vertex average stays clear of that edge case for the
 // convex, simple parcel shapes this validates.
-function centroid(vertices: DxfPoint[]): DxfPoint {
+export function centroid(vertices: DxfPoint[]): DxfPoint {
   let sumX = 0
   let sumY = 0
   for (const { x, y } of vertices) {

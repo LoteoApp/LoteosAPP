@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -79,6 +80,25 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 		}
 		if assigned {
 			t.Error("IsAssignedToLoteo() should not report an assignment it could not read")
+		}
+	})
+
+	t.Run("loteo exists", func(t *testing.T) {
+		// Same reasoning: an outage must not read as "the loteo is gone".
+		exists, err := repository.LoteoExists(ctx, newUUID(t))
+		if err == nil {
+			t.Error("LoteoExists() should fail when the database is unreachable")
+		}
+		if exists {
+			t.Error("LoteoExists() should not report existence it could not read")
+		}
+	})
+
+	t.Run("record dxf file", func(t *testing.T) {
+		if _, err := repository.RecordDxfFile(ctx, actor, newUUID(t), domain.NewLoteoDxfFile{
+			StorageKey: "loteos/x/original.dxf", OriginalName: "plano.dxf",
+		}); err == nil {
+			t.Error("RecordDxfFile() should fail when the database is unreachable")
 		}
 	})
 }
@@ -321,6 +341,153 @@ func TestLoteoRepository(t *testing.T) {
 			t.Error("IsAssignedToLoteo() should be false for an id that can't name a loteo")
 		}
 	})
+
+	t.Run("loteo exists", func(t *testing.T) {
+		loteo, err := repository.Create(context.Background(), actor, domain.NewLoteo{Name: "Loteo " + newUUID(t)})
+		t.Cleanup(func() { deleteLoteo(t, pool, loteo.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		for name, tc := range map[string]struct {
+			id   string
+			want bool
+		}{
+			"a real loteo": {loteo.ID, true},
+			"unknown uuid": {newUUID(t), false},
+			"not a uuid":   {"'; DROP TABLE loteos; --", false},
+			"empty":        {"", false},
+		} {
+			t.Run(name, func(t *testing.T) {
+				got, err := repository.LoteoExists(context.Background(), tc.id)
+				if err != nil {
+					t.Fatalf("LoteoExists() error = %v", err)
+				}
+				if got != tc.want {
+					t.Fatalf("LoteoExists(%q) = %v, want %v", tc.id, got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("records the dxf file", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		key := "loteos/" + loteo.ID + "/original.dxf"
+
+		file, err := repository.RecordDxfFile(context.Background(), actor, loteo.ID, domain.NewLoteoDxfFile{
+			StorageKey: key, OriginalName: "plano.dxf", MimeType: "application/dxf", Sha256: "abc123",
+		})
+		if err != nil {
+			t.Fatalf("RecordDxfFile() error = %v", err)
+		}
+		if file.ID == "" || file.CreatedAt.IsZero() {
+			t.Errorf("RecordDxfFile() = %#v, want an id and a fecha_creacion", file)
+		}
+		if file.StorageKey != key || file.OriginalName != "plano.dxf" || file.Sha256 != "abc123" {
+			t.Errorf("RecordDxfFile() = %#v", file)
+		}
+
+		var (
+			total       int
+			categoria   string
+			storageKey  string
+			original    string
+			hash        string
+			userPresent bool
+		)
+		if err := pool.QueryRow(context.Background(), `
+			SELECT count(*) FILTER (WHERE fecha_baja IS NULL),
+			       max(categoria), max(storage_key), max(nombre_original), max(hash_sha256),
+			       bool_and(usuario_modificacion IS NOT NULL)
+			FROM archivos WHERE loteo_id = $1::uuid
+		`, loteo.ID).Scan(&total, &categoria, &storageKey, &original, &hash, &userPresent); err != nil {
+			t.Fatalf("read archivos: %v", err)
+		}
+		if total != 1 || categoria != "dxf" || storageKey != key || original != "plano.dxf" || hash != "abc123" || !userPresent {
+			t.Errorf("archivos row: total=%d categoria=%q key=%q original=%q hash=%q user=%v",
+				total, categoria, storageKey, original, hash, userPresent)
+		}
+	})
+
+	t.Run("recording again supersedes the previous dxf file", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		key := "loteos/" + loteo.ID + "/original.dxf"
+
+		for _, name := range []string{"primero.dxf", "segundo.dxf"} {
+			if _, err := repository.RecordDxfFile(context.Background(), actor, loteo.ID, domain.NewLoteoDxfFile{
+				StorageKey: key, OriginalName: name, MimeType: "application/dxf", Sha256: name,
+			}); err != nil {
+				t.Fatalf("RecordDxfFile(%q) error = %v", name, err)
+			}
+		}
+
+		var active, all int
+		if err := pool.QueryRow(context.Background(), `
+			SELECT count(*) FILTER (WHERE fecha_baja IS NULL), count(*)
+			FROM archivos WHERE loteo_id = $1::uuid AND categoria = 'dxf'
+		`, loteo.ID).Scan(&active, &all); err != nil {
+			t.Fatalf("read archivos: %v", err)
+		}
+		if active != 1 || all != 2 {
+			t.Fatalf("archivos: %d active, %d total, want 1 and 2", active, all)
+		}
+	})
+
+	t.Run("concurrent recordings leave one active dxf file", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		files := []domain.NewLoteoDxfFile{
+			{StorageKey: "loteos/" + loteo.ID + "/dxf/first.dxf", OriginalName: "first.dxf", MimeType: "application/dxf", Sha256: "first"},
+			{StorageKey: "loteos/" + loteo.ID + "/dxf/second.dxf", OriginalName: "second.dxf", MimeType: "application/dxf", Sha256: "second"},
+		}
+
+		start := make(chan struct{})
+		errorsByCall := make(chan error, len(files))
+		var workers sync.WaitGroup
+		for _, file := range files {
+			workers.Add(1)
+			go func(file domain.NewLoteoDxfFile) {
+				defer workers.Done()
+				<-start
+				_, err := repository.RecordDxfFile(context.Background(), actor, loteo.ID, file)
+				errorsByCall <- err
+			}(file)
+		}
+		close(start)
+		workers.Wait()
+		close(errorsByCall)
+		for err := range errorsByCall {
+			if err != nil {
+				t.Fatalf("RecordDxfFile() error = %v", err)
+			}
+		}
+
+		var active, all int
+		if err := pool.QueryRow(context.Background(), `
+			SELECT count(*) FILTER (WHERE fecha_baja IS NULL), count(*)
+			FROM archivos WHERE loteo_id = $1::uuid AND categoria = 'dxf'
+		`, loteo.ID).Scan(&active, &all); err != nil {
+			t.Fatalf("read archivos: %v", err)
+		}
+		if active != 1 || all != 2 {
+			t.Fatalf("archivos: %d active, %d total, want 1 and 2", active, all)
+		}
+	})
+
+	t.Run("recording for an unknown loteo returns not found", func(t *testing.T) {
+		for name, id := range map[string]string{
+			"unknown uuid": newUUID(t),
+			"not a uuid":   "nope",
+		} {
+			t.Run(name, func(t *testing.T) {
+				_, err := repository.RecordDxfFile(context.Background(), actor, id, domain.NewLoteoDxfFile{
+					StorageKey: "loteos/x/original.dxf", OriginalName: "plano.dxf",
+				})
+				if !errors.Is(err, domain.ErrLoteoNotFound) {
+					t.Fatalf("RecordDxfFile() error = %v, want %v", err, domain.ErrLoteoNotFound)
+				}
+			})
+		}
+	})
 }
 
 // assertDxfEntities checks what only a real database can show: that the rings
@@ -441,6 +608,7 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 
 	statements := []string{
 		`DELETE FROM usuario_loteos WHERE loteo_id = $1::uuid`,
+		`DELETE FROM archivos WHERE loteo_id = $1::uuid`,
 		`DELETE FROM lotes WHERE loteo_id = $1::uuid`,
 		`DELETE FROM manzana_calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM calles WHERE loteo_id = $1::uuid`,

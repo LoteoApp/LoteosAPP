@@ -19,6 +19,7 @@ type Container struct {
 	CreateUserHandler      *handler.CreateUserHandler
 	CompleteProfileHandler *handler.CompleteProfileHandler
 	CreateLoteoHandler     *handler.CreateLoteoHandler
+	StoreLoteoDxfHandler   *handler.StoreLoteoDxfHandler
 	UpdateLoteHandler      *handler.UpdateLoteHandler
 	Pool                   *pgxpool.Pool
 	Verifier               *supabase.Verifier
@@ -55,12 +56,14 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 
 	loteoRepo := postgres.NewLoteoRepository(pool)
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
+	storeLoteoDxfHandler := handler.NewStoreLoteoDxfHandler(loteos.NewStoreLoteoDxf(loteoRepo, objectStorage))
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
 
 	return &Container{
 		CreateUserHandler:      createUserHandler,
 		CompleteProfileHandler: completeProfileHandler,
 		CreateLoteoHandler:     createLoteoHandler,
+		StoreLoteoDxfHandler:   storeLoteoDxfHandler,
 		UpdateLoteHandler:      updateLoteHandler,
 		Pool:                   pool,
 		Verifier:               verifier,

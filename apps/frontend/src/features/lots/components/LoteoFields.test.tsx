@@ -8,7 +8,6 @@ const empty: LoteoFieldValues = {
   name: '',
   location: '',
   description: '',
-  agencyIds: [],
 }
 
 function Harness() {
@@ -17,18 +16,19 @@ function Harness() {
 }
 
 describe('LoteoFields', () => {
-  it('lets the user fill name, location, inmobiliarias and description', async () => {
+  it('lets the user fill the available fields and keeps mock agencies disabled', async () => {
     const user = userEvent.setup()
     render(<Harness />)
 
     await user.type(screen.getByLabelText('Nombre'), 'San Pedro')
     await user.type(screen.getByLabelText('Ubicación/Ciudad'), 'Paraná')
-    await user.click(screen.getByRole('button', { name: 'Seleccionar todas' }))
     await user.type(screen.getByLabelText('Descripción'), 'Frente al río')
 
     expect(screen.getByLabelText('Nombre')).toHaveValue('San Pedro')
     expect(screen.getByLabelText('Ubicación/Ciudad')).toHaveValue('Paraná')
-    expect(screen.getByRole('button', { name: 'Quitar todas' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Seleccionar todas' })).toBeDisabled()
+    expect(screen.getByLabelText('Inmobiliarias')).toBeDisabled()
+    expect(screen.getByText(/catálogo de inmobiliarias esté conectado/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Descripción')).toHaveValue('Frente al río')
   })
 })

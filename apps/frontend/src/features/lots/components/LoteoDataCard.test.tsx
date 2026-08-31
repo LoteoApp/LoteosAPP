@@ -9,7 +9,6 @@ const empty: LoteoFieldValues = {
   name: '',
   location: '',
   description: '',
-  agencyIds: [],
 }
 
 function Harness() {

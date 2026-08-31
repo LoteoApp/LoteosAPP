@@ -7,7 +7,6 @@ export type LoteoFieldValues = {
   name: string
   location: string
   description: string
-  agencyIds: string[]
 }
 
 type LoteoFieldsProps = {
@@ -44,10 +43,7 @@ export default function LoteoFields({ values, onChange }: LoteoFieldsProps) {
         />
       </Field>
 
-      <AgenciesField
-        selectedIds={values.agencyIds}
-        onChange={(agencyIds) => update('agencyIds', agencyIds)}
-      />
+      <AgenciesField selectedIds={[]} disabled />
 
       <Field>
         <FieldLabel htmlFor="loteo-description">Descripción</FieldLabel>

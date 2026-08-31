@@ -17,7 +17,7 @@ type StoredObject struct {
 // reads files without depending on a concrete provider.
 //
 // A key is a slash-separated path relative to the bucket root, without a
-// leading slash (e.g. "loteos/42/original.dxf"). Implementations reject a
+	// leading slash (e.g. "loteos/42/dxf/version.dxf"). Implementations reject a
 // key that is empty, absolute, longer than the provider allows, or that
 // contains a "." or ".." segment, with domain.ErrInvalidObjectKey.
 type ObjectStorage interface {

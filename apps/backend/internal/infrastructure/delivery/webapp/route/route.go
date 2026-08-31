@@ -18,6 +18,10 @@ const (
 	// touches one row.
 	createLoteoTimeout = 60 * time.Second
 
+	// Uploading the original DXF streams up to domain.MaxDxfFileBytes to R2
+	// before writing one row, so it gets the same room as the alta.
+	uploadDxfTimeout = 60 * time.Second
+
 	// MaxHandlerTimeout is the longest any route registered here may take.
 	// The HTTP server's own deadlines are derived from it, so a handler that
 	// runs to its limit can still write its response instead of having the
@@ -29,6 +33,7 @@ type Handlers struct {
 	CreateUser      *handler.CreateUserHandler
 	CompleteProfile *handler.CompleteProfileHandler
 	CreateLoteo     *handler.CreateLoteoHandler
+	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
 }
 
@@ -37,5 +42,6 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(handlers.CreateUser, usersTimeout)))
 	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(handlers.CompleteProfile, usersTimeout)))
 	mux.Handle("POST /api/v1/loteos", requireAuth(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
+	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", requireAuth(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", requireAuth(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
 }

@@ -19,9 +19,10 @@ type ObjectStorage struct {
 	mu      sync.Mutex
 	objects map[string]storedObject
 
-	PutCalls    int
-	GetCalls    int
-	DeleteCalls int
+	PutCalls         int
+	GetCalls         int
+	DeleteCalls      int
+	DeleteContextErr error
 }
 
 type storedObject struct {
@@ -72,11 +73,12 @@ func (fake *ObjectStorage) Get(_ context.Context, key string) (*gateway.StoredOb
 	}, nil
 }
 
-func (fake *ObjectStorage) Delete(_ context.Context, key string) error {
+func (fake *ObjectStorage) Delete(ctx context.Context, key string) error {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
 
 	fake.DeleteCalls++
+	fake.DeleteContextErr = ctx.Err()
 	if fake.DeleteErr != nil {
 		return fake.DeleteErr
 	}

@@ -292,6 +292,92 @@ func (repository *LoteoRepository) IsAssignedToLoteo(ctx context.Context, authPr
 	return assigned, nil
 }
 
+func (repository *LoteoRepository) LoteoExists(ctx context.Context, loteoID string) (bool, error) {
+	var exists bool
+
+	err := repository.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL
+		)
+	`, loteoID).Scan(&exists)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return exists, nil
+}
+
+// RecordDxfFile supersedes any DXF already recorded for the loteo and inserts
+// the new one in a single transaction, so a reader never sees two active DXF
+// rows for one loteo. The object at file.StorageKey is written by the caller
+// before this runs.
+func (repository *LoteoRepository) RecordDxfFile(
+	ctx context.Context,
+	actorAuthProviderID, loteoID string,
+	file domain.NewLoteoDxfFile,
+) (domain.LoteoDxfFile, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return domain.LoteoDxfFile{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var present int
+	err = tx.QueryRow(ctx, `
+		SELECT 1 FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL
+		FOR UPDATE
+	`, loteoID).Scan(&present)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.LoteoDxfFile{}, domain.ErrLoteoNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.LoteoDxfFile{}, domain.ErrLoteoNotFound
+		}
+		return domain.LoteoDxfFile{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE archivos
+		SET fecha_baja = now(), fecha_modificacion = now()
+		WHERE loteo_id = $1::uuid AND categoria = 'dxf' AND fecha_baja IS NULL
+	`, loteoID); err != nil {
+		return domain.LoteoDxfFile{}, err
+	}
+
+	var recorded domain.LoteoDxfFile
+	err = tx.QueryRow(ctx, `
+		INSERT INTO archivos (
+			loteo_id, nombre, nombre_original, categoria,
+			storage_key, mime_type, hash_sha256, usuario_modificacion, fecha
+		)
+		VALUES (
+			$1::uuid, 'original.dxf', NULLIF($2, ''), 'dxf',
+			$3, NULLIF($4, ''), NULLIF($5, ''),
+			(SELECT id FROM usuarios WHERE auth_provider_id = $6::uuid), now()
+		)
+		RETURNING id::text, storage_key, COALESCE(nombre_original, ''),
+		          COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+	`, loteoID, file.OriginalName, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
+		&recorded.ID, &recorded.StorageKey, &recorded.OriginalName,
+		&recorded.MimeType, &recorded.Sha256, &recorded.CreatedAt,
+	)
+	if err != nil {
+		return domain.LoteoDxfFile{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.LoteoDxfFile{}, err
+	}
+
+	return recorded, nil
+}
+
 // polygonWKT renders a ring as WKT. The ring arrives normalized, with each
 // vertex listed once, and WKT closes a ring by repeating the first vertex.
 func polygonWKT(polygon domain.Polygon) string {

@@ -38,6 +38,7 @@ func New(ctx context.Context) (*App, error) {
 		CreateUser:      container.CreateUserHandler,
 		CompleteProfile: container.CompleteProfileHandler,
 		CreateLoteo:     container.CreateLoteoHandler,
+		StoreLoteoDxf:   container.StoreLoteoDxfHandler,
 		UpdateLote:      container.UpdateLoteHandler,
 	}, container.Verifier)
 
