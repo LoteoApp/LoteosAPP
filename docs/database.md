@@ -125,7 +125,8 @@ migrations/
 ├── 00002_create_usuarios.sql
 ├── 00003_rename_keycloak_id_to_auth_provider_id.sql
 ├── 00004_enable_rls_on_public_tables.sql
-└── 00005_create_entity_model.sql
+├── 00005_create_entity_model.sql
+└── 00006_add_usuarios_rol_activo_idx.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -144,6 +145,14 @@ migraciones ya aplicadas.
   en el historial. Un trigger bloquea el UPDATE directo, las filas del
   historial rechazan UPDATE, DELETE y TRUNCATE, y el alta crea la primera
   fila `activa`.
+
+`00006` agrega `usuarios_rol_activo_idx`, un índice parcial sobre
+`usuarios (rol) WHERE fecha_baja IS NULL`, que es la forma en que el
+[ABM de agrimensores](architecture.md#abm-de-agrimensores) lista los usuarios
+de un rol. La columna `fecha_baja` de `usuarios` ya venía de `00005`: la baja
+de un usuario es lógica (`fecha_baja IS NULL` = activo) porque borrar la fila
+rompería las FK de auditoría que la nombran (`usuario_modificacion`,
+`usuario_loteos`, `reservas`, `ventas`).
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 

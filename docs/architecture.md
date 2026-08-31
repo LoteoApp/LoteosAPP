@@ -55,6 +55,12 @@ apps/backend/
 │   │   └── usecase/
 │   │       ├── users/
 │   │       │   └── create_user.go
+│   │       ├── surveyors/
+│   │       │   ├── create_surveyor.go
+│   │       │   ├── list_surveyors.go
+│   │       │   ├── update_surveyor.go
+│   │       │   ├── deactivate_surveyor.go
+│   │       │   └── errors.go
 │   │       └── loteos/
 │   │           ├── create_loteo.go
 │   │           ├── update_lote.go
@@ -81,11 +87,19 @@ apps/backend/
 │               ├── dto/
 │               │   ├── users/
 │               │   │   └── create_user.go
+│               │   ├── surveyors/
+│               │   │   ├── create_surveyor.go
+│               │   │   ├── list_surveyors.go
+│               │   │   └── update_surveyor.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
 │               │       └── update_lote.go
 │               ├── handler/
 │               │   ├── create_user.go
+│               │   ├── create_surveyor.go
+│               │   ├── list_surveyors.go
+│               │   ├── update_surveyor.go
+│               │   ├── deactivate_surveyor.go
 │               │   ├── create_loteo.go
 │               │   └── update_lote.go
 │               ├── middleware/
@@ -208,13 +222,16 @@ flowchart LR
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]
+    handler --> usecaseSurveyors["business/usecase/surveyors"]
     handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
     usecaseUsers --> gateway
+    usecaseSurveyors --> gateway
     usecaseLoteos --> gateway
     usecaseUsers --> domain["business/domain"]
+    usecaseSurveyors --> domain
     usecaseLoteos --> domain
     response --> domain
     gateway --> domain
@@ -242,6 +259,42 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
   "message": "El lote solicitado no existe"
 }
 ```
+
+### ABM de agrimensores
+
+Un agrimensor no es una entidad propia: es un usuario con `rol = 'agrimensor'`
+(`docs/domain.md` § Usuarios y roles). El ABM vive bajo `/api/v1/agrimensores`
+y es exclusivo del rol **administrador**:
+
+- `POST /api/v1/agrimensores` — alta con nombre, apellido y email. Crea la
+  cuenta en Supabase Auth y la fila local; si la persistencia falla después,
+  borra la cuenta recién creada para no dejarla huérfana.
+- `GET /api/v1/agrimensores` — listado. Por defecto devuelve solo los activos;
+  con `?incluirBajas=true` incluye los dados de baja, para que la pantalla
+  pueda mostrar el histórico sin que el default arrastre gente que ya no opera.
+- `PATCH /api/v1/agrimensores/{id}` — modificación parcial de nombre y
+  apellido.
+- `DELETE /api/v1/agrimensores/{id}` — baja lógica.
+
+Decisiones de este recorte:
+
+- **La baja es lógica y se apoya en `usuarios.fecha_baja`**, la columna que ya
+  existía desde `migrations/00005_create_entity_model.sql`. Borrar la fila
+  rompería las FK de auditoría que la nombran (`usuario_modificacion`,
+  `usuario_loteos`, `reservas`, `ventas`). `fecha_baja IS NULL` significa
+  activo. La migración nueva (`00006`) agrega solo el índice parcial que
+  necesita el listado por rol.
+- **El email no se puede editar.** Identifica la cuenta en Supabase Auth;
+  cambiarlo ahí es otra operación, y un `PATCH` que tocara solo la fila local
+  dejaría las dos fuentes desincronizadas.
+- **Un usuario de otro rol se reporta como agrimensor inexistente**
+  (`surveyor_not_found`), así estas rutas no sirven para editar ni dar de baja,
+  por ejemplo, a un administrador, ni para averiguar qué id pertenece a quién.
+- **La asignación de loteos (`usuario_loteos`) queda afuera**
+  ([#21](https://github.com/LoteoApp/LoteosAPP/issues/21)), igual que las
+  acciones que el rol puede ejecutar sobre los loteos asignados
+  ([#24](https://github.com/LoteoApp/LoteosAPP/issues/24) y
+  [#27](https://github.com/LoteoApp/LoteosAPP/issues/27)).
 
 ### Alta de loteo y persistencia de la geometría
 
@@ -446,20 +499,32 @@ apps/frontend/src/
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
-│   └── lots/
+│   ├── lots/
+│   │   ├── api/
+│   │   │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│   │   ├── components/                # Formulario, cards y visor DXF
+│   │   ├── hooks/
+│   │   │   ├── use-loteo-fields.ts
+│   │   │   └── use-dxf-plan.ts
+│   │   ├── lib/                       # Parseo DXF a geometría SVG
+│   │   ├── pages/
+│   │   │   └── LotsPage.tsx           # Alta de loteo, en /lotes
+│   │   └── types.ts
+│   └── surveyors/
 │       ├── api/
-│       │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
-│       ├── components/                # Formulario, cards y visor DXF
-│       ├── hooks/
-│       │   ├── use-loteo-fields.ts
-│       │   └── use-dxf-plan.ts
-│       ├── lib/                       # Parseo DXF a geometría SVG
+│       │   └── surveyors.ts           # Cliente de /api/v1/agrimensores
+│       ├── components/
+│       │   └── SurveyorForm.tsx
+│       ├── lib/
+│       │   └── resolveFormView.ts
 │       ├── pages/
-│       │   └── LotsPage.tsx           # Alta de loteo, en /lotes
+│       │   └── SurveyorsPage.tsx      # ABM de agrimensores, en /agrimensores
 │       └── types.ts
 ├── shared/
 │   ├── api/
 │   │   └── client.ts
+│   ├── auth/
+│   │   └── roles.ts                   # Roles de dominio y lectura del rol del usuario
 │   ├── config/
 │   │   └── env.ts
 │   ├── ui/

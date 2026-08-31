@@ -84,6 +84,26 @@ quien asigna loteos y permisos.
 
 Los clientes no son usuarios del sistema.
 
+### ABM de agrimensores
+
+El agrimensor no es una entidad aparte: es un usuario con `rol = 'agrimensor'`.
+Su alta, listado, modificación y baja son exclusivas del administrador, desde
+la sección **Agrimensores** (`/agrimensores`).
+
+- **Alta**: nombre, apellido y email. El sistema crea la cuenta y devuelve una
+  contraseña temporal de un solo uso, que el administrador le pasa al
+  agrimensor.
+- **Listado**: por defecto solo los activos; un filtro permite ver también los
+  dados de baja.
+- **Modificación**: nombre y apellido. El email identifica la cuenta y no se
+  cambia desde acá.
+- **Baja**: lógica (`usuarios.fecha_baja`). El agrimensor dado de baja deja de
+  operar y de ser editable, pero se conserva su fila para no romper el
+  historial ni las referencias de auditoría.
+
+La asignación de loteos al agrimensor (`usuario_loteos`) es un paso aparte, ver
+[Gestión de roles y permisos](#gestión-de-roles-y-permisos).
+
 ### Gestión de roles y permisos
 
 Módulo de configuración exclusivo del administrador para definir, por usuario:

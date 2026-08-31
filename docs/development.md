@@ -73,6 +73,15 @@ Endpoints operativos del backend:
   temporal de un solo uso.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
+- `POST /api/v1/agrimensores` (requiere rol `administrador`): da de alta un
+  agrimensor (nombre, apellido y email) en Supabase Auth y en Postgres, y
+  devuelve una contraseña temporal de un solo uso.
+- `GET /api/v1/agrimensores` (requiere rol `administrador`): lista los
+  agrimensores activos; con `?incluirBajas=true` incluye los dados de baja.
+- `PATCH /api/v1/agrimensores/{id}` (requiere rol `administrador`): modifica
+  nombre y/o apellido de un agrimensor activo.
+- `DELETE /api/v1/agrimensores/{id}` (requiere rol `administrador`): da de
+  baja lógica al agrimensor (`usuarios.fecha_baja`); la fila se conserva.
 
 ### Content-Security-Policy del frontend
 
