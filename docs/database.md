@@ -125,7 +125,8 @@ migrations/
 ├── 00002_create_usuarios.sql
 ├── 00003_rename_keycloak_id_to_auth_provider_id.sql
 ├── 00004_enable_rls_on_public_tables.sql
-└── 00005_create_entity_model.sql
+├── 00005_create_entity_model.sql
+└── 00006_add_inmobiliarias_cuit_idx.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -144,6 +145,16 @@ migraciones ya aplicadas.
   en el historial. Un trigger bloquea el UPDATE directo, las filas del
   historial rechazan UPDATE, DELETE y TRUNCATE, y el alta crea la primera
   fila `activa`.
+
+`00006` agrega `inmobiliarias_cuit_idx`, un índice único parcial sobre
+`inmobiliarias (cuit) WHERE cuit IS NOT NULL AND fecha_baja IS NULL`: dos
+agencias activas no pueden compartir CUIT, pero el CUIT sigue siendo opcional
+y se puede reutilizar después de una baja. El
+[ABM de inmobiliarias](architecture.md#abm-de-inmobiliarias) normaliza el CUIT
+a 11 dígitos antes de persistirlo, que es lo que hace comparable el índice. La
+columna `fecha_baja` ya venía de `00005`: la baja de una inmobiliaria es
+lógica (`fecha_baja IS NULL` = activa) porque borrar la fila rompería las FK
+que la nombran (`usuarios.inmobiliaria_id`, `inmobiliaria_loteos`).
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 

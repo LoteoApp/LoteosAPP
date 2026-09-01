@@ -43,18 +43,34 @@ apps/backend/
 │   ├── business/
 │   │   ├── domain/
 │   │   │   ├── object.go
+│   │   │   ├── cliente.go
+│   │   │   ├── inmobiliaria.go
 │   │   │   └── usuario.go
 │   │   ├── gateway/
 │   │   │   ├── object_storage.go
 │   │   │   ├── usuario_repository.go
+│   │   │   ├── cliente_repository.go
+│   │   │   ├── inmobiliaria_repository.go
 │   │   │   ├── loteo_repository.go
 │   │   │   └── gatewayfake/
 │   │   │       ├── object_storage.go
 │   │   │       ├── user_repository.go
+│   │   │       ├── cliente_repository.go
+│   │   │       ├── inmobiliaria_repository.go
 │   │   │       └── loteo_repository.go
 │   │   └── usecase/
 │   │       ├── users/
 │   │       │   └── create_user.go
+│   │       ├── clients/
+│   │       │   ├── create_client.go
+│   │       │   ├── list_clients.go
+│   │       │   ├── update_client.go
+│   │       │   └── delete_client.go
+│   │       ├── agencies/
+│   │       │   ├── create_agency.go
+│   │       │   ├── list_agencies.go
+│   │       │   ├── update_agency.go
+│   │       │   └── delete_agency.go
 │   │       └── loteos/
 │   │           ├── create_loteo.go
 │   │           ├── store_loteo_dxf.go
@@ -71,6 +87,8 @@ apps/backend/
 │       │   └── postgres/
 │       │       ├── pool.go
 │       │       ├── usuario.go
+│       │       ├── cliente.go
+│       │       ├── inmobiliaria.go
 │       │       └── loteo.go
 │       ├── storage/
 │       │   └── r2/
@@ -82,12 +100,24 @@ apps/backend/
 │               ├── dto/
 │               │   ├── users/
 │               │   │   └── create_user.go
+│               │   ├── clients/
+│               │   │   ├── create_client.go
+│               │   │   ├── list_clients.go
+│               │   │   └── update_client.go
+│               │   ├── agencies/
+│               │   │   ├── create_agency.go
+│               │   │   ├── list_agencies.go
+│               │   │   └── update_agency.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
 │               │       ├── store_loteo_dxf.go
 │               │       └── update_lote.go
 │               ├── handler/
 │               │   ├── create_user.go
+│               │   ├── create_agency.go
+│               │   ├── list_agencies.go
+│               │   ├── update_agency.go
+│               │   ├── delete_agency.go
 │               │   ├── create_loteo.go
 │               │   ├── store_loteo_dxf.go
 │               │   └── update_lote.go
@@ -213,15 +243,18 @@ flowchart LR
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]
     handler --> usecaseClients["business/usecase/clients"]
+    handler --> usecaseAgencies["business/usecase/agencies"]
     handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
     usecaseUsers --> gateway
     usecaseClients --> gateway
+    usecaseAgencies --> gateway
     usecaseLoteos --> gateway
     usecaseUsers --> domain["business/domain"]
     usecaseClients --> domain
+    usecaseAgencies --> domain
     usecaseLoteos --> domain
     response --> domain
     gateway --> domain
@@ -249,6 +282,44 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
   "message": "El lote solicitado no existe"
 }
 ```
+
+### ABM de inmobiliarias
+
+Una inmobiliaria es una agencia externa asociada a los loteos
+(`docs/domain.md` § Inmobiliarias); no es un usuario. La tabla
+`inmobiliarias` ya existía desde `migrations/00005_create_entity_model.sql`.
+El ABM vive bajo `/api/v1/inmobiliarias`:
+
+- `POST /api/v1/inmobiliarias` — alta con razón social, CUIT, teléfono y
+  email. Solo **administrador**.
+- `GET /api/v1/inmobiliarias` — listado de las activas, con búsqueda por razón
+  social o CUIT en `?q=`. **Administrador** y **administrativo**: el catálogo
+  es lo que se elige al operar un loteo, y no expone datos de personas.
+- `PATCH /api/v1/inmobiliarias/{id}` — modificación parcial. Solo
+  **administrador**.
+- `DELETE /api/v1/inmobiliarias/{id}` — baja lógica. Solo **administrador**.
+
+Decisiones de este recorte:
+
+- **La baja es lógica y se apoya en `inmobiliarias.fecha_baja`.** Borrar la
+  fila rompería las FK que la nombran (`usuarios.inmobiliaria_id`,
+  `inmobiliaria_loteos`). `fecha_baja IS NULL` significa activa, y es lo único
+  que devuelve el listado.
+- **El CUIT se guarda como 11 dígitos, sin separadores.** Se normaliza en el
+  caso de uso antes de persistir; si no, `30-71234567-8` y `30712345678`
+  entrarían como dos agencias distintas y el índice único de la migración
+  `00006` no serviría de nada. Por eso el listado también normaliza un `?q=`
+  que sea un CUIT antes de buscarlo. No se valida el dígito verificador: la
+  intención es rechazar tipeos y texto libre, no validar contra AFIP.
+- **El `PATCH` no puede vaciar un campo opcional a null.** Un campo ausente
+  queda igual y uno en blanco se lee como ausente, como en el ABM de clientes;
+  limpiar CUIT, teléfono o email es una extensión futura, no algo que el API
+  necesite hoy.
+- **La asociación con loteos (`inmobiliaria_loteos`) queda afuera**, junto con
+  conectar el selector de agencias del alta de loteo
+  (`features/lots/api/list-agencies.ts`, todavía un catálogo mock) y la
+  asignación de usuarios con rol inmobiliaria a su agencia
+  (`usuarios.inmobiliaria_id`).
 
 ### Alta de loteo y persistencia de la geometría
 
@@ -473,9 +544,22 @@ apps/frontend/src/
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
+│   ├── agencies/
+│   │   ├── api/
+│   │   │   └── agencies.ts        # Cliente de /api/v1/inmobiliarias
+│   │   ├── components/
+│   │   │   └── AgencyForm.tsx
+│   │   ├── hooks/
+│   │   │   └── use-agencies.ts
+│   │   ├── lib/
+│   │   │   ├── cuit.ts            # Normalización y validación del CUIT
+│   │   │   └── resolveFormView.ts
+│   │   ├── pages/
+│   │   │   └── AgenciesPage.tsx   # ABM de inmobiliarias, en /inmobiliarias
+│   │   └── types.ts
 │   └── lots/
 │       ├── api/
-│       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       │   ├── list-agencies.ts       # Catálogo mock hasta conectar el GET de inmobiliarias
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
 │       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
 │       ├── components/                # Formulario, cards y visor DXF
@@ -490,6 +574,8 @@ apps/frontend/src/
 ├── shared/
 │   ├── api/
 │   │   └── client.ts
+│   ├── auth/
+│   │   └── roles.ts               # Roles de dominio y lectura del rol del usuario
 │   ├── config/
 │   │   └── env.ts
 │   ├── ui/
