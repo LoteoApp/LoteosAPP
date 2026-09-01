@@ -29,6 +29,7 @@ const FIELDS: ReadonlyArray<{
 type ClientFormProps = {
   initialValue?: ClienteFormValues
   submitLabel: string
+  isSubmitting?: boolean
   onSubmit: (values: ClienteFormValues) => void
   onValidate: (values: ClienteFormValues) => string | null
   onCancel: () => void
@@ -37,6 +38,7 @@ type ClientFormProps = {
 export default function ClientForm({
   initialValue,
   submitLabel,
+  isSubmitting = false,
   onSubmit,
   onValidate,
   onCancel,
@@ -52,6 +54,10 @@ export default function ClientForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (isSubmitting) {
+      return
+    }
 
     const trimmed: ClienteFormValues = {
       nombre: values.nombre.trim(),
@@ -98,10 +104,12 @@ export default function ClientForm({
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" disabled={isSubmitting} onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Guardando...' : submitLabel}
+        </Button>
       </div>
     </form>
   )
