@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog },
-  { to: '/inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
+  { to: '/inmobiliarias', label: 'Inmobiliarias', icon: Building2 },
 ]
 
 type SidebarProps = {

@@ -55,7 +55,7 @@ export const router = createBrowserRouter([
         element: <UsersPage />,
       },
       {
-        path: '/inmobiliaria',
+        path: '/inmobiliarias',
         element: <AgenciesPage />,
       },
     ],
