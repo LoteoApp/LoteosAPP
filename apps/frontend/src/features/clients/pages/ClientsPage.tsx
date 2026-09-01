@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../auth/hooks/use-auth'
 import { getUserRole, ROLE } from '../../auth/lib/getUserRole'
+import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
+import { createClient, deleteClient, listClients, updateClient } from '../api/clients'
 import ClientForm from '../components/ClientForm'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { toClienteFormValues, type Cliente, type ClienteFormValues } from '../types'
@@ -20,13 +22,21 @@ function matchesSearch(cliente: Cliente, search: string): boolean {
   return nombreCompleto.includes(search) || cliente.dni.toLowerCase().includes(search)
 }
 
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+}
+
 export default function ClientsPage() {
-  const { user } = useAuth()
-  // Hiding the button is UX only, not access control: once the baja endpoint
-  // exists it must also be enforced server-side (and via RLS) — see the API
-  // integration issue.
+  const { session, user } = useAuth()
+  const token = session?.access_token ?? ''
+  // Hiding the button is UX only, not access control: the backend restricts
+  // the baja to administrador as well, and RLS is still pending.
   const isAdministrador = getUserRole(user) === ROLE.administrador
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [reloadCount, setReloadCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [search, setSearch] = useState('')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)
@@ -37,6 +47,38 @@ export default function ClientsPage() {
   const filteredClientes = normalizedSearch
     ? clientes.filter((cliente) => matchesSearch(cliente, normalizedSearch))
     : clientes
+
+  useEffect(() => {
+    let cancelled = false
+
+    listClients(token)
+      .then((loaded) => {
+        if (cancelled) {
+          return
+        }
+        setClientes(loaded)
+        setError(null)
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          setError(messageOf(loadError))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token, reloadCount])
+
+  function refresh() {
+    setIsLoading(true)
+    setReloadCount((count) => count + 1)
+  }
 
   function validate(values: ClienteFormValues, excludeId?: string): string | null {
     if (!values.nombre || !values.apellido || !values.dni) {
@@ -53,21 +95,46 @@ export default function ClientsPage() {
     return null
   }
 
-  function handleCreate(values: ClienteFormValues) {
-    setClientes((current) => [...current, { id: crypto.randomUUID(), ...values }])
-    setFormState({ mode: 'closed' })
+  async function handleCreate(values: ClienteFormValues) {
+    setIsSubmitting(true)
+    try {
+      await createClient(token, values)
+      setFormState({ mode: 'closed' })
+      setError(null)
+      refresh()
+    } catch (createError) {
+      setError(messageOf(createError))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  function handleUpdate(id: string, values: ClienteFormValues) {
-    setClientes((current) =>
-      current.map((cliente) => (cliente.id === id ? { id, ...values } : cliente))
-    )
-    setFormState({ mode: 'closed' })
+  async function handleUpdate(id: string, values: ClienteFormValues) {
+    setIsSubmitting(true)
+    try {
+      await updateClient(token, id, values)
+      setFormState({ mode: 'closed' })
+      setError(null)
+      refresh()
+    } catch (updateError) {
+      setError(messageOf(updateError))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  function handleBaja(cliente: Cliente) {
-    setClientes((current) => current.filter((item) => item.id !== cliente.id))
-    setConfirmingBajaId(null)
+  async function handleBaja(cliente: Cliente) {
+    setIsSubmitting(true)
+    try {
+      await deleteClient(token, cliente.id)
+      setConfirmingBajaId(null)
+      setError(null)
+      refresh()
+    } catch (bajaError) {
+      setError(messageOf(bajaError))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -78,6 +145,13 @@ export default function ClientsPage() {
           <Button onClick={() => setFormState({ mode: 'create' })}>Nuevo cliente</Button>
         )}
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo completar la operación</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {formView.mode !== 'closed' ? (
         <Card>
@@ -107,7 +181,9 @@ export default function ClientsPage() {
         </Card>
       ) : (
         <>
-          {clientes.length === 0 && (
+          {isLoading && <p className="text-muted-foreground">Cargando clientes...</p>}
+
+          {!isLoading && clientes.length === 0 && (
             <p className="text-muted-foreground">No hay clientes cargados todavía.</p>
           )}
 
@@ -162,6 +238,7 @@ export default function ClientsPage() {
                             <Button
                               variant="destructive"
                               size="sm"
+                              disabled={isSubmitting}
                               onClick={() => handleBaja(cliente)}
                             >
                               Confirmar
