@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	usersTimeout = 5 * time.Second
-	lotesTimeout = 10 * time.Second
+	usersTimeout   = 5 * time.Second
+	clientsTimeout = 5 * time.Second
+	lotesTimeout   = 10 * time.Second
 
 	// Registering a loteo writes one row per polygon of a whole cadastral
 	// plan in a single transaction, so it gets more room than a request that
@@ -32,6 +33,10 @@ const (
 type Handlers struct {
 	CreateUser      *handler.CreateUserHandler
 	CompleteProfile *handler.CompleteProfileHandler
+	CreateClient    *handler.CreateClientHandler
+	UpdateClient    *handler.UpdateClientHandler
+	DeleteClient    *handler.DeleteClientHandler
+	ListClients     *handler.ListClientsHandler
 	CreateLoteo     *handler.CreateLoteoHandler
 	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
@@ -41,6 +46,12 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	requireAuth := middleware.RequireAuth(verifier)
 	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(handlers.CreateUser, usersTimeout)))
 	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(handlers.CompleteProfile, usersTimeout)))
+
+	mux.Handle("POST /api/v1/clientes", requireAuth(handler.Adapt(handlers.CreateClient, clientsTimeout)))
+	mux.Handle("PATCH /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.UpdateClient, clientsTimeout)))
+	mux.Handle("DELETE /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.DeleteClient, clientsTimeout)))
+	mux.Handle("GET /api/v1/clientes", requireAuth(handler.Adapt(handlers.ListClients, clientsTimeout)))
+
 	mux.Handle("POST /api/v1/loteos", requireAuth(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
 	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", requireAuth(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", requireAuth(handler.Adapt(handlers.UpdateLote, lotesTimeout)))

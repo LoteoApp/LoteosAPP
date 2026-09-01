@@ -132,9 +132,9 @@ vacíos antes de que exista una funcionalidad que los necesite.
   de `usecase`.
 - `internal/business/usecase`: casos de uso que orquestan el dominio a través de
   los contratos de `gateway`, agrupados en subpaquetes por funcionalidad
-  (`usecase/users`). Cada caso de uso es una interfaz de un solo método
-  `Execute` junto con su implementación, definidas en el mismo archivo (por
-  ejemplo `usecase/users/create_user.go`).
+  (`usecase/users`, `usecase/clients`, `usecase/loteos`). Cada caso de uso es
+  una interfaz de un solo método `Execute` junto con su implementación,
+  definidas en el mismo archivo (por ejemplo `usecase/users/create_user.go`).
 - `internal/infrastructure/environments`: carga de configuración desde
   variables de entorno.
 - `internal/infrastructure/auth/supabase`: valida el JWT (Bearer token)
@@ -158,10 +158,11 @@ vacíos antes de que exista una funcionalidad que los necesite.
   lee y borra los archivos que sube el usuario (el DXF original del alta de
   loteo, fotos y planos). Ver [almacenamiento de archivos](#almacenamiento-de-archivos).
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
-  HTTP, agrupados por feature (`dto/users`) igual que `usecase`. Cada
-  subpaquete declara `package dto`; como el identificador de paquete no
-  tiene que coincidir con el nombre del directorio, no choca con
-  `usecase/users` al importarse en el mismo archivo de `handler`.
+  HTTP, agrupados por feature (`dto/users`, `dto/clients`, `dto/loteos`)
+  igual que `usecase`. Cada subpaquete declara `package dto`; como el
+  identificador de paquete no tiene que coincidir con el nombre del
+  directorio, no choca con `usecase/users`, `usecase/clients` ni
+  `usecase/loteos` al importarse en el mismo archivo de `handler`.
 - `internal/infrastructure/delivery/webapp/handler`: adapta requests HTTP a
   llamadas del caso de uso, decodificando y codificando los tipos de `dto`, y
   convierte el resultado en una respuesta. Cada ruta tiene su propio handler
@@ -211,13 +212,16 @@ flowchart LR
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]
+    handler --> usecaseClients["business/usecase/clients"]
     handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
     usecaseUsers --> gateway
+    usecaseClients --> gateway
     usecaseLoteos --> gateway
     usecaseUsers --> domain["business/domain"]
+    usecaseClients --> domain
     usecaseLoteos --> domain
     response --> domain
     gateway --> domain

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 var (
 	ErrEmailEnUso          = &Error{Kind: KindConflict, Code: "email_in_use", Message: "El email ya está en uso"}
@@ -9,6 +12,9 @@ var (
 	ErrEmailInvalido       = &Error{Kind: KindInvalid, Code: "invalid_email", Message: "Email inválido"}
 	ErrRolInvalido         = &Error{Kind: KindInvalid, Code: "invalid_rol", Message: "Rol inválido"}
 	ErrPerfilInvalido      = &Error{Kind: KindInvalid, Code: "invalid_profile", Message: "Nombre y apellido son obligatorios"}
+	// ErrActorNoAprovisionado: the token is valid but its subject has no row
+	// in usuarios, so there is no local user to attribute the operation to.
+	ErrActorNoAprovisionado = &Error{Kind: KindForbidden, Code: "actor_not_provisioned", Message: "Tu usuario no está habilitado para operar en el sistema"}
 )
 
 type Usuario struct {
@@ -20,4 +26,8 @@ type Usuario struct {
 	Rol            Rol       `json:"rol"`
 	PerfilCompleto bool      `json:"perfilCompleto"`
 	CreatedAt      time.Time `json:"createdAt"`
+}
+
+func EmailValido(email string) bool {
+	return email != "" && strings.Contains(email, "@")
 }
