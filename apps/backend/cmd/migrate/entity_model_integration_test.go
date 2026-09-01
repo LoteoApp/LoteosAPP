@@ -17,6 +17,12 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
+// The entity model is migration 00005. Rolling back to the version before it
+// has to be explicit: a plain Down() only reverts the newest migration, so the
+// assertion below would silently stop testing anything as soon as a later
+// migration is added.
+const entityModelMigrationVersion = 5
+
 func TestEntityModelStateHistory(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -207,7 +213,7 @@ func TestEntityModelStateHistory(t *testing.T) {
 		assertIntegrityViolation(t, err)
 	})
 
-	if _, err := provider.Down(ctx); err != nil {
+	if _, err := provider.DownTo(ctx, entityModelMigrationVersion-1); err != nil {
 		t.Fatalf("roll back entity model migration: %v", err)
 	}
 	var entityModelRemoved bool
