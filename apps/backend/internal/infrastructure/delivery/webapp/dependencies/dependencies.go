@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/gateway"
+	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/surveyors"
 	"loteosapp/backend/internal/business/usecase/users"
@@ -19,6 +20,10 @@ import (
 type Container struct {
 	CreateUserHandler         *handler.CreateUserHandler
 	CompleteProfileHandler    *handler.CompleteProfileHandler
+	CreateClientHandler       *handler.CreateClientHandler
+	UpdateClientHandler       *handler.UpdateClientHandler
+	DeleteClientHandler       *handler.DeleteClientHandler
+	ListClientsHandler        *handler.ListClientsHandler
 	CreateSurveyorHandler     *handler.CreateSurveyorHandler
 	ListSurveyorsHandler      *handler.ListSurveyorsHandler
 	UpdateSurveyorHandler     *handler.UpdateSurveyorHandler
@@ -58,6 +63,12 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 
+	clienteRepo := postgres.NewClienteRepository(pool)
+	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
+	updateClientHandler := handler.NewUpdateClientHandler(clients.NewUpdateClient(clienteRepo, userRepo))
+	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
+	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
+
 	createSurveyorHandler := handler.NewCreateSurveyorHandler(surveyors.NewCreateSurveyor(userRepo, adminClient))
 	listSurveyorsHandler := handler.NewListSurveyorsHandler(surveyors.NewListSurveyors(userRepo))
 	updateSurveyorHandler := handler.NewUpdateSurveyorHandler(surveyors.NewUpdateSurveyor(userRepo))
@@ -70,6 +81,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	return &Container{
 		CreateUserHandler:         createUserHandler,
 		CompleteProfileHandler:    completeProfileHandler,
+		CreateClientHandler:       createClientHandler,
+		UpdateClientHandler:       updateClientHandler,
+		DeleteClientHandler:       deleteClientHandler,
+		ListClientsHandler:        listClientsHandler,
 		CreateSurveyorHandler:     createSurveyorHandler,
 		ListSurveyorsHandler:      listSurveyorsHandler,
 		UpdateSurveyorHandler:     updateSurveyorHandler,

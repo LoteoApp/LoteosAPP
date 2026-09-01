@@ -13,9 +13,10 @@ type UserRepository struct {
 	Created     domain.Usuario
 	CreateInput domain.Usuario
 
-	FindByAuthProviderIDCalls int
-	FindByAuthProviderIDErr   error
-	FoundByAuthProviderID     domain.Usuario
+	FindByAuthProviderIDCalls   int
+	FindByAuthProviderIDErr     error
+	FindByAuthProviderIDResult  domain.Usuario
+	FindByAuthProviderIDSubject string
 
 	FindByIDCalls int
 	FindByIDErr   error
@@ -54,12 +55,13 @@ func (fake *UserRepository) Create(_ context.Context, usuario domain.Usuario) (d
 	return fake.Created, nil
 }
 
-func (fake *UserRepository) FindByAuthProviderID(context.Context, string) (domain.Usuario, error) {
+func (fake *UserRepository) FindByAuthProviderID(_ context.Context, authProviderID string) (domain.Usuario, error) {
 	fake.FindByAuthProviderIDCalls++
+	fake.FindByAuthProviderIDSubject = authProviderID
 	if fake.FindByAuthProviderIDErr != nil {
 		return domain.Usuario{}, fake.FindByAuthProviderIDErr
 	}
-	return fake.FoundByAuthProviderID, nil
+	return fake.FindByAuthProviderIDResult, nil
 }
 
 func (fake *UserRepository) FindByID(_ context.Context, id string) (domain.Usuario, error) {

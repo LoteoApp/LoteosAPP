@@ -71,8 +71,8 @@ func TestUpdateSurveyorTrimsAndPersistsOnlyTheFieldsSent(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{
-		FoundByID:             activeSurveyor(),
-		FoundByAuthProviderID: domain.Usuario{ID: "admin-1", Rol: domain.RolAdministrador},
+		FoundByID:                  activeSurveyor(),
+		FindByAuthProviderIDResult: domain.Usuario{ID: "admin-1", Rol: domain.RolAdministrador},
 	}
 	updateSurveyor := NewUpdateSurveyor(repository)
 

@@ -8,7 +8,7 @@
     "test": "pnpm test:backend && pnpm test:frontend",
     "test:backend": "cd apps/backend && go test ./...",
     "test:backend:coverage": "pnpm test:backend:coverage:profile && node scripts/check-go-coverage.mjs",
-    "test:backend:coverage:profile": "cd apps/backend && go test -count=1 -coverprofile coverage.out ./internal/business/domain ./internal/business/usecase/loteos ./internal/business/usecase/surveyors ./internal/business/usecase/users ./internal/infrastructure/delivery/webapp/handler ./internal/infrastructure/delivery/webapp/middleware ./internal/infrastructure/delivery/webapp/response ./internal/infrastructure/delivery/webapp/server ./internal/infrastructure/auth/supabase ./internal/infrastructure/environments ./internal/infrastructure/repository/postgres ./internal/infrastructure/storage/r2 && go tool cover -func coverage.out",
+    "test:backend:coverage:profile": "cd apps/backend && go test -count=1 -coverprofile coverage.out ./internal/business/domain ./internal/business/usecase/clients ./internal/business/usecase/loteos ./internal/business/usecase/surveyors ./internal/business/usecase/users ./internal/infrastructure/delivery/webapp/handler ./internal/infrastructure/delivery/webapp/middleware ./internal/infrastructure/delivery/webapp/response ./internal/infrastructure/delivery/webapp/server ./internal/infrastructure/auth/supabase ./internal/infrastructure/environments ./internal/infrastructure/repository/postgres ./internal/infrastructure/storage/r2 && go tool cover -func coverage.out",
     "test:frontend": "pnpm --filter @loteos/frontend test",
     "test:frontend:coverage": "pnpm --filter @loteos/frontend test:coverage",
     "test:coverage": "pnpm test:backend:coverage && pnpm test:frontend:coverage",

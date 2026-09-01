@@ -37,7 +37,7 @@ func (useCase *createUserUseCase) Execute(
 	}
 
 	email = strings.TrimSpace(email)
-	if email == "" || !strings.Contains(email, "@") {
+	if !domain.EmailValido(email) {
 		return domain.Usuario{}, "", domain.ErrEmailInvalido
 	}
 
