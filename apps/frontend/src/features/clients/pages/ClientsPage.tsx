@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useAuth } from '../../auth/hooks/use-auth'
 import { getUserRole, ROLE } from '../../../shared/auth/roles'
+import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
+import { useClients } from '../hooks/use-clients'
 import ClientForm from '../components/ClientForm'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { toClienteFormValues, type Cliente, type ClienteFormValues } from '../types'
@@ -21,12 +23,12 @@ function matchesSearch(cliente: Cliente, search: string): boolean {
 }
 
 export default function ClientsPage() {
-  const { user } = useAuth()
-  // Hiding the button is UX only, not access control: once the baja endpoint
-  // exists it must also be enforced server-side (and via RLS) — see the API
-  // integration issue.
+  const { session, user } = useAuth()
+  const token = session?.access_token ?? ''
+  // Hiding the button is UX only, not access control: the backend restricts
+  // the baja to administrador as well, and RLS is still pending.
   const isAdministrador = getUserRole(user) === ROLE.administrador
-  const [clientes, setClientes] = useState<Cliente[]>([])
+  const { clientes, isLoading, isSubmitting, error, create, update, remove } = useClients(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [search, setSearch] = useState('')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)
@@ -53,21 +55,22 @@ export default function ClientsPage() {
     return null
   }
 
-  function handleCreate(values: ClienteFormValues) {
-    setClientes((current) => [...current, { id: crypto.randomUUID(), ...values }])
-    setFormState({ mode: 'closed' })
+  async function handleCreate(values: ClienteFormValues) {
+    if (await create(values)) {
+      setFormState({ mode: 'closed' })
+    }
   }
 
-  function handleUpdate(id: string, values: ClienteFormValues) {
-    setClientes((current) =>
-      current.map((cliente) => (cliente.id === id ? { id, ...values } : cliente))
-    )
-    setFormState({ mode: 'closed' })
+  async function handleUpdate(id: string, values: ClienteFormValues) {
+    if (await update(id, values)) {
+      setFormState({ mode: 'closed' })
+    }
   }
 
-  function handleBaja(cliente: Cliente) {
-    setClientes((current) => current.filter((item) => item.id !== cliente.id))
-    setConfirmingBajaId(null)
+  async function handleBaja(cliente: Cliente) {
+    if (await remove(cliente.id)) {
+      setConfirmingBajaId(null)
+    }
   }
 
   return (
@@ -79,6 +82,13 @@ export default function ClientsPage() {
         )}
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo completar la operación</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       {formView.mode !== 'closed' ? (
         <Card>
           <CardHeader>
@@ -89,6 +99,7 @@ export default function ClientsPage() {
               <ClientForm
                 key="create"
                 submitLabel="Crear cliente"
+                isSubmitting={isSubmitting}
                 onSubmit={handleCreate}
                 onValidate={(values) => validate(values)}
                 onCancel={() => setFormState({ mode: 'closed' })}
@@ -98,6 +109,7 @@ export default function ClientsPage() {
                 key={formView.client.id}
                 initialValue={toClienteFormValues(formView.client)}
                 submitLabel="Guardar cambios"
+                isSubmitting={isSubmitting}
                 onSubmit={(values) => handleUpdate(formView.client.id, values)}
                 onValidate={(values) => validate(values, formView.client.id)}
                 onCancel={() => setFormState({ mode: 'closed' })}
@@ -107,7 +119,9 @@ export default function ClientsPage() {
         </Card>
       ) : (
         <>
-          {clientes.length === 0 && (
+          {isLoading && <p className="text-muted-foreground">Cargando clientes...</p>}
+
+          {!isLoading && !error && clientes.length === 0 && (
             <p className="text-muted-foreground">No hay clientes cargados todavía.</p>
           )}
 
@@ -162,6 +176,7 @@ export default function ClientsPage() {
                             <Button
                               variant="destructive"
                               size="sm"
+                              disabled={isSubmitting}
                               onClick={() => handleBaja(cliente)}
                             >
                               Confirmar
