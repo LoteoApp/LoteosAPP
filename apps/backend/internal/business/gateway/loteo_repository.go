@@ -6,6 +6,20 @@ import (
 	"loteosapp/backend/internal/business/domain"
 )
 
+// LoteoScope limits a loteo read to what one caller may see. A nil
+// AssigneeAuthProviderID means no limit (administrador, administrativo).
+// Otherwise the caller sees a loteo only through the assignment paths that
+// are enabled: ByUserAssignment for a direct usuario_loteos row
+// (agrimensor, escribano) and ByAgencyAssignment for one reached through the
+// caller's inmobiliaria (inmobiliaria_loteos). The two are independent so a
+// caller who holds several roles gets the union of what each grants, and an
+// agrimensor tied to an agency by mistake still can't borrow its loteos.
+type LoteoScope struct {
+	AssigneeAuthProviderID *string
+	ByUserAssignment       bool
+	ByAgencyAssignment     bool
+}
+
 type LoteoRepository interface {
 	// Create persists the loteo and its whole plan atomically: either every
 	// polygon, manzana, lote and calle lands, or none does. The returned
@@ -13,6 +27,19 @@ type LoteoRepository interface {
 	// loteo.Plan, so a caller can match each one back to the polygon it
 	// sent.
 	Create(ctx context.Context, actorAuthProviderID string, loteo domain.NewLoteo) (domain.Loteo, error)
+
+	// List returns the active loteos as summaries, without geometry, ordered
+	// by name. search, when non-empty, filters by nombre or ubicacion,
+	// case-insensitively. scope limits the result to the loteos the caller
+	// may see (see LoteoScope).
+	List(ctx context.Context, search string, scope LoteoScope) ([]domain.LoteoSummary, error)
+
+	// Get returns one loteo with its manzanas, lotes, calles and the geometry
+	// of each (a nil polygon where an entity has no DXF ring yet). scope
+	// limits visibility the same way as List: a loteo that doesn't exist,
+	// isn't a valid id, or is outside the caller's scope all return
+	// domain.ErrLoteoNotFound, so a caller can't tell which ids exist.
+	Get(ctx context.Context, loteoID string, scope LoteoScope) (domain.Loteo, error)
 
 	// UpdateLote sets the manually loaded values of one lot. loteoID scopes
 	// the lookup so a caller authorized on one loteo can't reach a lot of

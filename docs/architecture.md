@@ -57,8 +57,11 @@ apps/backend/
 │   │       │   └── create_user.go
 │   │       └── loteos/
 │   │           ├── create_loteo.go
+│   │           ├── list_loteos.go
+│   │           ├── get_loteo.go
 │   │           ├── store_loteo_dxf.go
 │   │           ├── update_lote.go
+│   │           ├── visibility.go
 │   │           └── errors.go
 │   └── infrastructure/
 │       ├── environments/
@@ -71,7 +74,8 @@ apps/backend/
 │       │   └── postgres/
 │       │       ├── pool.go
 │       │       ├── usuario.go
-│       │       └── loteo.go
+│       │       ├── loteo.go
+│       │       └── geometry.go
 │       ├── storage/
 │       │   └── r2/
 │       │       └── client.go
@@ -84,11 +88,14 @@ apps/backend/
 │               │   │   └── create_user.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
+│               │       ├── list_loteos.go
 │               │       ├── store_loteo_dxf.go
 │               │       └── update_lote.go
 │               ├── handler/
 │               │   ├── create_user.go
 │               │   ├── create_loteo.go
+│               │   ├── list_loteos.go
+│               │   ├── get_loteo.go
 │               │   ├── store_loteo_dxf.go
 │               │   └── update_lote.go
 │               ├── middleware/
@@ -250,15 +257,22 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 }
 ```
 
-### Alta de loteo y persistencia de la geometría
+### Loteo: alta, persistencia de la geometría y lectura
 
 El DXF lo parsea el frontend; el backend recibe la geometría ya extraída, la
-valida y la persiste (`docs/domain.md` § Alta y visualización). Tres endpoints
-cubren eso:
+valida y la persiste (`docs/domain.md` § Alta y visualización). Cinco endpoints
+cubren el alta, la carga de datos y la lectura:
 
 - `POST /api/v1/loteos` — alta del loteo con su plano. Solo **administrador**:
   un agrimensor trabaja sobre loteos asignados, y un loteo que todavía no
   existe no puede estarlo.
+- `GET /api/v1/loteos` — listado de loteos activos como resúmenes sin
+  geometría: identidad, cantidad de manzanas / lotes / calles, si tiene plano
+  y si tiene DXF original. Filtro opcional `?q=` sobre `nombre` / `ubicacion`.
+- `GET /api/v1/loteos/{loteoId}` — detalle: metadata + contorno (capa `LOTEO`)
+  + manzanas, lotes y calles con su polígono, y los datos manuales del lote.
+  Un `loteoId` inexistente, inválido o no visible para el actor devuelve
+  `loteo_not_found` (404), nunca un 403, para no filtrar qué ids existen.
 - `PUT /api/v1/loteos/{loteoId}/dxf` — guarda el archivo DXF original de un
   loteo ya creado (`multipart/form-data`, campo `archivo`). El backend sube
   los bytes a R2 y registra la fila en `archivos`. **Administrador**, o
@@ -270,6 +284,18 @@ cubren eso:
   superficie y características de un lote, que no salen del DXF porque las
   capas son solo geometría. **Administrador**, o **agrimensor** sobre un loteo
   asignado (`usuario_loteos`).
+
+**Visibilidad de la lectura por rol** (`GET`): **administrador** y
+**administrativo** ven todos los loteos; **agrimensor** y **escribano** ven
+solo los asignados por `usuario_loteos`; **inmobiliaria** solo los que llegan
+por `inmobiliaria_loteos` vía `usuarios.inmobiliaria_id`; cualquier otro
+actor recibe `forbidden`. Cada rol habilita **únicamente su propio camino de
+asignación** (`gateway.LoteoScope` lleva un flag por camino), así que un
+agrimensor asociado por error a una agencia no ve sus loteos y un usuario
+inmobiliaria no accede por una asignación directa; un usuario con varios
+roles obtiene la unión. El scoping se resuelve en la query, no por RLS (las
+políticas llegan con
+[#138](https://github.com/LoteoApp/LoteosAPP/issues/138)).
 
 El cuerpo del alta lleva el formulario y, opcionalmente, `plano`: un polígono
 `loteo`, y las listas `manzanas`, `lotes` y `calles`. Un loteo puede darse de
@@ -293,12 +319,16 @@ Decisiones de este recorte:
   colgar lotes de la manzana de otro loteo, pero sí asignarlos a la equivocada
   dentro del suyo.
 - **La geometría viaja a PostgreSQL como WKT y entra por el cast implícito
-  `text → geometry`** que registra PostGIS. El repositorio no nombra ninguna
-  función ni tipo de PostGIS, así que no depende del `search_path` del rol:
-  hoy PostGIS vive en `extensions` y ese esquema está en el `search_path` por
-  default de Supabase, pero eso deja de ser una precondición cuando se separe
-  el rol de aplicación del de migraciones
-  ([#138](https://github.com/LoteoApp/LoteosAPP/issues/138)).
+  `text → geometry`** que registra PostGIS, así que el camino de escritura no
+  nombra ninguna función ni tipo de PostGIS. Leerla de vuelta sí necesita
+  `ST_AsText`, que resuelve mientras el esquema de PostGIS esté en el
+  `search_path` —hoy vive en `extensions`, que está en el `search_path` por
+  default de Supabase—; es la misma precondición que ya asumen los tests de
+  integración del repositorio. El anillo se parsea en Go
+  (`repository/postgres/geometry.go`, unit-testable sin DB): se descarta el
+  vértice de cierre repetido y, si un valor llegara con anillos interiores
+  (`POLYGON((exterior),(hueco))`), se lee solo el exterior —el camino de
+  escritura nunca los genera, pero el parser no rompe si aparecen.
 - **El alta es una sola transacción.** Un plano que falla a mitad dejaría un
   loteo con parte de sus manzanas y ninguna forma de saber cuáles faltan. Las
   manzanas, los lotes y las calles se insertan con `pgx.Batch` —un round trip

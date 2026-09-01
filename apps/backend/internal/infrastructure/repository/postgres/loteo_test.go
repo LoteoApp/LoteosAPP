@@ -11,8 +11,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
 )
+
+// unrestrictedScope is the scope an administrador/administrativo read uses:
+// no assignee, so every loteo is visible.
+var unrestrictedScope = gateway.LoteoScope{}
+
+func userScope(authProviderID string) gateway.LoteoScope {
+	return gateway.LoteoScope{AssigneeAuthProviderID: &authProviderID, ByUserAssignment: true}
+}
+
+func agencyScope(authProviderID string) gateway.LoteoScope {
+	return gateway.LoteoScope{AssigneeAuthProviderID: &authProviderID, ByAgencyAssignment: true}
+}
 
 func squareAt(offset float64) domain.Polygon {
 	return domain.Polygon{
@@ -99,6 +112,18 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 			StorageKey: "loteos/x/original.dxf", OriginalName: "plano.dxf",
 		}); err == nil {
 			t.Error("RecordDxfFile() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("list", func(t *testing.T) {
+		if _, err := repository.List(ctx, "", unrestrictedScope); err == nil {
+			t.Error("List() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("get", func(t *testing.T) {
+		if _, err := repository.Get(ctx, newUUID(t), unrestrictedScope); err == nil {
+			t.Error("Get() should fail when the database is unreachable")
 		}
 	})
 }
@@ -488,6 +513,194 @@ func TestLoteoRepository(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("lists active loteos with their plan counts, ordered by name", func(t *testing.T) {
+		prefix := "ZZ List " + newUUID(t) + " "
+		conPlano := createNamedLoteo(t, pool, repository, actor, prefix+"B", testPlan())
+		sinPlano := createNamedLoteo(t, pool, repository, actor, prefix+"A", nil)
+
+		summaries, err := repository.List(context.Background(), prefix, unrestrictedScope)
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if len(summaries) != 2 {
+			t.Fatalf("List() = %d loteos, want 2", len(summaries))
+		}
+
+		// Ordered by name: "...A" (sin plano) before "...B" (con plano).
+		if summaries[0].ID != sinPlano.ID || summaries[1].ID != conPlano.ID {
+			t.Fatalf("List() order = %q, %q; want %q then %q",
+				summaries[0].Name, summaries[1].Name, sinPlano.Name, conPlano.Name)
+		}
+		if summaries[0].HasPlan {
+			t.Error("the loteo without a plan should report HasPlan = false")
+		}
+		got := summaries[1]
+		if !got.HasPlan {
+			t.Error("the loteo with a plan should report HasPlan = true")
+		}
+		if got.ManzanaCount != 2 || got.LoteCount != 2 || got.CalleCount != 1 {
+			t.Errorf("counts = %d manzanas, %d lotes, %d calles; want 2, 2, 1",
+				got.ManzanaCount, got.LoteCount, got.CalleCount)
+		}
+		if got.HasDxfFile {
+			t.Error("HasDxfFile should be false until a DXF is recorded")
+		}
+	})
+
+	t.Run("filters the listing by name or ubicacion", func(t *testing.T) {
+		token := newUUID(t)
+		match := createNamedLoteo(t, pool, repository, actor, "Loteo "+token, nil)
+		createNamedLoteo(t, pool, repository, actor, "Loteo "+newUUID(t), nil)
+
+		summaries, err := repository.List(context.Background(), token, unrestrictedScope)
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if len(summaries) != 1 || summaries[0].ID != match.ID {
+			t.Fatalf("List(%q) = %#v, want just %q", token, summaries, match.ID)
+		}
+	})
+
+	t.Run("gets a loteo with its geometry", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		got, err := repository.Get(context.Background(), loteo.ID, unrestrictedScope)
+		if err != nil {
+			t.Fatalf("Get() error = %v", err)
+		}
+		if len(got.Boundary) != 4 {
+			t.Errorf("boundary = %d vertices, want 4", len(got.Boundary))
+		}
+		if len(got.Manzanas) != 2 || len(got.Lotes) != 2 || len(got.Calles) != 1 {
+			t.Fatalf("Get() = %d manzanas, %d lotes, %d calles", len(got.Manzanas), len(got.Lotes), len(got.Calles))
+		}
+		for _, manzana := range got.Manzanas {
+			if len(manzana.Polygon) != 4 {
+				t.Errorf("manzana %q polygon = %d vertices, want 4", manzana.ID, len(manzana.Polygon))
+			}
+		}
+		for _, lote := range got.Lotes {
+			if len(lote.Polygon) != 4 {
+				t.Errorf("lote %q polygon = %d vertices, want 4", lote.ID, len(lote.Polygon))
+			}
+			if lote.ManzanaID == "" {
+				t.Errorf("lote %q should name its manzana", lote.ID)
+			}
+		}
+		if len(got.Calles[0].Polygon) != 4 {
+			t.Errorf("calle polygon = %d vertices, want 4", len(got.Calles[0].Polygon))
+		}
+	})
+
+	t.Run("gets a loteo registered without a plan", func(t *testing.T) {
+		loteo := createNamedLoteo(t, pool, repository, actor, "Loteo "+newUUID(t), nil)
+
+		got, err := repository.Get(context.Background(), loteo.ID, unrestrictedScope)
+		if err != nil {
+			t.Fatalf("Get() error = %v", err)
+		}
+		if got.Boundary != nil || len(got.Manzanas) != 0 || len(got.Lotes) != 0 || len(got.Calles) != 0 {
+			t.Errorf("Get() = %#v, want no geometry", got)
+		}
+	})
+
+	t.Run("get treats an unknown or unparseable id as not found", func(t *testing.T) {
+		for name, id := range map[string]string{
+			"unknown uuid": newUUID(t),
+			"not a uuid":   "'; DROP TABLE loteos; --",
+			"empty":        "",
+		} {
+			t.Run(name, func(t *testing.T) {
+				_, err := repository.Get(context.Background(), id, unrestrictedScope)
+				if !errors.Is(err, domain.ErrLoteoNotFound) {
+					t.Fatalf("Get(%q) error = %v, want %v", id, err, domain.ErrLoteoNotFound)
+				}
+			})
+		}
+	})
+
+	t.Run("scopes the listing and detail to a caller's direct assignments", func(t *testing.T) {
+		viewer := createUsuario(t, pool)
+		propio := createLoteoWithPlan(t, pool, repository, actor)
+		ajeno := createLoteoWithPlan(t, pool, repository, actor)
+		assignLoteo(t, pool, viewer, propio.ID)
+
+		summaries, err := repository.List(context.Background(), "", userScope(viewer))
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if !containsLoteo(summaries, propio.ID) {
+			t.Error("List() should include a loteo assigned to the caller")
+		}
+		if containsLoteo(summaries, ajeno.ID) {
+			t.Error("List() should not include a loteo the caller isn't assigned to")
+		}
+
+		if _, err := repository.Get(context.Background(), propio.ID, userScope(viewer)); err != nil {
+			t.Errorf("Get() on an assigned loteo error = %v", err)
+		}
+		if _, err := repository.Get(context.Background(), ajeno.ID, userScope(viewer)); !errors.Is(err, domain.ErrLoteoNotFound) {
+			t.Errorf("Get() on an unassigned loteo error = %v, want %v", err, domain.ErrLoteoNotFound)
+		}
+	})
+
+	t.Run("scopes visibility through the caller's inmobiliaria", func(t *testing.T) {
+		viewer := createUsuario(t, pool)
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		inmobiliaria := createInmobiliaria(t, pool)
+		linkUsuarioToInmobiliaria(t, pool, viewer, inmobiliaria)
+		assignInmobiliariaToLoteo(t, pool, inmobiliaria, loteo.ID)
+
+		summaries, err := repository.List(context.Background(), "", agencyScope(viewer))
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if !containsLoteo(summaries, loteo.ID) {
+			t.Error("List() should include a loteo assigned to the caller's inmobiliaria")
+		}
+		if _, err := repository.Get(context.Background(), loteo.ID, agencyScope(viewer)); err != nil {
+			t.Errorf("Get() through the caller's inmobiliaria error = %v", err)
+		}
+	})
+
+	t.Run("an assignment path the scope does not enable stays invisible", func(t *testing.T) {
+		// A direct usuario_loteos assignment is not reachable with an
+		// agency-only scope, and an inmobiliaria_loteos assignment is not
+		// reachable with a user-only scope: an agrimensor tied to an agency
+		// by mistake can't borrow its loteos, and vice versa.
+		directViewer := createUsuario(t, pool)
+		directLoteo := createLoteoWithPlan(t, pool, repository, actor)
+		assignLoteo(t, pool, directViewer, directLoteo.ID)
+
+		agencyViewer := createUsuario(t, pool)
+		agencyLoteo := createLoteoWithPlan(t, pool, repository, actor)
+		inmobiliaria := createInmobiliaria(t, pool)
+		linkUsuarioToInmobiliaria(t, pool, agencyViewer, inmobiliaria)
+		assignInmobiliariaToLoteo(t, pool, inmobiliaria, agencyLoteo.ID)
+
+		directSeenByAgencyScope, err := repository.List(context.Background(), "", agencyScope(directViewer))
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if containsLoteo(directSeenByAgencyScope, directLoteo.ID) {
+			t.Error("a direct assignment must not be visible through an agency-only scope")
+		}
+		if _, err := repository.Get(context.Background(), directLoteo.ID, agencyScope(directViewer)); !errors.Is(err, domain.ErrLoteoNotFound) {
+			t.Errorf("Get() error = %v, want %v", err, domain.ErrLoteoNotFound)
+		}
+
+		agencySeenByUserScope, err := repository.List(context.Background(), "", userScope(agencyViewer))
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if containsLoteo(agencySeenByUserScope, agencyLoteo.ID) {
+			t.Error("an agency assignment must not be visible through a user-only scope")
+		}
+		if _, err := repository.Get(context.Background(), agencyLoteo.ID, userScope(agencyViewer)); !errors.Is(err, domain.ErrLoteoNotFound) {
+			t.Errorf("Get() error = %v, want %v", err, domain.ErrLoteoNotFound)
+		}
+	})
 }
 
 // assertDxfEntities checks what only a real database can show: that the rings
@@ -568,6 +781,80 @@ func createLoteoWithPlan(t *testing.T, pool *pgxpool.Pool, repository *postgres.
 	}
 
 	return loteo
+}
+
+func createNamedLoteo(t *testing.T, pool *pgxpool.Pool, repository *postgres.LoteoRepository, actor, name string, plan *domain.DxfPlan) domain.Loteo {
+	t.Helper()
+
+	loteo, err := repository.Create(context.Background(), actor, domain.NewLoteo{Name: name, Plan: plan})
+	t.Cleanup(func() { deleteLoteo(t, pool, loteo.ID) })
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	return loteo
+}
+
+func containsLoteo(summaries []domain.LoteoSummary, id string) bool {
+	for _, summary := range summaries {
+		if summary.ID == id {
+			return true
+		}
+	}
+
+	return false
+}
+
+func createInmobiliaria(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+
+	var id string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO inmobiliarias (razon_social) VALUES ($1) RETURNING id::text
+	`, "Inmobiliaria "+newUUID(t)).Scan(&id); err != nil {
+		t.Fatalf("create inmobiliaria: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM inmobiliarias WHERE id = $1::uuid`, id); err != nil {
+			t.Errorf("cleanup inmobiliaria: %v", err)
+		}
+	})
+
+	return id
+}
+
+func linkUsuarioToInmobiliaria(t *testing.T, pool *pgxpool.Pool, authProviderID, inmobiliariaID string) {
+	t.Helper()
+
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE usuarios SET inmobiliaria_id = $2::uuid WHERE auth_provider_id = $1::uuid
+	`, authProviderID, inmobiliariaID); err != nil {
+		t.Fatalf("link usuario to inmobiliaria: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `
+			UPDATE usuarios SET inmobiliaria_id = NULL WHERE auth_provider_id = $1::uuid
+		`, authProviderID); err != nil {
+			t.Errorf("cleanup usuario inmobiliaria link: %v", err)
+		}
+	})
+}
+
+func assignInmobiliariaToLoteo(t *testing.T, pool *pgxpool.Pool, inmobiliariaID, loteoID string) {
+	t.Helper()
+
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO inmobiliaria_loteos (inmobiliaria_id, loteo_id) VALUES ($1::uuid, $2::uuid)
+	`, inmobiliariaID, loteoID); err != nil {
+		t.Fatalf("assign inmobiliaria to loteo: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `
+			DELETE FROM inmobiliaria_loteos WHERE inmobiliaria_id = $1::uuid AND loteo_id = $2::uuid
+		`, inmobiliariaID, loteoID); err != nil {
+			t.Errorf("cleanup inmobiliaria loteo assignment: %v", err)
+		}
+	})
 }
 
 func createUsuario(t *testing.T, pool *pgxpool.Pool) string {
