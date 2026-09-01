@@ -42,6 +42,7 @@ func New(ctx context.Context) (*App, error) {
 		DeleteClient:    container.DeleteClientHandler,
 		ListClients:     container.ListClientsHandler,
 		CreateLoteo:     container.CreateLoteoHandler,
+		StoreLoteoDxf:   container.StoreLoteoDxfHandler,
 		UpdateLote:      container.UpdateLoteHandler,
 	}, container.Verifier)
 

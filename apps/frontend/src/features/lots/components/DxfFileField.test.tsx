@@ -48,8 +48,9 @@ describe('DxfFileField', () => {
 
     expect(onError).not.toHaveBeenCalled()
     expect(onParsed).toHaveBeenCalledTimes(1)
-    const [result, name] = onParsed.mock.calls[0]
-    expect(name).toBe('san-pedro.dxf')
+    const [result, parsedFile] = onParsed.mock.calls[0]
+    expect(parsedFile).toBeInstanceOf(File)
+    expect(parsedFile.name).toBe('san-pedro.dxf')
     expect(result.polygons).toHaveLength(1)
   })
 

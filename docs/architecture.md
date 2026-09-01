@@ -57,6 +57,7 @@ apps/backend/
 │   │       │   └── create_user.go
 │   │       └── loteos/
 │   │           ├── create_loteo.go
+│   │           ├── store_loteo_dxf.go
 │   │           ├── update_lote.go
 │   │           └── errors.go
 │   └── infrastructure/
@@ -83,10 +84,12 @@ apps/backend/
 │               │   │   └── create_user.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
+│               │       ├── store_loteo_dxf.go
 │               │       └── update_lote.go
 │               ├── handler/
 │               │   ├── create_user.go
 │               │   ├── create_loteo.go
+│               │   ├── store_loteo_dxf.go
 │               │   └── update_lote.go
 │               ├── middleware/
 │               │   └── auth.go
@@ -250,12 +253,19 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ### Alta de loteo y persistencia de la geometría
 
 El DXF lo parsea el frontend; el backend recibe la geometría ya extraída, la
-valida y la persiste (`docs/domain.md` § Alta y visualización). Dos endpoints
+valida y la persiste (`docs/domain.md` § Alta y visualización). Tres endpoints
 cubren eso:
 
 - `POST /api/v1/loteos` — alta del loteo con su plano. Solo **administrador**:
   un agrimensor trabaja sobre loteos asignados, y un loteo que todavía no
   existe no puede estarlo.
+- `PUT /api/v1/loteos/{loteoId}/dxf` — guarda el archivo DXF original de un
+  loteo ya creado (`multipart/form-data`, campo `archivo`). El backend sube
+  los bytes a R2 y registra la fila en `archivos`. **Administrador**, o
+  **agrimensor** sobre un loteo asignado (`usuario_loteos`). Se llama después
+  del alta, no dentro: una falla al guardar el archivo no invalida el loteo
+  ni su geometría. El frontend conserva el identificador y el archivo para
+  reintentar solamente este request, sin volver a crear el loteo.
 - `PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}` — número, precio, moneda,
   superficie y características de un lote, que no salen del DXF porque las
   capas son solo geometría. **Administrador**, o **agrimensor** sobre un loteo
@@ -268,17 +278,20 @@ obligatorio.
 
 Decisiones de este recorte:
 
-- **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma,
-  y resolverla por contención geométrica quedó descartado para esta
-  iteración. Cada manzana lleva una `ref` que eligió el cliente y cada lote
-  nombra la suya con `manzanaRef`. La referencia vive solo dentro del request:
-  el caso de uso la resuelve a una posición y no se persiste. Como el backend
-  no la verifica contra la geometría, sí verifica lo que puede: que cada
-  `ref` sea única y no vacía, y que todo `manzanaRef` apunte a una manzana
-  **del mismo plano**. Un request armado a mano no puede colgar lotes de la
-  manzana de otro loteo, pero sí puede asignarlos a la manzana equivocada
-  dentro del suyo; corregirlo es trabajo de la selección visual
-  ([#17](https://github.com/LoteoApp/LoteosAPP/issues/17)).
+- **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
+  Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
+  del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive
+  solo dentro del request: el caso de uso la resuelve a una posición y no se
+  persiste. El backend no la verifica contra la geometría; sí verifica lo que
+  puede: que cada `ref` sea única y no vacía, y que todo `manzanaRef` apunte a
+  una manzana **del mismo plano**. El frontend, mientras no exista la
+  selección visual ([#17](https://github.com/LoteoApp/LoteosAPP/issues/17)),
+  infiere el `manzanaRef` por contención best-effort
+  (`features/lots/lib/buildCreateLoteoPayload.ts`: la manzana que contiene el
+  centroide del lote, o la más cercana). Puede quedar mal en manzanas de forma
+  irregular; corregirlo es trabajo de #17. Un request armado a mano no puede
+  colgar lotes de la manzana de otro loteo, pero sí asignarlos a la equivocada
+  dentro del suyo.
 - **La geometría viaja a PostgreSQL como WKT y entra por el cast implícito
   `text → geometry`** que registra PostGIS. El repositorio no nombra ninguna
   función ni tipo de PostGIS, así que no depende del `search_path` del rol:
@@ -319,13 +332,24 @@ Decisiones de este recorte:
   servidor cortara antes que el handler, una transacción podría confirmarse y
   el cliente recibir una conexión cortada, y reintentar el alta duplicaría el
   loteo.
-- **El archivo DXF original todavía no se guarda.** Este recorte deja metadata
-  y geometría; la fila en `archivos` y la subida a R2 entran juntas en
-  [#12](https://github.com/LoteoApp/LoteosAPP/issues/12), para no dejar una
-  fila apuntando a un `storage_key` que no existe.
-- **Las inmobiliarias del formulario no se persisten todavía**
-  (`inmobiliaria_loteos`): el catálogo del frontend es un mock hasta que
-  exista el endpoint de inmobiliarias.
+- **El archivo DXF original se guarda en un request aparte.** El alta
+  (`POST /api/v1/loteos`) deja metadata y geometría; el binario va por
+  `PUT /api/v1/loteos/{loteoId}/dxf` una vez que el loteo existe. El caso de
+  uso (`usecase/loteos/store_loteo_dxf.go`) asigna una clave nueva por carga
+  (`loteos/{loteoId}/dxf/{version}.dxf`), sube el objeto a R2 y recién después
+  inserta la fila en `archivos`. Si el `INSERT` falla, borra solamente esa
+  versión con un contexto corto independiente de la cancelación del request;
+  una carga anterior nunca comparte la clave. En PostgreSQL se bloquea la fila
+  del loteo durante la transacción y un índice único parcial garantiza un solo
+  DXF activo incluso ante concurrencia. El límite de tamaño
+  (`domain.MaxDxfFileBytes`, 20 MB, en espejo con `MAX_DXF_FILE_BYTES` del
+  frontend) lo aplica el caso de uso, no el adaptador. El MIME recibido no se
+  confía: se normaliza a `application/dxf`, y se verifica el encabezado y el
+  terminador del contenedor sin parsear su geometría.
+- **Las inmobiliarias del formulario no se persisten todavía.** El control se
+  muestra deshabilitado mientras el catálogo sea un mock; se habilitará junto
+  con el endpoint real y la escritura de `inmobiliaria_loteos`, evitando que
+  una selección aparente perderse al guardar.
 - **El precio se modela como `float64`.** `NUMERIC(14,2)` va y vuelve estable
   a esas magnitudes y acá no se hace aritmética con dinero. Cuando aparezcan
   cuotas y planes de pago hay que revisarlo.
@@ -385,30 +409,28 @@ Decisiones del adaptador (`infrastructure/storage/r2`):
   la integridad extremo a extremo todavía no está garantizada. Si hiciera
   falta, se guarda un hash propio junto al archivo y se verifica al leer.
 
-Dos decisiones quedan abiertas hasta que haya un consumidor real
-([#12](https://github.com/LoteoApp/LoteosAPP/issues/12) y
-[#15](https://github.com/LoteoApp/LoteosAPP/issues/15)):
+El **límite de tamaño por archivo** es una regla del negocio, así que vive en
+el caso de uso que recibe la subida, no en el adaptador. El alta de loteo lo
+fija en `domain.MaxDxfFileBytes` (20 MB), en espejo con `MAX_DXF_FILE_BYTES`
+del frontend (`features/lots/lib/readDxfFile.ts`); el backend igual no confía
+en la validación del cliente y lo revalida contra `header.Size`. El techo
+técnico de R2 ronda los 5 GiB —`Put` hace una sola request y R2 corta ahí las
+subidas de una parte—; superarlo obliga a multipart, que el adaptador no
+implementa porque ningún archivo del dominio se acerca. Si R2 igual rechaza
+una subida, el adaptador traduce `EntityTooLarge` a `ErrInvalidObjectSize`,
+para que salga como entrada inválida y no como un 503.
+
+Una decisión queda abierta hasta que haya más consumidores
+([#15](https://github.com/LoteoApp/LoteosAPP/issues/15)):
 
 - **Cómo se leen los archivos.** Hoy solo se puede a través del backend, que
   es lo más simple y mantiene la autorización en un solo lugar. Si el costo
   de proxear archivos grandes pesa, se evalúa URL firmada; el contrato tendría
   que crecer una operación.
-- **El límite de tamaño por archivo.** Es una regla del negocio, así que va en
-  el caso de uso que reciba la subida, no en el adaptador. El frontend tiene
-  `MAX_DXF_LENGTH` (`features/lots/lib/parseDxf.ts`), que limita caracteres
-  del contenido parseado y no bytes del archivo, y de todas formas el backend
-  no puede confiar en una validación del cliente. El techo técnico ronda los
-  5 GiB —la doc de R2 dice 5 GiB en la página de límites y 4,995 GiB en las
-  notas al pie—: `Put` hace una sola request y R2 corta ahí las subidas de
-  una parte. Superarlo obliga a multipart, que el adaptador no implementa
-  porque ningún archivo del dominio se acerca. Si R2 igual la rechaza, el
-  adaptador traduce `EntityTooLarge` a `ErrInvalidObjectSize`, para que salga
-  como entrada inválida y no como un 503.
 
-Un límite de R2 a tener presente al armar las claves: **una escritura por
-segundo sobre la misma clave**. Mientras cada archivo tenga la suya, no
-aparece; se volvería un problema con un esquema que sobrescriba una clave fija
-(por ejemplo `loteos/<id>/original.dxf` reemplazado en cada reintento).
+Un límite de R2 a tener presente al armar las claves es **una escritura por
+segundo sobre la misma clave**. Cada carga usa una clave versionada distinta,
+por lo que los reintentos de negocio no compiten por una clave fija.
 
 ### Persistencia y pruebas
 
@@ -432,6 +454,7 @@ apps/frontend/src/
 ├── app/
 │   ├── router.tsx
 │   ├── AppLayout.tsx           # Sidebar + header + área de contenido
+│   ├── LotsRoute.tsx           # Inyecta la sesión en la feature de loteos
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
 │   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
 │   └── providers.tsx           # Cuando existan providers globales
@@ -452,12 +475,15 @@ apps/frontend/src/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
 │   └── lots/
 │       ├── api/
-│       │   └── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       │   ├── create-loteo.ts        # POST /api/v1/loteos
+│       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
 │       ├── components/                # Formulario, cards y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
-│       │   └── use-dxf-plan.ts
-│       ├── lib/                       # Parseo DXF a geometría SVG
+│       │   ├── use-dxf-plan.ts
+│       │   └── use-save-loteo.ts      # Orquesta alta + subida del DXF
+│       ├── lib/                       # Parseo DXF a geometría SVG y armado del payload
 │       ├── pages/
 │       │   └── LotsPage.tsx           # Alta de loteo, en /lotes
 │       └── types.ts
@@ -483,13 +509,16 @@ app → features → shared
 - `app` configura y compone la aplicación, las rutas, layouts y providers.
 - `features` contiene la UI, acceso a datos y comportamiento de cada
   funcionalidad.
-- `shared/api` contiene el cliente HTTP y el tratamiento común de errores.
+- `shared/api` contiene el cliente HTTP (`client.ts`: `apiFetch`, `ApiError`)
+  y el tratamiento común de errores. `apiFetch` recibe el token de sesión como
+  parámetro y no importa `features/auth`; `app/LotsRoute.tsx` compone ambas
+  features e inyecta `session.access_token` en la página de loteos.
 - `shared/config` centraliza la lectura de variables de entorno.
 - `shared/ui` contiene componentes visuales sin reglas de una funcionalidad.
 - `shared/lib` contiene funciones reutilizables con un propósito específico; no
   debe convertirse en un directorio genérico de helpers.
 - Una feature no importa archivos internos de otra. La composición entre
-  funcionalidades ocurre en `app` o en una página.
+  funcionalidades ocurre en `app`.
 - Se prefieren imports directos y no se crean archivos `index.ts` globales que
   reexporten gran parte de la aplicación.
 

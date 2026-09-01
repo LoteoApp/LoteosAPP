@@ -105,9 +105,9 @@ describe('LoteoPlanCard', () => {
       () => new Set(DXF_LAYERS),
     )
 
-    function handleParsed(result: DxfParseResult, name: string) {
+    function handleParsed(result: DxfParseResult, file: File) {
       setHasPlan(result.polygons.length > 0)
-      setFileName(name)
+      setFileName(file.name)
       setPolygons(result.polygons)
     }
 

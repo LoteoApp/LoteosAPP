@@ -62,7 +62,8 @@ Alta y gestión de inmobiliarias (agencias externas) asociadas a los loteos,
 desde el módulo **Inmobiliaria**. En el [alta de un loteo](#alta-y-visualización-de-un-loteo)
 se eligen una o más agencias de ese catálogo; el filtro por nombre es en
 el cliente porque el listado es chico y el API las devolverá todas. Hasta
-que exista ese endpoint, el formulario usa un catálogo mock.
+que exista ese endpoint, el control permanece visible pero deshabilitado para
+no simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
 inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
@@ -190,9 +191,12 @@ stateDiagram-v2
   `MANZANAS`, `LOTE` y `CALLES`, ya que distintos agrimensores nombran las
   capas de forma distinta.
 - El parseo del archivo ocurre en el frontend (no en el backend); el backend
-  recibe la geometría ya extraída. El archivo DXF original todavía no se envía
-  ni se guarda: la fila en `archivos` y la subida a R2 entran juntas en
-  [#12](https://github.com/LoteoApp/LoteosAPP/issues/12).
+  recibe la geometría ya extraída. El archivo DXF original sí se guarda: tras
+  crear el loteo, el frontend lo sube por `PUT /api/v1/loteos/{id}/dxf` y el
+  backend lo almacena en Cloudflare R2 con una clave versionada
+  (`loteos/{id}/dxf/{version}.dxf`) y su fila en `archivos`
+  (`categoria = 'dxf'`). Ver `docs/architecture.md` § Almacenamiento de
+  archivos.
 
 ### Georreferenciación
 

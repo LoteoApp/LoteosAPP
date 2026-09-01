@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { useDxfPlan } from './use-dxf-plan'
 import { DXF_LAYERS, type DxfParseResult } from '../types'
 
+const dxfFile = new File(['0\nSECTION\n'], 'las-acacias.dxf', { type: 'application/dxf' })
+
 const result: DxfParseResult = {
   polygons: [
     {
@@ -44,11 +46,12 @@ describe('useDxfPlan', () => {
     const { result: hookResult } = renderHook(() => useDxfPlan())
 
     act(() => {
-      hookResult.current.onParsed(result, 'las-acacias.dxf')
+      hookResult.current.onParsed(result, dxfFile)
     })
 
     expect(hookResult.current.hasPlan).toBe(true)
     expect(hookResult.current.fileName).toBe('las-acacias.dxf')
+    expect(hookResult.current.file).toBe(dxfFile)
     expect(hookResult.current.polygons).toEqual(result.polygons)
     expect(hookResult.current.issues).toEqual(result.issues)
     expect(hookResult.current.error).toBeNull()
@@ -58,7 +61,7 @@ describe('useDxfPlan', () => {
     const { result: hookResult } = renderHook(() => useDxfPlan())
 
     act(() => {
-      hookResult.current.onParsed(result, 'las-acacias.dxf')
+      hookResult.current.onParsed(result, dxfFile)
     })
     act(() => {
       hookResult.current.onError('No se pudo interpretar el archivo DXF.')
@@ -67,13 +70,14 @@ describe('useDxfPlan', () => {
     expect(hookResult.current.error).toBe('No se pudo interpretar el archivo DXF.')
     expect(hookResult.current.hasPlan).toBe(false)
     expect(hookResult.current.fileName).toBeNull()
+    expect(hookResult.current.file).toBeNull()
   })
 
   it('clears the plan on onCleared', () => {
     const { result: hookResult } = renderHook(() => useDxfPlan())
 
     act(() => {
-      hookResult.current.onParsed(result, 'las-acacias.dxf')
+      hookResult.current.onParsed(result, dxfFile)
     })
     act(() => {
       hookResult.current.onCleared()
@@ -87,7 +91,7 @@ describe('useDxfPlan', () => {
     const { result: hookResult } = renderHook(() => useDxfPlan())
 
     act(() => {
-      hookResult.current.onParsed(result, 'las-acacias.dxf')
+      hookResult.current.onParsed(result, dxfFile)
     })
     act(() => {
       hookResult.current.onVisibleLayersChange(new Set(['LOTES']))

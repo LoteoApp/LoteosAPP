@@ -5,7 +5,6 @@ const EMPTY_FIELDS: LoteoFieldValues = {
   name: '',
   location: '',
   description: '',
-  agencyIds: [],
 }
 
 export type UseLoteoFieldsResult = {

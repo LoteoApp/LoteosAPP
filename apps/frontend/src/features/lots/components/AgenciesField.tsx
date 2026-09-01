@@ -15,24 +15,26 @@ import { listAgencies, type Agency } from '../api/list-agencies'
 
 type AgenciesFieldProps = {
   selectedIds: readonly string[]
-  onChange: (ids: string[]) => void
+  onChange?: (ids: string[]) => void
   agencies?: readonly Agency[]
+  disabled?: boolean
 }
 
 export default function AgenciesField({
   selectedIds,
   onChange,
   agencies = listAgencies(),
+  disabled = false,
 }: AgenciesFieldProps) {
   const selected = agencies.filter((item) => selectedIds.includes(item.id))
   const allSelected = agencies.length > 0 && selected.length === agencies.length
 
   function handleValueChange(next: Agency[]) {
-    onChange(next.map((item) => item.id))
+    onChange?.(next.map((item) => item.id))
   }
 
   function handleToggleAll() {
-    onChange(allSelected ? [] : agencies.map((item) => item.id))
+    onChange?.(allSelected ? [] : agencies.map((item) => item.id))
   }
 
   return (
@@ -45,7 +47,7 @@ export default function AgenciesField({
           size="sm"
           className="min-h-11 md:h-7 md:min-h-7"
           onClick={handleToggleAll}
-          disabled={agencies.length === 0}
+          disabled={disabled || agencies.length === 0}
         >
           {allSelected ? 'Quitar todas' : 'Seleccionar todas'}
         </Button>
@@ -58,6 +60,7 @@ export default function AgenciesField({
         itemToStringLabel={(item) => item.businessName}
         itemToStringValue={(item) => item.id}
         isItemEqualToValue={(a, b) => a.id === b.id}
+        disabled={disabled}
       >
         <ComboboxChips className="min-h-11 md:min-h-8">
           <ComboboxValue>
@@ -72,6 +75,7 @@ export default function AgenciesField({
                   id="loteo-agencies"
                   placeholder={value.length > 0 ? 'Buscar' : 'Buscar inmobiliaria'}
                   autoComplete="off"
+                  disabled={disabled}
                 />
               </>
             )}
@@ -88,7 +92,11 @@ export default function AgenciesField({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      <FieldDescription>Asigná una o varias inmobiliarias a este loteo.</FieldDescription>
+      <FieldDescription>
+        {disabled
+          ? 'Disponible cuando el catálogo de inmobiliarias esté conectado.'
+          : 'Asigná una o varias inmobiliarias a este loteo.'}
+      </FieldDescription>
     </Field>
   )
 }

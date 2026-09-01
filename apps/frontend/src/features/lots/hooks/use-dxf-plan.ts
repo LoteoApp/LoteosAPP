@@ -3,7 +3,7 @@ import { DXF_LAYERS, type DxfLayer, type DxfParseResult, type DxfValidationIssue
 
 type DxfPlanState =
   | { status: 'empty' }
-  | { status: 'loaded'; result: DxfParseResult; fileName: string }
+  | { status: 'loaded'; result: DxfParseResult; file: File }
   | { status: 'error'; message: string }
 
 const EMPTY_STATE: DxfPlanState = { status: 'empty' }
@@ -14,13 +14,14 @@ function allLayersVisible(): ReadonlySet<DxfLayer> {
 
 export type UseDxfPlanResult = {
   fileName: string | null
+  file: File | null
   error: string | null
   polygons: DxfParseResult['polygons']
   issues: DxfValidationIssue[]
   hasPlan: boolean
   visibleLayers: ReadonlySet<DxfLayer>
   onVisibleLayersChange: (layers: ReadonlySet<DxfLayer>) => void
-  onParsed: (result: DxfParseResult, fileName: string) => void
+  onParsed: (result: DxfParseResult, file: File) => void
   onError: (message: string) => void
   onCleared: () => void
   reset: () => void
@@ -30,8 +31,8 @@ export function useDxfPlan(): UseDxfPlanResult {
   const [state, setState] = useState<DxfPlanState>(EMPTY_STATE)
   const [visibleLayers, setVisibleLayers] = useState<ReadonlySet<DxfLayer>>(allLayersVisible)
 
-  const onParsed = useCallback((result: DxfParseResult, fileName: string) => {
-    setState({ status: 'loaded', result, fileName })
+  const onParsed = useCallback((result: DxfParseResult, file: File) => {
+    setState({ status: 'loaded', result, file })
   }, [])
 
   const onError = useCallback((message: string) => {
@@ -51,7 +52,8 @@ export function useDxfPlan(): UseDxfPlanResult {
   const issues = state.status === 'loaded' ? state.result.issues : []
 
   return {
-    fileName: state.status === 'loaded' ? state.fileName : null,
+    fileName: state.status === 'loaded' ? state.file.name : null,
+    file: state.status === 'loaded' ? state.file : null,
     error: state.status === 'error' ? state.message : null,
     polygons,
     issues,

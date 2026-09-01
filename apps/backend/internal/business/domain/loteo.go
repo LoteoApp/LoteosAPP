@@ -21,6 +21,8 @@ var (
 	ErrInvalidCurrency      = &Error{Kind: KindInvalid, Code: "invalid_moneda", Message: "La moneda debe ser un código de tres letras"}
 	ErrInvalidArea          = &Error{Kind: KindInvalid, Code: "invalid_superficie", Message: "La superficie debe ser mayor a cero, de hasta 4 decimales y menor a 100.000.000"}
 	ErrLoteFeaturesTooLong  = &Error{Kind: KindInvalid, Code: "lote_caracteristicas_too_long", Message: "Las características del lote no pueden superar los 2000 caracteres"}
+	ErrLoteoNotFound        = &Error{Kind: KindNotFound, Code: "loteo_not_found", Message: "El loteo solicitado no existe"}
+	ErrInvalidDxfFile       = &Error{Kind: KindInvalid, Code: "invalid_dxf_file", Message: "El archivo DXF es inválido o supera el tamaño permitido"}
 )
 
 // A DXF plan arrives as JSON from a client we don't control, so the vertex
@@ -46,6 +48,11 @@ const (
 	lotePriceDecimals     = 2
 	loteAreaDecimals      = 4
 )
+
+// MaxDxfFileBytes bounds the original DXF upload. It mirrors MAX_DXF_FILE_BYTES
+// in apps/frontend/src/features/lots/lib/readDxfFile.ts; the backend can't
+// trust the client's check.
+const MaxDxfFileBytes = 20_000_000
 
 // Point is a vertex in the DXF's own coordinate system. Georeferencing is a
 // separate concern, so no spatial reference system is implied here.
@@ -325,4 +332,23 @@ type Calle struct {
 	ID   string `json:"id"`
 	Name string `json:"nombre"`
 	Type string `json:"tipo"`
+}
+
+// NewLoteoDxfFile is the original DXF about to be recorded for a loteo, once
+// its bytes are stored in object storage under StorageKey.
+type NewLoteoDxfFile struct {
+	StorageKey   string
+	OriginalName string
+	MimeType     string
+	Sha256       string
+}
+
+// LoteoDxfFile is the recorded original DXF of a loteo.
+type LoteoDxfFile struct {
+	ID           string
+	StorageKey   string
+	OriginalName string
+	MimeType     string
+	Sha256       string
+	CreatedAt    time.Time
 }
