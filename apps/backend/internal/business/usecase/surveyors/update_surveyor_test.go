@@ -195,3 +195,23 @@ func TestUpdateSurveyorWrapsUnexpectedLookupFailure(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrDatabaseUnavailable)
 	}
 }
+
+func TestUpdateSurveyorRejectsUnprovisionedActor(t *testing.T) {
+	t.Parallel()
+
+	nombre := "Ana"
+	repository := &gatewayfake.UserRepository{
+		FoundByID:               activeSurveyor(),
+		FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado,
+	}
+	updateSurveyor := NewUpdateSurveyor(repository)
+
+	_, err := updateSurveyor.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "agri-1", &nombre, nil)
+
+	if !errors.Is(err, domain.ErrActorNoAprovisionado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrActorNoAprovisionado)
+	}
+	if repository.UpdateCalls != 0 {
+		t.Error("Execute() updated the agrimensor with an unprovisioned actor")
+	}
+}

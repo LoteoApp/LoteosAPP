@@ -146,3 +146,25 @@ func TestDeactivateSurveyorWrapsUnexpectedLookupFailure(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrDatabaseUnavailable)
 	}
 }
+
+func TestDeactivateSurveyorRejectsUnprovisionedActor(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{
+		FoundByID:               activeSurveyor(),
+		FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado,
+	}
+	deactivateSurveyor := NewDeactivateSurveyor(repository)
+
+	err := deactivateSurveyor.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "agri-1")
+
+	if !errors.Is(err, domain.ErrActorNoAprovisionado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrActorNoAprovisionado)
+	}
+	if errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+		t.Error("Execute() reported the actor's missing row as a missing agrimensor")
+	}
+	if repository.SoftDeleteCalls != 0 {
+		t.Error("Execute() gave de baja with an unprovisioned actor")
+	}
+}

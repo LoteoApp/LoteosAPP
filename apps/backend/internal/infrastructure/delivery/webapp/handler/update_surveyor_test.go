@@ -151,6 +151,7 @@ func TestUpdateSurveyorRoute(t *testing.T) {
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
 			{name: "invalid profile", err: domain.ErrPerfilInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_profile"},
 			{name: "not found", err: domain.ErrAgrimensorNoEncontrado, wantStatus: http.StatusNotFound, wantCode: "surveyor_not_found"},
+			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 

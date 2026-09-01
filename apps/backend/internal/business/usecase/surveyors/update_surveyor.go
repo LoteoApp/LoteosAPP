@@ -54,16 +54,16 @@ func (useCase *updateSurveyorUseCase) Execute(
 		return domain.Usuario{}, domain.ErrAgrimensorNoEncontrado
 	}
 
-	actor, err := useCase.repository.FindByAuthProviderID(ctx, subject)
+	actorID, err := resolveActorID(ctx, useCase.repository, subject)
 	if err != nil {
-		return domain.Usuario{}, fromRepository(err)
+		return domain.Usuario{}, err
 	}
 
 	updated, err := useCase.repository.Update(ctx, domain.UsuarioUpdate{
 		ID:                  id,
 		Nombre:              nombre,
 		Apellido:            apellido,
-		UsuarioModificacion: actor.ID,
+		UsuarioModificacion: actorID,
 	})
 	if err != nil {
 		return domain.Usuario{}, fromRepository(err)

@@ -43,10 +43,10 @@ func (useCase *deactivateSurveyorUseCase) Execute(
 		return domain.ErrAgrimensorDadoDeBaja
 	}
 
-	actor, err := useCase.repository.FindByAuthProviderID(ctx, subject)
+	actorID, err := resolveActorID(ctx, useCase.repository, subject)
 	if err != nil {
-		return fromRepository(err)
+		return err
 	}
 
-	return fromRepository(useCase.repository.SoftDelete(ctx, id, actor.ID))
+	return fromRepository(useCase.repository.SoftDelete(ctx, id, actorID))
 }

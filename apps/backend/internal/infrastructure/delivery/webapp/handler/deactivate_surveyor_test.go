@@ -99,6 +99,7 @@ func TestDeactivateSurveyorRoute(t *testing.T) {
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
 			{name: "not found", err: domain.ErrAgrimensorNoEncontrado, wantStatus: http.StatusNotFound, wantCode: "surveyor_not_found"},
 			{name: "already inactive", err: domain.ErrAgrimensorDadoDeBaja, wantStatus: http.StatusConflict, wantCode: "surveyor_already_inactive"},
+			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 
