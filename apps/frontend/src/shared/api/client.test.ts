@@ -94,6 +94,19 @@ describe('apiFetch', () => {
     expect((error as ApiError).code).toBe('network_error')
     expect((error as ApiError).status).toBe(0)
   })
+
+  it('forwards an abort signal and rethrows its AbortError untouched', async () => {
+    const mock = stubFetch(() => Promise.reject(new DOMException('aborted', 'AbortError')))
+    const controller = new AbortController()
+
+    const error = await apiFetch('/api/v1/loteos', { signal: controller.signal }).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(DOMException)
+    expect((error as DOMException).name).toBe('AbortError')
+    expect(mock.mock.calls[0][1]?.signal).toBe(controller.signal)
+  })
 })
 
 describe('messageFromError', () => {

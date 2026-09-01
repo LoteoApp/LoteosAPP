@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { Button } from '../../../shared/ui/button'
 import LoteoStatusBadge from './LoteoStatusBadge'
 
@@ -29,6 +30,13 @@ export default function LoteoPageHeader({
       </div>
 
       <div className="flex gap-2 md:items-end">
+        <Button
+          variant="ghost"
+          className="min-h-11 md:h-8 md:min-h-8"
+          render={<Link to="/lotes" />}
+        >
+          Volver al listado
+        </Button>
         <Button
           type="button"
           variant="ghost"
