@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway"
 )
 
 // A malformed UUID reaches PostgreSQL as a cast failure rather than a missing
@@ -20,10 +21,10 @@ import (
 const invalidTextRepresentationCode = "22P02"
 
 // Every insert below writes the geometry as WKT and lets PostgreSQL apply the
-// implicit text -> geometry cast that PostGIS registers. No PostGIS function
-// or type is named anywhere in this file, so the repository keeps working if
-// the extension lives in another schema or the application role's search_path
-// changes.
+// implicit text -> geometry cast that PostGIS registers, so the write path
+// names no PostGIS function or type. Reading a ring back needs ST_AsText,
+// which resolves as long as the PostGIS schema is on the search_path — the
+// same assumption the repository's integration tests already make.
 const insertManzanaEntitySQL = `
 	WITH entidad AS (
 		INSERT INTO dxf_entidades (loteo_id, handle_dxf, capa, geom, usuario_modificacion)
@@ -105,6 +106,247 @@ func (repository *LoteoRepository) Create(
 	}
 
 	return loteo, nil
+}
+
+// The two read queries below keep a loteo visible only when it's assigned to
+// the caller. The assignee id parameter being NULL means no limit
+// (administrador, administrativo). Otherwise each assignment path is gated by
+// its own boolean flag — the direct usuario_loteos path and the
+// inmobiliaria_loteos path via the caller's agency — so a caller only
+// reaches a loteo through the path its role actually grants. The three scope
+// parameters are the last ones in each query so the predicate reads the same
+// in both.
+
+const loteoScopedPredicate = `($%[1]d::uuid IS NULL OR (
+		($%[2]d AND EXISTS (
+			SELECT 1 FROM usuario_loteos ul
+			JOIN usuarios u ON u.id = ul.usuario_id
+			WHERE ul.loteo_id = l.id AND ul.fecha_baja IS NULL
+			  AND u.fecha_baja IS NULL AND u.auth_provider_id = $%[1]d::uuid
+		))
+		OR ($%[3]d AND EXISTS (
+			SELECT 1 FROM inmobiliaria_loteos il
+			JOIN usuarios u ON u.inmobiliaria_id = il.inmobiliaria_id
+			WHERE il.loteo_id = l.id AND il.fecha_baja IS NULL
+			  AND u.fecha_baja IS NULL AND u.auth_provider_id = $%[1]d::uuid
+		))
+	))`
+
+var listLoteosSQL = `
+	SELECT
+		l.id::text,
+		l.nombre,
+		COALESCE(l.ubicacion, ''),
+		COALESCE(l.descripcion, ''),
+		(SELECT count(*) FROM manzanas m WHERE m.loteo_id = l.id AND m.fecha_baja IS NULL),
+		(SELECT count(*) FROM lotes lo WHERE lo.loteo_id = l.id AND lo.fecha_baja IS NULL),
+		(SELECT count(*) FROM calles c WHERE c.loteo_id = l.id AND c.fecha_baja IS NULL),
+		l.dxf_entidad_id IS NOT NULL,
+		EXISTS (
+			SELECT 1 FROM archivos a
+			WHERE a.loteo_id = l.id AND a.categoria = 'dxf' AND a.fecha_baja IS NULL
+		),
+		l.fecha_creacion
+	FROM loteos l
+	WHERE l.fecha_baja IS NULL
+		AND ($1 = '' OR l.nombre ILIKE $2 ESCAPE '\' OR COALESCE(l.ubicacion, '') ILIKE $2 ESCAPE '\')
+		AND ` + fmt.Sprintf(loteoScopedPredicate, 3, 4, 5) + `
+	ORDER BY l.nombre, l.fecha_creacion
+`
+
+var getLoteoSQL = `
+	SELECT
+		l.id::text, l.nombre, COALESCE(l.ubicacion, ''), COALESCE(l.descripcion, ''),
+		l.fecha_creacion, ST_AsText(bd.geom)
+	FROM loteos l
+	LEFT JOIN dxf_entidades bd ON bd.id = l.dxf_entidad_id
+	WHERE l.fecha_baja IS NULL
+		AND l.id = $1::uuid
+		AND ` + fmt.Sprintf(loteoScopedPredicate, 2, 3, 4) + `
+`
+
+// List returns the active loteos as summaries. search filters by nombre or
+// ubicacion; scope keeps only the loteos the caller may see. An assignee id
+// that can't be parsed as a UUID yields an empty result rather than an error.
+func (repository *LoteoRepository) List(
+	ctx context.Context,
+	search string,
+	scope gateway.LoteoScope,
+) ([]domain.LoteoSummary, error) {
+	rows, err := repository.pool.Query(ctx, listLoteosSQL,
+		search, containsPattern(search),
+		scope.AssigneeAuthProviderID, scope.ByUserAssignment, scope.ByAgencyAssignment,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return []domain.LoteoSummary{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Empty, not nil, so no matches serializes as "loteos": [].
+	loteos := make([]domain.LoteoSummary, 0)
+	for rows.Next() {
+		var loteo domain.LoteoSummary
+		if err := rows.Scan(
+			&loteo.ID, &loteo.Name, &loteo.Location, &loteo.Description,
+			&loteo.ManzanaCount, &loteo.LoteCount, &loteo.CalleCount,
+			&loteo.HasPlan, &loteo.HasDxfFile, &loteo.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		loteos = append(loteos, loteo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return loteos, nil
+}
+
+// Get returns one loteo with its plan. A missing loteo, an unparseable id, or
+// a loteo outside the caller's scope all read as domain.ErrLoteoNotFound.
+func (repository *LoteoRepository) Get(
+	ctx context.Context,
+	loteoID string,
+	scope gateway.LoteoScope,
+) (domain.Loteo, error) {
+	var (
+		loteo       domain.Loteo
+		boundaryWKT *string
+	)
+	err := repository.pool.QueryRow(ctx, getLoteoSQL,
+		loteoID, scope.AssigneeAuthProviderID, scope.ByUserAssignment, scope.ByAgencyAssignment,
+	).Scan(
+		&loteo.ID, &loteo.Name, &loteo.Location, &loteo.Description,
+		&loteo.CreatedAt, &boundaryWKT,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Loteo{}, domain.ErrLoteoNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Loteo{}, domain.ErrLoteoNotFound
+		}
+		return domain.Loteo{}, err
+	}
+
+	if loteo.Boundary, err = polygonFromNullableWKT(boundaryWKT); err != nil {
+		return domain.Loteo{}, err
+	}
+	if loteo.Manzanas, err = repository.getManzanas(ctx, loteo.ID); err != nil {
+		return domain.Loteo{}, err
+	}
+	if loteo.Lotes, err = repository.getLotes(ctx, loteo.ID); err != nil {
+		return domain.Loteo{}, err
+	}
+	if loteo.Calles, err = repository.getCalles(ctx, loteo.ID); err != nil {
+		return domain.Loteo{}, err
+	}
+
+	return loteo, nil
+}
+
+func (repository *LoteoRepository) getManzanas(ctx context.Context, loteoID string) ([]domain.Manzana, error) {
+	rows, err := repository.pool.Query(ctx, `
+		SELECT m.id::text, COALESCE(m.numero, ''), ST_AsText(de.geom)
+		FROM manzanas m
+		LEFT JOIN dxf_entidades de ON de.id = m.dxf_entidad_id
+		WHERE m.loteo_id = $1::uuid AND m.fecha_baja IS NULL
+		ORDER BY m.fecha_creacion, m.id
+	`, loteoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	manzanas := make([]domain.Manzana, 0)
+	for rows.Next() {
+		var (
+			manzana domain.Manzana
+			wkt     *string
+		)
+		if err := rows.Scan(&manzana.ID, &manzana.Number, &wkt); err != nil {
+			return nil, err
+		}
+		if manzana.Polygon, err = polygonFromNullableWKT(wkt); err != nil {
+			return nil, err
+		}
+		manzanas = append(manzanas, manzana)
+	}
+
+	return manzanas, rows.Err()
+}
+
+func (repository *LoteoRepository) getLotes(ctx context.Context, loteoID string) ([]domain.Lote, error) {
+	rows, err := repository.pool.Query(ctx, `
+		SELECT lo.id::text, lo.manzana_id::text, COALESCE(lo.numero, ''),
+		       lo.precio::float8, COALESCE(lo.moneda, ''), lo.superficie::float8,
+		       COALESCE(lo.caracteristicas, ''), ST_AsText(de.geom)
+		FROM lotes lo
+		LEFT JOIN dxf_entidades de ON de.id = lo.dxf_entidad_id
+		WHERE lo.loteo_id = $1::uuid AND lo.fecha_baja IS NULL
+		ORDER BY lo.fecha_creacion, lo.id
+	`, loteoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	lotes := make([]domain.Lote, 0)
+	for rows.Next() {
+		var (
+			lote domain.Lote
+			wkt  *string
+		)
+		if err := rows.Scan(
+			&lote.ID, &lote.ManzanaID, &lote.Number,
+			&lote.Price, &lote.Currency, &lote.Area,
+			&lote.Features, &wkt,
+		); err != nil {
+			return nil, err
+		}
+		if lote.Polygon, err = polygonFromNullableWKT(wkt); err != nil {
+			return nil, err
+		}
+		lotes = append(lotes, lote)
+	}
+
+	return lotes, rows.Err()
+}
+
+func (repository *LoteoRepository) getCalles(ctx context.Context, loteoID string) ([]domain.Calle, error) {
+	rows, err := repository.pool.Query(ctx, `
+		SELECT c.id::text, COALESCE(c.nombre, ''), COALESCE(c.tipo, ''), ST_AsText(de.geom)
+		FROM calles c
+		LEFT JOIN dxf_entidades de ON de.id = c.dxf_entidad_id
+		WHERE c.loteo_id = $1::uuid AND c.fecha_baja IS NULL
+		ORDER BY c.fecha_creacion, c.id
+	`, loteoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	calles := make([]domain.Calle, 0)
+	for rows.Next() {
+		var (
+			calle domain.Calle
+			wkt   *string
+		)
+		if err := rows.Scan(&calle.ID, &calle.Name, &calle.Type, &wkt); err != nil {
+			return nil, err
+		}
+		if calle.Polygon, err = polygonFromNullableWKT(wkt); err != nil {
+			return nil, err
+		}
+		calles = append(calles, calle)
+	}
+
+	return calles, rows.Err()
 }
 
 // insertPlano fills loteo.Manzanas and loteo.Calles in the same order as the

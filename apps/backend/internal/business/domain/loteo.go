@@ -300,13 +300,16 @@ func isCurrencyCode(currency string) bool {
 }
 
 // Loteo lists its manzanas, lotes and calles flat, the way the tables do:
-// a lote names its manzana through ManzanaID. Kept in the order the plan was
-// submitted in, so a client can match each row back to the polygon it sent.
+// a lote names its manzana through ManzanaID. On a create it keeps the order
+// the plan was submitted in, so a client can match each row back to the
+// polygon it sent. Boundary and the per-entity Polygon are filled when the
+// loteo is read back with its geometry, and omitted otherwise.
 type Loteo struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"nombre"`
 	Location    string    `json:"ubicacion"`
 	Description string    `json:"descripcion"`
+	Boundary    Polygon   `json:"contorno,omitempty"`
 	Manzanas    []Manzana `json:"manzanas"`
 	Lotes       []Lote    `json:"lotes"`
 	Calles      []Calle   `json:"calles"`
@@ -314,8 +317,9 @@ type Loteo struct {
 }
 
 type Manzana struct {
-	ID     string `json:"id"`
-	Number string `json:"numero"`
+	ID      string  `json:"id"`
+	Number  string  `json:"numero"`
+	Polygon Polygon `json:"poligono,omitempty"`
 }
 
 type Lote struct {
@@ -326,12 +330,30 @@ type Lote struct {
 	Currency  string   `json:"moneda"`
 	Area      *float64 `json:"superficie"`
 	Features  string   `json:"caracteristicas"`
+	Polygon   Polygon  `json:"poligono,omitempty"`
 }
 
 type Calle struct {
-	ID   string `json:"id"`
-	Name string `json:"nombre"`
-	Type string `json:"tipo"`
+	ID      string  `json:"id"`
+	Name    string  `json:"nombre"`
+	Type    string  `json:"tipo"`
+	Polygon Polygon `json:"poligono,omitempty"`
+}
+
+// LoteoSummary is a loteo as it appears in a listing: identity, how much of a
+// plan it already carries, and whether its original DXF is on file. It never
+// carries geometry — the list stays cheap to build and small on the wire.
+type LoteoSummary struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"nombre"`
+	Location     string    `json:"ubicacion"`
+	Description  string    `json:"descripcion"`
+	ManzanaCount int       `json:"cantidadManzanas"`
+	LoteCount    int       `json:"cantidadLotes"`
+	CalleCount   int       `json:"cantidadCalles"`
+	HasPlan      bool      `json:"tienePlano"`
+	HasDxfFile   bool      `json:"tieneDxf"`
+	CreatedAt    time.Time `json:"fechaCreacion"`
 }
 
 // NewLoteoDxfFile is the original DXF about to be recorded for a loteo, once
