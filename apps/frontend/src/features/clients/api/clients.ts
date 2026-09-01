@@ -4,15 +4,26 @@ import type { Cliente, ClienteFormValues } from '../types'
 const CLIENTS_PATH = '/api/v1/clientes'
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
 
-// celular and email travel as optional strings: domain.Cliente serializes
-// them with omitempty, so an absent value arrives as undefined rather than
-// as an empty string.
-type ClienteResponse = Omit<Cliente, 'celular' | 'email'> & {
+type ClientResponse = Omit<Cliente, 'celular' | 'email'> & {
   celular?: string | null
   email?: string | null
 }
 
-function toCliente(raw: ClienteResponse): Cliente {
+function isClientResponse(value: unknown): value is ClientResponse {
+  if (value === null || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.nombre === 'string' &&
+    typeof candidate.apellido === 'string' &&
+    typeof candidate.dni === 'string'
+  )
+}
+
+function toClient(raw: ClientResponse): Cliente {
   return {
     id: raw.id,
     nombre: raw.nombre,
@@ -39,6 +50,23 @@ async function readErrorMessage(response: Response): Promise<string> {
   return GENERIC_ERROR
 }
 
+async function readJSON(response: Response): Promise<unknown> {
+  try {
+    return await response.json()
+  } catch {
+    throw new Error(GENERIC_ERROR)
+  }
+}
+
+async function readClient(response: Response): Promise<Cliente> {
+  const body = await readJSON(response)
+  if (!isClientResponse(body)) {
+    throw new Error(GENERIC_ERROR)
+  }
+
+  return toClient(body)
+}
+
 async function send(token: string, path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(`${apiUrl}${path}`, {
     ...init,
@@ -55,11 +83,23 @@ async function send(token: string, path: string, init: RequestInit = {}): Promis
   return response
 }
 
-export async function listClients(token: string): Promise<Cliente[]> {
-  const response = await send(token, CLIENTS_PATH)
-  const body: { clientes?: ClienteResponse[] } = await response.json()
+export async function listClients(token: string, signal?: AbortSignal): Promise<Cliente[]> {
+  const response = await send(token, CLIENTS_PATH, { signal })
+  const body = await readJSON(response)
 
-  return (body.clientes ?? []).map(toCliente)
+  if (body === null || typeof body !== 'object' || !('clientes' in body)) {
+    throw new Error(GENERIC_ERROR)
+  }
+
+  const { clientes } = body as { clientes?: unknown }
+  if (clientes === null || clientes === undefined) {
+    return []
+  }
+  if (!Array.isArray(clientes) || !clientes.every(isClientResponse)) {
+    throw new Error(GENERIC_ERROR)
+  }
+
+  return clientes.map(toClient)
 }
 
 export async function createClient(token: string, values: ClienteFormValues): Promise<Cliente> {
@@ -68,7 +108,7 @@ export async function createClient(token: string, values: ClienteFormValues): Pr
     body: JSON.stringify(values),
   })
 
-  return toCliente((await response.json()) as ClienteResponse)
+  return readClient(response)
 }
 
 export async function updateClient(
@@ -81,7 +121,7 @@ export async function updateClient(
     body: JSON.stringify(values),
   })
 
-  return toCliente((await response.json()) as ClienteResponse)
+  return readClient(response)
 }
 
 export async function deleteClient(token: string, id: string): Promise<void> {

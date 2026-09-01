@@ -66,10 +66,44 @@ describe('listClients', () => {
     expect(cliente.email).toBe('')
   })
 
-  it('returns an empty list when the response carries no clientes', async () => {
-    stubFetch(jsonResponse(200, {}))
+  it('returns an empty list when clientes is null', async () => {
+    stubFetch(jsonResponse(200, { clientes: null }))
 
     await expect(listClients('token-123')).resolves.toEqual([])
+  })
+
+  it('rejects a 2xx body that does not carry the expected contract', async () => {
+    stubFetch(jsonResponse(200, {}))
+
+    await expect(listClients('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('rejects a 2xx body whose clientes are not clients', async () => {
+    stubFetch(jsonResponse(200, { clientes: [{ id: 'cliente-1' }] }))
+
+    await expect(listClients('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('rejects a 2xx body that is not json', async () => {
+    stubFetch(new Response('not json', { status: 200 }))
+
+    await expect(listClients('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('forwards the abort signal to fetch', async () => {
+    const fetchMock = stubFetch(jsonResponse(200, { clientes: [] }))
+    const controller = new AbortController()
+
+    await listClients('token-123', controller.signal)
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(init.signal).toBe(controller.signal)
   })
 
   it('throws the message returned by the backend', async () => {
@@ -112,6 +146,20 @@ describe('createClient', () => {
     expect(init.method).toBe('POST')
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
     expect(JSON.parse(String(init.body))).toMatchObject({ nombre: 'Ana', dni: '30111222' })
+  })
+
+  it('rejects a malformed created client', async () => {
+    stubFetch(jsonResponse(201, { id: 'cliente-1' }))
+
+    await expect(
+      createClient('token-123', {
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        dni: '30111222',
+        celular: '',
+        email: '',
+      })
+    ).rejects.toThrow('No se pudo completar la operación, intentá nuevamente.')
   })
 
   it('throws the conflict message when the dni is taken', async () => {

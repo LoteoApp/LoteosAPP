@@ -17,6 +17,10 @@ type StoredCliente = {
 let stored: StoredCliente[] = []
 let failure: { status: number; message: string } | null = null
 let nextId = 0
+let postCalls = 0
+let postGate: Promise<void> | null = null
+let getGate: Promise<void> | null = null
+let rejectWith: unknown = null
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -25,9 +29,6 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
-// A minimal stand-in for /api/v1/clientes that keeps the created rows, so a
-// test can assert what the screen shows after it reloads from the API rather
-// than what it kept in local state.
 function installFetch() {
   vi.stubGlobal(
     'fetch',
@@ -35,15 +36,26 @@ function installFetch() {
       const url = String(input)
       const method = init?.method ?? 'GET'
 
+      if (rejectWith) {
+        throw rejectWith
+      }
+
       if (failure) {
         return jsonResponse(failure.status, { code: 'error', message: failure.message })
       }
 
       if (method === 'GET') {
+        if (getGate) {
+          await getGate
+        }
         return jsonResponse(200, { clientes: stored })
       }
 
       if (method === 'POST') {
+        postCalls += 1
+        if (postGate) {
+          await postGate
+        }
         const values = JSON.parse(String(init?.body)) as Omit<StoredCliente, 'id'>
         if (stored.some((cliente) => cliente.dni === values.dni)) {
           return jsonResponse(409, { code: 'dni_in_use', message: 'El DNI ya está en uso' })
@@ -84,7 +96,7 @@ function renderClientsPage(role: string | null = 'administrador') {
     logout: vi.fn(),
   }
 
-  render(
+  return render(
     <AuthContext.Provider value={value}>
       <ClientsPage />
     </AuthContext.Provider>,
@@ -110,6 +122,10 @@ beforeEach(() => {
   stored = []
   failure = null
   nextId = 0
+  postCalls = 0
+  postGate = null
+  getGate = null
+  rejectWith = null
   installFetch()
 })
 
@@ -151,6 +167,39 @@ describe('ClientsPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('does not claim the list is empty when it failed to load', async () => {
+    failure = { status: 403, message: 'Tu usuario no está habilitado para operar en el sistema' }
+    renderClientsPage()
+
+    await screen.findByText('Tu usuario no está habilitado para operar en el sistema')
+
+    expect(screen.queryByText('No hay clientes cargados todavía.')).not.toBeInTheDocument()
+  })
+
+  it('shows a generic message when the failure carries no message', async () => {
+    rejectWith = { status: 500 }
+    renderClientsPage()
+
+    expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument()
+  })
+
+  it('drops the pending load when the screen is unmounted', async () => {
+    let releaseGet = () => {}
+    getGate = new Promise<void>((resolve) => {
+      releaseGet = resolve
+    })
+    stored = [{ id: 'cliente-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }]
+
+    const { unmount } = renderClientsPage()
+    expect(screen.getByText('Cargando clientes...')).toBeInTheDocument()
+
+    unmount()
+    releaseGet()
+    await Promise.resolve()
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+  })
+
   it('creates a new client and shows it in the list', async () => {
     const user = userEvent.setup()
     renderClientsPage()
@@ -163,6 +212,30 @@ describe('ClientsPage', () => {
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
     expect(screen.getByText('DNI 30111222')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Crear cliente' })).not.toBeInTheDocument()
+  })
+
+  it('sends a single request when the alta is submitted twice in a row', async () => {
+    const user = userEvent.setup()
+    let releasePost = () => {}
+    postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    renderClientsPage()
+    await screen.findByText('No hay clientes cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
+    await fillClientForm(user, { nombre: 'Ana', apellido: 'Pérez', dni: '30111222' })
+
+    const submit = screen.getByRole('button', { name: 'Crear cliente' })
+    await user.click(submit)
+
+    expect(await screen.findByRole('button', { name: 'Guardando...' })).toBeDisabled()
+
+    await user.click(submit)
+    releasePost()
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(postCalls).toBe(1)
   })
 
   it('shows contact info when celular or email are provided', async () => {
