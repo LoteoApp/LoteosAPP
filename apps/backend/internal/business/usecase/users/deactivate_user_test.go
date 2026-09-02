@@ -65,24 +65,18 @@ func TestDeactivateUserRejectsUnknownID(t *testing.T) {
 func TestDeactivateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 	t.Parallel()
 
-	for _, rol := range []string{domain.RolAgrimensor, domain.RolAdministrador} {
-		t.Run(rol, func(t *testing.T) {
-			t.Parallel()
+	repository := &gatewayfake.UserRepository{
+		FoundByID: domain.Usuario{ID: "user-2", Rol: domain.RolAdministrador},
+	}
+	deactivateUser := NewDeactivateUser(repository)
 
-			repository := &gatewayfake.UserRepository{
-				FoundByID: domain.Usuario{ID: "user-2", Rol: domain.Rol(rol)},
-			}
-			deactivateUser := NewDeactivateUser(repository)
+	err := deactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-2")
 
-			err := deactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-2")
-
-			if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
-			}
-			if repository.SoftDeleteCalls != 0 {
-				t.Error("Execute() should not give de baja a user of a role this ABM doesn't manage")
-			}
-		})
+	if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+	}
+	if repository.SoftDeleteCalls != 0 {
+		t.Error("Execute() should not give de baja a user of a role this ABM doesn't manage")
 	}
 }
 

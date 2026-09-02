@@ -1,9 +1,10 @@
-export const GESTIONABLE_ROLES = ['administrativo', 'escribano', 'inmobiliaria'] as const
+export const GESTIONABLE_ROLES = ['administrativo', 'escribano', 'inmobiliaria', 'agrimensor'] as const
 
 export type GestionableRol = (typeof GESTIONABLE_ROLES)[number]
 
 export const ROLE_LABELS: Record<GestionableRol, string> = {
   administrativo: 'Administrativo',
+  agrimensor: 'Agrimensor',
   escribano: 'Escribano',
   inmobiliaria: 'Inmobiliaria',
 }

@@ -79,25 +79,19 @@ func TestReactivateUserRejectsUnknownID(t *testing.T) {
 func TestReactivateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 	t.Parallel()
 
-	for _, rol := range []string{domain.RolAgrimensor, domain.RolAdministrador} {
-		t.Run(rol, func(t *testing.T) {
-			t.Parallel()
+	baja := time.Now()
+	repository := &gatewayfake.UserRepository{
+		FoundByID: domain.Usuario{ID: "user-2", Rol: domain.RolAdministrador, FechaBaja: &baja},
+	}
+	reactivateUser := NewReactivateUser(repository)
 
-			baja := time.Now()
-			repository := &gatewayfake.UserRepository{
-				FoundByID: domain.Usuario{ID: "user-2", Rol: domain.Rol(rol), FechaBaja: &baja},
-			}
-			reactivateUser := NewReactivateUser(repository)
+	_, err := reactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-2")
 
-			_, err := reactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-2")
-
-			if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
-			}
-			if repository.ReactivateCalls != 0 {
-				t.Error("Execute() should not reactivate a user of a role this ABM doesn't manage")
-			}
-		})
+	if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+	}
+	if repository.ReactivateCalls != 0 {
+		t.Error("Execute() should not reactivate a user of a role this ABM doesn't manage")
 	}
 }
 

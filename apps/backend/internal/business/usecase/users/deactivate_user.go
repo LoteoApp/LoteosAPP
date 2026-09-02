@@ -8,9 +8,9 @@ import (
 )
 
 // DeactivateUser gives a user managed by this ABM (administrativo,
-// escribano, inmobiliaria) de baja. The row is kept and only marked with
-// its fecha de baja, so the records that name it stay readable. Only
-// callers with the administrador role may do this.
+// escribano, inmobiliaria, agrimensor) de baja. The row is kept and only
+// marked with its fecha de baja, so the records that name it stay
+// readable. Only callers with the administrador role may do this.
 type DeactivateUser interface {
 	Execute(ctx context.Context, actorRoles []string, subject, id string) error
 }

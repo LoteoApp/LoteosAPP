@@ -18,9 +18,9 @@ func NewListUsersHandler(listUsers users.ListUsers) *ListUsersHandler {
 }
 
 // Handle lists the users this ABM manages (administrativo, escribano,
-// inmobiliaria) for administrador callers. Only the active ones unless the
-// request asks for the rest with ?incluirBajas=true. It must run behind
-// middleware.RequireAuth.
+// inmobiliaria, agrimensor) for administrador callers. Only the active
+// ones unless the request asks for the rest with ?incluirBajas=true. It
+// must run behind middleware.RequireAuth.
 func (handler *ListUsersHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	// PrincipalFromContext is always populated here: this handler only ever
 	// runs behind middleware.RequireAuth.

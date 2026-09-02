@@ -21,8 +21,8 @@ type UpdateUserInput struct {
 }
 
 // UpdateUser modifies an active user managed by this ABM (administrativo,
-// escribano, inmobiliaria). Only callers with the administrador role may do
-// this.
+// escribano, inmobiliaria, agrimensor). Only callers with the
+// administrador role may do this.
 type UpdateUser interface {
 	Execute(ctx context.Context, input UpdateUserInput) (domain.Usuario, error)
 }
@@ -49,9 +49,9 @@ func (useCase *updateUserUseCase) Execute(ctx context.Context, input UpdateUserI
 		return domain.Usuario{}, domain.ErrUsuarioSinCambios
 	}
 
-	// A target of a role this ABM doesn't manage (agrimensor,
-	// administrador) is reported as not found, so these routes can't be
-	// used to rename accounts outside their scope.
+	// A target of a role this ABM doesn't manage (administrador) is
+	// reported as not found, so these routes can't be used to rename
+	// accounts outside their scope.
 	target, err := useCase.repository.FindByID(ctx, input.ID)
 	if err != nil {
 		return domain.Usuario{}, err

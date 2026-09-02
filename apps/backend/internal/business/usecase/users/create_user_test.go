@@ -83,10 +83,9 @@ func TestCreateUserRejectsInvalidRol(t *testing.T) {
 func TestCreateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 	t.Parallel()
 
-	// agrimensor has its own module (/api/v1/agrimensores); administrador
-	// isn't created through this route either. Both are valid domain.Rol
-	// values, but not ones this use case accepts.
-	for _, rol := range []string{domain.RolAgrimensor, domain.RolAdministrador} {
+	// administrador isn't created through this route: it's a valid
+	// domain.Rol value, but not one this use case accepts.
+	for _, rol := range []string{domain.RolAdministrador} {
 		t.Run(rol, func(t *testing.T) {
 			t.Parallel()
 

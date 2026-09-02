@@ -417,6 +417,28 @@ describe('UsersPage', () => {
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
   })
 
+  it('creates and filters by the agrimensor role', async () => {
+    const user = userEvent.setup()
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, {
+      nombre: 'Mara',
+      apellido: 'Cruz',
+      email: 'mara@example.com',
+      rol: 'agrimensor',
+    })
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    const card = (await screen.findByText('Mara Cruz')).closest('li') as HTMLElement
+    expect(within(card).getByText('Agrimensor')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Rol'), 'agrimensor')
+
+    expect(screen.getByText('Mara Cruz')).toBeInTheDocument()
+  })
+
   it('filters the list by estado', async () => {
     const user = userEvent.setup()
     stored = [

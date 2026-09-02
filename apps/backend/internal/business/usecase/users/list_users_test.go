@@ -41,10 +41,12 @@ func TestListUsersReturnsOnlyActiveByDefault(t *testing.T) {
 	if len(usuarios) != 1 || usuarios[0].ID != "u-1" {
 		t.Errorf("Execute() = %#v", usuarios)
 	}
-	if len(repository.ListByRolesInput) != 3 {
-		t.Fatalf("Execute() queried roles = %v, want the 3 gestionable roles", repository.ListByRolesInput)
+	if len(repository.ListByRolesInput) != 4 {
+		t.Fatalf("Execute() queried roles = %v, want the 4 gestionable roles", repository.ListByRolesInput)
 	}
-	for _, rol := range []domain.Rol{domain.RolAdministrativo, domain.RolEscribano, domain.RolInmobiliaria} {
+	for _, rol := range []domain.Rol{
+		domain.RolAdministrativo, domain.RolAgrimensor, domain.RolEscribano, domain.RolInmobiliaria,
+	} {
 		found := false
 		for _, queried := range repository.ListByRolesInput {
 			if queried == rol {

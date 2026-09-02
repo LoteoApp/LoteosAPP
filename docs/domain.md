@@ -85,20 +85,25 @@ quien asigna loteos y permisos.
 
 Los clientes no son usuarios del sistema.
 
-### ABM de administrativo, escribano e inmobiliaria
+### ABM de administrativo, escribano, inmobiliaria y agrimensor
 
 El administrador da de alta, edita (nombre y apellido), da de baja y
-reactiva usuarios con rol administrativo, escribano o inmobiliaria desde el
-módulo **Usuarios**. El email identifica la cuenta en el proveedor de
-identidad y no se edita desde acá; el rol se fija en el alta y no cambia
-después. La baja es lógica (`usuarios.fecha_baja`): el usuario deja de poder
-operar pero su fila se conserva para no romper las FK de auditoría
-(`usuario_modificacion`, `usuario_loteos`, reservas, ventas). Reactivar
-limpia `fecha_baja` y deja al usuario operar de nuevo; no restaura ningún
-otro estado (por ejemplo, no reasigna loteos que se le hayan quitado
-mientras estaba de baja). El rol agrimensor tiene su propio ABM
-(`features/surveyors`, `/api/v1/agrimensores`) y el administrador no se
-gestiona desde ningún ABM.
+reactiva usuarios con rol administrativo, escribano, inmobiliaria o
+agrimensor desde el módulo **Usuarios**. El email identifica la cuenta en
+el proveedor de identidad y no se edita desde acá; el rol se fija en el
+alta y no cambia después. La baja es lógica (`usuarios.fecha_baja`): el
+usuario deja de poder operar pero su fila se conserva para no romper las FK
+de auditoría (`usuario_modificacion`, `usuario_loteos`, reservas, ventas).
+Reactivar limpia `fecha_baja` y deja al usuario operar de nuevo; no
+restaura ningún otro estado (por ejemplo, no reasigna loteos que se le
+hayan quitado mientras estaba de baja). El administrador no se gestiona
+desde ningún ABM.
+
+Agrimensor iba a tener un ABM propio (`features/surveyors`,
+`/api/v1/agrimensores`, PR #164), pero se deprecó antes de mergear: un
+agrimensor es un usuario con `rol = 'agrimensor'` como cualquier otro, sin
+necesidad de un módulo aparte, así que quedó unificado en esta misma
+pantalla.
 
 La baja bloquea el acceso de inmediato, no solo la visibilidad en el
 listado: `middleware.RequireActiveAccount` corre en cada request autenticado

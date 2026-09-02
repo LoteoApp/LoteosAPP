@@ -11,8 +11,7 @@ import (
 
 // CreateUser gives a new user access to the system. Only callers with the
 // administrador role may do this. The role must be one of
-// gestionableRoles — this ABM doesn't create agrimensor accounts (its own
-// module does, under /api/v1/agrimensores) or other administrador accounts.
+// gestionableRoles — this ABM doesn't create other administrador accounts.
 type CreateUser interface {
 	Execute(ctx context.Context, actorRoles []string, nombre, apellido, email, rol string) (domain.Usuario, string, error)
 }

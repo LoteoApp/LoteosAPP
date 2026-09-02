@@ -8,8 +8,8 @@ import (
 )
 
 // ReactivateUser undoes a baja on a user managed by this ABM (administrativo,
-// escribano, inmobiliaria), the inverse of DeactivateUser. Only callers with
-// the administrador role may do this.
+// escribano, inmobiliaria, agrimensor), the inverse of DeactivateUser. Only
+// callers with the administrador role may do this.
 type ReactivateUser interface {
 	Execute(ctx context.Context, actorRoles []string, subject, id string) (domain.Usuario, error)
 }

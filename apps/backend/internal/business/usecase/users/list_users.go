@@ -8,7 +8,8 @@ import (
 )
 
 // ListUsers lists the users this ABM manages (administrativo, escribano,
-// inmobiliaria). Only callers with the administrador role may do this.
+// inmobiliaria, agrimensor). Only callers with the administrador role may
+// do this.
 type ListUsers interface {
 	Execute(ctx context.Context, actorRoles []string, includeInactive bool) ([]domain.Usuario, error)
 }

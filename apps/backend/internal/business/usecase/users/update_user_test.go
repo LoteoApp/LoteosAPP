@@ -135,26 +135,20 @@ func TestUpdateUserRejectsUnknownID(t *testing.T) {
 func TestUpdateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 	t.Parallel()
 
-	for _, rol := range []string{domain.RolAgrimensor, domain.RolAdministrador} {
-		t.Run(rol, func(t *testing.T) {
-			t.Parallel()
+	repository := &gatewayfake.UserRepository{
+		FoundByID: domain.Usuario{ID: "user-2", Rol: domain.RolAdministrador},
+	}
+	updateUser := NewUpdateUser(repository)
 
-			repository := &gatewayfake.UserRepository{
-				FoundByID: domain.Usuario{ID: "user-2", Rol: domain.Rol(rol)},
-			}
-			updateUser := NewUpdateUser(repository)
+	_, err := updateUser.Execute(context.Background(), UpdateUserInput{
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "admin-sub", ID: "user-2", Nombre: stringPtr("Ana"),
+	})
 
-			_, err := updateUser.Execute(context.Background(), UpdateUserInput{
-				ActorRoles: []string{domain.RolAdministrador}, Subject: "admin-sub", ID: "user-2", Nombre: stringPtr("Ana"),
-			})
-
-			if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
-			}
-			if repository.UpdateCalls != 0 {
-				t.Error("Execute() should not update a user of a role this ABM doesn't manage")
-			}
-		})
+	if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+	}
+	if repository.UpdateCalls != 0 {
+		t.Error("Execute() should not update a user of a role this ABM doesn't manage")
 	}
 }
 
