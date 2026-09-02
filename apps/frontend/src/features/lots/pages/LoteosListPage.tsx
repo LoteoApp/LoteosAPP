@@ -17,7 +17,14 @@ export default function LoteosListPage({ accessToken }: LoteosListPageProps) {
   const { loteos, isLoading, error } = useLoteos(accessToken ?? '', search)
 
   const isSearching = search.trim() !== ''
-  const showSearch = loteos.length > 0 || isSearching
+  // Once a load brings loteos the search box stays: clearing a search that
+  // matched nothing leaves the list empty until the debounced refetch lands,
+  // and unmounting the input there would steal the focus mid-typing.
+  const [hasLoadedLoteos, setHasLoadedLoteos] = useState(false)
+  if (!hasLoadedLoteos && loteos.length > 0) {
+    setHasLoadedLoteos(true)
+  }
+  const showSearch = hasLoadedLoteos || isSearching
 
   return (
     <section className="flex flex-col gap-4">

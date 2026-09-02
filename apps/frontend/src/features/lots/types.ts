@@ -44,8 +44,8 @@ export type DxfParseResult = {
   issues: DxfValidationIssue[]
 }
 
-// LoteoSummary is a loteo as GET /api/v1/loteos returns it: identity, how
-// much of a plan it carries and whether its DXF is on file. No geometry.
+// LoteoSummary is a loteo as GET /api/v1/loteos returns it: identity and how
+// much of a plan it carries. No geometry.
 export type LoteoSummary = {
   id: string
   nombre: string
@@ -55,6 +55,4 @@ export type LoteoSummary = {
   cantidadLotes: number
   cantidadCalles: number
   tienePlano: boolean
-  tieneDxf: boolean
-  fechaCreacion: string
 }

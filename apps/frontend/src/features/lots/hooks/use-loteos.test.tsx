@@ -19,8 +19,6 @@ function summary(overrides: Partial<LoteoSummary> = {}): LoteoSummary {
     cantidadLotes: 148,
     cantidadCalles: 8,
     tienePlano: true,
-    tieneDxf: true,
-    fechaCreacion: '2026-01-10T12:00:00Z',
     ...overrides,
   }
 }
@@ -50,6 +48,22 @@ describe('useLoteos', () => {
     listLoteosMock.mockRejectedValue(new Error('No autorizado'))
 
     const { result } = renderHook(() => useLoteos('token-123', ''))
+
+    await waitFor(() => expect(result.current.error).toBe('No autorizado'))
+    expect(result.current.loteos).toEqual([])
+  })
+
+  it('drops the loaded result when a later request fails', async () => {
+    listLoteosMock.mockResolvedValueOnce([summary()])
+
+    const { result, rerender } = renderHook(({ search }) => useLoteos('token-123', search), {
+      initialProps: { search: '' },
+    })
+
+    await waitFor(() => expect(result.current.loteos).toHaveLength(1))
+
+    listLoteosMock.mockRejectedValueOnce(new Error('No autorizado'))
+    rerender({ search: 'acacias' })
 
     await waitFor(() => expect(result.current.error).toBe('No autorizado'))
     expect(result.current.loteos).toEqual([])

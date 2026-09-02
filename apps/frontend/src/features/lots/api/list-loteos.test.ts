@@ -26,8 +26,6 @@ const loteoResponse = {
   cantidadLotes: 148,
   cantidadCalles: 8,
   tienePlano: true,
-  tieneDxf: true,
-  fechaCreacion: '2026-01-10T12:00:00Z',
 }
 
 afterEach(() => {

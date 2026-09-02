@@ -24,9 +24,7 @@ function isLoteoSummaryResponse(value: unknown): value is LoteoSummaryResponse {
     typeof candidate.cantidadManzanas === 'number' &&
     typeof candidate.cantidadLotes === 'number' &&
     typeof candidate.cantidadCalles === 'number' &&
-    typeof candidate.tienePlano === 'boolean' &&
-    typeof candidate.tieneDxf === 'boolean' &&
-    typeof candidate.fechaCreacion === 'string'
+    typeof candidate.tienePlano === 'boolean'
   )
 }
 
@@ -40,8 +38,6 @@ function toLoteoSummary(raw: LoteoSummaryResponse): LoteoSummary {
     cantidadLotes: raw.cantidadLotes,
     cantidadCalles: raw.cantidadCalles,
     tienePlano: raw.tienePlano,
-    tieneDxf: raw.tieneDxf,
-    fechaCreacion: raw.fechaCreacion,
   }
 }
 
