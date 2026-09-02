@@ -15,6 +15,10 @@ const (
 	agenciesTimeout = 5 * time.Second
 	lotesTimeout    = 10 * time.Second
 
+	// Reading a loteo runs several queries (loteo, manzanas, lotes, calles),
+	// so it gets more room than a request that touches one row.
+	loteosReadTimeout = 15 * time.Second
+
 	// Registering a loteo writes one row per polygon of a whole cadastral
 	// plan in a single transaction, so it gets more room than a request that
 	// touches one row.
@@ -45,6 +49,8 @@ type Handlers struct {
 	CreateLoteo     *handler.CreateLoteoHandler
 	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
+	ListLoteos      *handler.ListLoteosHandler
+	GetLoteo        *handler.GetLoteoHandler
 }
 
 func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Verifier) {
@@ -63,6 +69,8 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("GET /api/v1/inmobiliarias", requireAuth(handler.Adapt(handlers.ListAgencies, agenciesTimeout)))
 
 	mux.Handle("POST /api/v1/loteos", requireAuth(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
+	mux.Handle("GET /api/v1/loteos", requireAuth(handler.Adapt(handlers.ListLoteos, loteosReadTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}", requireAuth(handler.Adapt(handlers.GetLoteo, loteosReadTimeout)))
 	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", requireAuth(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", requireAuth(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
 }
