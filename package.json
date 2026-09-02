@@ -15,5 +15,10 @@
     "typecheck": "pnpm --filter @loteos/frontend typecheck",
     "lint": "pnpm --filter @loteos/frontend lint",
     "preview": "pnpm --filter @loteos/frontend preview"
+  },
+  "pnpm": {
+    "overrides": {
+      "fast-uri@<3.1.6": "^3.1.6"
+    }
   }
 }
