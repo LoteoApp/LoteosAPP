@@ -1,9 +1,7 @@
 import type { DxfPolygon, LoteoDetail } from '../types'
 
-// planFromLoteoDetail turns the persisted geometry that GET /api/v1/loteos/{id}
-// returns into the DxfPolygon list DxfViewer already renders. Entities without a
-// ring are dropped. The id prefixes keep a lote and a manzana that happen to
-// share a UUID from colliding on their React key.
+// The id prefixes keep a lote and a manzana that share a database UUID from
+// colliding on their React key once flattened into one list.
 export function planFromLoteoDetail(loteo: LoteoDetail): DxfPolygon[] {
   const polygons: DxfPolygon[] = []
 

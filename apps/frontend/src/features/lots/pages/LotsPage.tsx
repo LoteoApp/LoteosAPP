@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
@@ -17,6 +18,13 @@ export default function LotsPage({ accessToken }: LotsPageProps) {
   const fields = useLoteoFields()
   const plan = useDxfPlan()
   const saver = useSaveLoteo(accessToken)
+  const [createdLoteoId, setCreatedLoteoId] = useState<string | null>(null)
+
+  function goToCreatedLoteo() {
+    if (createdLoteoId) {
+      navigate(`/lotes/${createdLoteoId}`)
+    }
+  }
 
   function handleDiscard() {
     fields.reset()
@@ -31,10 +39,17 @@ export default function LotsPage({ accessToken }: LotsPageProps) {
     }
     fields.reset()
     plan.reset()
-    // A DXF-upload warning leaves the retry UI on this screen as the only way to
-    // finish the upload; only a clean alta navigates away to the new loteo.
+    setCreatedLoteoId(outcome.loteoId)
+    // A DXF-upload warning keeps the retry UI on this screen; the alta finishes
+    // (and navigates) once the retry succeeds or the user continues without it.
     if (outcome.dxfWarning === null) {
       navigate(`/lotes/${outcome.loteoId}`)
+    }
+  }
+
+  async function handleRetryDxf() {
+    if (await saver.retryDxf()) {
+      goToCreatedLoteo()
     }
   }
 
@@ -62,28 +77,40 @@ export default function LotsPage({ accessToken }: LotsPageProps) {
           <AlertTitle>Loteo creado</AlertTitle>
           <AlertDescription>
             {saver.dxfWarning ?? 'Ya podés cargar otro loteo.'}
-            {saver.dxfWarning && (
+            {saver.dxfWarning ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 min-h-11 md:h-8 md:min-h-8"
+                  onClick={handleRetryDxf}
+                  disabled={saver.isRetryingDxf}
+                >
+                  {saver.isRetryingDxf ? 'Reintentando…' : 'Reintentar carga del DXF'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 min-h-11 md:h-8 md:min-h-8"
+                  onClick={goToCreatedLoteo}
+                  disabled={saver.isRetryingDxf}
+                >
+                  Continuar sin el DXF
+                </Button>
+              </>
+            ) : (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="mt-1 min-h-11 md:h-8 md:min-h-8"
-                onClick={saver.retryDxf}
-                disabled={saver.isRetryingDxf}
+                onClick={saver.reset}
               >
-                {saver.isRetryingDxf ? 'Reintentando…' : 'Reintentar carga del DXF'}
+                Cargar otro loteo
               </Button>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-1 min-h-11 md:h-8 md:min-h-8"
-              onClick={saver.reset}
-              disabled={saver.isRetryingDxf}
-            >
-              {saver.dxfWarning ? 'Continuar sin el DXF' : 'Cargar otro loteo'}
-            </Button>
           </AlertDescription>
         </Alert>
       )}

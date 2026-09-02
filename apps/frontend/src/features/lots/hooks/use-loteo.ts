@@ -13,8 +13,8 @@ function isNotFound(error: unknown): boolean {
   )
 }
 
-// Both ApiError (backend message) and the plain Error the api client throws for
-// an unexpected shape carry a user-facing message; keep it.
+// The api client's plain Error also carries a user-facing message, so don't
+// route it through messageFromError (which hides non-ApiError messages).
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
 }
@@ -34,10 +34,8 @@ function pending(token: string): UseLoteo {
 export function useLoteo(loteoId: string, token: string): UseLoteo {
   const [state, setState] = useState<UseLoteo>(() => pending(token))
 
-  // A new id or token starts a fresh load: show the spinner (or the expired
-  // session error) now, during render, so the UI never presents the previous
-  // loteo as the current one. Same "reset state on prop change" pattern as
-  // useLoteos.
+  // Reset to the pending state during render when the request key changes, so
+  // the UI never shows the previous loteo while the next one loads.
   const requestKey = JSON.stringify([token, loteoId])
   const [loadedKey, setLoadedKey] = useState(requestKey)
   if (requestKey !== loadedKey) {

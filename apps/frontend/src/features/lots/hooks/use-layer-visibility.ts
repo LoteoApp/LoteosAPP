@@ -11,8 +11,6 @@ export type UseLayerVisibility = {
   reset: () => void
 }
 
-// Shared by the loteo form (useDxfPlan) and the loteo detail screen so both
-// start with every layer visible and toggle the same way.
 export function useLayerVisibility(): UseLayerVisibility {
   const [visibleLayers, setVisibleLayers] =
     useState<ReadonlySet<DxfLayer>>(allLayersVisible)

@@ -26,8 +26,13 @@ function isPointArray(value: unknown): value is DxfPoint[] {
   )
 }
 
-// The polygon fields are absent when the entity has no DXF ring. Anything other
-// than a valid point array (including undefined) becomes an empty polygon.
+// The backend omits a polygon field (Go `omitempty`) when the entity has no
+// DXF ring yet. Absent is fine and maps to []; a present but malformed value
+// is a corrupt response and fails the shape check.
+function isOptionalPointArray(value: unknown): boolean {
+  return value == null || isPointArray(value)
+}
+
 function toPolygon(value: unknown): DxfPoint[] {
   return isPointArray(value) ? value.map((point) => ({ x: point.x, y: point.y })) : []
 }
@@ -36,7 +41,8 @@ function isManzana(value: unknown): value is Record<string, unknown> {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
-    typeof value.numero === 'string'
+    typeof value.numero === 'string' &&
+    isOptionalPointArray(value.poligono)
   )
 }
 
@@ -49,7 +55,8 @@ function isLote(value: unknown): value is Record<string, unknown> {
     (value.precio === null || typeof value.precio === 'number') &&
     typeof value.moneda === 'string' &&
     (value.superficie === null || typeof value.superficie === 'number') &&
-    typeof value.caracteristicas === 'string'
+    typeof value.caracteristicas === 'string' &&
+    isOptionalPointArray(value.poligono)
   )
 }
 
@@ -58,7 +65,8 @@ function isCalle(value: unknown): value is Record<string, unknown> {
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.nombre === 'string' &&
-    typeof value.tipo === 'string'
+    typeof value.tipo === 'string' &&
+    isOptionalPointArray(value.poligono)
   )
 }
 
@@ -72,6 +80,7 @@ function isLoteoDetailResponse(value: unknown): value is Record<string, unknown>
     typeof value.ubicacion === 'string' &&
     typeof value.descripcion === 'string' &&
     typeof value.fechaCreacion === 'string' &&
+    isOptionalPointArray(value.contorno) &&
     Array.isArray(value.manzanas) &&
     value.manzanas.every(isManzana) &&
     Array.isArray(value.lotes) &&
@@ -141,8 +150,8 @@ export async function getLoteo(
       { token, signal },
     )
   } catch (error) {
-    // ApiError already carries a user-facing message (and the 404 code the hook
-    // needs); an aborted request must keep propagating its AbortError.
+    // ApiError carries a user-facing message and the 404 code the hook maps;
+    // an AbortError must keep propagating. Anything else collapses to GENERIC_ERROR.
     if (
       error instanceof ApiError ||
       (error instanceof DOMException && error.name === 'AbortError')

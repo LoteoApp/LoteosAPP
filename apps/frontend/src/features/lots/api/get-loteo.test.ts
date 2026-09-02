@@ -105,6 +105,19 @@ describe('getLoteo', () => {
     await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(GENERIC_ERROR)
   })
 
+  it('rejects a present but malformed polygon instead of treating it as empty', async () => {
+    stubFetch(jsonResponse(200, { ...detailResponse, contorno: 'garbage' }))
+    await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(GENERIC_ERROR)
+
+    stubFetch(
+      jsonResponse(200, {
+        ...detailResponse,
+        lotes: [{ ...detailResponse.lotes[0], poligono: [{ x: 1 }] }],
+      }),
+    )
+    await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(GENERIC_ERROR)
+  })
+
   it('rejects a 2xx body that is not json', async () => {
     stubFetch(new Response('not json', { status: 200 }))
 
@@ -121,15 +134,22 @@ describe('getLoteo', () => {
     })
   })
 
-  it('forwards the abort signal and rethrows an AbortError untouched', async () => {
+  it('forwards the abort signal to fetch', async () => {
+    const fetchMock = stubFetch(jsonResponse(200, detailResponse))
+    const controller = new AbortController()
+
+    await getLoteo('loteo-1', 'token-123', { signal: controller.signal })
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(init.signal).toBe(controller.signal)
+  })
+
+  it('rethrows an AbortError untouched', async () => {
     const fetchMock = vi.fn(async () => {
       throw new DOMException('aborted', 'AbortError')
     })
     vi.stubGlobal('fetch', fetchMock)
-    const controller = new AbortController()
 
-    await expect(
-      getLoteo('loteo-1', 'token-123', { signal: controller.signal }),
-    ).rejects.toThrow(/aborted/)
+    await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(/aborted/)
   })
 })

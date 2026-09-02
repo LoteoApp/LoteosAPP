@@ -233,8 +233,32 @@ describe('LotsPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reintentar carga del DXF' }))
 
-    expect(await screen.findByText('Ya podés cargar otro loteo.')).toBeInTheDocument()
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
     expect(calls.map((call) => call.method)).toEqual(['POST', 'PUT', 'PUT'])
+  })
+
+  it('navigates to the detail when the user continues without the failed DXF', async () => {
+    const user = userEvent.setup()
+    stubFetch((call) =>
+      call.method === 'POST'
+        ? jsonResponse({ id: 'loteo-1', nombre: 'Las Acacias' }, 201)
+        : jsonResponse(
+            { code: 'storage_unavailable', message: 'El almacenamiento no está disponible' },
+            503,
+          ),
+    )
+    renderPage()
+
+    await user.type(screen.getByLabelText('Nombre'), 'Las Acacias')
+    await user.upload(screen.getByLabelText('Archivo DXF'), planDxf())
+    expect(await screen.findByText('Plano cargado')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar loteo' }))
+    expect(await screen.findByText(/no se pudo guardar el archivo DXF/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Continuar sin el DXF' }))
+
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
   })
 
   it('blocks the save when the plan has no LOTEO layer', async () => {

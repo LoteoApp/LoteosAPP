@@ -32,6 +32,15 @@ export default function LoteoDetailPage({ accessToken }: LoteoDetailPageProps) {
   const layers = useLayerVisibility()
   const [manzanaFilter, setManzanaFilter] = useState(ALL_MANZANAS)
 
+  // React Router keeps this component mounted across a param change, so drop the
+  // previous loteo's manzana filter and layer selection when loteoId changes.
+  const [trackedLoteoId, setTrackedLoteoId] = useState(loteoId)
+  if (loteoId !== trackedLoteoId) {
+    setTrackedLoteoId(loteoId)
+    setManzanaFilter(ALL_MANZANAS)
+    layers.reset()
+  }
+
   const loteo = state.status === 'loaded' ? state.loteo : null
 
   const plan = useMemo(() => (loteo ? planFromLoteoDetail(loteo) : []), [loteo])

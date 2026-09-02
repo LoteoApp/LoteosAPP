@@ -32,7 +32,6 @@ describe('LotesTable', () => {
     )
 
     const rows = screen.getAllByRole('row')
-    // header + 2 data rows
     expect(rows).toHaveLength(3)
 
     const first = within(rows[1])
@@ -52,12 +51,13 @@ describe('LotesTable', () => {
       />,
     )
 
-    const cells = within(screen.getAllByRole('row')[1]).getAllByRole('cell')
-    // Lote, Superficie, Precio and Características columns
-    expect(cells[1]).toHaveTextContent('—')
-    expect(cells[2]).toHaveTextContent('—')
-    expect(cells[3]).toHaveTextContent('—')
-    expect(cells[4]).toHaveTextContent('—')
+    const [, loteCell, superficieCell, precioCell, caracteristicasCell] = within(
+      screen.getAllByRole('row')[1],
+    ).getAllByRole('cell')
+    expect(loteCell).toHaveTextContent('—')
+    expect(superficieCell).toHaveTextContent('—')
+    expect(precioCell).toHaveTextContent('—')
+    expect(caracteristicasCell).toHaveTextContent('—')
   })
 
   it('shows a dash for a lote whose manzana is unknown', () => {

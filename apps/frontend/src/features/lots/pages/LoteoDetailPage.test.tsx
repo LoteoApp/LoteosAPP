@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import LoteoDetailPage from './LoteoDetailPage'
 import { ApiError } from '../../../shared/api/client'
@@ -60,6 +60,7 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
 function renderPage(path = '/lotes/loteo-1') {
   render(
     <MemoryRouter initialEntries={[path]}>
+      <Link to="/lotes/loteo-2">ir a loteo-2</Link>
       <Routes>
         <Route
           path="/lotes/:loteoId"
@@ -83,7 +84,7 @@ describe('LoteoDetailPage', () => {
     expect(screen.getByText('Río Ceballos, Córdoba')).toBeInTheDocument()
 
     const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(3) // header + 2 lotes
+    expect(rows).toHaveLength(3)
     expect(within(rows[1]).getByText(/150\.000/)).toBeInTheDocument()
     expect(within(rows[1]).getByText('300 m²')).toBeInTheDocument()
   })
@@ -106,7 +107,7 @@ describe('LoteoDetailPage', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Manzana' }), 'mz-2')
 
     const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(2) // header + lote 8
+    expect(rows).toHaveLength(2)
     expect(within(rows[1]).getByText('8')).toBeInTheDocument()
   })
 
@@ -129,6 +130,37 @@ describe('LoteoDetailPage', () => {
 
     expect(await screen.findByText('No se pudo cargar el loteo')).toBeInTheDocument()
     expect(screen.getByText('No se pudo cargar el loteo, intentá nuevamente.')).toBeInTheDocument()
+  })
+
+  it('drops the previous manzana filter when navigating to another loteo', async () => {
+    getLoteoMock.mockImplementation(async (loteoId) =>
+      loteoId === 'loteo-2'
+        ? detail({
+            id: 'loteo-2',
+            nombre: 'Altos del Sur',
+            manzanas: [
+              { id: 'mz-9', numero: '9', poligono: triangle },
+              { id: 'mz-10', numero: '10', poligono: triangle },
+            ],
+            lotes: [
+              { ...detail().lotes[0], id: 'lt-9', manzanaId: 'mz-9', numero: '90' },
+              { ...detail().lotes[1], id: 'lt-10', manzanaId: 'mz-10', numero: '91' },
+            ],
+          })
+        : detail(),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Manzana' }), 'mz-2')
+    expect(screen.getAllByRole('row')).toHaveLength(2)
+
+    await userEvent.click(screen.getByRole('link', { name: 'ir a loteo-2' }))
+
+    await screen.findByRole('heading', { name: 'Altos del Sur' })
+    expect(screen.getByRole('combobox', { name: 'Manzana' })).toHaveValue('')
+    expect(screen.getByText('90')).toBeInTheDocument()
+    expect(screen.getByText('91')).toBeInTheDocument()
   })
 
   it('tells the user when the loteo has no plan yet', async () => {

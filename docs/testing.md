@@ -123,13 +123,13 @@ un bucket de producción.
 
 ## Prueba manual del alta de loteo
 
-Los endpoints de loteo todavía no tienen pantalla que los consuma
-([#11](https://github.com/LoteoApp/LoteosAPP/issues/11) y
-[#12](https://github.com/LoteoApp/LoteosAPP/issues/12)), así que se prueban por
-HTTP. `scripts/smoke-loteos.sh` hace el recorrido completo: login contra
-Supabase Auth, alta de un loteo con plano, carga de datos de un lote y los
-caminos de error (número repetido, lote de otro loteo, referencia a una manzana
-que no está en el plano, anillo abierto, request sin token).
+El alta (`POST /api/v1/loteos`), el listado y el detalle ya tienen pantalla; la
+carga de datos de un lote (`PATCH .../lotes/{loteId}`) todavía no. `scripts/smoke-loteos.sh`
+prueba el recorrido completo por HTTP como verificación end-to-end
+independiente del frontend: login contra Supabase Auth, alta de un loteo con
+plano, carga de datos de un lote y los caminos de error (número repetido, lote
+de otro loteo, referencia a una manzana que no está en el plano, anillo
+abierto, request sin token).
 
 Levantar el backend en una terminal:
 

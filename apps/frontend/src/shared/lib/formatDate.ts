@@ -1,6 +1,4 @@
-// Takes the RFC 3339 string the API returns and renders it as a short es-AR
-// date. Returns an empty string for an unparseable value instead of
-// "Invalid Date".
+// Returns "" for an unparseable value rather than "Invalid Date".
 export function formatDate(isoDate: string): string {
   const date = new Date(isoDate)
   if (Number.isNaN(date.getTime())) {
