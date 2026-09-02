@@ -485,6 +485,7 @@ apps/frontend/src/
 │   ├── router.tsx
 │   ├── AppLayout.tsx           # Sidebar + header + área de contenido
 │   ├── LoteosRoute.tsx         # Inyecta la sesión en el listado de loteos (/lotes)
+│   ├── LoteoDetailRoute.tsx    # Inyecta la sesión en el detalle de loteo (/lotes/:loteoId)
 │   ├── LotsRoute.tsx           # Inyecta la sesión en el alta de loteo (/lotes/nuevo)
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
 │   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
@@ -508,18 +509,21 @@ apps/frontend/src/
 │       ├── api/
 │       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
 │       │   ├── list-loteos.ts         # GET /api/v1/loteos?q= (valida la forma)
+│       │   ├── get-loteo.ts           # GET /api/v1/loteos/{id} (valida la forma)
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
 │       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
-│       ├── components/                # Formulario, cards, banda del listado y visor DXF
+│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
 │       │   ├── use-dxf-plan.ts
+│       │   ├── use-layer-visibility.ts # Capas visibles del visor, compartido por alta y detalle
 │       │   ├── use-loteos.ts          # Carga el listado + búsqueda con debounce
+│       │   ├── use-loteo.ts           # Carga el detalle de un loteo (loading/loaded/not-found/error)
 │       │   └── use-save-loteo.ts      # Orquesta alta + subida del DXF
-│       ├── lib/                       # Parseo DXF a geometría SVG y armado del payload
+│       ├── lib/                       # Parseo DXF a geometría SVG, armado del payload y plano del detalle
 │       ├── pages/
 │       │   ├── LoteosListPage.tsx     # Listado de loteos (zócalo panorámico), en /lotes
-│       │   ├── LoteoDetailPage.tsx    # Detalle de un loteo, en /lotes/:loteoId (en construcción)
+│       │   ├── LoteoDetailPage.tsx    # Detalle de un loteo, en /lotes/:loteoId
 │       │   └── LotsPage.tsx           # Alta de loteo, en /lotes/nuevo
 │       └── types.ts
 ├── shared/
@@ -527,8 +531,8 @@ apps/frontend/src/
 │   │   └── client.ts
 │   ├── config/
 │   │   └── env.ts
-│   ├── ui/
-│   └── lib/
+│   ├── ui/                     # Componentes shadcn (incluye table.tsx)
+│   └── lib/                    # cn + formatCurrency / formatArea / formatDate
 ├── index.css
 └── main.tsx
 ```
@@ -547,12 +551,14 @@ app → features → shared
 - `shared/api` contiene el cliente HTTP (`client.ts`: `apiFetch`, `ApiError`)
   y el tratamiento común de errores. `apiFetch` recibe el token de sesión y un
   `AbortSignal` opcional como parámetros y no importa `features/auth`;
-  `app/LoteosRoute.tsx` y `app/LotsRoute.tsx` componen las features e inyectan
-  `session.access_token` en el listado y el alta de loteos.
+  `app/LoteosRoute.tsx`, `app/LoteoDetailRoute.tsx` y `app/LotsRoute.tsx`
+  componen las features e inyectan `session.access_token` en el listado, el
+  detalle y el alta de loteos.
 - `shared/config` centraliza la lectura de variables de entorno.
 - `shared/ui` contiene componentes visuales sin reglas de una funcionalidad.
-- `shared/lib` contiene funciones reutilizables con un propósito específico; no
-  debe convertirse en un directorio genérico de helpers.
+- `shared/lib` contiene funciones reutilizables con un propósito específico
+  (por ejemplo `formatCurrency`, `formatArea` y `formatDate`, cada una en su
+  archivo); no debe convertirse en un directorio genérico de helpers.
 - Una feature no importa archivos internos de otra. La composición entre
   funcionalidades ocurre en `app`.
 - Se prefieren imports directos y no se crean archivos `index.ts` globales que

@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import LoteoDataCard from '../components/LoteoDataCard'
@@ -12,6 +13,7 @@ type LotsPageProps = {
 }
 
 export default function LotsPage({ accessToken }: LotsPageProps) {
+  const navigate = useNavigate()
   const fields = useLoteoFields()
   const plan = useDxfPlan()
   const saver = useSaveLoteo(accessToken)
@@ -23,10 +25,16 @@ export default function LotsPage({ accessToken }: LotsPageProps) {
   }
 
   async function handleSave() {
-    const created = await saver.save(fields.values, plan.polygons, plan.file)
-    if (created) {
-      fields.reset()
-      plan.reset()
+    const outcome = await saver.save(fields.values, plan.polygons, plan.file)
+    if (!outcome) {
+      return
+    }
+    fields.reset()
+    plan.reset()
+    // A DXF-upload warning leaves the retry UI on this screen as the only way to
+    // finish the upload; only a clean alta navigates away to the new loteo.
+    if (outcome.dxfWarning === null) {
+      navigate(`/lotes/${outcome.loteoId}`)
     }
   }
 
