@@ -484,7 +484,8 @@ apps/frontend/src/
 ├── app/
 │   ├── router.tsx
 │   ├── AppLayout.tsx           # Sidebar + header + área de contenido
-│   ├── LotsRoute.tsx           # Inyecta la sesión en la feature de loteos
+│   ├── LoteosRoute.tsx         # Inyecta la sesión en el listado de loteos (/lotes)
+│   ├── LotsRoute.tsx           # Inyecta la sesión en el alta de loteo (/lotes/nuevo)
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
 │   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
 │   └── providers.tsx           # Cuando existan providers globales
@@ -506,16 +507,20 @@ apps/frontend/src/
 │   └── lots/
 │       ├── api/
 │       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       │   ├── list-loteos.ts         # GET /api/v1/loteos?q= (valida la forma)
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
 │       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
-│       ├── components/                # Formulario, cards y visor DXF
+│       ├── components/                # Formulario, cards, banda del listado y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
 │       │   ├── use-dxf-plan.ts
+│       │   ├── use-loteos.ts          # Carga el listado + búsqueda con debounce
 │       │   └── use-save-loteo.ts      # Orquesta alta + subida del DXF
 │       ├── lib/                       # Parseo DXF a geometría SVG y armado del payload
 │       ├── pages/
-│       │   └── LotsPage.tsx           # Alta de loteo, en /lotes
+│       │   ├── LoteosListPage.tsx     # Listado de loteos (zócalo panorámico), en /lotes
+│       │   ├── LoteoDetailPage.tsx    # Detalle de un loteo, en /lotes/:loteoId (en construcción)
+│       │   └── LotsPage.tsx           # Alta de loteo, en /lotes/nuevo
 │       └── types.ts
 ├── shared/
 │   ├── api/
@@ -540,9 +545,10 @@ app → features → shared
 - `features` contiene la UI, acceso a datos y comportamiento de cada
   funcionalidad.
 - `shared/api` contiene el cliente HTTP (`client.ts`: `apiFetch`, `ApiError`)
-  y el tratamiento común de errores. `apiFetch` recibe el token de sesión como
-  parámetro y no importa `features/auth`; `app/LotsRoute.tsx` compone ambas
-  features e inyecta `session.access_token` en la página de loteos.
+  y el tratamiento común de errores. `apiFetch` recibe el token de sesión y un
+  `AbortSignal` opcional como parámetros y no importa `features/auth`;
+  `app/LoteosRoute.tsx` y `app/LotsRoute.tsx` componen las features e inyectan
+  `session.access_token` en el listado y el alta de loteos.
 - `shared/config` centraliza la lectura de variables de entorno.
 - `shared/ui` contiene componentes visuales sin reglas de una funcionalidad.
 - `shared/lib` contiene funciones reutilizables con un propósito específico; no
