@@ -32,7 +32,7 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
 }
 
-// This route is admin-only, gated by RequireAdmin — every render here is
+// This route is admin-only, gated by RequireRole — every render here is
 // for an administrador, so no further role check is needed on top of it.
 export default function UsersPage() {
   const { session } = useAuth()
