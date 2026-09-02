@@ -13,7 +13,7 @@ import (
 
 // cuitUniqueConstraint is the name of the unique index backing "one active
 // inmobiliaria per CUIT" (see
-// migrations/00006_add_inmobiliarias_cuit_idx.sql). Only a 23505 violation
+// migrations/00007_add_inmobiliarias_cuit_idx.sql). Only a 23505 violation
 // on this specific constraint means "CUIT ya está en uso"; any other unique
 // violation on the inmobiliarias table is a different business rule and must
 // not be misreported as a duplicate CUIT.

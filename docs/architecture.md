@@ -315,7 +315,7 @@ Decisiones de este recorte:
 - **El CUIT se guarda como 11 dígitos, sin separadores.** Se normaliza en el
   caso de uso antes de persistir; si no, `30-71234567-8` y `30712345678`
   entrarían como dos agencias distintas y el índice único de la migración
-  `00006` no serviría de nada. Por eso el listado también normaliza un `?q=`
+  `00007` no serviría de nada. Por eso el listado también normaliza un `?q=`
   que sea un CUIT antes de buscarlo. No se valida el dígito verificador: la
   intención es rechazar tipeos y texto libre, no validar contra AFIP.
 - **El `PATCH` no puede vaciar un campo opcional a null.** Un campo ausente
