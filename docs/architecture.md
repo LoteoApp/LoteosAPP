@@ -150,6 +150,13 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
+  También expone `RequireActiveAccount`, que corre detrás de `RequireAuth` en
+  toda la API y rechaza con 403 a un caller cuya fila en `usuarios` tenga
+  `fecha_baja` seteado — necesario porque la validación del token es
+  stateless (contra el JWKS, sin ida y vuelta a Supabase), así que un token
+  ya emitido seguiría siendo válido hasta expirar aunque la cuenta esté dada
+  de baja. Recibe el repositorio de usuarios a través de una interfaz chica
+  definida en el propio paquete, no de `business/gateway`.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.UserRepository`) con `pgxpool` y SQL explícito, y
   expone la apertura y configuración del pool de conexiones.
@@ -209,6 +216,7 @@ flowchart LR
     deps --> storage["infrastructure/storage/r2"]
     route --> handler["infrastructure/delivery/webapp/handler"]
     route --> middleware["infrastructure/delivery/webapp/middleware"]
+    route --> gateway["business/gateway"]
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]

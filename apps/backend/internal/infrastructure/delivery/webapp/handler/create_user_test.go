@@ -22,13 +22,17 @@ type createUserStub struct {
 	err           error
 	called        bool
 	gotActorRoles []string
+	gotNombre     string
+	gotApellido   string
 	gotEmail      string
 	gotRol        string
 }
 
-func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, email, rol string) (domain.Usuario, string, error) {
+func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nombre, apellido, email, rol string) (domain.Usuario, string, error) {
 	stub.called = true
 	stub.gotActorRoles = actorRoles
+	stub.gotNombre = nombre
+	stub.gotApellido = apellido
 	stub.gotEmail = email
 	stub.gotRol = rol
 	return stub.usuario, stub.tempPassword, stub.err
@@ -59,7 +63,7 @@ func TestCreateUserRoute(t *testing.T) {
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
 		recorder := performCreateUserRequest(t, createUser, verifier, "valid-token",
-			map[string]string{"email": "ana@example.com", "rol": domain.RolAdministrativo})
+			map[string]string{"nombre": "Ana", "apellido": "Gómez", "email": "ana@example.com", "rol": domain.RolAdministrativo})
 
 		if recorder.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
@@ -78,6 +82,9 @@ func TestCreateUserRoute(t *testing.T) {
 		if len(createUser.gotActorRoles) != 1 || createUser.gotActorRoles[0] != domain.RolAdministrador {
 			t.Errorf("actor roles passed to use case = %v", createUser.gotActorRoles)
 		}
+		if createUser.gotNombre != "Ana" || createUser.gotApellido != "Gómez" {
+			t.Errorf("use case called with nombre=%q apellido=%q", createUser.gotNombre, createUser.gotApellido)
+		}
 		if createUser.gotEmail != "ana@example.com" || createUser.gotRol != domain.RolAdministrativo {
 			t.Errorf("use case called with email=%q rol=%q", createUser.gotEmail, createUser.gotRol)
 		}
@@ -88,7 +95,7 @@ func TestCreateUserRoute(t *testing.T) {
 
 		createUser := &createUserStub{}
 		recorder := performCreateUserRequest(t, createUser, userVerifierStub{}, "",
-			map[string]string{"email": "ana@example.com", "rol": domain.RolAdministrativo})
+			map[string]string{"nombre": "Ana", "apellido": "Gómez", "email": "ana@example.com", "rol": domain.RolAdministrativo})
 
 		if recorder.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
@@ -138,7 +145,7 @@ func TestCreateUserRoute(t *testing.T) {
 				verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
 				recorder := performCreateUserRequest(t, createUser, verifier, "valid-token",
-					map[string]string{"email": "ana@example.com", "rol": domain.RolAdministrativo})
+					map[string]string{"nombre": "Ana", "apellido": "Gómez", "email": "ana@example.com", "rol": domain.RolAdministrativo})
 
 				if recorder.Code != test.wantStatus {
 					t.Fatalf("status = %d, want %d", recorder.Code, test.wantStatus)

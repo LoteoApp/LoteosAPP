@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiFetch, messageFromError } from './client'
 import { apiUrl } from '../config/env'
+import { supabaseClient } from '../config/supabase-client'
+
+vi.mock('../config/supabase-client', () => ({
+  supabaseClient: { auth: { signOut: vi.fn() } },
+}))
+
+const signOutMock = vi.mocked(supabaseClient.auth.signOut)
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  signOutMock.mockReset()
 })
 
 function stubFetch(response: Response | (() => Promise<Response>)) {
@@ -93,6 +101,80 @@ describe('apiFetch', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).code).toBe('network_error')
     expect((error as ApiError).status).toBe(0)
+  })
+
+  it('forwards the abort signal to fetch', async () => {
+    const mock = stubFetch(new Response('{}', { status: 200 }))
+    const controller = new AbortController()
+
+    await apiFetch('/api/v1/loteos', { signal: controller.signal })
+
+    const [, init] = mock.mock.calls[0]
+    expect(init?.signal).toBe(controller.signal)
+  })
+
+  it('signs out and sends the browser to /login on a 401, without resolving or rejecting', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ code: 'unauthorized', message: 'No autorizado' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    signOutMock.mockResolvedValue({ error: null })
+    const location = { href: '' }
+    vi.stubGlobal('location', location)
+
+    let settled = false
+    apiFetch('/api/v1/usuarios').then(
+      () => (settled = true),
+      () => (settled = true),
+    )
+    await vi.waitFor(() => expect(location.href).toBe('/login'))
+
+    expect(signOutMock).toHaveBeenCalledOnce()
+    expect(settled).toBe(false)
+  })
+
+  it('signs out and sends the browser to /login when the account is given de baja', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ code: 'account_inactive', message: 'Tu cuenta fue dada de baja' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    signOutMock.mockResolvedValue({ error: null })
+    const location = { href: '' }
+    vi.stubGlobal('location', location)
+
+    void apiFetch('/api/v1/usuarios')
+    await vi.waitFor(() => expect(location.href).toBe('/login'))
+  })
+
+  it('redirects to /login even when signing out fails', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ code: 'unauthorized', message: 'No autorizado' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    signOutMock.mockRejectedValue(new Error('network down'))
+    const location = { href: '' }
+    vi.stubGlobal('location', location)
+
+    void apiFetch('/api/v1/usuarios')
+    await vi.waitFor(() => expect(location.href).toBe('/login'))
+  })
+
+  it('does not redirect for a 403 unrelated to the account being inactive', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ code: 'forbidden', message: 'No tenés permisos' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await expect(apiFetch('/api/v1/usuarios')).rejects.toMatchObject({ code: 'forbidden' })
+    expect(signOutMock).not.toHaveBeenCalled()
   })
 })
 

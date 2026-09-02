@@ -19,6 +19,10 @@ import (
 type Container struct {
 	CreateUserHandler      *handler.CreateUserHandler
 	CompleteProfileHandler *handler.CompleteProfileHandler
+	ListUsersHandler       *handler.ListUsersHandler
+	UpdateUserHandler      *handler.UpdateUserHandler
+	DeactivateUserHandler  *handler.DeactivateUserHandler
+	ReactivateUserHandler  *handler.ReactivateUserHandler
 	CreateClientHandler    *handler.CreateClientHandler
 	UpdateClientHandler    *handler.UpdateClientHandler
 	DeleteClientHandler    *handler.DeleteClientHandler
@@ -29,6 +33,7 @@ type Container struct {
 	Pool                   *pgxpool.Pool
 	Verifier               *supabase.Verifier
 	ObjectStorage          gateway.ObjectStorage
+	UserRepository         gateway.UserRepository
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -58,6 +63,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	userRepo := postgres.NewUserRepository(pool)
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
+	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
+	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
+	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
+	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
 
 	clienteRepo := postgres.NewClienteRepository(pool)
 	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
@@ -72,6 +81,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	return &Container{
 		CreateUserHandler:      createUserHandler,
 		CompleteProfileHandler: completeProfileHandler,
+		ListUsersHandler:       listUsersHandler,
+		UpdateUserHandler:      updateUserHandler,
+		DeactivateUserHandler:  deactivateUserHandler,
+		ReactivateUserHandler:  reactivateUserHandler,
 		CreateClientHandler:    createClientHandler,
 		UpdateClientHandler:    updateClientHandler,
 		DeleteClientHandler:    deleteClientHandler,
@@ -82,5 +95,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		Pool:                   pool,
 		Verifier:               verifier,
 		ObjectStorage:          objectStorage,
+		UserRepository:         userRepo,
 	}, nil
 }
