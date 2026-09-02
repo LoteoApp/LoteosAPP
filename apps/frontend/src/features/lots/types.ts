@@ -43,3 +43,16 @@ export type DxfParseResult = {
   polygons: DxfPolygon[]
   issues: DxfValidationIssue[]
 }
+
+// LoteoSummary is a loteo as GET /api/v1/loteos returns it: identity and how
+// much of a plan it carries. No geometry.
+export type LoteoSummary = {
+  id: string
+  nombre: string
+  ubicacion: string
+  descripcion: string
+  cantidadManzanas: number
+  cantidadLotes: number
+  cantidadCalles: number
+  tienePlano: boolean
+}

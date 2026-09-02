@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import LotsPage from './LotsPage'
 
@@ -37,7 +38,11 @@ function planDxf(): File {
 }
 
 function renderPage({ token = 'test-token' }: { token?: string | null } = {}) {
-  return render(<LotsPage accessToken={token} />)
+  return render(
+    <MemoryRouter>
+      <LotsPage accessToken={token} />
+    </MemoryRouter>,
+  )
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

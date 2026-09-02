@@ -24,11 +24,12 @@ type ApiFetchOptions = {
   method?: string
   body?: unknown
   token?: string | null
+  signal?: AbortSignal
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
-  { method = 'GET', body, token }: ApiFetchOptions = {},
+  { method = 'GET', body, token, signal }: ApiFetchOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) {
@@ -46,8 +47,13 @@ export async function apiFetch<T = unknown>(
 
   let response: Response
   try {
-    response = await fetch(`${apiUrl}${path}`, { method, headers, body: payload })
-  } catch {
+    response = await fetch(`${apiUrl}${path}`, { method, headers, body: payload, signal })
+  } catch (error) {
+    // A caller that aborted the request wants the AbortError to propagate, not
+    // a "network is down" message it would then have to filter back out.
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error
+    }
     throw new ApiError(NETWORK_ERROR_MESSAGE, 'network_error', 0)
   }
 
