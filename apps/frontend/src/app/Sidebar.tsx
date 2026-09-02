@@ -9,11 +9,18 @@ import {
   Wallet,
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router'
+import { useAuth } from '../features/auth/hooks/use-auth'
+import { getUserRole, ROLE } from '../features/auth/lib/getUserRole'
 
 type NavItem = {
   to: string
   label: string
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  // Omitted means every authenticated role sees the section. When present,
+  // keep this in sync with the roles the matching route in router.tsx
+  // allows through RequireRole — the route is the actual gate, this only
+  // controls whether the link is worth showing.
+  roles?: readonly string[]
 }
 
 const navItems: NavItem[] = [
@@ -22,7 +29,7 @@ const navItems: NavItem[] = [
   { to: '/reservas', label: 'Reservas', icon: CalendarCheck },
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
-  { to: '/usuarios', label: 'Usuarios', icon: UserCog },
+  { to: '/usuarios', label: 'Usuarios', icon: UserCog, roles: [ROLE.administrador] },
   { to: '/inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
 ]
 
@@ -32,6 +39,10 @@ type SidebarProps = {
 }
 
 export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
+  const { user } = useAuth()
+  const role = getUserRole(user)
+  const visibleNavItems = navItems.filter((item) => !item.roles || (role !== null && item.roles.includes(role)))
+
   return (
     <aside
       id="app-sidebar"
@@ -51,7 +62,7 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
 
       <nav className="w-64 flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}

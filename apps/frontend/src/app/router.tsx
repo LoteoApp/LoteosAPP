@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import AppLayout from './AppLayout'
 import RequireAuth from '../features/auth/components/RequireAuth'
+import RequireRole from '../features/auth/components/RequireRole'
+import { ROLE } from '../features/auth/lib/getUserRole'
 import LoginPage from '../features/auth/pages/LoginPage'
 import LotsRoute from './LotsRoute'
 import ClientsPage from '../features/clients/pages/ClientsPage'
@@ -52,7 +54,11 @@ export const router = createBrowserRouter([
       },
       {
         path: '/usuarios',
-        element: <UsersPage />,
+        element: (
+          <RequireRole roles={[ROLE.administrador]}>
+            <UsersPage />
+          </RequireRole>
+        ),
       },
       {
         path: '/inmobiliaria',

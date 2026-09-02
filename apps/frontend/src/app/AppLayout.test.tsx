@@ -15,6 +15,7 @@ const authValue: AuthContextValue = {
   user: {
     email: 'leonel@loteosapp.com',
     user_metadata: { full_name: 'Leonel Zorzoli' },
+    app_metadata: { role: 'administrador' },
   } as unknown as User,
   error: null,
   login: vi.fn(),
@@ -60,7 +61,7 @@ function stubDesktopMatchMedia(initialMatches = true) {
   }
 }
 
-function renderLayoutAt(path: string) {
+function renderLayoutAt(path: string, role: string | null = 'administrador') {
   const router = createMemoryRouter(
     [
       {
@@ -74,8 +75,16 @@ function renderLayoutAt(path: string) {
     { initialEntries: [path] },
   )
 
+  const value: AuthContextValue = {
+    ...authValue,
+    user: {
+      ...authValue.user,
+      app_metadata: { role },
+    } as unknown as User,
+  }
+
   return render(
-    <AuthContext.Provider value={authValue}>
+    <AuthContext.Provider value={value}>
       <RouterProvider router={router} />
     </AuthContext.Provider>,
   )
@@ -214,5 +223,20 @@ describe('AppLayout', () => {
       'aria-expanded',
       'true',
     )
+  })
+
+  it('hides the Usuarios section for a non-administrador role', () => {
+    renderLayoutAt('/lotes', 'administrativo')
+
+    expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
+    for (const label of sectionLabels.filter((section) => section !== 'Usuarios')) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('hides the Usuarios section when the caller has no role', () => {
+    renderLayoutAt('/lotes', null)
+
+    expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
   })
 })
