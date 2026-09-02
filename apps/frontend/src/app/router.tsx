@@ -5,6 +5,8 @@ import RequireRole from '../features/auth/components/RequireRole'
 import { ROLE } from '../features/auth/lib/getUserRole'
 import LoginPage from '../features/auth/pages/LoginPage'
 import LotsRoute from './LotsRoute'
+import LoteosRoute from './LoteosRoute'
+import LoteoDetailPage from '../features/lots/pages/LoteoDetailPage'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
@@ -34,7 +36,15 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/lotes',
+        element: <LoteosRoute />,
+      },
+      {
+        path: '/lotes/nuevo',
         element: <LotsRoute />,
+      },
+      {
+        path: '/lotes/:loteoId',
+        element: <LoteoDetailPage />,
       },
       {
         path: '/clientes',

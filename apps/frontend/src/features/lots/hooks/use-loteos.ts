@@ -1,0 +1,70 @@
+import { useEffect, useState } from 'react'
+import { listLoteos } from '../api/list-loteos'
+import type { LoteoSummary } from '../types'
+
+const SEARCH_DEBOUNCE_MS = 250
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+}
+
+export type UseLoteos = {
+  loteos: LoteoSummary[]
+  isLoading: boolean
+  error: string | null
+}
+
+export function useLoteos(token: string, search: string): UseLoteos {
+  const [loteos, setLoteos] = useState<LoteoSummary[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [debouncedSearch, setDebouncedSearch] = useState(search.trim())
+
+  useEffect(() => {
+    const trimmed = search.trim()
+    const timer = setTimeout(() => setDebouncedSearch(trimmed), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // A new token or search term starts a fresh load: show the spinner and drop
+  // the stale error now, during render, so the UI never presents the previous
+  // result as the current one. Same "reset state on prop change" pattern as
+  // DxfViewer's viewBox.
+  const requestKey = JSON.stringify([token, debouncedSearch])
+  const [loadedKey, setLoadedKey] = useState(requestKey)
+  if (requestKey !== loadedKey) {
+    setLoadedKey(requestKey)
+    setIsLoading(true)
+    setError(null)
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    listLoteos(token, { q: debouncedSearch || undefined, signal: controller.signal })
+      .then((loaded) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        setLoteos(loaded)
+        setError(null)
+      })
+      .catch((loadError: unknown) => {
+        if (!controller.signal.aborted) {
+          setLoteos([])
+          setError(messageOf(loadError))
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      controller.abort()
+    }
+  }, [token, debouncedSearch])
+
+  return { loteos, isLoading, error }
+}

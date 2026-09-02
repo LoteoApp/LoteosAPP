@@ -48,7 +48,12 @@ export async function apiFetch<T = unknown>(
   let response: Response
   try {
     response = await fetch(`${apiUrl}${path}`, { method, headers, body: payload, signal })
-  } catch {
+  } catch (error) {
+    // A caller that aborted the request wants the AbortError to propagate, not
+    // a "network is down" message it would then have to filter back out.
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error
+    }
     throw new ApiError(NETWORK_ERROR_MESSAGE, 'network_error', 0)
   }
 

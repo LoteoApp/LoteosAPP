@@ -15,6 +15,10 @@ const (
 	clientsTimeout = 5 * time.Second
 	lotesTimeout   = 10 * time.Second
 
+	// Reading a loteo runs several queries (loteo, manzanas, lotes, calles),
+	// so it gets more room than a request that touches one row.
+	loteosReadTimeout = 15 * time.Second
+
 	// Registering a loteo writes one row per polygon of a whole cadastral
 	// plan in a single transaction, so it gets more room than a request that
 	// touches one row.
@@ -45,6 +49,8 @@ type Handlers struct {
 	CreateLoteo     *handler.CreateLoteoHandler
 	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
+	ListLoteos      *handler.ListLoteosHandler
+	GetLoteo        *handler.GetLoteoHandler
 }
 
 // RegisterRoutes wires every route behind both RequireAuth (a valid token)
@@ -70,6 +76,8 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("GET /api/v1/clientes", protected(handler.Adapt(handlers.ListClients, clientsTimeout)))
 
 	mux.Handle("POST /api/v1/loteos", protected(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
+	mux.Handle("GET /api/v1/loteos", protected(handler.Adapt(handlers.ListLoteos, loteosReadTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}", protected(handler.Adapt(handlers.GetLoteo, loteosReadTimeout)))
 	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", protected(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", protected(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
 }

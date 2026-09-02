@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import LoteoPageHeader from './LoteoPageHeader'
 
@@ -12,7 +13,11 @@ function renderHeader(overrides: Partial<Parameters<typeof LoteoPageHeader>[0]> 
     onDiscard: vi.fn(),
     ...overrides,
   }
-  render(<LoteoPageHeader {...props} />)
+  render(
+    <MemoryRouter>
+      <LoteoPageHeader {...props} />
+    </MemoryRouter>,
+  )
   return props
 }
 
@@ -22,6 +27,15 @@ describe('LoteoPageHeader', () => {
 
     expect(screen.getByRole('heading', { name: 'Nuevo loteo' })).toBeInTheDocument()
     expect(screen.getByText('Plano pendiente')).toBeInTheDocument()
+  })
+
+  it('links back to the loteo list', () => {
+    renderHeader()
+
+    expect(screen.getByRole('link', { name: 'Volver al listado' })).toHaveAttribute(
+      'href',
+      '/lotes',
+    )
   })
 
   it('disables the save button until the loteo can be saved', () => {

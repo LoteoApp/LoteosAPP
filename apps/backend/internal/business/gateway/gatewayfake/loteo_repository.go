@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway"
 )
 
 // LoteoRepository is a fake gateway.LoteoRepository for tests.
@@ -33,6 +34,18 @@ type LoteoRepository struct {
 	RecordedDxfLoteoID    string
 	RecordedDxfFile       domain.NewLoteoDxfFile
 	RecordedDxfFileResult domain.LoteoDxfFile
+
+	ListCalls  int
+	ListErr    error
+	ListResult []domain.LoteoSummary
+	ListSearch string
+	ListScope  gateway.LoteoScope
+
+	GetCalls   int
+	GetErr     error
+	GetResult  domain.Loteo
+	GetLoteoID string
+	GetScope   gateway.LoteoScope
 
 	ActorAuthProviderID string
 }
@@ -73,6 +86,39 @@ func (fake *LoteoRepository) UpdateLote(
 	}
 
 	return fake.UpdatedLote, nil
+}
+
+func (fake *LoteoRepository) List(
+	_ context.Context,
+	search string,
+	scope gateway.LoteoScope,
+) ([]domain.LoteoSummary, error) {
+	fake.ListCalls++
+	fake.ListSearch = search
+	fake.ListScope = scope
+	if fake.ListErr != nil {
+		return nil, fake.ListErr
+	}
+
+	return fake.ListResult, nil
+}
+
+func (fake *LoteoRepository) Get(
+	_ context.Context,
+	loteoID string,
+	scope gateway.LoteoScope,
+) (domain.Loteo, error) {
+	fake.GetCalls++
+	fake.GetLoteoID = loteoID
+	fake.GetScope = scope
+	if fake.GetErr != nil {
+		return domain.Loteo{}, fake.GetErr
+	}
+	if fake.GetResult.ID == "" {
+		return domain.Loteo{ID: loteoID}, nil
+	}
+
+	return fake.GetResult, nil
 }
 
 func (fake *LoteoRepository) IsAssignedToLoteo(context.Context, string, string) (bool, error) {
