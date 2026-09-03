@@ -16,7 +16,7 @@ func resolveActorID(ctx context.Context, users gateway.UserRepository, subject s
 		if errors.Is(err, domain.ErrUsuarioNoEncontrado) {
 			return "", domain.ErrActorNoAprovisionado
 		}
-		return "", err
+		return "", fromRepository(err)
 	}
 
 	return actor.ID, nil

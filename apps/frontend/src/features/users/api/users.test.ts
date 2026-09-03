@@ -70,6 +70,49 @@ describe('listUsers', () => {
     )
   })
 
+  it('rejects a usuario with a rol outside GESTIONABLE_ROLES', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrador',
+            perfilCompleto: true,
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('rejects a usuario missing perfilCompleto, fechaBaja or createdAt', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
   it('forwards the abort signal to fetch', async () => {
     const fetchMock = stubFetch(jsonResponse(200, { usuarios: [] }))
     const controller = new AbortController()

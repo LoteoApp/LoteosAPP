@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
 import { GESTIONABLE_ROLES, ROLE_LABELS } from '../types'
 import type { GestionableRol, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
@@ -104,19 +105,24 @@ export default function UserForm(props: UserFormProps) {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="rol">Rol</Label>
-              <select
-                id="rol"
+              <Select
                 name="rol"
                 value={rol}
-                onChange={(e) => setRol(e.target.value as GestionableRol)}
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                onValueChange={(value) => setRol(value as GestionableRol)}
               >
-                {GESTIONABLE_ROLES.map((candidate) => (
-                  <option key={candidate} value={candidate}>
-                    {ROLE_LABELS[candidate]}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="rol">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectList>
+                    {GESTIONABLE_ROLES.map((candidate) => (
+                      <SelectItem key={candidate} value={candidate}>
+                        {ROLE_LABELS[candidate]}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectContent>
+              </Select>
             </div>
           </>
         ) : (

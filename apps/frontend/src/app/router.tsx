@@ -11,7 +11,7 @@ import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
 import BillingPage from '../features/billing/pages/BillingPage'
-import UsersPage from '../features/users/pages/UsersPage'
+import UsersRoute from './UsersRoute'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage'
 
 export const router = createBrowserRouter([
@@ -66,7 +66,7 @@ export const router = createBrowserRouter([
         path: '/usuarios',
         element: (
           <RequireRole roles={[ROLE.administrador]}>
-            <UsersPage />
+            <UsersRoute />
           </RequireRole>
         ),
       },

@@ -248,8 +248,8 @@ func TestUserRepository(t *testing.T) {
 			t.Error("SoftDelete() should leave the user inactive")
 		}
 
-		if err := repository.SoftDelete(context.Background(), target.ID, actor.ID); !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-			t.Fatalf("SoftDelete() on an inactive user error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		if err := repository.SoftDelete(context.Background(), target.ID, actor.ID); !errors.Is(err, domain.ErrUsuarioDadoDeBaja) {
+			t.Fatalf("SoftDelete() on an inactive user error = %v, want %v", err, domain.ErrUsuarioDadoDeBaja)
 		}
 	})
 
@@ -305,13 +305,13 @@ func TestUserRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("reactivate ignores an already active user", func(t *testing.T) {
+	t.Run("reactivate reports an already active user as such", func(t *testing.T) {
 		actor := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
 		target := createUsuarioConRol(t, pool, repository, domain.RolEscribano, "Ana", "Gómez")
 
 		err := repository.Reactivate(context.Background(), target.ID, actor.ID)
-		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-			t.Fatalf("Reactivate() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		if !errors.Is(err, domain.ErrUsuarioYaActivo) {
+			t.Fatalf("Reactivate() error = %v, want %v", err, domain.ErrUsuarioYaActivo)
 		}
 	})
 }

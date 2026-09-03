@@ -87,6 +87,11 @@ function blockAndRedirectToLogin<T>(): Promise<T> {
   })
 }
 
+// A hung signOut() call (e.g. Supabase unreachable) must not keep the user
+// stuck on the current screen forever, so it races against this timeout —
+// the redirect below fires either way.
+const SIGN_OUT_TIMEOUT_MS = 3000
+
 // Imported lazily so the vast majority of apiFetch callers — every request
 // that never hits an invalid session — don't pull in the Supabase client
 // module, which requires real project credentials to construct and would
@@ -94,7 +99,10 @@ function blockAndRedirectToLogin<T>(): Promise<T> {
 async function redirectToLogin(): Promise<void> {
   try {
     const { supabaseClient } = await import('../config/supabase-client')
-    await supabaseClient.auth.signOut()
+    await Promise.race([
+      supabaseClient.auth.signOut(),
+      new Promise((resolve) => setTimeout(resolve, SIGN_OUT_TIMEOUT_MS)),
+    ])
   } catch {
     // Best effort: redirect regardless so the user isn't stuck.
   }

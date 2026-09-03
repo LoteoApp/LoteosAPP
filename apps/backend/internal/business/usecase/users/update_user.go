@@ -54,7 +54,7 @@ func (useCase *updateUserUseCase) Execute(ctx context.Context, input UpdateUserI
 	// accounts outside their scope.
 	target, err := useCase.repository.FindByID(ctx, input.ID)
 	if err != nil {
-		return domain.Usuario{}, err
+		return domain.Usuario{}, fromRepository(err)
 	}
 	if !esRolGestionable(target.Rol) {
 		return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
@@ -72,7 +72,7 @@ func (useCase *updateUserUseCase) Execute(ctx context.Context, input UpdateUserI
 		UsuarioModificacion: actorID,
 	})
 	if err != nil {
-		return domain.Usuario{}, err
+		return domain.Usuario{}, fromRepository(err)
 	}
 
 	return updated, nil

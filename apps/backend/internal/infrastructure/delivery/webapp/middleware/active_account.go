@@ -21,9 +21,13 @@ type accountRepository interface {
 // is still active. Must run behind RequireAuth, which populates the
 // Principal this reads.
 //
-// A caller with no usuarios row at all (e.g. an administrador provisioned
-// only in the identity provider) passes through unchanged: whether that's
-// allowed is for each use case to decide, via domain.ErrActorNoAprovisionado.
+// A caller with no usuarios row at all fails closed, except an
+// administrador claimed by the identity provider's token itself (checked
+// on the token's own Roles claim, never on the missing row): that one
+// bootstrap case passes through so the very first administrador can be
+// provisioned before any usuarios row exists. Every other unprovisioned
+// identity is blocked here — use cases can no longer rely on
+// domain.ErrActorNoAprovisionado as an access check of their own.
 func RequireActiveAccount(repository accountRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
@@ -36,10 +40,14 @@ func RequireActiveAccount(repository accountRepository) func(http.Handler) http.
 			usuario, err := repository.FindByAuthProviderID(request.Context(), principal.Subject)
 			if err != nil {
 				if errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-					next.ServeHTTP(w, request)
+					if domain.HasRole(principal.Roles, domain.RolAdministrador) {
+						next.ServeHTTP(w, request)
+						return
+					}
+					response.WriteError(w, request, "unprovisioned account blocked", domain.ErrActorNoAprovisionado)
 					return
 				}
-				response.WriteError(w, request, "active account lookup failed", err)
+				response.WriteError(w, request, "active account lookup failed", domain.ErrDatabaseUnavailable.WithCause(err))
 				return
 			}
 

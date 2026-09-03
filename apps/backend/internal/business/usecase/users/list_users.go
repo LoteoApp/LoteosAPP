@@ -33,7 +33,7 @@ func (useCase *listUsersUseCase) Execute(
 
 	usuarios, err := useCase.repository.ListByRoles(ctx, gestionableRoles, includeInactive)
 	if err != nil {
-		return nil, err
+		return nil, fromRepository(err)
 	}
 
 	return usuarios, nil

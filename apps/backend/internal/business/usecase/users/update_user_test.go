@@ -155,9 +155,10 @@ func TestUpdateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 func TestUpdateUserWrapsActorLookupFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID:               activeManagedUser(),
-		FindByAuthProviderIDErr: errors.New("connection refused"),
+		FindByAuthProviderIDErr: cause,
 	}
 	updateUser := NewUpdateUser(repository)
 
@@ -165,9 +166,7 @@ func TestUpdateUserWrapsActorLookupFailure(t *testing.T) {
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "admin-sub", ID: "user-1", Nombre: stringPtr("Ana"),
 	})
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the actor lookup failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 	if repository.UpdateCalls != 0 {
 		t.Error("Execute() should not update when the actor cannot be resolved")
 	}
@@ -194,9 +193,10 @@ func TestUpdateUserReportsActorNotProvisioned(t *testing.T) {
 func TestUpdateUserWrapsUpdateFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID: activeManagedUser(),
-		UpdateErr: errors.New("connection refused"),
+		UpdateErr: cause,
 	}
 	updateUser := NewUpdateUser(repository)
 
@@ -204,7 +204,5 @@ func TestUpdateUserWrapsUpdateFailure(t *testing.T) {
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "admin-sub", ID: "user-1", Nombre: stringPtr("Ana"),
 	})
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the update failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 }

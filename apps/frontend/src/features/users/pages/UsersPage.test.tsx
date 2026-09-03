@@ -1,9 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Session, User } from '@supabase/supabase-js'
 import UsersPage from './UsersPage'
-import { AuthContext, type AuthContextValue } from '../../auth/hooks/use-auth'
+import { ROLE_LABELS, type GestionableRol } from '../types'
 
 type StoredUsuario = {
   id: string
@@ -17,7 +16,7 @@ type StoredUsuario = {
 }
 
 let stored: StoredUsuario[] = []
-let failure: { status: number; message: string } | null = null
+let failure: { status: number; message: string; code?: string } | null = null
 let nextId = 0
 let getGate: Promise<void> | null = null
 let rejectWith: unknown = null
@@ -55,7 +54,7 @@ function installFetch() {
       }
 
       if (failure) {
-        return jsonResponse(failure.status, { code: 'error', message: failure.message })
+        return jsonResponse(failure.status, { code: failure.code ?? 'error', message: failure.message })
       }
 
       if (method === 'GET') {
@@ -106,20 +105,12 @@ function installFetch() {
 }
 
 function renderUsersPage() {
-  const value: AuthContextValue = {
-    isLoading: false,
-    session: { access_token: 'token-123' } as unknown as Session,
-    user: { app_metadata: { role: 'administrador' } } as unknown as User,
-    error: null,
-    login: vi.fn(),
-    logout: vi.fn(),
-  }
+  return render(<UsersPage accessToken="token-123" />)
+}
 
-  return render(
-    <AuthContext.Provider value={value}>
-      <UsersPage />
-    </AuthContext.Provider>,
-  )
+async function selectOption(user: ReturnType<typeof userEvent.setup>, triggerLabel: string, optionName: string) {
+  await user.click(screen.getByRole('combobox', { name: triggerLabel }))
+  await user.click(await screen.findByRole('option', { name: optionName }))
 }
 
 async function fillUserForm(
@@ -132,7 +123,7 @@ async function fillUserForm(
     await user.type(screen.getByLabelText('Correo electrónico'), values.email)
   }
   if (values.rol) {
-    await user.selectOptions(screen.getByLabelText('Rol'), values.rol)
+    await selectOption(user, 'Rol', ROLE_LABELS[values.rol as GestionableRol])
   }
 }
 
@@ -358,6 +349,33 @@ describe('UsersPage', () => {
     expect(screen.getAllByRole('button', { name: 'Editar' })).toHaveLength(1)
   })
 
+  it('reconciles the baja locally when a retry lands on an already-inactive conflict', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    failure = { status: 409, code: 'user_already_inactive', message: 'El usuario ya está dado de baja' }
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(await screen.findByText('Dado de baja')).toBeInTheDocument()
+    expect(screen.queryByText('El usuario ya está dado de baja')).not.toBeInTheDocument()
+  })
+
+  it('reconciles a reactivación locally when a retry lands on an already-active conflict', async () => {
+    const user = userEvent.setup()
+    stored = [{ ...usuario({ nombre: 'Ana', apellido: 'Pérez' }), fechaBaja: '2026-01-01T00:00:00Z' }]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    failure = { status: 409, code: 'user_already_active', message: 'El usuario ya está activo' }
+    await user.click(screen.getByRole('button', { name: 'Reactivar' }))
+
+    expect(await screen.findByText('Activo')).toBeInTheDocument()
+    expect(screen.queryByText('El usuario ya está activo')).not.toBeInTheDocument()
+  })
+
   it('keeps the user when the inline baja confirmation is cancelled', async () => {
     const user = userEvent.setup()
     stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
@@ -411,7 +429,7 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('Ana Pérez')
 
-    await user.selectOptions(screen.getByLabelText('Rol'), 'escribano')
+    await selectOption(user, 'Rol', 'Escribano')
 
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
@@ -434,7 +452,7 @@ describe('UsersPage', () => {
     const card = (await screen.findByText('Mara Cruz')).closest('li') as HTMLElement
     expect(within(card).getByText('Agrimensor')).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('Rol'), 'agrimensor')
+    await selectOption(user, 'Rol', 'Agrimensor')
 
     expect(screen.getByText('Mara Cruz')).toBeInTheDocument()
   })
@@ -449,12 +467,12 @@ describe('UsersPage', () => {
     await screen.findByText('Ana Pérez')
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('Estado'), 'activos')
+    await selectOption(user, 'Estado', 'Activos')
 
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
     expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('Estado'), 'inactivos')
+    await selectOption(user, 'Estado', 'Dados de baja')
 
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
@@ -466,7 +484,7 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('Ana Pérez')
 
-    await user.selectOptions(screen.getByLabelText('Rol'), 'escribano')
+    await selectOption(user, 'Rol', 'Escribano')
 
     expect(screen.getByText('No se encontraron usuarios con esos filtros.')).toBeInTheDocument()
   })

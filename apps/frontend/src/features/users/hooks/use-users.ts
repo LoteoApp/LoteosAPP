@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ApiError } from '../../../shared/api/client'
 import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from '../api/users'
 import type { Usuario, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
@@ -91,13 +92,24 @@ export function useUsers(token: string): UseUsers {
     [run, token],
   )
 
+  // A retried baja/reactivación can land on the backend's own already-done
+  // conflict (e.g. the first attempt's response was lost, not its effect):
+  // that's reconciled into the same local state a successful call would
+  // have produced, instead of surfacing it as an error and leaving the UI
+  // showing a stale status.
   const deactivate = useCallback(
     (id: string) =>
       run(async () => {
-        await deactivateUser(token, id)
+        try {
+          await deactivateUser(token, id)
+        } catch (deactivateError) {
+          if (!(deactivateError instanceof ApiError) || deactivateError.code !== 'user_already_inactive') {
+            throw deactivateError
+          }
+        }
         setUsuarios((current) =>
           current.map((usuario) =>
-            usuario.id === id ? { ...usuario, fechaBaja: new Date().toISOString() } : usuario,
+            usuario.id === id ? { ...usuario, fechaBaja: usuario.fechaBaja ?? new Date().toISOString() } : usuario,
           ),
         )
       }),
@@ -107,8 +119,17 @@ export function useUsers(token: string): UseUsers {
   const reactivate = useCallback(
     (id: string) =>
       run(async () => {
-        const updated = await reactivateUser(token, id)
-        setUsuarios((current) => current.map((usuario) => (usuario.id === id ? updated : usuario)))
+        try {
+          const updated = await reactivateUser(token, id)
+          setUsuarios((current) => current.map((usuario) => (usuario.id === id ? updated : usuario)))
+        } catch (reactivateError) {
+          if (!(reactivateError instanceof ApiError) || reactivateError.code !== 'user_already_active') {
+            throw reactivateError
+          }
+          setUsuarios((current) =>
+            current.map((usuario) => (usuario.id === id ? { ...usuario, fechaBaja: null } : usuario)),
+          )
+        }
       }),
     [run, token],
   )

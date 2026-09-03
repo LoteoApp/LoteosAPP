@@ -1,4 +1,5 @@
 import { apiFetch } from '../../../shared/api/client'
+import { GESTIONABLE_ROLES } from '../types'
 import type { Usuario, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
 const USERS_PATH = '/api/v1/usuarios'
@@ -15,7 +16,11 @@ function isUsuarioResponse(value: unknown): value is Usuario {
     typeof candidate.email === 'string' &&
     typeof candidate.nombre === 'string' &&
     typeof candidate.apellido === 'string' &&
-    typeof candidate.rol === 'string'
+    typeof candidate.rol === 'string' &&
+    (GESTIONABLE_ROLES as readonly string[]).includes(candidate.rol) &&
+    typeof candidate.perfilCompleto === 'boolean' &&
+    (candidate.fechaBaja === null || typeof candidate.fechaBaja === 'string') &&
+    typeof candidate.createdAt === 'string'
   )
 }
 

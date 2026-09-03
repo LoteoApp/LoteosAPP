@@ -187,9 +187,7 @@ func TestCreateUserCompensatesWhenPersistenceFails(t *testing.T) {
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
 
-	if !errors.Is(err, persistErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, persistErr)
-	}
+	assertDatabaseUnavailable(t, err, persistErr)
 	if identity.DeleteCalls != 1 {
 		t.Fatalf("Execute() identity.DeleteUser calls = %d, want 1", identity.DeleteCalls)
 	}
@@ -208,7 +206,5 @@ func TestCreateUserReturnsOriginalErrorWhenCompensationAlsoFails(t *testing.T) {
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
 
-	if !errors.Is(err, persistErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, persistErr)
-	}
+	assertDatabaseUnavailable(t, err, persistErr)
 }

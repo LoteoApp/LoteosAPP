@@ -114,17 +114,16 @@ func TestReactivateUserRejectsAlreadyActive(t *testing.T) {
 func TestReactivateUserWrapsActorLookupFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID:               inactiveManagedUser(),
-		FindByAuthProviderIDErr: errors.New("connection refused"),
+		FindByAuthProviderIDErr: cause,
 	}
 	reactivateUser := NewReactivateUser(repository)
 
 	_, err := reactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-1")
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the actor lookup failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 	if repository.ReactivateCalls != 0 {
 		t.Error("Execute() should not reactivate when the actor cannot be resolved")
 	}
@@ -149,15 +148,14 @@ func TestReactivateUserReportsActorNotProvisioned(t *testing.T) {
 func TestReactivateUserWrapsReactivateFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID:     inactiveManagedUser(),
-		ReactivateErr: errors.New("connection refused"),
+		ReactivateErr: cause,
 	}
 	reactivateUser := NewReactivateUser(repository)
 
 	_, err := reactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-1")
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the reactivate failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 }

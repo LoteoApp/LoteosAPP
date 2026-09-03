@@ -1,25 +1,14 @@
 import { useState } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
-import { Badge } from '../../../shared/ui/badge'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
-import { Label } from '../../../shared/ui/label'
-import { useAuth } from '../../auth/hooks/use-auth'
+import CreatedCredentialsAlert from '../components/CreatedCredentialsAlert'
+import UserCard from '../components/UserCard'
 import UserForm from '../components/UserForm'
+import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
-import {
-  GESTIONABLE_ROLES,
-  ROLE_LABELS,
-  isActivo,
-  toUsuarioUpdateValues,
-  type GestionableRol,
-  type Usuario,
-  type UsuarioFormValues,
-} from '../types'
-
-type RolFilter = 'todos' | GestionableRol
-type EstadoFilter = 'todos' | 'activos' | 'inactivos'
+import { isActivo, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
 
 function matchesRol(usuario: Usuario, filter: RolFilter): boolean {
   return filter === 'todos' || usuario.rol === filter
@@ -32,11 +21,14 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
 }
 
+type UsersPageProps = {
+  accessToken: string | null
+}
+
 // This route is admin-only, gated by RequireRole — every render here is
 // for an administrador, so no further role check is needed on top of it.
-export default function UsersPage() {
-  const { session } = useAuth()
-  const token = session?.access_token ?? ''
+export default function UsersPage({ accessToken }: UsersPageProps) {
+  const token = accessToken ?? ''
   const { usuarios, isLoading, isSubmitting, error, create, update, deactivate, reactivate } =
     useUsers(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
@@ -119,24 +111,11 @@ export default function UsersPage() {
       )}
 
       {createdCredentials && formView.mode === 'closed' && (
-        <Alert>
-          <AlertTitle>Usuario creado</AlertTitle>
-          <AlertDescription>
-            <p>
-              Contraseña temporal para {createdCredentials.email}:{' '}
-              <strong>{createdCredentials.temporaryPassword}</strong>
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={() => setCreatedCredentials(null)}
-            >
-              Cerrar
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <CreatedCredentialsAlert
+          email={createdCredentials.email}
+          temporaryPassword={createdCredentials.temporaryPassword}
+          onClose={() => setCreatedCredentials(null)}
+        />
       )}
 
       {formView.mode !== 'closed' ? (
@@ -180,37 +159,12 @@ export default function UsersPage() {
           )}
 
           {usuarios.length > 0 && (
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="filtro-rol">Rol</Label>
-                <select
-                  id="filtro-rol"
-                  value={rolFilter}
-                  onChange={(event) => setRolFilter(event.target.value as RolFilter)}
-                  className="h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-48 md:text-sm dark:bg-input/30"
-                >
-                  <option value="todos">Todos</option>
-                  {GESTIONABLE_ROLES.map((candidate) => (
-                    <option key={candidate} value={candidate}>
-                      {ROLE_LABELS[candidate]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="filtro-estado">Estado</Label>
-                <select
-                  id="filtro-estado"
-                  value={estadoFilter}
-                  onChange={(event) => setEstadoFilter(event.target.value as EstadoFilter)}
-                  className="h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-48 md:text-sm dark:bg-input/30"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="activos">Activos</option>
-                  <option value="inactivos">Dados de baja</option>
-                </select>
-              </div>
-            </div>
+            <UsersFilters
+              rolFilter={rolFilter}
+              estadoFilter={estadoFilter}
+              onRolFilterChange={setRolFilter}
+              onEstadoFilterChange={setEstadoFilter}
+            />
           )}
 
           {usuarios.length > 0 && filteredUsuarios.length === 0 && (
@@ -219,83 +173,22 @@ export default function UsersPage() {
 
           {filteredUsuarios.length > 0 && (
             <ul className="flex flex-col gap-3">
-              {filteredUsuarios.map((usuario) => {
-                const activo = isActivo(usuario)
-                return (
-                  <li key={usuario.id}>
-                    <Card>
-                      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {usuario.nombre} {usuario.apellido}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{usuario.email}</p>
-                          <div className="mt-1 flex gap-1.5">
-                            <Badge variant="outline">{ROLE_LABELS[usuario.rol]}</Badge>
-                            <Badge variant={activo ? 'default' : 'secondary'}>
-                              {activo ? 'Activo' : 'Dado de baja'}
-                            </Badge>
-                          </div>
-                        </div>
-                        {activo && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setCreatedCredentials(null)
-                                setFormState({ mode: 'edit', id: usuario.id })
-                              }}
-                            >
-                              Editar
-                            </Button>
-                            {confirmingBajaId === usuario.id ? (
-                              <>
-                                <span className="text-sm text-muted-foreground">¿Confirmar baja?</span>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  disabled={isSubmitting}
-                                  onClick={() => handleBaja(usuario)}
-                                >
-                                  Confirmar
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setConfirmingBajaId(null)}
-                                >
-                                  Cancelar
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => setConfirmingBajaId(usuario.id)}
-                              >
-                                Dar de baja
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                        {!activo && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isSubmitting}
-                              onClick={() => handleReactivar(usuario)}
-                            >
-                              Reactivar
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </li>
-                )
-              })}
+              {filteredUsuarios.map((usuario) => (
+                <UserCard
+                  key={usuario.id}
+                  usuario={usuario}
+                  isSubmitting={isSubmitting}
+                  isConfirmingBaja={confirmingBajaId === usuario.id}
+                  onEdit={() => {
+                    setCreatedCredentials(null)
+                    setFormState({ mode: 'edit', id: usuario.id })
+                  }}
+                  onStartConfirmBaja={() => setConfirmingBajaId(usuario.id)}
+                  onCancelConfirmBaja={() => setConfirmingBajaId(null)}
+                  onConfirmBaja={() => handleBaja(usuario)}
+                  onReactivar={() => handleReactivar(usuario)}
+                />
+              ))}
             </ul>
           )}
         </>

@@ -33,7 +33,7 @@ func (useCase *reactivateUserUseCase) Execute(
 
 	target, err := useCase.repository.FindByID(ctx, id)
 	if err != nil {
-		return domain.Usuario{}, err
+		return domain.Usuario{}, fromRepository(err)
 	}
 	if !esRolGestionable(target.Rol) {
 		return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
@@ -48,7 +48,7 @@ func (useCase *reactivateUserUseCase) Execute(
 	}
 
 	if err := useCase.repository.Reactivate(ctx, id, actorID); err != nil {
-		return domain.Usuario{}, err
+		return domain.Usuario{}, fromRepository(err)
 	}
 
 	target.FechaBaja = nil

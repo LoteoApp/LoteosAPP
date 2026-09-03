@@ -92,12 +92,11 @@ func TestListUsersIncludesInactiveWhenAsked(t *testing.T) {
 func TestListUsersWrapsRepositoryFailure(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.UserRepository{ListByRolesErr: errors.New("connection refused")}
+	cause := errors.New("connection refused")
+	repository := &gatewayfake.UserRepository{ListByRolesErr: cause}
 	listUsers := NewListUsers(repository)
 
 	_, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, false)
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the repository failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 }

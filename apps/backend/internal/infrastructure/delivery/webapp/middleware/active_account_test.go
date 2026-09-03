@@ -53,38 +53,56 @@ func TestRequireActiveAccount(t *testing.T) {
 	t.Parallel()
 
 	baja := time.Now()
-	principal := supabase.Principal{Subject: "auth-1"}
 
 	tests := []struct {
 		name           string
+		principal      supabase.Principal
 		repository     accountRepositoryStub
 		wantStatus     int
 		wantCode       string
 		wantNextCalled bool
 	}{
 		{
-			name:           "no usuarios row passes through",
+			name:           "administrador claimed by the token with no usuarios row passes through",
+			principal:      supabase.Principal{Subject: "auth-1", Roles: []string{domain.RolAdministrador}},
 			repository:     accountRepositoryStub{err: domain.ErrUsuarioNoEncontrado},
 			wantStatus:     http.StatusOK,
 			wantNextCalled: true,
 		},
 		{
+			name:       "non-administrador with no usuarios row is blocked",
+			principal:  supabase.Principal{Subject: "auth-1", Roles: []string{"escribano"}},
+			repository: accountRepositoryStub{err: domain.ErrUsuarioNoEncontrado},
+			wantStatus: http.StatusForbidden,
+			wantCode:   "actor_not_provisioned",
+		},
+		{
+			name:       "no usuarios row and no role claim at all is blocked",
+			principal:  supabase.Principal{Subject: "auth-1"},
+			repository: accountRepositoryStub{err: domain.ErrUsuarioNoEncontrado},
+			wantStatus: http.StatusForbidden,
+			wantCode:   "actor_not_provisioned",
+		},
+		{
 			name:           "active account passes through",
+			principal:      supabase.Principal{Subject: "auth-1"},
 			repository:     accountRepositoryStub{usuario: domain.Usuario{ID: "user-1"}},
 			wantStatus:     http.StatusOK,
 			wantNextCalled: true,
 		},
 		{
 			name:       "inactive account is blocked",
+			principal:  supabase.Principal{Subject: "auth-1"},
 			repository: accountRepositoryStub{usuario: domain.Usuario{ID: "user-1", FechaBaja: &baja}},
 			wantStatus: http.StatusForbidden,
 			wantCode:   "account_inactive",
 		},
 		{
 			name:       "unexpected repository error",
+			principal:  supabase.Principal{Subject: "auth-1"},
 			repository: accountRepositoryStub{err: errors.New("connection refused")},
-			wantStatus: http.StatusInternalServerError,
-			wantCode:   "internal_error",
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "database_unavailable",
 		},
 	}
 
@@ -98,7 +116,7 @@ func TestRequireActiveAccount(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			handler := middleware.RequireAuth(verifierStub{principal: principal})(
+			handler := middleware.RequireAuth(verifierStub{principal: test.principal})(
 				middleware.RequireActiveAccount(test.repository)(next))
 
 			request := httptest.NewRequest(http.MethodGet, "/protected", nil)

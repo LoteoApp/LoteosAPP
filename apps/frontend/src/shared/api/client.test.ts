@@ -178,6 +178,28 @@ describe('apiFetch', () => {
     await vi.waitFor(() => expect(location.href).toBe('/login'))
   })
 
+  it('redirects to /login even when signing out never resolves', async () => {
+    vi.useFakeTimers()
+    try {
+      stubFetch(
+        new Response(JSON.stringify({ code: 'unauthorized', message: 'No autorizado' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      signOutMock.mockReturnValue(new Promise(() => {}))
+      const location = { href: '' }
+      vi.stubGlobal('location', location)
+
+      void apiFetch('/api/v1/usuarios')
+      await vi.advanceTimersByTimeAsync(3000)
+
+      expect(location.href).toBe('/login')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not redirect for a 403 unrelated to the account being inactive', async () => {
     stubFetch(
       new Response(JSON.stringify({ code: 'forbidden', message: 'No tenés permisos' }), {

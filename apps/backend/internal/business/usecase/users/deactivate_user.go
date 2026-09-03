@@ -34,7 +34,7 @@ func (useCase *deactivateUserUseCase) Execute(
 
 	target, err := useCase.repository.FindByID(ctx, id)
 	if err != nil {
-		return err
+		return fromRepository(err)
 	}
 	if !esRolGestionable(target.Rol) {
 		return domain.ErrUsuarioNoEncontrado
@@ -48,5 +48,5 @@ func (useCase *deactivateUserUseCase) Execute(
 		return err
 	}
 
-	return useCase.repository.SoftDelete(ctx, id, actorID)
+	return fromRepository(useCase.repository.SoftDelete(ctx, id, actorID))
 }

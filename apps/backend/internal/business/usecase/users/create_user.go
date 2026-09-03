@@ -54,7 +54,7 @@ func (useCase *createUserUseCase) Execute(
 
 	authProviderID, temporaryPassword, err := useCase.identity.CreateUser(ctx, email, rol)
 	if err != nil {
-		return domain.Usuario{}, "", err
+		return domain.Usuario{}, "", fromRepository(err)
 	}
 
 	usuario, err := useCase.repository.Create(ctx, domain.Usuario{
@@ -70,7 +70,7 @@ func (useCase *createUserUseCase) Execute(
 			slog.ErrorContext(ctx, "compensating identity provider delete failed after local persistence error",
 				"auth_provider_id", authProviderID, "error", deleteErr)
 		}
-		return domain.Usuario{}, "", err
+		return domain.Usuario{}, "", fromRepository(err)
 	}
 
 	return usuario, temporaryPassword, nil

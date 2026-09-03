@@ -162,8 +162,12 @@ vacíos antes de que exista una funcionalidad que los necesite.
   `fecha_baja` seteado — necesario porque la validación del token es
   stateless (contra el JWKS, sin ida y vuelta a Supabase), así que un token
   ya emitido seguiría siendo válido hasta expirar aunque la cuenta esté dada
-  de baja. Recibe el repositorio de usuarios a través de una interfaz chica
-  definida en el propio paquete, no de `business/gateway`.
+  de baja. Un caller sin fila en `usuarios` también es rechazado (403,
+  `actor_not_provisioned`), salvo el caso puntual de bootstrap: un
+  administrador provisionado solo en Supabase, identificado por el claim de
+  rol del propio token, no por la fila ausente. Recibe el repositorio de
+  usuarios a través de una interfaz chica definida en el propio paquete, no
+  de `business/gateway`.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.UserRepository`) con `pgxpool` y SQL explícito, y
   expone la apertura y configuración del pool de conexiones.

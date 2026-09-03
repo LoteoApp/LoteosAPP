@@ -102,17 +102,16 @@ func TestDeactivateUserRejectsAlreadyInactive(t *testing.T) {
 func TestDeactivateUserWrapsActorLookupFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID:               activeManagedUser(),
-		FindByAuthProviderIDErr: errors.New("connection refused"),
+		FindByAuthProviderIDErr: cause,
 	}
 	deactivateUser := NewDeactivateUser(repository)
 
 	err := deactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-1")
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the actor lookup failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 	if repository.SoftDeleteCalls != 0 {
 		t.Error("Execute() should not give de baja when the actor cannot be resolved")
 	}
@@ -137,15 +136,14 @@ func TestDeactivateUserReportsActorNotProvisioned(t *testing.T) {
 func TestDeactivateUserWrapsSoftDeleteFailure(t *testing.T) {
 	t.Parallel()
 
+	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{
 		FoundByID:     activeManagedUser(),
-		SoftDeleteErr: errors.New("connection refused"),
+		SoftDeleteErr: cause,
 	}
 	deactivateUser := NewDeactivateUser(repository)
 
 	err := deactivateUser.Execute(context.Background(), []string{domain.RolAdministrador}, "admin-sub", "user-1")
 
-	if err == nil {
-		t.Fatal("Execute() error = nil, want the soft delete failure")
-	}
+	assertDatabaseUnavailable(t, err, cause)
 }

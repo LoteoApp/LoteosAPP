@@ -172,6 +172,11 @@ func (repository *UserRepository) Update(ctx context.Context, update domain.Usua
 	return usuario, nil
 }
 
+// SoftDelete gives a user de baja. A retry after a lost response lands on a
+// row that's already inactive: reconcileMissingUpdate distinguishes that
+// (domain.ErrUsuarioDadoDeBaja, so a caller can treat it as already done)
+// from the row not existing at all (domain.ErrUsuarioNoEncontrado), closing
+// the race between DeactivateUser's own read of the row and this write.
 func (repository *UserRepository) SoftDelete(ctx context.Context, id, usuarioModificacion string) error {
 	tag, err := repository.pool.Exec(ctx, `
 		UPDATE usuarios
@@ -186,15 +191,16 @@ func (repository *UserRepository) SoftDelete(ctx context.Context, id, usuarioMod
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrUsuarioNoEncontrado
+		return repository.reconcileMissingUpdate(ctx, id, domain.ErrUsuarioDadoDeBaja)
 	}
 
 	return nil
 }
 
 // Reactivate clears fecha_baja on an inactive user, the inverse of
-// SoftDelete. It only matches a currently inactive row, so reactivating an
-// already-active or unknown id reports domain.ErrUsuarioNoEncontrado.
+// SoftDelete. It only matches a currently inactive row; a retry that lands
+// on an already-active row is reconciled the same way SoftDelete reconciles
+// an already-inactive one (see reconcileMissingUpdate).
 func (repository *UserRepository) Reactivate(ctx context.Context, id, usuarioModificacion string) error {
 	tag, err := repository.pool.Exec(ctx, `
 		UPDATE usuarios
@@ -209,10 +215,29 @@ func (repository *UserRepository) Reactivate(ctx context.Context, id, usuarioMod
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrUsuarioNoEncontrado
+		return repository.reconcileMissingUpdate(ctx, id, domain.ErrUsuarioYaActivo)
 	}
 
 	return nil
+}
+
+// reconcileMissingUpdate runs after a state-guarded UPDATE (SoftDelete or
+// Reactivate) affects no rows. id is syntactically valid at this point — an
+// invalid one is already caught before Exec returns a row count — so 0 rows
+// affected means either id doesn't exist, or it exists but was already in
+// the state the caller wanted (alreadyInTargetState), which is what makes a
+// retried baja/reactivación idempotent instead of a false "not found".
+func (repository *UserRepository) reconcileMissingUpdate(ctx context.Context, id string, alreadyInTargetState error) error {
+	var exists bool
+	err := repository.pool.QueryRow(ctx, `SELECT true FROM usuarios WHERE id = $1::uuid`, id).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrUsuarioNoEncontrado
+	}
+	if err != nil {
+		return err
+	}
+
+	return alreadyInTargetState
 }
 
 func scanTargets(usuario *domain.Usuario) []any {
