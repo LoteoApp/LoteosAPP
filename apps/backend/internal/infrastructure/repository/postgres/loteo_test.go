@@ -371,8 +371,18 @@ func TestLoteoRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Get() error = %v", err)
 		}
-		if loaded.Manzanas[0].Number != "A" || len(loaded.Manzanas[0].CalleIDs) != 1 {
-			t.Errorf("Get() manzana = %#v", loaded.Manzanas[0])
+		var loadedManzana domain.Manzana
+		for _, candidate := range loaded.Manzanas {
+			if candidate.ID == loteo.Manzanas[0].ID {
+				loadedManzana = candidate
+				break
+			}
+		}
+		if loadedManzana.ID == "" {
+			t.Fatalf("Get() did not return manzana %q", loteo.Manzanas[0].ID)
+		}
+		if loadedManzana.Number != "A" || len(loadedManzana.CalleIDs) != 1 {
+			t.Errorf("Get() manzana = %#v", loadedManzana)
 		}
 	})
 
