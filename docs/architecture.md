@@ -557,6 +557,7 @@ apps/frontend/src/
 │   ├── AppLayout.tsx           # Sidebar + header + área de contenido
 │   ├── LoteosRoute.tsx         # Inyecta la sesión en el listado de loteos (/lotes)
 │   ├── LotsRoute.tsx           # Inyecta la sesión en el alta de loteo (/lotes/nuevo)
+│   ├── AgenciesRoute.tsx       # Inyecta sesión y rol en el ABM de inmobiliarias
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
 │   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
 │   └── providers.tsx           # Cuando existan providers globales

@@ -9,6 +9,10 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
 )
 
+// An inmobiliaria is four short text fields, so the cap stops a caller from
+// making the decoder allocate before the use case gets to check the role.
+const maxAgencyBodyBytes = 32 << 10
+
 type CreateAgencyHandler struct {
 	createAgency agencies.CreateAgency
 }
@@ -23,6 +27,8 @@ func (handler *CreateAgencyHandler) Handle(w http.ResponseWriter, request *http.
 	// PrincipalFromContext is always populated here: this handler only ever
 	// runs behind middleware.RequireAuth.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
+
+	request.Body = http.MaxBytesReader(w, request.Body, maxAgencyBodyBytes)
 
 	body, err := decodeJSON[dto.CreateAgencyRequest](request)
 	if err != nil {

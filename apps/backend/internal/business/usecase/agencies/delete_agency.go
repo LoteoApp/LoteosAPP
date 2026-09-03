@@ -38,5 +38,5 @@ func (useCase *deleteAgencyUseCase) Execute(ctx context.Context, input DeleteAge
 		return err
 	}
 
-	return useCase.repository.SoftDelete(ctx, input.ID, actorID)
+	return fromRepository(useCase.repository.SoftDelete(ctx, input.ID, actorID))
 }

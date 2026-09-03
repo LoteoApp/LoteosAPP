@@ -10,7 +10,7 @@ import ReservationsPage from '../features/reservations/pages/ReservationsPage'
 import SalesPage from '../features/sales/pages/SalesPage'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersPage from '../features/users/pages/UsersPage'
-import AgenciesPage from '../features/agencies/pages/AgenciesPage'
+import AgenciesRoute from './AgenciesRoute'
 
 export const router = createBrowserRouter([
   {
@@ -66,7 +66,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/inmobiliarias',
-        element: <AgenciesPage />,
+        element: <AgenciesRoute />,
       },
     ],
   },

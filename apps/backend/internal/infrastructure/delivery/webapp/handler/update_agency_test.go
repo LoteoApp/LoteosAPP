@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -167,6 +168,33 @@ func TestUpdateAgencyRoute(t *testing.T) {
 		}
 		if updateAgency.called {
 			t.Error("use case should not be called with an invalid body")
+		}
+	})
+
+	// The body limit runs before the use case, so an authenticated caller
+	// with no permission still can't make the decoder allocate.
+	t.Run("rejects an oversized body without reaching the use case", func(t *testing.T) {
+		t.Parallel()
+
+		updateAgency := &updateAgencyStub{}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolEscribano}}}
+
+		oversized := `{"razonSocial":"` + strings.Repeat("a", 64<<10) + `"}`
+		recorder := performUpdateAgencyRequest(t, updateAgency, verifier, "valid-token", validAgencyID, oversized)
+
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+		}
+		if updateAgency.called {
+			t.Error("use case should not be called with an oversized body")
+		}
+
+		var got response.ErrorResponse
+		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if got.Code != "invalid_body" {
+			t.Errorf("error code = %q, want %q", got.Code, "invalid_body")
 		}
 	})
 

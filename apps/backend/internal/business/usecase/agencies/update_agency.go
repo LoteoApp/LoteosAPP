@@ -81,7 +81,7 @@ func (useCase *updateAgencyUseCase) Execute(ctx context.Context, input UpdateAge
 		UsuarioModificacion: actorID,
 	})
 	if err != nil {
-		return domain.Inmobiliaria{}, err
+		return domain.Inmobiliaria{}, fromRepository(err)
 	}
 
 	return updated, nil

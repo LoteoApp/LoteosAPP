@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAgency, deleteAgency, listAgencies, updateAgency } from './agencies'
+import { ApiError } from '../../../shared/api/client'
 
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
 
@@ -70,22 +71,44 @@ describe('listAgencies', () => {
     await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
   })
 
+  // An optional field of the wrong type used to survive the type guard and
+  // blow up later, when the search called .includes on a number.
+  it('rejects an agency whose optional field is not a string', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        inmobiliarias: [{ id: 'inm-1', razonSocial: 'Lotes del Sur', cuit: 42 }],
+      }),
+    )
+
+    await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
+  })
+
   it('surfaces the message of an error response', async () => {
     stubFetch(jsonResponse(403, { code: 'forbidden', message: 'No tenés permisos' }))
 
     await expect(listAgencies('token-123')).rejects.toThrow('No tenés permisos')
   })
 
-  it('falls back to a generic message when the error body is not JSON', async () => {
-    stubFetch(new Response('boom', { status: 500 }))
+  it('reports a request that never reached the server as a network failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
 
-    await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
+    await expect(listAgencies('token-123')).rejects.toMatchObject({ code: 'network_error' })
   })
 
-  it('falls back to a generic message when the error body carries no message', async () => {
-    stubFetch(jsonResponse(500, { code: 'internal_error' }))
+  it('keeps an aborted request as an AbortError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new DOMException('The operation was aborted.', 'AbortError')
+      }),
+    )
 
-    await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
+    await expect(listAgencies('token-123')).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('rejects a successful response that is not JSON', async () => {
@@ -132,6 +155,19 @@ describe('createAgency', () => {
       }),
     ).rejects.toThrow(GENERIC_ERROR)
   })
+
+  it('surfaces a conflict with the backend code', async () => {
+    stubFetch(jsonResponse(409, { code: 'cuit_in_use', message: 'El CUIT ya está en uso' }))
+
+    await expect(
+      createAgency('token-123', {
+        razonSocial: 'Lotes del Sur',
+        cuit: '30712345678',
+        telefono: '',
+        email: '',
+      }),
+    ).rejects.toThrow(ApiError)
+  })
 })
 
 describe('updateAgency', () => {
@@ -166,7 +202,9 @@ describe('deleteAgency', () => {
   })
 
   it('surfaces the message of an error response', async () => {
-    stubFetch(jsonResponse(404, { code: 'agency_not_found', message: 'Inmobiliaria no encontrada' }))
+    stubFetch(
+      jsonResponse(404, { code: 'agency_not_found', message: 'Inmobiliaria no encontrada' }),
+    )
 
     await expect(deleteAgency('token-123', 'inm-1')).rejects.toThrow(
       'Inmobiliaria no encontrada',

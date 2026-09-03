@@ -1,4 +1,4 @@
-import { apiUrl } from '../../../shared/config/env'
+import { ApiError, apiFetch } from '../../../shared/api/client'
 import type { Inmobiliaria, InmobiliariaFormValues } from '../types'
 
 const AGENCIES_PATH = '/api/v1/inmobiliarias'
@@ -10,13 +10,23 @@ type AgencyResponse = Pick<Inmobiliaria, 'id' | 'razonSocial'> & {
   email?: string | null
 }
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === 'string'
+}
+
 function isAgencyResponse(value: unknown): value is AgencyResponse {
   if (value === null || typeof value !== 'object') {
     return false
   }
 
   const candidate = value as Record<string, unknown>
-  return typeof candidate.id === 'string' && typeof candidate.razonSocial === 'string'
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.razonSocial === 'string' &&
+    isOptionalString(candidate.cuit) &&
+    isOptionalString(candidate.telefono) &&
+    isOptionalString(candidate.email)
+  )
 }
 
 function toAgency(raw: AgencyResponse): Inmobiliaria {
@@ -29,32 +39,27 @@ function toAgency(raw: AgencyResponse): Inmobiliaria {
   }
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
+type RequestOptions = {
+  method?: string
+  body?: unknown
+  signal?: AbortSignal
+}
+
+async function request(token: string, path: string, options: RequestOptions = {}): Promise<unknown> {
   try {
-    const body: unknown = await response.json()
-    if (body && typeof body === 'object' && 'message' in body) {
-      const { message } = body as { message?: unknown }
-      if (typeof message === 'string' && message !== '') {
-        return message
-      }
+    return await apiFetch<unknown>(path, { ...options, token })
+  } catch (error) {
+    // ApiError already carries a user-facing message, and an aborted request
+    // must keep propagating its AbortError. Anything else (e.g. a 200 whose
+    // body isn't JSON) collapses to the generic failure.
+    if (error instanceof ApiError || (error instanceof DOMException && error.name === 'AbortError')) {
+      throw error
     }
-  } catch {
-    return GENERIC_ERROR
-  }
-
-  return GENERIC_ERROR
-}
-
-async function readJSON(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    throw new Error(GENERIC_ERROR)
+    throw new Error(GENERIC_ERROR, { cause: error })
   }
 }
 
-async function readAgency(response: Response): Promise<Inmobiliaria> {
-  const body = await readJSON(response)
+function readAgency(body: unknown): Inmobiliaria {
   if (!isAgencyResponse(body)) {
     throw new Error(GENERIC_ERROR)
   }
@@ -62,28 +67,11 @@ async function readAgency(response: Response): Promise<Inmobiliaria> {
   return toAgency(body)
 }
 
-async function send(token: string, path: string, init: RequestInit = {}): Promise<Response> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers: {
-      ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response))
-  }
-
-  return response
-}
-
 export async function listAgencies(
   token: string,
   signal?: AbortSignal,
 ): Promise<Inmobiliaria[]> {
-  const response = await send(token, AGENCIES_PATH, { signal })
-  const body = await readJSON(response)
+  const body = await request(token, AGENCIES_PATH, { signal })
 
   if (body === null || typeof body !== 'object' || !('inmobiliarias' in body)) {
     throw new Error(GENERIC_ERROR)
@@ -104,12 +92,7 @@ export async function createAgency(
   token: string,
   values: InmobiliariaFormValues,
 ): Promise<Inmobiliaria> {
-  const response = await send(token, AGENCIES_PATH, {
-    method: 'POST',
-    body: JSON.stringify(values),
-  })
-
-  return readAgency(response)
+  return readAgency(await request(token, AGENCIES_PATH, { method: 'POST', body: values }))
 }
 
 export async function updateAgency(
@@ -117,14 +100,11 @@ export async function updateAgency(
   id: string,
   values: InmobiliariaFormValues,
 ): Promise<Inmobiliaria> {
-  const response = await send(token, `${AGENCIES_PATH}/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(values),
-  })
-
-  return readAgency(response)
+  return readAgency(
+    await request(token, `${AGENCIES_PATH}/${id}`, { method: 'PATCH', body: values }),
+  )
 }
 
 export async function deleteAgency(token: string, id: string): Promise<void> {
-  await send(token, `${AGENCIES_PATH}/${id}`, { method: 'DELETE' })
+  await request(token, `${AGENCIES_PATH}/${id}`, { method: 'DELETE' })
 }

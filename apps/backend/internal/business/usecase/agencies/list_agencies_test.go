@@ -111,7 +111,7 @@ func TestListAgenciesLeavesANameSearchAlone(t *testing.T) {
 	}
 }
 
-func TestListAgenciesPropagatesRepositoryError(t *testing.T) {
+func TestListAgenciesClassifiesUnexpectedRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("connection refused")
@@ -120,7 +120,28 @@ func TestListAgenciesPropagatesRepositoryError(t *testing.T) {
 
 	_, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{domain.RolAdministrador}})
 
+	if !errors.Is(err, domain.ErrDatabaseUnavailable) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrDatabaseUnavailable)
+	}
 	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
+		t.Errorf("Execute() error = %v, want it to carry %v as Cause for the log", err, rawErr)
+	}
+}
+
+// A *domain.Error the repository already classified travels unchanged: the
+// caller still gets the specific conflict, not a generic unavailable.
+func TestListAgenciesKeepsDomainErrors(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.InmobiliariaRepository{ListErr: domain.ErrNoAutorizado}
+	listAgencies := NewListAgencies(repository)
+
+	_, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{domain.RolAdministrador}})
+
+	if !errors.Is(err, domain.ErrNoAutorizado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
+	}
+	if errors.Is(err, domain.ErrDatabaseUnavailable) {
+		t.Error("Execute() should not reclassify an error the gateway already classified")
 	}
 }

@@ -1,9 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Session, User } from '@supabase/supabase-js'
 import AgenciesPage from './AgenciesPage'
-import { AuthContext, type AuthContextValue } from '../../auth/hooks/use-auth'
 
 type StoredInmobiliaria = {
   id: string
@@ -82,21 +80,8 @@ function installFetch() {
   )
 }
 
-function renderAgenciesPage(role: string | null = 'administrador') {
-  const value: AuthContextValue = {
-    isLoading: false,
-    session: { access_token: 'token-123' } as unknown as Session,
-    user: role ? ({ app_metadata: { role } } as unknown as User) : null,
-    error: null,
-    login: vi.fn(),
-    logout: vi.fn(),
-  }
-
-  return render(
-    <AuthContext.Provider value={value}>
-      <AgenciesPage />
-    </AuthContext.Provider>,
-  )
+function renderAgenciesPage(isAdministrador = true) {
+  return render(<AgenciesPage accessToken="token-123" isAdministrador={isAdministrador} />)
 }
 
 async function fillAgencyForm(
@@ -203,11 +188,14 @@ describe('AgenciesPage', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows a generic message when the failure carries no message', async () => {
-    rejectWith = { status: 500 }
+  // A fetch that never reaches the server must not surface its native
+  // "Failed to fetch" to the user.
+  it('reports a network failure in the user language', async () => {
+    rejectWith = new TypeError('Failed to fetch')
     renderAgenciesPage()
 
-    expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument()
+    expect(await screen.findByText(/No se pudo conectar con el servidor/)).toBeInTheDocument()
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument()
   })
 
   it('drops the pending load when the screen is unmounted', async () => {
@@ -405,6 +393,26 @@ describe('AgenciesPage', () => {
     expect(screen.queryByText('Altamira Propiedades')).not.toBeInTheDocument()
   })
 
+  // A term made only of CUIT separators normalizes to an empty string, which
+  // every CUIT "contains": it has to match nothing, not everything.
+  it('does not match every agency when the search is only a separator', async () => {
+    stored = [
+      { id: 'inmobiliaria-1', razonSocial: 'Lotes del Sur', cuit: '30712345678' },
+      { id: 'inmobiliaria-2', razonSocial: 'Altamira Propiedades' },
+    ]
+    const user = userEvent.setup()
+    renderAgenciesPage()
+    await screen.findByText('Lotes del Sur')
+
+    await user.type(screen.getByLabelText('Buscar'), '-')
+
+    expect(screen.queryByText('Lotes del Sur')).not.toBeInTheDocument()
+    expect(screen.queryByText('Altamira Propiedades')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('No se encontraron inmobiliarias con esa búsqueda.'),
+    ).toBeInTheDocument()
+  })
+
   it('reports a search with no matches', async () => {
     stored = [{ id: 'inmobiliaria-1', razonSocial: 'Lotes del Sur' }]
     const user = userEvent.setup()
@@ -420,7 +428,7 @@ describe('AgenciesPage', () => {
 
   it('hides every write action from a non administrador', async () => {
     stored = [{ id: 'inmobiliaria-1', razonSocial: 'Lotes del Sur' }]
-    renderAgenciesPage('administrativo')
+    renderAgenciesPage(false)
 
     const item = await screen.findByRole('listitem')
     expect(within(item).queryByRole('button')).not.toBeInTheDocument()

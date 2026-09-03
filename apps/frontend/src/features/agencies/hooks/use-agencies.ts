@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { messageFromError } from '../../../shared/api/client'
 import { createAgency, deleteAgency, listAgencies, updateAgency } from '../api/agencies'
 import type { Inmobiliaria, InmobiliariaFormValues } from '../types'
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
-}
 
 export type UseAgencies = {
   inmobiliarias: Inmobiliaria[]
@@ -35,7 +32,7 @@ export function useAgencies(token: string): UseAgencies {
       })
       .catch((loadError: unknown) => {
         if (!controller.signal.aborted) {
-          setError(messageOf(loadError))
+          setError(messageFromError(loadError))
         }
       })
       .finally(() => {
@@ -56,7 +53,7 @@ export function useAgencies(token: string): UseAgencies {
       setError(null)
       return true
     } catch (operationError) {
-      setError(messageOf(operationError))
+      setError(messageFromError(operationError))
       return false
     } finally {
       setIsSubmitting(false)

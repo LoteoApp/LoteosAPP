@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { useAuth } from '../../auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../../../shared/auth/roles'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
@@ -23,20 +21,27 @@ function normalize(value: string): string {
 }
 
 function matchesSearch(inmobiliaria: Inmobiliaria, search: string): boolean {
-  return (
-    normalize(inmobiliaria.razonSocial).includes(search) ||
-    inmobiliaria.cuit.includes(normalizeCuit(search))
-  )
+  if (normalize(inmobiliaria.razonSocial).includes(search)) {
+    return true
+  }
+
+  // A search made only of separators normalizes to an empty CUIT, and every
+  // string contains the empty string — matching on it would list every
+  // agency instead of none.
+  const cuit = normalizeCuit(search)
+  return cuit !== '' && inmobiliaria.cuit.includes(cuit)
 }
 
-export default function AgenciesPage() {
-  const { session, user } = useAuth()
-  const token = session?.access_token ?? ''
-  // Hiding the buttons is UX only, not access control: the backend restricts
-  // every write to administrador as well, and RLS is still pending.
-  const isAdministrador = getUserRole(user) === ROLE.administrador
+type AgenciesPageProps = {
+  accessToken: string | null
+  // Hiding the write actions is UX only, not access control: the backend
+  // restricts every write to administrador as well, and RLS is still pending.
+  isAdministrador: boolean
+}
+
+export default function AgenciesPage({ accessToken, isAdministrador }: AgenciesPageProps) {
   const { inmobiliarias, isLoading, isSubmitting, error, create, update, remove } =
-    useAgencies(token)
+    useAgencies(accessToken ?? '')
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [search, setSearch] = useState('')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)

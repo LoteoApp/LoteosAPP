@@ -29,6 +29,8 @@ func (handler *UpdateAgencyHandler) Handle(w http.ResponseWriter, request *http.
 		return domain.ErrInmobiliariaIDInvalido
 	}
 
+	request.Body = http.MaxBytesReader(w, request.Body, maxAgencyBodyBytes)
+
 	body, err := decodeJSON[dto.UpdateAgencyRequest](request)
 	if err != nil {
 		return err

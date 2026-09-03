@@ -152,7 +152,10 @@ migraciones ya aplicadas.
 agencias activas no pueden compartir CUIT, pero el CUIT sigue siendo opcional
 y se puede reutilizar después de una baja. El
 [ABM de inmobiliarias](architecture.md#abm-de-inmobiliarias) normaliza el CUIT
-a 11 dígitos antes de persistirlo, que es lo que hace comparable el índice. La
+a 11 dígitos antes de persistirlo, que es lo que hace comparable el índice;
+como nada lo garantizaba antes, el `Up` primero normaliza las filas
+existentes y aborta si alguna activa queda con un CUIT que no son 11 dígitos
+o si dos comparten valor, en vez de deduplicar por su cuenta. La
 columna `fecha_baja` ya venía de `00005`: la baja de una inmobiliaria es
 lógica (`fecha_baja IS NULL` = activa) porque borrar la fila rompería las FK
 que la nombran (`usuarios.inmobiliaria_id`, `inmobiliaria_loteos`).

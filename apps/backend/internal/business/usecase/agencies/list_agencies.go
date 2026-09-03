@@ -43,7 +43,7 @@ func (useCase *listAgenciesUseCase) Execute(ctx context.Context, input ListAgenc
 
 	inmobiliarias, err := useCase.repository.List(ctx, search)
 	if err != nil {
-		return nil, err
+		return nil, fromRepository(err)
 	}
 
 	return inmobiliarias, nil

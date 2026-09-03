@@ -77,7 +77,7 @@ func TestDeleteAgencyPropagatesRepositoryError(t *testing.T) {
 	}
 }
 
-func TestDeleteAgencyLeavesUnexpectedRepositoryErrorUnclassified(t *testing.T) {
+func TestDeleteAgencyClassifiesUnexpectedRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("syntax error at end of input")
@@ -89,12 +89,11 @@ func TestDeleteAgencyLeavesUnexpectedRepositoryErrorUnclassified(t *testing.T) {
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1",
 	})
 
-	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
+	if !errors.Is(err, domain.ErrDatabaseUnavailable) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrDatabaseUnavailable)
 	}
-	var domainErr *domain.Error
-	if errors.As(err, &domainErr) {
-		t.Errorf("Execute() error = %v, want it unclassified so it surfaces as a 500", err)
+	if !errors.Is(err, rawErr) {
+		t.Errorf("Execute() error = %v, want it to carry %v as Cause for the log", err, rawErr)
 	}
 }
 
@@ -117,7 +116,7 @@ func TestDeleteAgencyRejectsActorWithoutUsuario(t *testing.T) {
 	}
 }
 
-func TestDeleteAgencyPropagatesActorResolutionError(t *testing.T) {
+func TestDeleteAgencyClassifiesActorResolutionError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("connection refused")
@@ -129,8 +128,11 @@ func TestDeleteAgencyPropagatesActorResolutionError(t *testing.T) {
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1",
 	})
 
+	if !errors.Is(err, domain.ErrDatabaseUnavailable) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrDatabaseUnavailable)
+	}
 	if !errors.Is(err, rawErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, rawErr)
+		t.Errorf("Execute() error = %v, want it to carry %v as Cause for the log", err, rawErr)
 	}
 	if repository.SoftDeleteCalls != 0 {
 		t.Error("Execute() should not call repository when actor resolution fails")
