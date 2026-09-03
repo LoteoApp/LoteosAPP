@@ -52,7 +52,7 @@ func TestInmobiliariaRepository(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repository := postgres.NewInmobiliariaRepository(pool)
+	repository := postgres.NewAgencyRepository(pool)
 
 	t.Run("create and list", func(t *testing.T) {
 		razonSocial := "Lotes del Sur " + newUUID(t)
@@ -60,9 +60,9 @@ func TestInmobiliariaRepository(t *testing.T) {
 		telefono := "3415551234"
 		email := "contacto@lotesdelsur.com"
 
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: razonSocial, CUIT: &cuit, Telefono: &telefono, Email: &email,
-			UsuarioModificacion: seedUsuario(t, pool),
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: razonSocial, CUIT: &cuit, Phone: &telefono, Email: &email,
+			ModifiedBy: seedUsuario(t, pool),
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -71,7 +71,7 @@ func TestInmobiliariaRepository(t *testing.T) {
 		if created.ID == "" {
 			t.Error("Create() should assign an id")
 		}
-		if created.FechaCreacion.IsZero() {
+		if created.CreatedAt.IsZero() {
 			t.Error("Create() should set fecha_creacion")
 		}
 
@@ -86,9 +86,9 @@ func TestInmobiliariaRepository(t *testing.T) {
 
 	t.Run("list finds an agency by cuit", func(t *testing.T) {
 		cuit := newCUIT(t)
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), CUIT: &cuit,
-			UsuarioModificacion: seedUsuario(t, pool),
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), CUIT: &cuit,
+			ModifiedBy: seedUsuario(t, pool),
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -118,9 +118,9 @@ func TestInmobiliariaRepository(t *testing.T) {
 	})
 
 	t.Run("search treats ILIKE wildcards as literal characters", func(t *testing.T) {
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial:         "Lotes del Sur " + newUUID(t),
-			UsuarioModificacion: seedUsuario(t, pool),
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t),
+			ModifiedBy:   seedUsuario(t, pool),
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -132,8 +132,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 			if err != nil {
 				t.Fatalf("List(%q) error = %v", search, err)
 			}
-			for _, inmobiliaria := range found {
-				if inmobiliaria.ID == created.ID {
+			for _, agency := range found {
+				if agency.ID == created.ID {
 					t.Errorf("List(%q) matched every inmobiliaria, want the wildcard treated as a literal", search)
 				}
 			}
@@ -144,19 +144,19 @@ func TestInmobiliariaRepository(t *testing.T) {
 		cuit := newCUIT(t)
 		actor := seedUsuario(t, pool)
 
-		first, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), CUIT: &cuit, UsuarioModificacion: actor,
+		first, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), CUIT: &cuit, ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, first.ID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		_, err = repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Altamira " + newUUID(t), CUIT: &cuit, UsuarioModificacion: actor,
+		_, err = repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Altamira " + newUUID(t), CUIT: &cuit, ModifiedBy: actor,
 		})
-		if !errors.Is(err, domain.ErrCUITEnUso) {
-			t.Fatalf("Create() error = %v, want %v", err, domain.ErrCUITEnUso)
+		if !errors.Is(err, domain.ErrCUITInUse) {
+			t.Fatalf("Create() error = %v, want %v", err, domain.ErrCUITInUse)
 		}
 	})
 
@@ -165,16 +165,16 @@ func TestInmobiliariaRepository(t *testing.T) {
 	t.Run("create allows several agencies without cuit", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
 
-		first, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), UsuarioModificacion: actor,
+		first, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, first.ID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		second, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Altamira " + newUUID(t), UsuarioModificacion: actor,
+		second, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Altamira " + newUUID(t), ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, second.ID) })
 		if err != nil {
@@ -186,8 +186,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 		cuit := newCUIT(t)
 		actor := seedUsuario(t, pool)
 
-		first, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), CUIT: &cuit, UsuarioModificacion: actor,
+		first, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), CUIT: &cuit, ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, first.ID) })
 		if err != nil {
@@ -198,8 +198,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 			t.Fatalf("SoftDelete() error = %v", err)
 		}
 
-		second, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Altamira " + newUUID(t), CUIT: &cuit, UsuarioModificacion: actor,
+		second, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Altamira " + newUUID(t), CUIT: &cuit, ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, second.ID) })
 		if err != nil {
@@ -209,8 +209,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 
 	t.Run("update replaces the fields that are present", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), UsuarioModificacion: actor,
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -218,15 +218,15 @@ func TestInmobiliariaRepository(t *testing.T) {
 		}
 
 		newCUITValue := newCUIT(t)
-		updated, err := repository.Update(context.Background(), domain.InmobiliariaUpdate{
-			ID: created.ID, RazonSocial: inmobiliariaStrPtr("Lotes del Sur SRL"),
-			CUIT: &newCUITValue, UsuarioModificacion: actor,
+		updated, err := repository.Update(context.Background(), domain.AgencyUpdate{
+			ID: created.ID, BusinessName: inmobiliariaStrPtr("Lotes del Sur SRL"),
+			CUIT: &newCUITValue, ModifiedBy: actor,
 		})
 		if err != nil {
 			t.Fatalf("Update() error = %v", err)
 		}
-		if updated.RazonSocial != "Lotes del Sur SRL" {
-			t.Errorf("Update() razon social = %q, want %q", updated.RazonSocial, "Lotes del Sur SRL")
+		if updated.BusinessName != "Lotes del Sur SRL" {
+			t.Errorf("Update() razon social = %q, want %q", updated.BusinessName, "Lotes del Sur SRL")
 		}
 		if updated.CUIT == nil || *updated.CUIT != newCUITValue {
 			t.Errorf("Update() cuit = %v, want %q", updated.CUIT, newCUITValue)
@@ -237,9 +237,9 @@ func TestInmobiliariaRepository(t *testing.T) {
 		actor := seedUsuario(t, pool)
 		cuit := newCUIT(t)
 		telefono := "3415551234"
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), CUIT: &cuit, Telefono: &telefono,
-			UsuarioModificacion: actor,
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), CUIT: &cuit, Phone: &telefono,
+			ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -248,20 +248,20 @@ func TestInmobiliariaRepository(t *testing.T) {
 
 		// Only email is sent; razon social, cuit and telefono are omitted
 		// and must survive the update untouched.
-		updated, err := repository.Update(context.Background(), domain.InmobiliariaUpdate{
-			ID: created.ID, Email: inmobiliariaStrPtr("contacto@lotesdelsur.com"), UsuarioModificacion: actor,
+		updated, err := repository.Update(context.Background(), domain.AgencyUpdate{
+			ID: created.ID, Email: inmobiliariaStrPtr("contacto@lotesdelsur.com"), ModifiedBy: actor,
 		})
 		if err != nil {
 			t.Fatalf("Update() error = %v", err)
 		}
-		if updated.RazonSocial != created.RazonSocial {
-			t.Errorf("Update() razon social = %q, want it unchanged (%q)", updated.RazonSocial, created.RazonSocial)
+		if updated.BusinessName != created.BusinessName {
+			t.Errorf("Update() razon social = %q, want it unchanged (%q)", updated.BusinessName, created.BusinessName)
 		}
 		if updated.CUIT == nil || *updated.CUIT != cuit {
 			t.Errorf("Update() cuit = %v, want it unchanged (%q)", updated.CUIT, cuit)
 		}
-		if updated.Telefono == nil || *updated.Telefono != telefono {
-			t.Errorf("Update() telefono = %v, want it unchanged (%q)", updated.Telefono, telefono)
+		if updated.Phone == nil || *updated.Phone != telefono {
+			t.Errorf("Update() telefono = %v, want it unchanged (%q)", updated.Phone, telefono)
 		}
 		if updated.Email == nil || *updated.Email != "contacto@lotesdelsur.com" {
 			t.Errorf("Update() email = %v, want it replaced", updated.Email)
@@ -272,44 +272,44 @@ func TestInmobiliariaRepository(t *testing.T) {
 		actor := seedUsuario(t, pool)
 		takenCUIT := newCUIT(t)
 
-		first, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), CUIT: &takenCUIT, UsuarioModificacion: actor,
+		first, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), CUIT: &takenCUIT, ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, first.ID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		second, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Altamira " + newUUID(t), UsuarioModificacion: actor,
+		second, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Altamira " + newUUID(t), ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, second.ID) })
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		_, err = repository.Update(context.Background(), domain.InmobiliariaUpdate{
-			ID: second.ID, CUIT: &takenCUIT, UsuarioModificacion: actor,
+		_, err = repository.Update(context.Background(), domain.AgencyUpdate{
+			ID: second.ID, CUIT: &takenCUIT, ModifiedBy: actor,
 		})
-		if !errors.Is(err, domain.ErrCUITEnUso) {
-			t.Fatalf("Update() error = %v, want %v", err, domain.ErrCUITEnUso)
+		if !errors.Is(err, domain.ErrCUITInUse) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrCUITInUse)
 		}
 	})
 
 	t.Run("update not found", func(t *testing.T) {
-		_, err := repository.Update(context.Background(), domain.InmobiliariaUpdate{
-			ID: newUUID(t), RazonSocial: inmobiliariaStrPtr("Lotes del Sur"), UsuarioModificacion: seedUsuario(t, pool),
+		_, err := repository.Update(context.Background(), domain.AgencyUpdate{
+			ID: newUUID(t), BusinessName: inmobiliariaStrPtr("Lotes del Sur"), ModifiedBy: seedUsuario(t, pool),
 		})
-		if !errors.Is(err, domain.ErrInmobiliariaNoEncontrada) {
-			t.Fatalf("Update() error = %v, want %v", err, domain.ErrInmobiliariaNoEncontrada)
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrAgencyNotFound)
 		}
 	})
 
 	t.Run("soft delete", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
 		razonSocial := "Lotes del Sur " + newUUID(t)
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: razonSocial, UsuarioModificacion: actor,
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: razonSocial, ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -331,8 +331,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 
 	t.Run("soft delete not found", func(t *testing.T) {
 		err := repository.SoftDelete(context.Background(), newUUID(t), seedUsuario(t, pool))
-		if !errors.Is(err, domain.ErrInmobiliariaNoEncontrada) {
-			t.Fatalf("SoftDelete() error = %v, want %v", err, domain.ErrInmobiliariaNoEncontrada)
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("SoftDelete() error = %v, want %v", err, domain.ErrAgencyNotFound)
 		}
 	})
 
@@ -340,8 +340,8 @@ func TestInmobiliariaRepository(t *testing.T) {
 	// matches rows with fecha_baja IS NULL.
 	t.Run("update of an agency given de baja is reported as not found", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
-		created, err := repository.Create(context.Background(), domain.Inmobiliaria{
-			RazonSocial: "Lotes del Sur " + newUUID(t), UsuarioModificacion: actor,
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: actor,
 		})
 		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
 		if err != nil {
@@ -351,11 +351,11 @@ func TestInmobiliariaRepository(t *testing.T) {
 			t.Fatalf("SoftDelete() error = %v", err)
 		}
 
-		_, err = repository.Update(context.Background(), domain.InmobiliariaUpdate{
-			ID: created.ID, RazonSocial: inmobiliariaStrPtr("Lotes del Sur SRL"), UsuarioModificacion: actor,
+		_, err = repository.Update(context.Background(), domain.AgencyUpdate{
+			ID: created.ID, BusinessName: inmobiliariaStrPtr("Lotes del Sur SRL"), ModifiedBy: actor,
 		})
-		if !errors.Is(err, domain.ErrInmobiliariaNoEncontrada) {
-			t.Fatalf("Update() error = %v, want %v", err, domain.ErrInmobiliariaNoEncontrada)
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrAgencyNotFound)
 		}
 	})
 }

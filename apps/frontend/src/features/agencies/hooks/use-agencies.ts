@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { messageFromError } from '../../../shared/api/client'
 import { createAgency, deleteAgency, listAgencies, updateAgency } from '../api/agencies'
-import type { Inmobiliaria, InmobiliariaFormValues } from '../types'
+import type { Agency, AgencyFormValues } from '../types'
 
 export type UseAgencies = {
-  inmobiliarias: Inmobiliaria[]
+  agencies: Agency[]
   isLoading: boolean
   isSubmitting: boolean
   error: string | null
-  create: (values: InmobiliariaFormValues) => Promise<boolean>
-  update: (id: string, values: InmobiliariaFormValues) => Promise<boolean>
+  create: (values: AgencyFormValues) => Promise<boolean>
+  update: (id: string, values: AgencyFormValues) => Promise<boolean>
   remove: (id: string) => Promise<boolean>
 }
 
 export function useAgencies(token: string): UseAgencies {
-  const [inmobiliarias, setInmobiliarias] = useState<Inmobiliaria[]>([])
+  const [agencies, setAgencies] = useState<Agency[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +27,7 @@ export function useAgencies(token: string): UseAgencies {
         if (controller.signal.aborted) {
           return
         }
-        setInmobiliarias(loaded)
+        setAgencies(loaded)
         setError(null)
       })
       .catch((loadError: unknown) => {
@@ -61,20 +61,20 @@ export function useAgencies(token: string): UseAgencies {
   }, [])
 
   const create = useCallback(
-    (values: InmobiliariaFormValues) =>
+    (values: AgencyFormValues) =>
       run(async () => {
         const created = await createAgency(token, values)
-        setInmobiliarias((current) => [...current, created])
+        setAgencies((current) => [...current, created])
       }),
     [run, token],
   )
 
   const update = useCallback(
-    (id: string, values: InmobiliariaFormValues) =>
+    (id: string, values: AgencyFormValues) =>
       run(async () => {
         const updated = await updateAgency(token, id, values)
-        setInmobiliarias((current) =>
-          current.map((inmobiliaria) => (inmobiliaria.id === id ? updated : inmobiliaria)),
+        setAgencies((current) =>
+          current.map((agency) => (agency.id === id ? updated : agency)),
         )
       }),
     [run, token],
@@ -84,12 +84,12 @@ export function useAgencies(token: string): UseAgencies {
     (id: string) =>
       run(async () => {
         await deleteAgency(token, id)
-        setInmobiliarias((current) =>
-          current.filter((inmobiliaria) => inmobiliaria.id !== id),
+        setAgencies((current) =>
+          current.filter((agency) => agency.id !== id),
         )
       }),
     [run, token],
   )
 
-  return { inmobiliarias, isLoading, isSubmitting, error, create, update, remove }
+  return { agencies, isLoading, isSubmitting, error, create, update, remove }
 }

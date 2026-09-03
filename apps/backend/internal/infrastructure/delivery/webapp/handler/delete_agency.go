@@ -24,7 +24,7 @@ func (handler *DeleteAgencyHandler) Handle(w http.ResponseWriter, request *http.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	id := request.PathValue("id")
 	if !isValidUUID(id) {
-		return domain.ErrInmobiliariaIDInvalido
+		return domain.ErrInvalidAgencyID
 	}
 
 	input := agencies.DeleteAgencyInput{ActorRoles: principal.Roles, Subject: principal.Subject, ID: id}

@@ -35,18 +35,18 @@ func (handler *CreateAgencyHandler) Handle(w http.ResponseWriter, request *http.
 		return err
 	}
 
-	inmobiliaria, err := handler.createAgency.Execute(request.Context(), agencies.CreateAgencyInput{
-		ActorRoles:  principal.Roles,
-		Subject:     principal.Subject,
-		RazonSocial: body.RazonSocial,
-		CUIT:        body.CUIT,
-		Telefono:    body.Telefono,
-		Email:       body.Email,
+	agency, err := handler.createAgency.Execute(request.Context(), agencies.CreateAgencyInput{
+		ActorRoles:   principal.Roles,
+		Subject:      principal.Subject,
+		BusinessName: body.BusinessName,
+		CUIT:         body.CUIT,
+		Phone:        body.Phone,
+		Email:        body.Email,
 	})
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusCreated, dto.AgencyResponse{Inmobiliaria: inmobiliaria})
+	response.WriteJSON(w, http.StatusCreated, dto.AgencyResponse{Agency: agency})
 	return nil
 }

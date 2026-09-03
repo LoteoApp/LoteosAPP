@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { resolveFormView } from './resolveFormView'
-import type { Inmobiliaria } from '../types'
+import type { Agency } from '../types'
 
-const agency: Inmobiliaria = {
+const agency: Agency = {
   id: 'inmobiliaria-1',
   razonSocial: 'Lotes del Sur',
   cuit: '30712345678',

@@ -40,9 +40,9 @@ func normalizeOptionalCUIT(cuit *string) (*string, error) {
 		return nil, nil
 	}
 
-	normalized := domain.NormalizarCUIT(*cuit)
-	if !domain.CUITValido(normalized) {
-		return nil, domain.ErrCUITInvalido
+	normalized := domain.NormalizeCUIT(*cuit)
+	if !domain.ValidCUIT(normalized) {
+		return nil, domain.ErrInvalidCUIT
 	}
 
 	return &normalized, nil

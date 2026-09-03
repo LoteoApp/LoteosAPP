@@ -112,7 +112,7 @@ func TestDeleteAgencyRoute(t *testing.T) {
 			wantCode   string
 		}{
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
-			{name: "agency not found", err: domain.ErrInmobiliariaNoEncontrada, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
+			{name: "agency not found", err: domain.ErrAgencyNotFound, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
 		}
 
 		for _, test := range tests {

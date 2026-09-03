@@ -18,7 +18,7 @@ func TestDeleteAgencyRejectsNonAdministrador(t *testing.T) {
 		t.Run(rol, func(t *testing.T) {
 			t.Parallel()
 
-			repository := &gatewayfake.InmobiliariaRepository{}
+			repository := &gatewayfake.AgencyRepository{}
 			users := &gatewayfake.UserRepository{}
 			deleteAgency := NewDeleteAgency(repository, users)
 
@@ -39,7 +39,7 @@ func TestDeleteAgencyRejectsNonAdministrador(t *testing.T) {
 func TestDeleteAgencyHappyPath(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteAgency := NewDeleteAgency(repository, users)
 
@@ -63,8 +63,8 @@ func TestDeleteAgencyHappyPath(t *testing.T) {
 func TestDeleteAgencyPropagatesRepositoryError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := domain.ErrInmobiliariaNoEncontrada
-	repository := &gatewayfake.InmobiliariaRepository{SoftDeleteErr: wantErr}
+	wantErr := domain.ErrAgencyNotFound
+	repository := &gatewayfake.AgencyRepository{SoftDeleteErr: wantErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteAgency := NewDeleteAgency(repository, users)
 
@@ -81,7 +81,7 @@ func TestDeleteAgencyClassifiesUnexpectedRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("syntax error at end of input")
-	repository := &gatewayfake.InmobiliariaRepository{SoftDeleteErr: rawErr}
+	repository := &gatewayfake.AgencyRepository{SoftDeleteErr: rawErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	deleteAgency := NewDeleteAgency(repository, users)
 
@@ -100,7 +100,7 @@ func TestDeleteAgencyClassifiesUnexpectedRepositoryError(t *testing.T) {
 func TestDeleteAgencyRejectsActorWithoutUsuario(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado}
 	deleteAgency := NewDeleteAgency(repository, users)
 
@@ -120,7 +120,7 @@ func TestDeleteAgencyClassifiesActorResolutionError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("connection refused")
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: rawErr}
 	deleteAgency := NewDeleteAgency(repository, users)
 

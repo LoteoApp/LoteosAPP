@@ -1,10 +1,10 @@
 import { ApiError, apiFetch } from '../../../shared/api/client'
-import type { Inmobiliaria, InmobiliariaFormValues } from '../types'
+import type { Agency, AgencyFormValues } from '../types'
 
 const AGENCIES_PATH = '/api/v1/inmobiliarias'
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
 
-type AgencyResponse = Pick<Inmobiliaria, 'id' | 'razonSocial'> & {
+type AgencyResponse = Pick<Agency, 'id' | 'razonSocial'> & {
   cuit?: string | null
   telefono?: string | null
   email?: string | null
@@ -29,7 +29,7 @@ function isAgencyResponse(value: unknown): value is AgencyResponse {
   )
 }
 
-function toAgency(raw: AgencyResponse): Inmobiliaria {
+function toAgency(raw: AgencyResponse): Agency {
   return {
     id: raw.id,
     razonSocial: raw.razonSocial,
@@ -59,7 +59,7 @@ async function request(token: string, path: string, options: RequestOptions = {}
   }
 }
 
-function readAgency(body: unknown): Inmobiliaria {
+function readAgency(body: unknown): Agency {
   if (!isAgencyResponse(body)) {
     throw new Error(GENERIC_ERROR)
   }
@@ -70,7 +70,7 @@ function readAgency(body: unknown): Inmobiliaria {
 export async function listAgencies(
   token: string,
   signal?: AbortSignal,
-): Promise<Inmobiliaria[]> {
+): Promise<Agency[]> {
   const body = await request(token, AGENCIES_PATH, { signal })
 
   if (body === null || typeof body !== 'object' || !('inmobiliarias' in body)) {
@@ -90,16 +90,16 @@ export async function listAgencies(
 
 export async function createAgency(
   token: string,
-  values: InmobiliariaFormValues,
-): Promise<Inmobiliaria> {
+  values: AgencyFormValues,
+): Promise<Agency> {
   return readAgency(await request(token, AGENCIES_PATH, { method: 'POST', body: values }))
 }
 
 export async function updateAgency(
   token: string,
   id: string,
-  values: InmobiliariaFormValues,
-): Promise<Inmobiliaria> {
+  values: AgencyFormValues,
+): Promise<Agency> {
   return readAgency(
     await request(token, `${AGENCIES_PATH}/${id}`, { method: 'PATCH', body: values }),
   )

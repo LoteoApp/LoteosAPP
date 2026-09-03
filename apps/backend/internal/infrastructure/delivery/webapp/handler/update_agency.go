@@ -26,7 +26,7 @@ func (handler *UpdateAgencyHandler) Handle(w http.ResponseWriter, request *http.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	id := request.PathValue("id")
 	if !isValidUUID(id) {
-		return domain.ErrInmobiliariaIDInvalido
+		return domain.ErrInvalidAgencyID
 	}
 
 	request.Body = http.MaxBytesReader(w, request.Body, maxAgencyBodyBytes)
@@ -36,19 +36,19 @@ func (handler *UpdateAgencyHandler) Handle(w http.ResponseWriter, request *http.
 		return err
 	}
 
-	inmobiliaria, err := handler.updateAgency.Execute(request.Context(), agencies.UpdateAgencyInput{
-		ActorRoles:  principal.Roles,
-		Subject:     principal.Subject,
-		ID:          id,
-		RazonSocial: body.RazonSocial,
-		CUIT:        body.CUIT,
-		Telefono:    body.Telefono,
-		Email:       body.Email,
+	agency, err := handler.updateAgency.Execute(request.Context(), agencies.UpdateAgencyInput{
+		ActorRoles:   principal.Roles,
+		Subject:      principal.Subject,
+		ID:           id,
+		BusinessName: body.BusinessName,
+		CUIT:         body.CUIT,
+		Phone:        body.Phone,
+		Email:        body.Email,
 	})
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusOK, dto.AgencyResponse{Inmobiliaria: inmobiliaria})
+	response.WriteJSON(w, http.StatusOK, dto.AgencyResponse{Agency: agency})
 	return nil
 }

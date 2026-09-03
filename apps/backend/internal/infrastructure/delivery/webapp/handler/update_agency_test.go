@@ -20,26 +20,26 @@ import (
 const validAgencyID = "22222222-2222-2222-2222-222222222222"
 
 type updateAgencyStub struct {
-	inmobiliaria   domain.Inmobiliaria
-	err            error
-	called         bool
-	gotSubject     string
-	gotID          string
-	gotRazonSocial *string
-	gotCUIT        *string
-	gotTelefono    *string
-	gotEmail       *string
+	agency          domain.Agency
+	err             error
+	called          bool
+	gotSubject      string
+	gotID           string
+	gotBusinessName *string
+	gotCUIT         *string
+	gotPhone        *string
+	gotEmail        *string
 }
 
-func (stub *updateAgencyStub) Execute(_ context.Context, input agencies.UpdateAgencyInput) (domain.Inmobiliaria, error) {
+func (stub *updateAgencyStub) Execute(_ context.Context, input agencies.UpdateAgencyInput) (domain.Agency, error) {
 	stub.called = true
 	stub.gotSubject = input.Subject
 	stub.gotID = input.ID
-	stub.gotRazonSocial = input.RazonSocial
+	stub.gotBusinessName = input.BusinessName
 	stub.gotCUIT = input.CUIT
-	stub.gotTelefono = input.Telefono
+	stub.gotPhone = input.Phone
 	stub.gotEmail = input.Email
-	return stub.inmobiliaria, stub.err
+	return stub.agency, stub.err
 }
 
 func performUpdateAgencyRequest(t *testing.T, updateAgency *updateAgencyStub, verifier userVerifierStub, token, id string, body any) *httptest.ResponseRecorder {
@@ -61,7 +61,7 @@ func TestUpdateAgencyRoute(t *testing.T) {
 		t.Parallel()
 
 		updateAgency := &updateAgencyStub{
-			inmobiliaria: domain.Inmobiliaria{ID: validAgencyID, RazonSocial: "Lotes del Sur SRL"},
+			agency: domain.Agency{ID: validAgencyID, BusinessName: "Lotes del Sur SRL"},
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
 
@@ -77,17 +77,17 @@ func TestUpdateAgencyRoute(t *testing.T) {
 		if updateAgency.gotSubject != "user-1" {
 			t.Errorf("subject passed to use case = %q, want %q", updateAgency.gotSubject, "user-1")
 		}
-		if updateAgency.gotRazonSocial == nil || *updateAgency.gotRazonSocial != "Lotes del Sur SRL" {
-			t.Errorf("razon social passed to use case = %v", updateAgency.gotRazonSocial)
+		if updateAgency.gotBusinessName == nil || *updateAgency.gotBusinessName != "Lotes del Sur SRL" {
+			t.Errorf("razon social passed to use case = %v", updateAgency.gotBusinessName)
 		}
 
 		var got struct {
-			RazonSocial string `json:"razonSocial"`
+			BusinessName string `json:"razonSocial"`
 		}
 		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if got.RazonSocial != "Lotes del Sur SRL" {
+		if got.BusinessName != "Lotes del Sur SRL" {
 			t.Errorf("response = %#v", got)
 		}
 	})
@@ -106,12 +106,12 @@ func TestUpdateAgencyRoute(t *testing.T) {
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
 		}
-		if updateAgency.gotRazonSocial != nil || updateAgency.gotCUIT != nil || updateAgency.gotEmail != nil {
+		if updateAgency.gotBusinessName != nil || updateAgency.gotCUIT != nil || updateAgency.gotEmail != nil {
 			t.Errorf("omitted fields passed to use case = %v/%v/%v, want all absent",
-				updateAgency.gotRazonSocial, updateAgency.gotCUIT, updateAgency.gotEmail)
+				updateAgency.gotBusinessName, updateAgency.gotCUIT, updateAgency.gotEmail)
 		}
-		if updateAgency.gotTelefono == nil || *updateAgency.gotTelefono != "3415551234" {
-			t.Errorf("telefono passed to use case = %v", updateAgency.gotTelefono)
+		if updateAgency.gotPhone == nil || *updateAgency.gotPhone != "3415551234" {
+			t.Errorf("telefono passed to use case = %v", updateAgency.gotPhone)
 		}
 	})
 
@@ -208,9 +208,9 @@ func TestUpdateAgencyRoute(t *testing.T) {
 			wantCode   string
 		}{
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
-			{name: "agency not found", err: domain.ErrInmobiliariaNoEncontrada, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
-			{name: "empty update", err: domain.ErrInmobiliariaSinCambios, wantStatus: http.StatusBadRequest, wantCode: "empty_agency_update"},
-			{name: "cuit in use", err: domain.ErrCUITEnUso, wantStatus: http.StatusConflict, wantCode: "cuit_in_use"},
+			{name: "agency not found", err: domain.ErrAgencyNotFound, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
+			{name: "empty update", err: domain.ErrEmptyAgencyUpdate, wantStatus: http.StatusBadRequest, wantCode: "empty_agency_update"},
+			{name: "cuit in use", err: domain.ErrCUITInUse, wantStatus: http.StatusConflict, wantCode: "cuit_in_use"},
 		}
 
 		for _, test := range tests {

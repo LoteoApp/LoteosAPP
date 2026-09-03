@@ -44,19 +44,19 @@ apps/backend/
 │   │   ├── domain/
 │   │   │   ├── object.go
 │   │   │   ├── cliente.go
-│   │   │   ├── inmobiliaria.go
+│   │   │   ├── agency.go
 │   │   │   └── usuario.go
 │   │   ├── gateway/
 │   │   │   ├── object_storage.go
 │   │   │   ├── usuario_repository.go
 │   │   │   ├── cliente_repository.go
-│   │   │   ├── inmobiliaria_repository.go
+│   │   │   ├── agency_repository.go
 │   │   │   ├── loteo_repository.go
 │   │   │   └── gatewayfake/
 │   │   │       ├── object_storage.go
 │   │   │       ├── user_repository.go
 │   │   │       ├── cliente_repository.go
-│   │   │       ├── inmobiliaria_repository.go
+│   │   │       ├── agency_repository.go
 │   │   │       └── loteo_repository.go
 │   │   └── usecase/
 │   │       ├── users/
@@ -91,7 +91,7 @@ apps/backend/
 │       │       ├── pool.go
 │       │       ├── usuario.go
 │       │       ├── cliente.go
-│       │       ├── inmobiliaria.go
+│       │       ├── agency.go
 │       │       ├── loteo.go
 │       │       └── geometry.go
 │       ├── storage/
@@ -327,6 +327,13 @@ Decisiones de este recorte:
   (`features/lots/api/list-agencies.ts`, todavía un catálogo mock) y la
   asignación de usuarios con rol inmobiliaria a su agencia
   (`usuarios.inmobiliaria_id`).
+- **Los identificadores de este módulo están en inglés** (`domain.Agency`,
+  `BusinessName`, `AgencyRepository`, `AgencyListItem`), como pide
+  `AGENTS.md`. Lo que sigue en español es lo que no es un identificador: las
+  columnas de la base, los tags JSON y las rutas que ya publica el API
+  (`razonSocial`, `/api/v1/inmobiliarias`) y los textos que ve el usuario.
+  Las entidades más viejas (`domain.Cliente`, `domain.Usuario`) todavía usan
+  español; unificarlas es un cambio aparte.
 
 ### Loteo: alta, persistencia de la geometría y lectura
 
@@ -580,7 +587,10 @@ apps/frontend/src/
 │   │   ├── api/
 │   │   │   └── agencies.ts        # Cliente de /api/v1/inmobiliarias
 │   │   ├── components/
-│   │   │   └── AgencyForm.tsx
+│   │   │   ├── AgencyEditor.tsx
+│   │   │   ├── AgencyForm.tsx
+│   │   │   ├── AgencyList.tsx
+│   │   │   └── AgencyListItem.tsx
 │   │   ├── hooks/
 │   │   │   └── use-agencies.ts
 │   │   ├── lib/

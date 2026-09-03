@@ -18,18 +18,18 @@ type ListAgenciesInput struct {
 // listing is open to administrador and administrativo; only administrador
 // may change it.
 type ListAgencies interface {
-	Execute(ctx context.Context, input ListAgenciesInput) ([]domain.Inmobiliaria, error)
+	Execute(ctx context.Context, input ListAgenciesInput) ([]domain.Agency, error)
 }
 
 type listAgenciesUseCase struct {
-	repository gateway.InmobiliariaRepository
+	repository gateway.AgencyRepository
 }
 
-func NewListAgencies(repository gateway.InmobiliariaRepository) ListAgencies {
+func NewListAgencies(repository gateway.AgencyRepository) ListAgencies {
 	return &listAgenciesUseCase{repository: repository}
 }
 
-func (useCase *listAgenciesUseCase) Execute(ctx context.Context, input ListAgenciesInput) ([]domain.Inmobiliaria, error) {
+func (useCase *listAgenciesUseCase) Execute(ctx context.Context, input ListAgenciesInput) ([]domain.Agency, error) {
 	if !hasRole(input.ActorRoles, domain.RolAdministrador, domain.RolAdministrativo) {
 		return nil, domain.ErrNoAutorizado
 	}
@@ -37,14 +37,14 @@ func (useCase *listAgenciesUseCase) Execute(ctx context.Context, input ListAgenc
 	// A CUIT is stored without separators, so a search typed as
 	// "30-71234567-8" has to be normalized before it reaches the LIKE.
 	search := strings.TrimSpace(input.Search)
-	if normalized := domain.NormalizarCUIT(search); domain.CUITValido(normalized) {
+	if normalized := domain.NormalizeCUIT(search); domain.ValidCUIT(normalized) {
 		search = normalized
 	}
 
-	inmobiliarias, err := useCase.repository.List(ctx, search)
+	found, err := useCase.repository.List(ctx, search)
 	if err != nil {
 		return nil, fromRepository(err)
 	}
 
-	return inmobiliarias, nil
+	return found, nil
 }

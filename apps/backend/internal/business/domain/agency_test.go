@@ -25,8 +25,8 @@ func TestNormalizarCUIT(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := domain.NormalizarCUIT(test.cuit); got != test.want {
-				t.Errorf("NormalizarCUIT(%q) = %q, want %q", test.cuit, got, test.want)
+			if got := domain.NormalizeCUIT(test.cuit); got != test.want {
+				t.Errorf("NormalizeCUIT(%q) = %q, want %q", test.cuit, got, test.want)
 			}
 		})
 	}
@@ -52,8 +52,8 @@ func TestCUITValido(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := domain.CUITValido(test.cuit); got != test.want {
-				t.Errorf("CUITValido(%q) = %v, want %v", test.cuit, got, test.want)
+			if got := domain.ValidCUIT(test.cuit); got != test.want {
+				t.Errorf("ValidCUIT(%q) = %v, want %v", test.cuit, got, test.want)
 			}
 		})
 	}

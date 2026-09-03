@@ -18,7 +18,7 @@ func TestListAgenciesRejectsUnauthorizedRole(t *testing.T) {
 		t.Run(rol, func(t *testing.T) {
 			t.Parallel()
 
-			repository := &gatewayfake.InmobiliariaRepository{}
+			repository := &gatewayfake.AgencyRepository{}
 			listAgencies := NewListAgencies(repository)
 
 			_, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{rol}})
@@ -42,17 +42,17 @@ func TestListAgenciesAllowsAdministradorAndAdministrativo(t *testing.T) {
 		t.Run(rol, func(t *testing.T) {
 			t.Parallel()
 
-			repository := &gatewayfake.InmobiliariaRepository{
-				ListResult: []domain.Inmobiliaria{{ID: "agency-1", RazonSocial: "Lotes del Sur"}},
+			repository := &gatewayfake.AgencyRepository{
+				ListResult: []domain.Agency{{ID: "agency-1", BusinessName: "Lotes del Sur"}},
 			}
 			listAgencies := NewListAgencies(repository)
 
-			inmobiliarias, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{rol}})
+			found, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{rol}})
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
-			if len(inmobiliarias) != 1 || inmobiliarias[0].ID != "agency-1" {
-				t.Errorf("Execute() = %#v", inmobiliarias)
+			if len(found) != 1 || found[0].ID != "agency-1" {
+				t.Errorf("Execute() = %#v", found)
 			}
 			if repository.ListCalls != 1 {
 				t.Errorf("Execute() repository.List calls = %d, want 1", repository.ListCalls)
@@ -64,7 +64,7 @@ func TestListAgenciesAllowsAdministradorAndAdministrativo(t *testing.T) {
 func TestListAgenciesTrimsTheSearch(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	listAgencies := NewListAgencies(repository)
 
 	if _, err := listAgencies.Execute(context.Background(), ListAgenciesInput{
@@ -82,7 +82,7 @@ func TestListAgenciesTrimsTheSearch(t *testing.T) {
 func TestListAgenciesNormalizesASearchedCUIT(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	listAgencies := NewListAgencies(repository)
 
 	if _, err := listAgencies.Execute(context.Background(), ListAgenciesInput{
@@ -98,7 +98,7 @@ func TestListAgenciesNormalizesASearchedCUIT(t *testing.T) {
 func TestListAgenciesLeavesANameSearchAlone(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	listAgencies := NewListAgencies(repository)
 
 	if _, err := listAgencies.Execute(context.Background(), ListAgenciesInput{
@@ -115,7 +115,7 @@ func TestListAgenciesClassifiesUnexpectedRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("connection refused")
-	repository := &gatewayfake.InmobiliariaRepository{ListErr: rawErr}
+	repository := &gatewayfake.AgencyRepository{ListErr: rawErr}
 	listAgencies := NewListAgencies(repository)
 
 	_, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{domain.RolAdministrador}})
@@ -133,7 +133,7 @@ func TestListAgenciesClassifiesUnexpectedRepositoryError(t *testing.T) {
 func TestListAgenciesKeepsDomainErrors(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{ListErr: domain.ErrNoAutorizado}
+	repository := &gatewayfake.AgencyRepository{ListErr: domain.ErrNoAutorizado}
 	listAgencies := NewListAgencies(repository)
 
 	_, err := listAgencies.Execute(context.Background(), ListAgenciesInput{ActorRoles: []string{domain.RolAdministrador}})

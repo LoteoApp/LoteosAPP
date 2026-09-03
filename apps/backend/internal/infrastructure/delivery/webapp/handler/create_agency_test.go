@@ -19,26 +19,26 @@ import (
 )
 
 type createAgencyStub struct {
-	inmobiliaria   domain.Inmobiliaria
-	err            error
-	called         bool
-	gotActorRoles  []string
-	gotSubject     string
-	gotRazonSocial string
-	gotCUIT        *string
-	gotTelefono    *string
-	gotEmail       *string
+	agency          domain.Agency
+	err             error
+	called          bool
+	gotActorRoles   []string
+	gotSubject      string
+	gotBusinessName string
+	gotCUIT         *string
+	gotPhone        *string
+	gotEmail        *string
 }
 
-func (stub *createAgencyStub) Execute(_ context.Context, input agencies.CreateAgencyInput) (domain.Inmobiliaria, error) {
+func (stub *createAgencyStub) Execute(_ context.Context, input agencies.CreateAgencyInput) (domain.Agency, error) {
 	stub.called = true
 	stub.gotActorRoles = input.ActorRoles
 	stub.gotSubject = input.Subject
-	stub.gotRazonSocial = input.RazonSocial
+	stub.gotBusinessName = input.BusinessName
 	stub.gotCUIT = input.CUIT
-	stub.gotTelefono = input.Telefono
+	stub.gotPhone = input.Phone
 	stub.gotEmail = input.Email
-	return stub.inmobiliaria, stub.err
+	return stub.agency, stub.err
 }
 
 func performCreateAgencyRequest(t *testing.T, createAgency *createAgencyStub, verifier userVerifierStub, token string, body any) *httptest.ResponseRecorder {
@@ -60,7 +60,7 @@ func TestCreateAgencyRoute(t *testing.T) {
 		t.Parallel()
 
 		createAgency := &createAgencyStub{
-			inmobiliaria: domain.Inmobiliaria{ID: validAgencyID, RazonSocial: "Lotes del Sur"},
+			agency: domain.Agency{ID: validAgencyID, BusinessName: "Lotes del Sur"},
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrador}}}
 
@@ -72,13 +72,13 @@ func TestCreateAgencyRoute(t *testing.T) {
 		}
 
 		var got struct {
-			ID          string `json:"id"`
-			RazonSocial string `json:"razonSocial"`
+			ID           string `json:"id"`
+			BusinessName string `json:"razonSocial"`
 		}
 		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if got.ID != validAgencyID || got.RazonSocial != "Lotes del Sur" {
+		if got.ID != validAgencyID || got.BusinessName != "Lotes del Sur" {
 			t.Errorf("response = %#v", got)
 		}
 		if createAgency.gotSubject != "user-1" {
@@ -104,9 +104,9 @@ func TestCreateAgencyRoute(t *testing.T) {
 		if recorder.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
 		}
-		if createAgency.gotCUIT != nil || createAgency.gotTelefono != nil || createAgency.gotEmail != nil {
+		if createAgency.gotCUIT != nil || createAgency.gotPhone != nil || createAgency.gotEmail != nil {
 			t.Errorf("optional fields passed to use case = %v/%v/%v, want all absent",
-				createAgency.gotCUIT, createAgency.gotTelefono, createAgency.gotEmail)
+				createAgency.gotCUIT, createAgency.gotPhone, createAgency.gotEmail)
 		}
 	})
 
@@ -178,9 +178,9 @@ func TestCreateAgencyRoute(t *testing.T) {
 			wantCode   string
 		}{
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
-			{name: "invalid agency", err: domain.ErrInmobiliariaInvalida, wantStatus: http.StatusBadRequest, wantCode: "invalid_agency"},
-			{name: "invalid cuit", err: domain.ErrCUITInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_cuit"},
-			{name: "cuit in use", err: domain.ErrCUITEnUso, wantStatus: http.StatusConflict, wantCode: "cuit_in_use"},
+			{name: "invalid agency", err: domain.ErrInvalidAgency, wantStatus: http.StatusBadRequest, wantCode: "invalid_agency"},
+			{name: "invalid cuit", err: domain.ErrInvalidCUIT, wantStatus: http.StatusBadRequest, wantCode: "invalid_cuit"},
+			{name: "cuit in use", err: domain.ErrCUITInUse, wantStatus: http.StatusConflict, wantCode: "cuit_in_use"},
 			{name: "invalid email", err: domain.ErrEmailInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_email"},
 			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},

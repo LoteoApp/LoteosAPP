@@ -1,4 +1,6 @@
-export type Inmobiliaria = {
+// The property names are the wire contract of /api/v1/inmobiliarias, so they
+// keep the Spanish the API publishes even though the symbols are in English.
+export type Agency = {
   id: string
   razonSocial: string
   cuit: string
@@ -6,11 +8,9 @@ export type Inmobiliaria = {
   email: string
 }
 
-export type InmobiliariaFormValues = Omit<Inmobiliaria, 'id'>
+export type AgencyFormValues = Omit<Agency, 'id'>
 
-export function toInmobiliariaFormValues(
-  inmobiliaria: Inmobiliaria,
-): InmobiliariaFormValues {
-  const { razonSocial, cuit, telefono, email } = inmobiliaria
+export function toAgencyFormValues(agency: Agency): AgencyFormValues {
+  const { razonSocial, cuit, telefono, email } = agency
   return { razonSocial, cuit, telefono, email }
 }

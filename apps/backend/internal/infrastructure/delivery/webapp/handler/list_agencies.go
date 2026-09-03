@@ -26,7 +26,7 @@ func (handler *ListAgenciesHandler) Handle(w http.ResponseWriter, request *http.
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 	search := request.URL.Query().Get("q")
 
-	inmobiliarias, err := handler.listAgencies.Execute(request.Context(), agencies.ListAgenciesInput{
+	found, err := handler.listAgencies.Execute(request.Context(), agencies.ListAgenciesInput{
 		ActorRoles: principal.Roles,
 		Search:     search,
 	})
@@ -34,6 +34,6 @@ func (handler *ListAgenciesHandler) Handle(w http.ResponseWriter, request *http.
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusOK, dto.ListAgenciesResponse{Inmobiliarias: inmobiliarias})
+	response.WriteJSON(w, http.StatusOK, dto.ListAgenciesResponse{Agencies: found})
 	return nil
 }

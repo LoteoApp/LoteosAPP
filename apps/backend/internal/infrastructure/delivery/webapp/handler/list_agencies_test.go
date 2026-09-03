@@ -16,18 +16,18 @@ import (
 )
 
 type listAgenciesStub struct {
-	inmobiliarias []domain.Inmobiliaria
+	agencies      []domain.Agency
 	err           error
 	called        bool
 	gotActorRoles []string
 	gotSearch     string
 }
 
-func (stub *listAgenciesStub) Execute(_ context.Context, input agencies.ListAgenciesInput) ([]domain.Inmobiliaria, error) {
+func (stub *listAgenciesStub) Execute(_ context.Context, input agencies.ListAgenciesInput) ([]domain.Agency, error) {
 	stub.called = true
 	stub.gotActorRoles = input.ActorRoles
 	stub.gotSearch = input.Search
-	return stub.inmobiliarias, stub.err
+	return stub.agencies, stub.err
 }
 
 func performListAgenciesRequest(t *testing.T, listAgencies *listAgenciesStub, verifier userVerifierStub, token, query string) *httptest.ResponseRecorder {
@@ -53,7 +53,7 @@ func TestListAgenciesRoute(t *testing.T) {
 		t.Parallel()
 
 		listAgencies := &listAgenciesStub{
-			inmobiliarias: []domain.Inmobiliaria{{ID: validAgencyID, RazonSocial: "Lotes del Sur"}},
+			agencies: []domain.Agency{{ID: validAgencyID, BusinessName: "Lotes del Sur"}},
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "user-1", Roles: []string{domain.RolAdministrativo}}}
 
@@ -70,12 +70,12 @@ func TestListAgenciesRoute(t *testing.T) {
 		}
 
 		var got struct {
-			Inmobiliarias []domain.Inmobiliaria `json:"inmobiliarias"`
+			Agencies []domain.Agency `json:"inmobiliarias"`
 		}
 		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if len(got.Inmobiliarias) != 1 || got.Inmobiliarias[0].ID != validAgencyID {
+		if len(got.Agencies) != 1 || got.Agencies[0].ID != validAgencyID {
 			t.Errorf("response = %#v", got)
 		}
 	})

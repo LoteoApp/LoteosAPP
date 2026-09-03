@@ -19,38 +19,38 @@ import (
 // not be misreported as a duplicate CUIT.
 const cuitUniqueConstraint = "inmobiliarias_cuit_idx"
 
-type InmobiliariaRepository struct {
+type AgencyRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewInmobiliariaRepository(pool *pgxpool.Pool) *InmobiliariaRepository {
-	return &InmobiliariaRepository{pool: pool}
+func NewAgencyRepository(pool *pgxpool.Pool) *AgencyRepository {
+	return &AgencyRepository{pool: pool}
 }
 
-func (repository *InmobiliariaRepository) Create(ctx context.Context, inmobiliaria domain.Inmobiliaria) (domain.Inmobiliaria, error) {
-	var created domain.Inmobiliaria
+func (repository *AgencyRepository) Create(ctx context.Context, agency domain.Agency) (domain.Agency, error) {
+	var created domain.Agency
 
 	err := repository.pool.QueryRow(ctx, `
 		INSERT INTO inmobiliarias (razon_social, cuit, telefono, email, usuario_modificacion)
 		VALUES ($1, $2, $3, $4, $5::uuid)
 		RETURNING id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion
-	`, inmobiliaria.RazonSocial, inmobiliaria.CUIT, inmobiliaria.Telefono, inmobiliaria.Email, inmobiliaria.UsuarioModificacion).Scan(
-		&created.ID, &created.RazonSocial, &created.CUIT,
-		&created.Telefono, &created.Email, &created.FechaCreacion, &created.FechaModificacion,
+	`, agency.BusinessName, agency.CUIT, agency.Phone, agency.Email, agency.ModifiedBy).Scan(
+		&created.ID, &created.BusinessName, &created.CUIT,
+		&created.Phone, &created.Email, &created.CreatedAt, &created.UpdatedAt,
 	)
 	if err != nil {
-		return domain.Inmobiliaria{}, mapInmobiliariaWriteError(err)
+		return domain.Agency{}, mapAgencyWriteError(err)
 	}
 
 	return created, nil
 }
 
-// Update applies a partial change to an existing active inmobiliaria. A nil
+// Update applies a partial change to an existing active agency. A nil
 // field on update is left unchanged via COALESCE — that's what gives the
 // PATCH /api/v1/inmobiliarias/{id} route correct partial-update semantics
 // instead of silently wiping fields the caller didn't send.
-func (repository *InmobiliariaRepository) Update(ctx context.Context, update domain.InmobiliariaUpdate) (domain.Inmobiliaria, error) {
-	var updated domain.Inmobiliaria
+func (repository *AgencyRepository) Update(ctx context.Context, update domain.AgencyUpdate) (domain.Agency, error) {
+	var updated domain.Agency
 
 	err := repository.pool.QueryRow(ctx, `
 		UPDATE inmobiliarias
@@ -62,21 +62,21 @@ func (repository *InmobiliariaRepository) Update(ctx context.Context, update dom
 			fecha_modificacion = now()
 		WHERE id = $1::uuid AND fecha_baja IS NULL
 		RETURNING id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion
-	`, update.ID, update.RazonSocial, update.CUIT, update.Telefono, update.Email, update.UsuarioModificacion).Scan(
-		&updated.ID, &updated.RazonSocial, &updated.CUIT,
-		&updated.Telefono, &updated.Email, &updated.FechaCreacion, &updated.FechaModificacion,
+	`, update.ID, update.BusinessName, update.CUIT, update.Phone, update.Email, update.ModifiedBy).Scan(
+		&updated.ID, &updated.BusinessName, &updated.CUIT,
+		&updated.Phone, &updated.Email, &updated.CreatedAt, &updated.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Inmobiliaria{}, domain.ErrInmobiliariaNoEncontrada
+		return domain.Agency{}, domain.ErrAgencyNotFound
 	}
 	if err != nil {
-		return domain.Inmobiliaria{}, mapInmobiliariaWriteError(err)
+		return domain.Agency{}, mapAgencyWriteError(err)
 	}
 
 	return updated, nil
 }
 
-func (repository *InmobiliariaRepository) SoftDelete(ctx context.Context, id, usuarioModificacion string) error {
+func (repository *AgencyRepository) SoftDelete(ctx context.Context, id, usuarioModificacion string) error {
 	tag, err := repository.pool.Exec(ctx, `
 		UPDATE inmobiliarias
 		SET fecha_baja = now(), usuario_modificacion = $2::uuid, fecha_modificacion = now()
@@ -86,13 +86,13 @@ func (repository *InmobiliariaRepository) SoftDelete(ctx context.Context, id, us
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrInmobiliariaNoEncontrada
+		return domain.ErrAgencyNotFound
 	}
 
 	return nil
 }
 
-func (repository *InmobiliariaRepository) List(ctx context.Context, search string) ([]domain.Inmobiliaria, error) {
+func (repository *AgencyRepository) List(ctx context.Context, search string) ([]domain.Agency, error) {
 	rows, err := repository.pool.Query(ctx, `
 		SELECT id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion
 		FROM inmobiliarias
@@ -107,39 +107,39 @@ func (repository *InmobiliariaRepository) List(ctx context.Context, search strin
 
 	// Initialized empty rather than nil so a search with no matches
 	// serializes as `"inmobiliarias": []`, not `"inmobiliarias": null`.
-	inmobiliarias := make([]domain.Inmobiliaria, 0)
+	found := make([]domain.Agency, 0)
 	for rows.Next() {
-		var inmobiliaria domain.Inmobiliaria
+		var agency domain.Agency
 		if err := rows.Scan(
-			&inmobiliaria.ID, &inmobiliaria.RazonSocial, &inmobiliaria.CUIT,
-			&inmobiliaria.Telefono, &inmobiliaria.Email, &inmobiliaria.FechaCreacion, &inmobiliaria.FechaModificacion,
+			&agency.ID, &agency.BusinessName, &agency.CUIT,
+			&agency.Phone, &agency.Email, &agency.CreatedAt, &agency.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
-		inmobiliarias = append(inmobiliarias, inmobiliaria)
+		found = append(found, agency)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return inmobiliarias, nil
+	return found, nil
 }
 
-// mapInmobiliariaWriteError translates a PostgreSQL unique-violation on the
+// mapAgencyWriteError translates a PostgreSQL unique-violation on the
 // inmobiliarias table into the right domain error. Only pgErr.ConstraintName
 // == cuitUniqueConstraint means "CUIT ya está en uso"; any other unique
 // violation is reported as a generic conflict with the original error kept
 // as Cause. Any non-constraint error is returned unchanged, so it reaches
 // response.WriteError as an unexpected failure: logged, hidden behind a
 // generic 500.
-func mapInmobiliariaWriteError(err error) error {
+func mapAgencyWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != uniqueViolationCode {
 		return err
 	}
 
 	if pgErr.ConstraintName == cuitUniqueConstraint {
-		return domain.ErrCUITEnUso
+		return domain.ErrCUITInUse
 	}
 
 	return &domain.Error{

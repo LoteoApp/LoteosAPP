@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AgenciesPage from './AgenciesPage'
 
-type StoredInmobiliaria = {
+type StoredAgency = {
   id: string
   razonSocial: string
   cuit?: string
@@ -11,7 +11,7 @@ type StoredInmobiliaria = {
   email?: string
 }
 
-let stored: StoredInmobiliaria[] = []
+let stored: StoredAgency[] = []
 let failure: { status: number; message: string } | null = null
 let nextId = 0
 let postCalls = 0
@@ -53,7 +53,7 @@ function installFetch() {
         if (postGate) {
           await postGate
         }
-        const values = JSON.parse(String(init?.body)) as Omit<StoredInmobiliaria, 'id'>
+        const values = JSON.parse(String(init?.body)) as Omit<StoredAgency, 'id'>
         nextId += 1
         const created = { id: `inmobiliaria-${nextId}`, ...values }
         stored = [...stored, created]
@@ -63,7 +63,7 @@ function installFetch() {
       const id = url.slice(url.lastIndexOf('/') + 1)
 
       if (method === 'PATCH') {
-        const values = JSON.parse(String(init?.body)) as Partial<StoredInmobiliaria>
+        const values = JSON.parse(String(init?.body)) as Partial<StoredAgency>
         stored = stored.map((inmobiliaria) =>
           inmobiliaria.id === id ? { ...inmobiliaria, ...values } : inmobiliaria,
         )
@@ -80,8 +80,8 @@ function installFetch() {
   )
 }
 
-function renderAgenciesPage(isAdministrador = true) {
-  return render(<AgenciesPage accessToken="token-123" isAdministrador={isAdministrador} />)
+function renderAgenciesPage(isAdmin = true) {
+  return render(<AgenciesPage accessToken="token-123" isAdmin={isAdmin} />)
 }
 
 async function fillAgencyForm(

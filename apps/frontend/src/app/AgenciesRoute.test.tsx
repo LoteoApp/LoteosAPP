@@ -7,13 +7,13 @@ import AgenciesRoute from './AgenciesRoute'
 vi.mock('../features/agencies/pages/AgenciesPage', () => ({
   default: ({
     accessToken,
-    isAdministrador,
+    isAdmin,
   }: {
     accessToken: string | null
-    isAdministrador: boolean
+    isAdmin: boolean
   }) => (
     <output>
-      {accessToken ?? 'no-session'} | {isAdministrador ? 'administrador' : 'otro rol'}
+      {accessToken ?? 'no-session'} | {isAdmin ? 'administrador' : 'otro rol'}
     </output>
   ),
 }))

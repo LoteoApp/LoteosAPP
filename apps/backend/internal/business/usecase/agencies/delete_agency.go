@@ -20,11 +20,11 @@ type DeleteAgency interface {
 }
 
 type deleteAgencyUseCase struct {
-	repository gateway.InmobiliariaRepository
+	repository gateway.AgencyRepository
 	users      gateway.UserRepository
 }
 
-func NewDeleteAgency(repository gateway.InmobiliariaRepository, users gateway.UserRepository) DeleteAgency {
+func NewDeleteAgency(repository gateway.AgencyRepository, users gateway.UserRepository) DeleteAgency {
 	return &deleteAgencyUseCase{repository: repository, users: users}
 }
 

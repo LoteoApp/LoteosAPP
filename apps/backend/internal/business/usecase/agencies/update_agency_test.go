@@ -18,12 +18,12 @@ func TestUpdateAgencyRejectsUnauthorizedRole(t *testing.T) {
 		t.Run(rol, func(t *testing.T) {
 			t.Parallel()
 
-			repository := &gatewayfake.InmobiliariaRepository{}
+			repository := &gatewayfake.AgencyRepository{}
 			users := &gatewayfake.UserRepository{}
 			updateAgency := NewUpdateAgency(repository, users)
 
 			_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-				ActorRoles: []string{rol}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("Lotes del Sur"),
+				ActorRoles: []string{rol}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("Lotes del Sur"),
 			})
 
 			if !errors.Is(err, domain.ErrNoAutorizado) {
@@ -39,16 +39,16 @@ func TestUpdateAgencyRejectsUnauthorizedRole(t *testing.T) {
 func TestUpdateAgencyRejectsBlankRazonSocial(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("   "),
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("   "),
 	})
 
-	if !errors.Is(err, domain.ErrInmobiliariaInvalida) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInmobiliariaInvalida)
+	if !errors.Is(err, domain.ErrInvalidAgency) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidAgency)
 	}
 	if repository.UpdateCalls != 0 {
 		t.Error("Execute() should not call repository with a blank razon social")
@@ -58,7 +58,7 @@ func TestUpdateAgencyRejectsBlankRazonSocial(t *testing.T) {
 func TestUpdateAgencyRejectsInvalidCUIT(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{}
 	updateAgency := NewUpdateAgency(repository, users)
 
@@ -66,8 +66,8 @@ func TestUpdateAgencyRejectsInvalidCUIT(t *testing.T) {
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", CUIT: ptr("123"),
 	})
 
-	if !errors.Is(err, domain.ErrCUITInvalido) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrCUITInvalido)
+	if !errors.Is(err, domain.ErrInvalidCUIT) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidCUIT)
 	}
 	if repository.UpdateCalls != 0 {
 		t.Error("Execute() should not call repository with an invalid cuit")
@@ -77,7 +77,7 @@ func TestUpdateAgencyRejectsInvalidCUIT(t *testing.T) {
 func TestUpdateAgencyRejectsInvalidEmail(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{}
 	updateAgency := NewUpdateAgency(repository, users)
 
@@ -108,7 +108,7 @@ func TestUpdateAgencyRejectsAnEmptyChange(t *testing.T) {
 			name: "only blank optional fields",
 			input: UpdateAgencyInput{
 				ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1",
-				CUIT: ptr("  "), Telefono: ptr(""), Email: ptr("   "),
+				CUIT: ptr("  "), Phone: ptr(""), Email: ptr("   "),
 			},
 		},
 	}
@@ -117,14 +117,14 @@ func TestUpdateAgencyRejectsAnEmptyChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			repository := &gatewayfake.InmobiliariaRepository{}
+			repository := &gatewayfake.AgencyRepository{}
 			users := &gatewayfake.UserRepository{}
 			updateAgency := NewUpdateAgency(repository, users)
 
 			_, err := updateAgency.Execute(context.Background(), test.input)
 
-			if !errors.Is(err, domain.ErrInmobiliariaSinCambios) {
-				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInmobiliariaSinCambios)
+			if !errors.Is(err, domain.ErrEmptyAgencyUpdate) {
+				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmptyAgencyUpdate)
 			}
 			if repository.UpdateCalls != 0 {
 				t.Error("Execute() should not stamp a modification for a change that isn't one")
@@ -136,26 +136,26 @@ func TestUpdateAgencyRejectsAnEmptyChange(t *testing.T) {
 func TestUpdateAgencyHappyPath(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	updated, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1",
-		RazonSocial: ptr("  Lotes del Sur SRL  "), CUIT: ptr("30-71234567-8"),
-		Telefono: ptr(" 3415551234 "), Email: ptr(" contacto@lotesdelsur.com "),
+		BusinessName: ptr("  Lotes del Sur SRL  "), CUIT: ptr("30-71234567-8"),
+		Phone: ptr(" 3415551234 "), Email: ptr(" contacto@lotesdelsur.com "),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if updated.RazonSocial != "Lotes del Sur SRL" {
-		t.Errorf("Execute() razon social = %q, want it trimmed", updated.RazonSocial)
+	if updated.BusinessName != "Lotes del Sur SRL" {
+		t.Errorf("Execute() razon social = %q, want it trimmed", updated.BusinessName)
 	}
 	if repository.UpdateInput.CUIT == nil || *repository.UpdateInput.CUIT != "30712345678" {
 		t.Errorf("Execute() cuit = %v, want it normalized to digits", repository.UpdateInput.CUIT)
 	}
-	if repository.UpdateInput.UsuarioModificacion != "user-1" {
-		t.Errorf("Execute() usuario modificacion = %q, want %q", repository.UpdateInput.UsuarioModificacion, "user-1")
+	if repository.UpdateInput.ModifiedBy != "user-1" {
+		t.Errorf("Execute() usuario modificacion = %q, want %q", repository.UpdateInput.ModifiedBy, "user-1")
 	}
 	if repository.UpdateInput.ID != "agency-1" {
 		t.Errorf("Execute() id = %q, want %q", repository.UpdateInput.ID, "agency-1")
@@ -165,18 +165,18 @@ func TestUpdateAgencyHappyPath(t *testing.T) {
 func TestUpdateAgencyLeavesOmittedFieldsUnchanged(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	if _, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
 		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1",
-		Telefono: ptr("3415551234"),
+		Phone: ptr("3415551234"),
 	}); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if repository.UpdateInput.RazonSocial != nil {
-		t.Errorf("Execute() razon social = %v, want it absent", repository.UpdateInput.RazonSocial)
+	if repository.UpdateInput.BusinessName != nil {
+		t.Errorf("Execute() razon social = %v, want it absent", repository.UpdateInput.BusinessName)
 	}
 	if repository.UpdateInput.CUIT != nil || repository.UpdateInput.Email != nil {
 		t.Errorf("Execute() update = %#v, want the omitted fields absent", repository.UpdateInput)
@@ -186,13 +186,13 @@ func TestUpdateAgencyLeavesOmittedFieldsUnchanged(t *testing.T) {
 func TestUpdateAgencyPropagatesRepositoryError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := domain.ErrInmobiliariaNoEncontrada
-	repository := &gatewayfake.InmobiliariaRepository{UpdateErr: wantErr}
+	wantErr := domain.ErrAgencyNotFound
+	repository := &gatewayfake.AgencyRepository{UpdateErr: wantErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("Lotes del Sur"),
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("Lotes del Sur"),
 	})
 
 	if !errors.Is(err, wantErr) {
@@ -204,12 +204,12 @@ func TestUpdateAgencyClassifiesUnexpectedRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("syntax error at end of input")
-	repository := &gatewayfake.InmobiliariaRepository{UpdateErr: rawErr}
+	repository := &gatewayfake.AgencyRepository{UpdateErr: rawErr}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "user-1"}}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("Lotes del Sur"),
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("Lotes del Sur"),
 	})
 
 	if !errors.Is(err, domain.ErrDatabaseUnavailable) {
@@ -223,12 +223,12 @@ func TestUpdateAgencyClassifiesUnexpectedRepositoryError(t *testing.T) {
 func TestUpdateAgencyRejectsActorWithoutUsuario(t *testing.T) {
 	t.Parallel()
 
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("Lotes del Sur"),
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("Lotes del Sur"),
 	})
 
 	if !errors.Is(err, domain.ErrActorNoAprovisionado) {
@@ -243,12 +243,12 @@ func TestUpdateAgencyClassifiesActorResolutionError(t *testing.T) {
 	t.Parallel()
 
 	rawErr := errors.New("connection refused")
-	repository := &gatewayfake.InmobiliariaRepository{}
+	repository := &gatewayfake.AgencyRepository{}
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: rawErr}
 	updateAgency := NewUpdateAgency(repository, users)
 
 	_, err := updateAgency.Execute(context.Background(), UpdateAgencyInput{
-		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", RazonSocial: ptr("Lotes del Sur"),
+		ActorRoles: []string{domain.RolAdministrador}, Subject: "sb-1", ID: "agency-1", BusinessName: ptr("Lotes del Sur"),
 	})
 
 	if !errors.Is(err, domain.ErrDatabaseUnavailable) {

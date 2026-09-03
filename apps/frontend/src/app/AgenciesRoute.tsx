@@ -8,7 +8,7 @@ export default function AgenciesRoute() {
   return (
     <AgenciesPage
       accessToken={session?.access_token ?? null}
-      isAdministrador={getUserRole(user) === ROLE.administrador}
+      isAdmin={getUserRole(user) === ROLE.administrador}
     />
   )
 }

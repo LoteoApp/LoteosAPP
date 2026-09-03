@@ -72,7 +72,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
 	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
 
-	inmobiliariaRepo := postgres.NewInmobiliariaRepository(pool)
+	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
 	createAgencyHandler := handler.NewCreateAgencyHandler(agencies.NewCreateAgency(inmobiliariaRepo, userRepo))
 	updateAgencyHandler := handler.NewUpdateAgencyHandler(agencies.NewUpdateAgency(inmobiliariaRepo, userRepo))
 	deleteAgencyHandler := handler.NewDeleteAgencyHandler(agencies.NewDeleteAgency(inmobiliariaRepo, userRepo))

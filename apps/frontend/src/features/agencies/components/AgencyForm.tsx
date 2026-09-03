@@ -3,9 +3,9 @@ import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
 import { cn } from '../../../shared/lib/utils'
-import type { InmobiliariaFormValues } from '../types'
+import type { AgencyFormValues } from '../types'
 
-const emptyValues: InmobiliariaFormValues = {
+const emptyValues: AgencyFormValues = {
   razonSocial: '',
   cuit: '',
   telefono: '',
@@ -13,7 +13,7 @@ const emptyValues: InmobiliariaFormValues = {
 }
 
 const FIELDS: ReadonlyArray<{
-  name: keyof InmobiliariaFormValues
+  name: keyof AgencyFormValues
   label: string
   type?: string
   full?: boolean
@@ -25,11 +25,11 @@ const FIELDS: ReadonlyArray<{
 ]
 
 type AgencyFormProps = {
-  initialValue?: InmobiliariaFormValues
+  initialValue?: AgencyFormValues
   submitLabel: string
   isSubmitting?: boolean
-  onSubmit: (values: InmobiliariaFormValues) => void
-  onValidate: (values: InmobiliariaFormValues) => string | null
+  onSubmit: (values: AgencyFormValues) => void
+  onValidate: (values: AgencyFormValues) => string | null
   onCancel: () => void
 }
 
@@ -41,10 +41,10 @@ export default function AgencyForm({
   onValidate,
   onCancel,
 }: AgencyFormProps) {
-  const [values, setValues] = useState<InmobiliariaFormValues>(initialValue ?? emptyValues)
+  const [values, setValues] = useState<AgencyFormValues>(initialValue ?? emptyValues)
   const [error, setError] = useState<string | null>(null)
 
-  function handleChange(field: keyof InmobiliariaFormValues) {
+  function handleChange(field: keyof AgencyFormValues) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       setValues((current) => ({ ...current, [field]: event.target.value }))
     }
@@ -57,7 +57,7 @@ export default function AgencyForm({
       return
     }
 
-    const trimmed: InmobiliariaFormValues = {
+    const trimmed: AgencyFormValues = {
       razonSocial: values.razonSocial.trim(),
       cuit: values.cuit.trim(),
       telefono: values.telefono.trim(),

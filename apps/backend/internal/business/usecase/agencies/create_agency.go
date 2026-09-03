@@ -8,66 +8,66 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// CreateAgencyInput carries the fields of a new inmobiliaria.
+// CreateAgencyInput carries the fields of a new agency.
 type CreateAgencyInput struct {
-	ActorRoles  []string
-	Subject     string
-	RazonSocial string
-	CUIT        *string
-	Telefono    *string
-	Email       *string
+	ActorRoles   []string
+	Subject      string
+	BusinessName string
+	CUIT         *string
+	Phone        *string
+	Email        *string
 }
 
-// CreateAgency registers a new inmobiliaria. Only callers with the
+// CreateAgency registers a new agency. Only callers with the
 // administrador role may do this.
 type CreateAgency interface {
-	Execute(ctx context.Context, input CreateAgencyInput) (domain.Inmobiliaria, error)
+	Execute(ctx context.Context, input CreateAgencyInput) (domain.Agency, error)
 }
 
 type createAgencyUseCase struct {
-	repository gateway.InmobiliariaRepository
+	repository gateway.AgencyRepository
 	users      gateway.UserRepository
 }
 
-func NewCreateAgency(repository gateway.InmobiliariaRepository, users gateway.UserRepository) CreateAgency {
+func NewCreateAgency(repository gateway.AgencyRepository, users gateway.UserRepository) CreateAgency {
 	return &createAgencyUseCase{repository: repository, users: users}
 }
 
-func (useCase *createAgencyUseCase) Execute(ctx context.Context, input CreateAgencyInput) (domain.Inmobiliaria, error) {
+func (useCase *createAgencyUseCase) Execute(ctx context.Context, input CreateAgencyInput) (domain.Agency, error) {
 	if !hasRole(input.ActorRoles, domain.RolAdministrador) {
-		return domain.Inmobiliaria{}, domain.ErrNoAutorizado
+		return domain.Agency{}, domain.ErrNoAutorizado
 	}
 
-	razonSocial := strings.TrimSpace(input.RazonSocial)
+	razonSocial := strings.TrimSpace(input.BusinessName)
 	if razonSocial == "" {
-		return domain.Inmobiliaria{}, domain.ErrInmobiliariaInvalida
+		return domain.Agency{}, domain.ErrInvalidAgency
 	}
 
 	cuit, err := normalizeOptionalCUIT(trimOptional(input.CUIT))
 	if err != nil {
-		return domain.Inmobiliaria{}, err
+		return domain.Agency{}, err
 	}
 
-	telefono := trimOptional(input.Telefono)
+	telefono := trimOptional(input.Phone)
 	email := trimOptional(input.Email)
 	if err := validateOptionalEmail(email); err != nil {
-		return domain.Inmobiliaria{}, err
+		return domain.Agency{}, err
 	}
 
 	actorID, err := resolveActorID(ctx, useCase.users, input.Subject)
 	if err != nil {
-		return domain.Inmobiliaria{}, err
+		return domain.Agency{}, err
 	}
 
-	created, err := useCase.repository.Create(ctx, domain.Inmobiliaria{
-		RazonSocial:         razonSocial,
-		CUIT:                cuit,
-		Telefono:            telefono,
-		Email:               email,
-		UsuarioModificacion: actorID,
+	created, err := useCase.repository.Create(ctx, domain.Agency{
+		BusinessName: razonSocial,
+		CUIT:         cuit,
+		Phone:        telefono,
+		Email:        email,
+		ModifiedBy:   actorID,
 	})
 	if err != nil {
-		return domain.Inmobiliaria{}, fromRepository(err)
+		return domain.Agency{}, fromRepository(err)
 	}
 
 	return created, nil
