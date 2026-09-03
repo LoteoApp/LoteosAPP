@@ -34,11 +34,11 @@ function entityPayload(polygon: DxfPolygon): EntityPayload {
   return { handle: polygon.handle ?? '', vertices: polygon.vertices }
 }
 
-// The DXF layers don't record which manzana a lote sits in, and #17 (visual
-// selection) isn't built yet, so the mapping is inferred here: the manzana
-// whose polygon contains the lote's centroid, or the nearest one when the
-// centroid lands outside every manzana. It can be wrong for oddly shaped
-// blocks and is meant to be corrected in the plan view later.
+// The DXF layers don't record which manzana a lote sits in, and the create
+// form has no visual relation editor yet, so the mapping is inferred here:
+// the manzana whose polygon contains the lote's centroid, or the nearest one
+// when the centroid lands outside every manzana. It can be wrong for oddly
+// shaped blocks and is meant to be corrected in a later iteration.
 function manzanaRefFor(lote: DxfPolygon, manzanas: DxfPolygon[]): string {
   const loteCenter = centroid(lote.vertices)
 

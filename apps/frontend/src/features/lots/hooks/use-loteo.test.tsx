@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useLoteo } from './use-loteo'
 import { ApiError } from '../../../shared/api/client'
@@ -107,6 +107,151 @@ describe('useLoteo', () => {
     const { result, unmount } = renderHook(() => useLoteo('loteo-1', 'token'))
     unmount()
     resolve(detail())
+
+    expect(result.current.status).toBe('loading')
+  })
+
+  it('replaces a lote in the loaded detail without refetching', async () => {
+    getLoteoMock.mockResolvedValue(
+      detail({
+        lotes: [
+          {
+            id: 'lt-1',
+            manzanaId: 'mz-1',
+            numero: '7',
+            precio: null,
+            moneda: '',
+            superficie: null,
+            caracteristicas: '',
+            poligono: [],
+          },
+        ],
+      }),
+    )
+
+    const { result } = renderHook(() => useLoteo('loteo-1', 'token'))
+    await waitFor(() => expect(result.current.status).toBe('loaded'))
+
+    act(() => {
+      result.current.replaceLote({
+        id: 'lt-1',
+        manzanaId: 'mz-1',
+        numero: '12',
+        precio: 100,
+        moneda: 'ARS',
+        superficie: 200,
+        caracteristicas: 'Esquina',
+        poligono: [],
+      })
+    })
+
+    expect(getLoteoMock).toHaveBeenCalledTimes(1)
+    if (result.current.status === 'loaded') {
+      expect(result.current.loteo.lotes[0].numero).toBe('12')
+    }
+  })
+
+  it('ignores replaceLote while the detail is not loaded', async () => {
+    const { result } = renderHook(() => useLoteo('loteo-1', ''))
+
+    act(() => {
+      result.current.replaceLote({
+        id: 'lt-1',
+        manzanaId: 'mz-1',
+        numero: '12',
+        precio: null,
+        moneda: '',
+        superficie: null,
+        caracteristicas: '',
+        poligono: [],
+      })
+    })
+
+    expect(result.current.status).toBe('error')
+  })
+
+  it('replaces a calle in the loaded detail without refetching', async () => {
+    getLoteoMock.mockResolvedValue(
+      detail({
+        calles: [{ id: 'ca-1', nombre: '', tipo: '', poligono: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }],
+      }),
+    )
+
+    const { result } = renderHook(() => useLoteo('loteo-1', 'token'))
+    await waitFor(() => expect(result.current.status).toBe('loaded'))
+
+    act(() => {
+      result.current.replaceCalle({
+        id: 'ca-1',
+        nombre: 'Los Álamos',
+        tipo: 'asfalto',
+        poligono: [],
+      })
+    })
+
+    expect(getLoteoMock).toHaveBeenCalledTimes(1)
+    if (result.current.status === 'loaded') {
+      expect(result.current.loteo.calles[0]).toMatchObject({
+        nombre: 'Los Álamos',
+        tipo: 'asfalto',
+      })
+      expect(result.current.loteo.calles[0].poligono).toHaveLength(3)
+    }
+  })
+
+  it('replaces a manzana and preserves its geometry when needed', async () => {
+    const originalPolygon = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    getLoteoMock.mockResolvedValue(
+      detail({
+        manzanas: [{
+          id: 'mz-1', numero: '1', tieneAgua: false, tieneCloaca: false,
+          tieneLuz: false, tieneGas: false, calleIds: [], poligono: originalPolygon,
+        }],
+      }),
+    )
+
+    const { result } = renderHook(() => useLoteo('loteo-1', 'token'))
+    await waitFor(() => expect(result.current.status).toBe('loaded'))
+
+    act(() => {
+      result.current.replaceManzana({
+        id: 'mz-1', numero: '2', tieneAgua: true, tieneCloaca: false,
+        tieneLuz: false, tieneGas: false, calleIds: [], poligono: [],
+      })
+    })
+
+    if (result.current.status === 'loaded') {
+      expect(result.current.loteo.manzanas[0]).toMatchObject({ numero: '2', tieneAgua: true })
+      expect(result.current.loteo.manzanas[0].poligono).toEqual(originalPolygon)
+    }
+  })
+
+  it('ignores replacements while the detail is not loaded', () => {
+    const { result } = renderHook(() => useLoteo('loteo-1', ''))
+
+    act(() => {
+      result.current.replaceManzana({
+        id: 'mz-1', numero: '2', tieneAgua: false, tieneCloaca: false,
+        tieneLuz: false, tieneGas: false, calleIds: [], poligono: [],
+      })
+      result.current.replaceCalle({ id: 'ca-1', nombre: 'Nueva', tipo: '', poligono: [] })
+    })
+
+    expect(result.current.status).toBe('error')
+  })
+
+  it('ignores a rejected request after unmount', async () => {
+    let reject: (reason?: unknown) => void = () => {}
+    getLoteoMock.mockReturnValue(
+      new Promise<LoteoDetail>((_, rejectPromise) => {
+        reject = rejectPromise
+      }),
+    )
+
+    const { result, unmount } = renderHook(() => useLoteo('loteo-1', 'token'))
+    unmount()
+    reject(new Error('cancelled'))
+    await Promise.resolve()
 
     expect(result.current.status).toBe('loading')
   })

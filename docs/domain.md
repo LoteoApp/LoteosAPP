@@ -16,7 +16,7 @@ se organiza el código de cada funcionalidad.
   asignado manualmente en el sistema, precio, superficie, características,
   estado.
 - **Calle**: pertenece a un loteo; polígono (capa `CALLE` del DXF); nombre
-  asignado manualmente en el sistema.
+  y tipo (`asfalto`, `tierra`, `brosa`, `granito`) asignados manualmente.
 - **Cliente**: nombre y apellido, DNI, celular, mail. No tiene acceso al
   sistema. Puede tener múltiples lotes en distintos estados (en compra, en
   financiación, finalizados).
@@ -47,11 +47,15 @@ se organiza el código de cada funcionalidad.
 5. Las capas son solo geometría, sin texto: el número de cada lote y el
    nombre de cada calle no se extraen del DXF; se cargan manualmente tras
    visualizar el plano.
-6. Visualización con navegación por capas: loteo → manzana → lote.
-7. Carga de datos por lote (clic sobre el lote): precio, superficie,
-   características.
-8. Carga de datos por manzana: hasta 4 calles que la rodean.
-9. Documentación legal del loteo (escrituras, certificaciones, poderes,
+6. Visualización con navegación por capas: loteo → manzana, lote o calle.
+7. Carga de datos por lote (clic sobre el lote): precio, superficie
+   (si no hay un valor guardado, se precarga con Gauss sobre la poligonal
+   cerrada del plano, en m², y se puede corregir a mano), características.
+8. Carga de datos por manzana (clic sobre la manzana): número, servicios
+   (agua, cloaca, luz, gas) y hasta 4 calles del loteo que la rodean.
+9. Carga de datos por calle (clic sobre la calle): nombre y tipo de
+   superficie (`asfalto`, `tierra`, `brosa`, `granito`).
+10. Documentación legal del loteo (escrituras, certificaciones, poderes,
    cartas documento) se carga y consulta desde esta misma vista, a cargo del
    escribano asignado. No existe una sección de menú separada para esto; el
    detalle de esta funcionalidad queda para una futura iteración.
@@ -79,9 +83,9 @@ quien asigna loteos y permisos.
 |---|---|---|
 | **Administrador** | Control total: crea usuarios, asigna permisos y loteos, gestiona ventas, cobranzas, edición/eliminación de lotes | — |
 | **Administrativo** | Visualizar información, editar ciertos datos (configurable, ver [Roles y permisos](#gestión-de-roles-y-permisos)), cargar ventas | Crear usuarios, asignar permisos, vender por sí mismo sin definición del admin, editar/eliminar lotes |
-| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes en loteos asignados; editar loteos/manzanas/lotes | Operar loteos no asignados |
-| **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas o lotes |
-| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
+| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes/calles en loteos asignados; editar loteos/manzanas/lotes/calles | Operar loteos no asignados |
+| **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas, lotes o calles |
+| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 
 Los clientes no son usuarios del sistema.
 
@@ -181,7 +185,7 @@ stateDiagram-v2
   solo en parte: rechaza el anillo abierto, colineal, de área nula o que se
   cruza a sí mismo, pero **todavía no detecta superposiciones entre entidades
   de una misma capa** (ver `docs/architecture.md` § Alta de loteo y
-  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17)).
+  [#176](https://github.com/LoteoApp/LoteosAPP/issues/176)).
 - Como las capas no traen texto, el número de cada lote y el nombre de cada
   calle no se pueden asociar automáticamente al polígono; se asignan
   manualmente en el sistema tras visualizar el plano.

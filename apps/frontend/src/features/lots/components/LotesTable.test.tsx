@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import LotesTable from './LotesTable'
 import type { LoteoLote } from '../types'
 
@@ -79,5 +80,36 @@ describe('LotesTable', () => {
     render(<LotesTable lotes={[lote(), lote({ id: 'lt-2' })]} manzanaNumberById={manzanaNumberById} />)
 
     expect(screen.getByText('2 lotes')).toBeInTheDocument()
+  })
+
+  it('selects a lote from a row click and from the keyboard', async () => {
+    const user = userEvent.setup()
+    const onSelectLote = vi.fn()
+
+    render(
+      <LotesTable
+        lotes={[lote(), lote({ id: 'lt-2', numero: '8' })]}
+        manzanaNumberById={manzanaNumberById}
+        selectedLoteId="lt-1"
+        onSelectLote={onSelectLote}
+      />,
+    )
+
+    expect(screen.getByRole('row', { name: 'Lote 7' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('row', { name: 'Lote 8' }))
+    expect(onSelectLote).toHaveBeenCalledWith('lt-2')
+
+    screen.getByRole('row', { name: 'Lote 7' }).focus()
+    await user.keyboard('{Enter}')
+    expect(onSelectLote).toHaveBeenCalledWith('lt-1')
+
+    onSelectLote.mockClear()
+    await user.keyboard(' ')
+    expect(onSelectLote).toHaveBeenCalledWith('lt-1')
+
+    onSelectLote.mockClear()
+    await user.keyboard('a')
+    expect(onSelectLote).not.toHaveBeenCalled()
   })
 })

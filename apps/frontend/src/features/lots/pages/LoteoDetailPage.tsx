@@ -6,12 +6,18 @@ import LoteoDetailHeader from '../components/LoteoDetailHeader'
 import LoteoPlanPanel from '../components/LoteoPlanPanel'
 import LotesTable from '../components/LotesTable'
 import ManzanaFilter, { ALL_MANZANAS } from '../components/ManzanaFilter'
+import PlanSelectionPanel from '../components/PlanSelectionPanel'
 import { useLayerVisibility } from '../hooks/use-layer-visibility'
 import { useLoteo } from '../hooks/use-loteo'
-import { planFromLoteoDetail } from '../lib/planFromLoteoDetail'
+import { usePlanSelection } from '../hooks/use-plan-selection'
+import { useUpdateCalle } from '../hooks/use-update-calle'
+import { useUpdateLote } from '../hooks/use-update-lote'
+import { useUpdateManzana } from '../hooks/use-update-manzana'
+import { planFromLoteoDetail, planLabelsFromLoteoDetail } from '../lib/planFromLoteoDetail'
 
 type LoteoDetailPageProps = {
   accessToken: string | null
+  canEdit?: boolean
 }
 
 function BackLink() {
@@ -26,10 +32,16 @@ function BackLink() {
   )
 }
 
-export default function LoteoDetailPage({ accessToken }: LoteoDetailPageProps) {
+export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoDetailPageProps) {
   const { loteoId = '' } = useParams()
-  const state = useLoteo(loteoId, accessToken ?? '')
+  const { replaceLote, replaceManzana, replaceCalle, ...state } = useLoteo(
+    loteoId,
+    accessToken ?? '',
+  )
   const layers = useLayerVisibility()
+  const loteUpdate = useUpdateLote(accessToken)
+  const manzanaUpdate = useUpdateManzana(accessToken)
+  const calleUpdate = useUpdateCalle(accessToken)
   const [manzanaFilter, setManzanaFilter] = useState(ALL_MANZANAS)
 
   // React Router keeps this component mounted across a param change, so drop the
@@ -39,11 +51,32 @@ export default function LoteoDetailPage({ accessToken }: LoteoDetailPageProps) {
     setTrackedLoteoId(loteoId)
     setManzanaFilter(ALL_MANZANAS)
     layers.reset()
+    loteUpdate.reset()
+    manzanaUpdate.reset()
+    calleUpdate.reset()
   }
 
   const loteo = state.status === 'loaded' ? state.loteo : null
 
   const plan = useMemo(() => (loteo ? planFromLoteoDetail(loteo) : []), [loteo])
+  const polygonLabels = useMemo(
+    () => (loteo ? planLabelsFromLoteoDetail(loteo) : new Map<string, string>()),
+    [loteo],
+  )
+  const selection = usePlanSelection(plan)
+  const selectedKey =
+    selection.selected === null
+      ? ''
+      : selection.selected.kind === 'loteo'
+        ? 'loteo'
+        : `${selection.selected.kind}:${selection.selected.id}`
+  const [trackedSelection, setTrackedSelection] = useState(selectedKey)
+  if (selectedKey !== trackedSelection) {
+    setTrackedSelection(selectedKey)
+    loteUpdate.reset()
+    manzanaUpdate.reset()
+    calleUpdate.reset()
+  }
   const manzanaNumberById = useMemo(
     () => new Map((loteo?.manzanas ?? []).map((manzana) => [manzana.id, manzana.numero])),
     [loteo],
@@ -100,15 +133,54 @@ export default function LoteoDetailPage({ accessToken }: LoteoDetailPageProps) {
           polygons={plan}
           visibleLayers={layers.visibleLayers}
           onVisibleLayersChange={layers.onVisibleLayersChange}
+          selectedPolygonId={selection.selectedPolygonId}
+          onSelectPolygon={selection.select}
+          polygonLabels={polygonLabels}
         />
 
         <div className="flex min-h-0 flex-col gap-3">
+          <PlanSelectionPanel
+            canEdit={canEdit}
+            selected={selection.selected}
+            loteo={state.loteo}
+            polygonLabels={polygonLabels}
+            selectedPolygonId={selection.selectedPolygonId}
+            updateState={loteUpdate}
+            onSave={async (loteId, payload) => {
+              const updated = await loteUpdate.update(state.loteo.id, loteId, payload)
+              if (updated) {
+                replaceLote(updated)
+              }
+              return updated !== null
+            }}
+            manzanaUpdateState={manzanaUpdate}
+            onSaveManzana={async (manzanaId, payload) => {
+              const updated = await manzanaUpdate.update(state.loteo.id, manzanaId, payload)
+              if (updated) {
+                replaceManzana(updated)
+              }
+              return updated !== null
+            }}
+            calleUpdateState={calleUpdate}
+            onSaveCalle={async (calleId, payload) => {
+              const updated = await calleUpdate.update(state.loteo.id, calleId, payload)
+              if (updated) {
+                replaceCalle(updated)
+              }
+              return updated !== null
+            }}
+          />
           <ManzanaFilter
             manzanas={state.loteo.manzanas}
             value={manzanaFilter}
             onChange={setManzanaFilter}
           />
-          <LotesTable lotes={filteredLotes} manzanaNumberById={manzanaNumberById} />
+          <LotesTable
+            lotes={filteredLotes}
+            manzanaNumberById={manzanaNumberById}
+            selectedLoteId={selection.selected?.kind === 'lote' ? selection.selected.id : null}
+            onSelectLote={(loteId) => selection.selectEntity({ kind: 'lote', id: loteId })}
+          />
         </div>
       </div>
     </section>

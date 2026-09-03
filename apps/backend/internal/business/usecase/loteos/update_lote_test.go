@@ -146,7 +146,8 @@ func TestUpdateLoteNormalizesTextBeforePersisting(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{}
 	useCase := loteos.NewUpdateLote(repository)
 
-	data := domain.LoteData{Number: "  12  ", Currency: " ars ", Features: "  esquina  "}
+	price := 100.0
+	data := domain.LoteData{Number: "  12  ", Price: &price, Currency: " ars ", Features: "  esquina  "}
 	if _, err := useCase.Execute(context.Background(), administrador(), "loteo-1", "lote-1", data); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}

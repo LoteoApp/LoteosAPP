@@ -61,6 +61,9 @@ apps/backend/
 │   │           ├── get_loteo.go
 │   │           ├── store_loteo_dxf.go
 │   │           ├── update_lote.go
+│   │           ├── update_manzana.go
+│   │           ├── update_calle.go
+│   │           ├── authorize_editor.go
 │   │           ├── visibility.go
 │   │           └── errors.go
 │   └── infrastructure/
@@ -90,14 +93,18 @@ apps/backend/
 │               │       ├── create_loteo.go
 │               │       ├── list_loteos.go
 │               │       ├── store_loteo_dxf.go
-│               │       └── update_lote.go
+│               │       ├── update_lote.go
+│               │       ├── update_manzana.go
+│               │       └── update_calle.go
 │               ├── handler/
 │               │   ├── create_user.go
 │               │   ├── create_loteo.go
 │               │   ├── list_loteos.go
 │               │   ├── get_loteo.go
 │               │   ├── store_loteo_dxf.go
-│               │   └── update_lote.go
+│               │   ├── update_lote.go
+│               │   ├── update_manzana.go
+│               │   └── update_calle.go
 │               ├── middleware/
 │               │   └── auth.go
 │               ├── response/
@@ -260,7 +267,7 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 ### Loteo: alta, persistencia de la geometría y lectura
 
 El DXF lo parsea el frontend; el backend recibe la geometría ya extraída, la
-valida y la persiste (`docs/domain.md` § Alta y visualización). Cinco endpoints
+valida y la persiste (`docs/domain.md` § Alta y visualización). Siete endpoints
 cubren el alta, la carga de datos y la lectura:
 
 - `POST /api/v1/loteos` — alta del loteo con su plano. Solo **administrador**:
@@ -270,7 +277,7 @@ cubren el alta, la carga de datos y la lectura:
   geometría: identidad, cantidad de manzanas / lotes / calles, si tiene plano
   y si tiene DXF original. Filtro opcional `?q=` sobre `nombre` / `ubicacion`.
 - `GET /api/v1/loteos/{loteoId}` — detalle: metadata + contorno (capa `LOTEO`)
-  + manzanas, lotes y calles con su polígono, y los datos manuales del lote.
+  + manzanas, lotes y calles con su polígono, y los datos manuales de cada uno.
   Un `loteoId` inexistente, inválido o no visible para el actor devuelve
   `loteo_not_found` (404), nunca un 403, para no filtrar qué ids existen.
 - `PUT /api/v1/loteos/{loteoId}/dxf` — guarda el archivo DXF original de un
@@ -284,6 +291,12 @@ cubren el alta, la carga de datos y la lectura:
   superficie y características de un lote, que no salen del DXF porque las
   capas son solo geometría. **Administrador**, o **agrimensor** sobre un loteo
   asignado (`usuario_loteos`).
+- `PATCH /api/v1/loteos/{loteoId}/manzanas/{manzanaId}` — número, servicios
+  (agua, cloaca, luz, gas) y hasta 4 calles que rodean la manzana.
+  **Administrador**, o **agrimensor** sobre un loteo asignado.
+- `PATCH /api/v1/loteos/{loteoId}/calles/{calleId}` — nombre y tipo
+  (`asfalto`, `tierra`, `brosa`, `granito`; vacío se guarda como sin tipo).
+  **Administrador**, o **agrimensor** sobre un loteo asignado.
 
 **Visibilidad de la lectura por rol** (`GET`): **administrador** y
 **administrativo** ven todos los loteos; **agrimensor** y **escribano** ven
@@ -310,14 +323,16 @@ Decisiones de este recorte:
   solo dentro del request: el caso de uso la resuelve a una posición y no se
   persiste. El backend no la verifica contra la geometría; sí verifica lo que
   puede: que cada `ref` sea única y no vacía, y que todo `manzanaRef` apunte a
-  una manzana **del mismo plano**. El frontend, mientras no exista la
-  selección visual ([#17](https://github.com/LoteoApp/LoteosAPP/issues/17)),
-  infiere el `manzanaRef` por contención best-effort
+  una manzana **del mismo plano**. El formulario de alta todavía no ofrece
+  selección visual para esta relación e infiere el `manzanaRef` por contención
+  best-effort
   (`features/lots/lib/buildCreateLoteoPayload.ts`: la manzana que contiene el
   centroide del lote, o la más cercana). Puede quedar mal en manzanas de forma
-  irregular; corregirlo es trabajo de #17. Un request armado a mano no puede
-  colgar lotes de la manzana de otro loteo, pero sí asignarlos a la equivocada
-  dentro del suyo.
+  irregular; corregirlo quedó fuera de
+  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17) y se sigue en
+  [#176](https://github.com/LoteoApp/LoteosAPP/issues/176). Un request armado a
+  mano no puede colgar lotes de la manzana de otro loteo, pero sí asignarlos a
+  la equivocada dentro del suyo.
 - **La geometría viaja a PostgreSQL como WKT y entra por el cast implícito
   `text → geometry`** que registra PostGIS, así que el camino de escritura no
   nombra ninguna función ni tipo de PostGIS. Leerla de vuelta sí necesita
@@ -353,9 +368,11 @@ Decisiones de este recorte:
   solapamiento entre entidades de una misma capa: es una relación entre
   polígonos y resolverla bien pide índice espacial (`ST_Overlaps` sobre el
   índice GiST, o un grid en memoria), no una comparación de todos contra todos
-  sobre hasta 25 000 polígonos. Queda para
-  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17), junto con la
-  contención lote → manzana.
+  sobre hasta 25 000 polígonos. Quedó fuera de
+  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17) (selección y edición
+  del lote ya persistido) y se sigue en
+  [#176](https://github.com/LoteoApp/LoteosAPP/issues/176), junto con la
+  contención lote → manzana del alta.
 - **Los deadlines del servidor se derivan de la ruta más lenta.**
   `route.MaxHandlerTimeout` es el timeout más alto registrado (el alta, 60 s) y
   `server.New` lo recibe para calcular `ReadTimeout` y `WriteTimeout`. Si el
@@ -510,15 +527,23 @@ apps/frontend/src/
 │       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
 │       │   ├── list-loteos.ts         # GET /api/v1/loteos?q= (valida la forma)
 │       │   ├── get-loteo.ts           # GET /api/v1/loteos/{id} (valida la forma)
+│       │   ├── update-lote.ts         # PATCH /api/v1/loteos/{id}/lotes/{loteId}
+│       │   ├── update-manzana.ts      # PATCH /api/v1/loteos/{id}/manzanas/{manzanaId}
+│       │   ├── update-calle.ts        # PATCH /api/v1/loteos/{id}/calles/{calleId}
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
 │       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
-│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes y visor DXF
+│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes, panel de selección y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
 │       │   ├── use-dxf-plan.ts
 │       │   ├── use-layer-visibility.ts # Capas visibles del visor, compartido por alta y detalle
 │       │   ├── use-loteos.ts          # Carga el listado + búsqueda con debounce
-│       │   ├── use-loteo.ts           # Carga el detalle de un loteo (loading/loaded/not-found/error)
+│       │   ├── use-loteo.ts           # Carga el detalle de un loteo (loading/loaded/not-found/error) y mergea lote, manzana o calle guardados
+│       │   ├── use-plan-selection.ts  # Polígono/entidad seleccionados en el plano
+│       │   ├── use-update-lote.ts     # PATCH de número, precio, superficie y características
+│       │   ├── use-update-manzana.ts  # PATCH de número, servicios y calles de una manzana
+│       │   ├── use-update-calle.ts    # PATCH de nombre y tipo de una calle
+│       │   ├── use-update-resource.ts # Estado común y protección contra respuestas obsoletas
 │       │   └── use-save-loteo.ts      # Orquesta alta + subida del DXF
 │       ├── lib/                       # Parseo DXF a geometría SVG, armado del payload y plano del detalle
 │       ├── pages/
@@ -531,7 +556,7 @@ apps/frontend/src/
 │   │   └── client.ts
 │   ├── config/
 │   │   └── env.ts
-│   ├── ui/                     # Componentes shadcn (incluye table.tsx)
+│   ├── ui/                     # Componentes shadcn (incluye table.tsx) y SaveNotice
 │   └── lib/                    # cn + formatCurrency / formatArea / formatDate
 ├── index.css
 └── main.tsx

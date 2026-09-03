@@ -26,7 +26,16 @@ const detailResponse = {
     { x: 10, y: 0 },
     { x: 10, y: 10 },
   ],
-  manzanas: [{ id: 'mz-1', numero: '1', poligono: [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }] }],
+  manzanas: [{
+    id: 'mz-1',
+    numero: '1',
+    tieneAgua: false,
+    tieneCloaca: false,
+    tieneLuz: false,
+    tieneGas: false,
+    calleIds: [],
+    poligono: [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }],
+  }],
   lotes: [
     {
       id: 'lt-1',

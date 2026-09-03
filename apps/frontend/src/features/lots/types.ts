@@ -11,6 +11,22 @@ export type DxfPoint = {
   y: number
 }
 
+export type PlanEntityRef =
+  | { kind: 'loteo' }
+  | { kind: 'manzana'; id: string }
+  | { kind: 'lote'; id: string }
+  | { kind: 'calle'; id: string }
+
+export function entityEquals(left: PlanEntityRef, right: PlanEntityRef): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+  if (left.kind === 'loteo') {
+    return true
+  }
+  return 'id' in right && left.id === right.id
+}
+
 export type DxfPolygon = {
   // Synthetic identifier unique per parse result. The DXF `handle` is not
   // reliable for this: entities copied from a block INSERT all share the
@@ -19,6 +35,12 @@ export type DxfPolygon = {
   layer: DxfLayer
   handle: string | null
   vertices: DxfPoint[]
+  // Set only when the polygon comes from a persisted loteo. Polygons
+  // parsed out of a DXF have no database entity yet.
+  entity?: PlanEntityRef
+  // Short label drawn on the plan (lote/manzana number, calle name).
+  // Absent when that value has not been loaded yet.
+  caption?: string
 }
 
 export type DxfValidationIssueCode =
@@ -64,6 +86,11 @@ export type LoteoSummary = {
 export type LoteoManzana = {
   id: string
   numero: string
+  tieneAgua: boolean
+  tieneCloaca: boolean
+  tieneLuz: boolean
+  tieneGas: boolean
+  calleIds: string[]
   poligono: DxfPoint[]
 }
 

@@ -84,6 +84,18 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 		}
 	})
 
+	t.Run("update manzana", func(t *testing.T) {
+		if _, err := repository.UpdateManzana(ctx, actor, newUUID(t), newUUID(t), domain.ManzanaData{Number: "1"}); err == nil {
+			t.Error("UpdateManzana() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("update calle", func(t *testing.T) {
+		if _, err := repository.UpdateCalle(ctx, actor, newUUID(t), newUUID(t), domain.CalleData{Name: "A"}); err == nil {
+			t.Error("UpdateCalle() should fail when the database is unreachable")
+		}
+	})
+
 	t.Run("assignment lookup", func(t *testing.T) {
 		// This one must not answer "not assigned" on a failure: that would
 		// turn an outage into a silent permission decision.
@@ -332,6 +344,156 @@ func TestLoteoRepository(t *testing.T) {
 		}
 		if _, err := repository.UpdateLote(context.Background(), actor, segundo.ID, segundo.Lotes[0].ID, domain.LoteData{Number: "1"}); err != nil {
 			t.Fatalf("UpdateLote() error = %v, want the number to be free in another loteo", err)
+		}
+	})
+
+	t.Run("update a manzana", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		calleID := loteo.Calles[0].ID
+
+		manzana, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, loteo.Manzanas[0].ID, domain.ManzanaData{
+			Number: "A", HasWater: true, HasPower: true, CalleIDs: []string{calleID},
+		})
+		if err != nil {
+			t.Fatalf("UpdateManzana() error = %v", err)
+		}
+		if manzana.Number != "A" || !manzana.HasWater || manzana.HasSewer || !manzana.HasPower || manzana.HasGas {
+			t.Errorf("UpdateManzana() = %#v", manzana)
+		}
+		if len(manzana.CalleIDs) != 1 || manzana.CalleIDs[0] != calleID {
+			t.Errorf("CalleIDs = %#v, want [%q]", manzana.CalleIDs, calleID)
+		}
+		if len(manzana.Polygon) == 0 {
+			t.Error("UpdateManzana() should keep the polygon")
+		}
+
+		loaded, err := repository.Get(context.Background(), loteo.ID, unrestrictedScope)
+		if err != nil {
+			t.Fatalf("Get() error = %v", err)
+		}
+		if loaded.Manzanas[0].Number != "A" || len(loaded.Manzanas[0].CalleIDs) != 1 {
+			t.Errorf("Get() manzana = %#v", loaded.Manzanas[0])
+		}
+	})
+
+	t.Run("update replaces the streets of a manzana", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		manzanaID := loteo.Manzanas[0].ID
+		calleID := loteo.Calles[0].ID
+
+		if _, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, manzanaID, domain.ManzanaData{
+			Number: "1", CalleIDs: []string{calleID},
+		}); err != nil {
+			t.Fatalf("UpdateManzana() error = %v", err)
+		}
+
+		manzana, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, manzanaID, domain.ManzanaData{Number: "1"})
+		if err != nil {
+			t.Fatalf("UpdateManzana() error = %v", err)
+		}
+		if len(manzana.CalleIDs) != 0 {
+			t.Errorf("CalleIDs = %#v, want none", manzana.CalleIDs)
+		}
+	})
+
+	t.Run("update rejects a manzana of another loteo", func(t *testing.T) {
+		propio := createLoteoWithPlan(t, pool, repository, actor)
+		ajeno := createLoteoWithPlan(t, pool, repository, actor)
+
+		_, err := repository.UpdateManzana(context.Background(), actor, propio.ID, ajeno.Manzanas[0].ID, domain.ManzanaData{Number: "1"})
+		if !errors.Is(err, domain.ErrManzanaNotFound) {
+			t.Fatalf("UpdateManzana() error = %v, want %v", err, domain.ErrManzanaNotFound)
+		}
+	})
+
+	t.Run("update rejects a manzana number already used in the loteo", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		if _, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, loteo.Manzanas[0].ID, domain.ManzanaData{Number: "1"}); err != nil {
+			t.Fatalf("UpdateManzana() error = %v", err)
+		}
+		_, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, loteo.Manzanas[1].ID, domain.ManzanaData{Number: "1"})
+		if !errors.Is(err, domain.ErrManzanaNumberInUse) {
+			t.Fatalf("UpdateManzana() error = %v, want %v", err, domain.ErrManzanaNumberInUse)
+		}
+	})
+
+	t.Run("update rejects a calle that is not in the loteo", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		ajeno := createLoteoWithPlan(t, pool, repository, actor)
+
+		_, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, loteo.Manzanas[0].ID, domain.ManzanaData{
+			Number: "1", CalleIDs: []string{ajeno.Calles[0].ID},
+		})
+		if !errors.Is(err, domain.ErrUnknownCalle) {
+			t.Fatalf("UpdateManzana() error = %v, want %v", err, domain.ErrUnknownCalle)
+		}
+	})
+
+	t.Run("update rejects a soft-deleted calle", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		calleID := loteo.Calles[0].ID
+		if _, err := pool.Exec(context.Background(), `
+			UPDATE calles
+			SET fecha_baja = now(), usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid)
+			WHERE id = $2::uuid
+		`, actor, calleID); err != nil {
+			t.Fatalf("soft-delete calle: %v", err)
+		}
+
+		_, err := repository.UpdateManzana(context.Background(), actor, loteo.ID, loteo.Manzanas[0].ID, domain.ManzanaData{
+			Number: "1", CalleIDs: []string{calleID},
+		})
+		if !errors.Is(err, domain.ErrUnknownCalle) {
+			t.Fatalf("UpdateManzana() error = %v, want %v", err, domain.ErrUnknownCalle)
+		}
+	})
+
+	t.Run("update a calle", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		calle, err := repository.UpdateCalle(context.Background(), actor, loteo.ID, loteo.Calles[0].ID, domain.CalleData{
+			Name: "Los Álamos", Type: domain.CalleTypeAsfalto,
+		})
+		if err != nil {
+			t.Fatalf("UpdateCalle() error = %v", err)
+		}
+		if calle.Name != "Los Álamos" || calle.Type != domain.CalleTypeAsfalto {
+			t.Errorf("UpdateCalle() = %#v", calle)
+		}
+		if len(calle.Polygon) == 0 {
+			t.Error("UpdateCalle() should keep the polygon")
+		}
+
+		cleared, err := repository.UpdateCalle(context.Background(), actor, loteo.ID, loteo.Calles[0].ID, domain.CalleData{
+			Name: "Los Álamos",
+		})
+		if err != nil {
+			t.Fatalf("UpdateCalle() error = %v", err)
+		}
+		if cleared.Type != "" {
+			t.Errorf("Type = %q, want empty after clearing", cleared.Type)
+		}
+	})
+
+	t.Run("update rejects a calle of another loteo", func(t *testing.T) {
+		propio := createLoteoWithPlan(t, pool, repository, actor)
+		ajeno := createLoteoWithPlan(t, pool, repository, actor)
+
+		_, err := repository.UpdateCalle(context.Background(), actor, propio.ID, ajeno.Calles[0].ID, domain.CalleData{Name: "A"})
+		if !errors.Is(err, domain.ErrCalleNotFound) {
+			t.Fatalf("UpdateCalle() error = %v, want %v", err, domain.ErrCalleNotFound)
+		}
+	})
+
+	t.Run("update rejects an invalid calle type", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		_, err := repository.UpdateCalle(context.Background(), actor, loteo.ID, loteo.Calles[0].ID, domain.CalleData{
+			Name: "A", Type: "cemento",
+		})
+		if !errors.Is(err, domain.ErrInvalidCalleType) {
+			t.Fatalf("UpdateCalle() error = %v, want %v", err, domain.ErrInvalidCalleType)
 		}
 	})
 

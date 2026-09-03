@@ -44,6 +44,8 @@ type Handlers struct {
 	CreateLoteo     *handler.CreateLoteoHandler
 	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
+	UpdateManzana   *handler.UpdateManzanaHandler
+	UpdateCalle     *handler.UpdateCalleHandler
 	ListLoteos      *handler.ListLoteosHandler
 	GetLoteo        *handler.GetLoteoHandler
 }
@@ -63,4 +65,6 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("GET /api/v1/loteos/{loteoId}", requireAuth(handler.Adapt(handlers.GetLoteo, loteosReadTimeout)))
 	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", requireAuth(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", requireAuth(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
+	mux.Handle("PATCH /api/v1/loteos/{loteoId}/manzanas/{manzanaId}", requireAuth(handler.Adapt(handlers.UpdateManzana, lotesTimeout)))
+	mux.Handle("PATCH /api/v1/loteos/{loteoId}/calles/{calleId}", requireAuth(handler.Adapt(handlers.UpdateCalle, lotesTimeout)))
 }
