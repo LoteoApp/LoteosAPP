@@ -1,5 +1,5 @@
 import { useAuth } from '../features/auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../features/auth/lib/getUserRole'
+import { getUserRole, ROLE } from '../shared/auth/roles'
 import LoteoDetailPage from '../features/lots/pages/LoteoDetailPage'
 
 export default function LoteoDetailRoute() {
