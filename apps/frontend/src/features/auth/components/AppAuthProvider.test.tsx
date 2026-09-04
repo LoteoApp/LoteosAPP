@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '@supabase/supabase-js'
 import AppAuthProvider from './AppAuthProvider'
-import { supabaseClient } from '../config/supabase-client'
+import { supabaseClient } from '../../../shared/config/supabase-client'
 import { useAuth } from '../hooks/use-auth'
 
-vi.mock('../config/supabase-client', () => ({
+vi.mock('../../../shared/config/supabase-client', () => ({
   supabaseClient: {
     auth: {
       onAuthStateChange: vi.fn(),

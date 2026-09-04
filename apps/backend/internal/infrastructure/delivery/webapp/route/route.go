@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
@@ -38,6 +39,10 @@ const (
 type Handlers struct {
 	CreateUser      *handler.CreateUserHandler
 	CompleteProfile *handler.CompleteProfileHandler
+	ListUsers       *handler.ListUsersHandler
+	UpdateUser      *handler.UpdateUserHandler
+	DeactivateUser  *handler.DeactivateUserHandler
+	ReactivateUser  *handler.ReactivateUserHandler
 	CreateClient    *handler.CreateClientHandler
 	UpdateClient    *handler.UpdateClientHandler
 	DeleteClient    *handler.DeleteClientHandler
@@ -53,24 +58,36 @@ type Handlers struct {
 	GetLoteo        *handler.GetLoteoHandler
 }
 
-func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Verifier) {
+// RegisterRoutes wires every route behind both RequireAuth (a valid token)
+// and RequireActiveAccount (a usuarios row that isn't given de baja): a baja
+// must block a caller right away, not just once their current token expires.
+func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Verifier, userRepository gateway.UserRepository) {
 	requireAuth := middleware.RequireAuth(verifier)
-	mux.Handle("POST /api/v1/usuarios", requireAuth(handler.Adapt(handlers.CreateUser, usersTimeout)))
-	mux.Handle("PATCH /api/v1/usuarios/me", requireAuth(handler.Adapt(handlers.CompleteProfile, usersTimeout)))
+	requireActiveAccount := middleware.RequireActiveAccount(userRepository)
+	protected := func(h http.Handler) http.Handler {
+		return requireAuth(requireActiveAccount(h))
+	}
 
-	mux.Handle("POST /api/v1/clientes", requireAuth(handler.Adapt(handlers.CreateClient, clientsTimeout)))
-	mux.Handle("PATCH /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.UpdateClient, clientsTimeout)))
-	mux.Handle("DELETE /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.DeleteClient, clientsTimeout)))
-	mux.Handle("GET /api/v1/clientes", requireAuth(handler.Adapt(handlers.ListClients, clientsTimeout)))
+	mux.Handle("POST /api/v1/usuarios", protected(handler.Adapt(handlers.CreateUser, usersTimeout)))
+	mux.Handle("PATCH /api/v1/usuarios/me", protected(handler.Adapt(handlers.CompleteProfile, usersTimeout)))
+	mux.Handle("GET /api/v1/usuarios", protected(handler.Adapt(handlers.ListUsers, usersTimeout)))
+	mux.Handle("PATCH /api/v1/usuarios/{id}", protected(handler.Adapt(handlers.UpdateUser, usersTimeout)))
+	mux.Handle("DELETE /api/v1/usuarios/{id}", protected(handler.Adapt(handlers.DeactivateUser, usersTimeout)))
+	mux.Handle("POST /api/v1/usuarios/{id}/reactivar", protected(handler.Adapt(handlers.ReactivateUser, usersTimeout)))
 
-	mux.Handle("POST /api/v1/inmobiliarias", requireAuth(handler.Adapt(handlers.CreateAgency, agenciesTimeout)))
-	mux.Handle("PATCH /api/v1/inmobiliarias/{id}", requireAuth(handler.Adapt(handlers.UpdateAgency, agenciesTimeout)))
-	mux.Handle("DELETE /api/v1/inmobiliarias/{id}", requireAuth(handler.Adapt(handlers.DeleteAgency, agenciesTimeout)))
-	mux.Handle("GET /api/v1/inmobiliarias", requireAuth(handler.Adapt(handlers.ListAgencies, agenciesTimeout)))
+	mux.Handle("POST /api/v1/clientes", protected(handler.Adapt(handlers.CreateClient, clientsTimeout)))
+	mux.Handle("PATCH /api/v1/clientes/{id}", protected(handler.Adapt(handlers.UpdateClient, clientsTimeout)))
+	mux.Handle("DELETE /api/v1/clientes/{id}", protected(handler.Adapt(handlers.DeleteClient, clientsTimeout)))
+	mux.Handle("GET /api/v1/clientes", protected(handler.Adapt(handlers.ListClients, clientsTimeout)))
 
-	mux.Handle("POST /api/v1/loteos", requireAuth(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
-	mux.Handle("GET /api/v1/loteos", requireAuth(handler.Adapt(handlers.ListLoteos, loteosReadTimeout)))
-	mux.Handle("GET /api/v1/loteos/{loteoId}", requireAuth(handler.Adapt(handlers.GetLoteo, loteosReadTimeout)))
-	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", requireAuth(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
-	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", requireAuth(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
+	mux.Handle("POST /api/v1/inmobiliarias", protected(handler.Adapt(handlers.CreateAgency, agenciesTimeout)))
+	mux.Handle("PATCH /api/v1/inmobiliarias/{id}", protected(handler.Adapt(handlers.UpdateAgency, agenciesTimeout)))
+	mux.Handle("DELETE /api/v1/inmobiliarias/{id}", protected(handler.Adapt(handlers.DeleteAgency, agenciesTimeout)))
+	mux.Handle("GET /api/v1/inmobiliarias", protected(handler.Adapt(handlers.ListAgencies, agenciesTimeout)))
+
+	mux.Handle("POST /api/v1/loteos", protected(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
+	mux.Handle("GET /api/v1/loteos", protected(handler.Adapt(handlers.ListLoteos, loteosReadTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}", protected(handler.Adapt(handlers.GetLoteo, loteosReadTimeout)))
+	mux.Handle("PUT /api/v1/loteos/{loteoId}/dxf", protected(handler.Adapt(handlers.StoreLoteoDxf, uploadDxfTimeout)))
+	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", protected(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
 }

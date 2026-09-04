@@ -29,7 +29,9 @@ func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 		return err
 	}
 
-	usuario, temporaryPassword, err := handler.createUser.Execute(request.Context(), principal.Roles, body.Email, body.Rol)
+	usuario, temporaryPassword, err := handler.createUser.Execute(
+		request.Context(), principal.Roles, body.Nombre, body.Apellido, body.Email, body.Rol,
+	)
 	if err != nil {
 		return err
 	}

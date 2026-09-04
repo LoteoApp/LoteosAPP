@@ -3,8 +3,10 @@ package dto
 import "loteosapp/backend/internal/business/domain"
 
 type CreateUserRequest struct {
-	Email string `json:"email"`
-	Rol   string `json:"rol"`
+	Nombre   string `json:"nombre"`
+	Apellido string `json:"apellido"`
+	Email    string `json:"email"`
+	Rol      string `json:"rol"`
 }
 
 type CreateUserResponse struct {
