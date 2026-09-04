@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import LotsPage from './LotsPage'
+
+function DetailProbe() {
+  const { loteoId } = useParams()
+  return <p>Detalle del loteo {loteoId}</p>
+}
 
 function lwpolyline(layer: string, points: Array<[number, number]>): string {
   const lines = ['0', 'LWPOLYLINE', '8', layer, '90', String(points.length), '70', '1']
@@ -39,8 +44,11 @@ function planDxf(): File {
 
 function renderPage({ token = 'test-token' }: { token?: string | null } = {}) {
   return render(
-    <MemoryRouter>
-      <LotsPage accessToken={token} />
+    <MemoryRouter initialEntries={['/lotes/nuevo']}>
+      <Routes>
+        <Route path="/lotes/nuevo" element={<LotsPage accessToken={token} />} />
+        <Route path="/lotes/:loteoId" element={<DetailProbe />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -129,7 +137,7 @@ describe('LotsPage', () => {
     expect(screen.getByRole('button', { name: 'Guardar loteo' })).toBeEnabled()
   })
 
-  it('creates a loteo with data only and resets the form', async () => {
+  it('creates a loteo with data only and navigates to its detail', async () => {
     const user = userEvent.setup()
     const calls = stubFetch(() => jsonResponse({ id: 'loteo-1', nombre: 'Las Acacias' }, 201))
     renderPage()
@@ -138,7 +146,7 @@ describe('LotsPage', () => {
     await user.type(screen.getByLabelText('Ubicación/Ciudad'), 'Córdoba')
     await user.click(screen.getByRole('button', { name: 'Guardar loteo' }))
 
-    expect(await screen.findByText('Loteo creado')).toBeInTheDocument()
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
 
     expect(calls).toHaveLength(1)
     expect(calls[0].method).toBe('POST')
@@ -150,11 +158,9 @@ describe('LotsPage', () => {
       descripcion: '',
       plano: null,
     })
-
-    expect(screen.getByLabelText('Nombre')).toHaveValue('')
   })
 
-  it('uploads the DXF after creating the loteo', async () => {
+  it('uploads the DXF after creating the loteo and navigates to its detail', async () => {
     const user = userEvent.setup()
     const calls = stubFetch((call) =>
       call.method === 'POST'
@@ -168,7 +174,7 @@ describe('LotsPage', () => {
     expect(await screen.findByText('Plano cargado')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Guardar loteo' }))
-    expect(await screen.findByText('Loteo creado')).toBeInTheDocument()
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
 
     expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
       'POST /api/v1/loteos',
@@ -222,10 +228,37 @@ describe('LotsPage', () => {
 
     expect(await screen.findByText('Loteo creado')).toBeInTheDocument()
     expect(screen.getByText(/no se pudo guardar el archivo DXF/i)).toBeInTheDocument()
+    // The DXF still needs the retry UI on this screen, so the alta stays put.
+    expect(screen.queryByText(/Detalle del loteo/)).not.toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Reintentar carga del DXF' }))
 
-    expect(await screen.findByText('Ya podés cargar otro loteo.')).toBeInTheDocument()
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
     expect(calls.map((call) => call.method)).toEqual(['POST', 'PUT', 'PUT'])
+  })
+
+  it('navigates to the detail when the user continues without the failed DXF', async () => {
+    const user = userEvent.setup()
+    stubFetch((call) =>
+      call.method === 'POST'
+        ? jsonResponse({ id: 'loteo-1', nombre: 'Las Acacias' }, 201)
+        : jsonResponse(
+            { code: 'storage_unavailable', message: 'El almacenamiento no está disponible' },
+            503,
+          ),
+    )
+    renderPage()
+
+    await user.type(screen.getByLabelText('Nombre'), 'Las Acacias')
+    await user.upload(screen.getByLabelText('Archivo DXF'), planDxf())
+    expect(await screen.findByText('Plano cargado')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar loteo' }))
+    expect(await screen.findByText(/no se pudo guardar el archivo DXF/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Continuar sin el DXF' }))
+
+    expect(await screen.findByText('Detalle del loteo loteo-1')).toBeInTheDocument()
   })
 
   it('blocks the save when the plan has no LOTEO layer', async () => {

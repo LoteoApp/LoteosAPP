@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../../auth/lib/getUserRole'
+import { getUserRole, ROLE } from '../../../shared/auth/roles'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'

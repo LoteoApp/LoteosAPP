@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { DXF_LAYERS, type DxfLayer, type DxfParseResult, type DxfValidationIssue } from '../types'
+import type { DxfLayer, DxfParseResult, DxfValidationIssue } from '../types'
+import { useLayerVisibility } from './use-layer-visibility'
 
 type DxfPlanState =
   | { status: 'empty' }
@@ -7,10 +8,6 @@ type DxfPlanState =
   | { status: 'error'; message: string }
 
 const EMPTY_STATE: DxfPlanState = { status: 'empty' }
-
-function allLayersVisible(): ReadonlySet<DxfLayer> {
-  return new Set(DXF_LAYERS)
-}
 
 export type UseDxfPlanResult = {
   fileName: string | null
@@ -29,7 +26,8 @@ export type UseDxfPlanResult = {
 
 export function useDxfPlan(): UseDxfPlanResult {
   const [state, setState] = useState<DxfPlanState>(EMPTY_STATE)
-  const [visibleLayers, setVisibleLayers] = useState<ReadonlySet<DxfLayer>>(allLayersVisible)
+  const layers = useLayerVisibility()
+  const resetLayers = layers.reset
 
   const onParsed = useCallback((result: DxfParseResult, file: File) => {
     setState({ status: 'loaded', result, file })
@@ -45,8 +43,8 @@ export function useDxfPlan(): UseDxfPlanResult {
 
   const reset = useCallback(() => {
     setState(EMPTY_STATE)
-    setVisibleLayers(allLayersVisible())
-  }, [])
+    resetLayers()
+  }, [resetLayers])
 
   const polygons = state.status === 'loaded' ? state.result.polygons : []
   const issues = state.status === 'loaded' ? state.result.issues : []
@@ -58,8 +56,8 @@ export function useDxfPlan(): UseDxfPlanResult {
     polygons,
     issues,
     hasPlan: polygons.length > 0,
-    visibleLayers,
-    onVisibleLayersChange: setVisibleLayers,
+    visibleLayers: layers.visibleLayers,
+    onVisibleLayersChange: layers.onVisibleLayersChange,
     onParsed,
     onError,
     onCleared,

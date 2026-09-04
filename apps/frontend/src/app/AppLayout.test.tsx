@@ -29,7 +29,7 @@ const sectionLabels = [
   'Ventas',
   'Cobranzas',
   'Usuarios',
-  'Inmobiliaria',
+  'Inmobiliarias',
 ]
 
 function stubDesktopMatchMedia(initialMatches = true) {

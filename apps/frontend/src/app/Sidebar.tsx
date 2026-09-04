@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router'
 import { useAuth } from '../features/auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../features/auth/lib/getUserRole'
+import { getUserRole, ROLE } from '../shared/auth/roles'
 
 type NavItem = {
   to: string
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog, roles: [ROLE.administrador] },
-  { to: '/inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
+  { to: '/inmobiliarias', label: 'Inmobiliarias', icon: Building2 },
 ]
 
 type SidebarProps = {

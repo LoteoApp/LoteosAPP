@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useSaveLoteo } from './use-save-loteo'
+import { useSaveLoteo, type SaveOutcome } from './use-save-loteo'
 import * as createLoteoModule from '../api/create-loteo'
 import * as uploadModule from '../api/upload-loteo-dxf'
 import { ApiError } from '../../../shared/api/client'
@@ -239,6 +239,49 @@ describe('useSaveLoteo', () => {
     if (result.current.status === 'error') {
       expect(result.current.message).toMatch(/ninguna manzana/i)
     }
+  })
+
+  it('returns the created loteo id and no warning on a clean save', async () => {
+    vi.spyOn(createLoteoModule, 'createLoteo').mockResolvedValue({ id: 'loteo-9', nombre: 'x' })
+
+    const { result } = setup()
+    let outcome: SaveOutcome | null = null
+    await act(async () => {
+      outcome = await result.current.save(fields, [], null)
+    })
+
+    expect(outcome).toEqual({ loteoId: 'loteo-9', dxfWarning: null })
+  })
+
+  it('returns the loteo id with the warning when the DXF upload fails', async () => {
+    vi.spyOn(createLoteoModule, 'createLoteo').mockResolvedValue({ id: 'loteo-9', nombre: 'x' })
+    vi.spyOn(uploadModule, 'uploadLoteoDxf').mockRejectedValue(
+      new ApiError('Storage unavailable', 'storage_unavailable', 503),
+    )
+
+    const { result } = setup()
+    let outcome: SaveOutcome | null = null
+    await act(async () => {
+      outcome = await result.current.save(fields, planPolygons, dxfFile)
+    })
+
+    expect(outcome).not.toBeNull()
+    expect(outcome!.loteoId).toBe('loteo-9')
+    expect(outcome!.dxfWarning).toMatch(/no se pudo guardar el archivo DXF/i)
+  })
+
+  it('returns null when nothing was created', async () => {
+    vi.spyOn(createLoteoModule, 'createLoteo').mockRejectedValue(
+      new ApiError('Falta el nombre', 'invalid_loteo_nombre', 400),
+    )
+
+    const { result } = setup()
+    let outcome: SaveOutcome | null = { loteoId: 'unset', dxfWarning: null }
+    await act(async () => {
+      outcome = await result.current.save(fields, [], null)
+    })
+
+    expect(outcome).toBeNull()
   })
 
   it('clears the state on reset', async () => {

@@ -49,12 +49,19 @@ function midpointOf(a: PointerPosition, b: PointerPosition): PointerPosition {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
 
+const DEFAULT_EMPTY_MESSAGE = 'El plano aparece acá cuando cargues un DXF.'
+
 type DxfViewerProps = {
   polygons: DxfPolygon[]
   visibleLayers: ReadonlySet<DxfLayer>
+  emptyMessage?: string
 }
 
-export default function DxfViewer({ polygons, visibleLayers }: DxfViewerProps) {
+export default function DxfViewer({
+  polygons,
+  visibleLayers,
+  emptyMessage = DEFAULT_EMPTY_MESSAGE,
+}: DxfViewerProps) {
   const visiblePolygons = useMemo(
     () => polygons.filter((polygon) => visibleLayers.has(polygon.layer)),
     [polygons, visibleLayers],
@@ -169,7 +176,7 @@ export default function DxfViewer({ polygons, visibleLayers }: DxfViewerProps) {
   if (!hasGeometry) {
     return (
       <div className="flex h-[50dvh] min-h-64 items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 px-4 text-center text-sm text-muted-foreground md:h-auto md:min-h-0 md:flex-1">
-        El plano aparece acá cuando cargues un DXF.
+        {emptyMessage}
       </div>
     )
   }

@@ -56,3 +56,43 @@ export type LoteoSummary = {
   cantidadCalles: number
   tienePlano: boolean
 }
+
+// The types below mirror GET /api/v1/loteos/{loteoId}. The backend leaves
+// `contorno` and every `poligono` off the payload when the entity has no DXF
+// ring yet (Go `omitempty`), so the api client normalizes those to [].
+
+export type LoteoManzana = {
+  id: string
+  numero: string
+  poligono: DxfPoint[]
+}
+
+export type LoteoLote = {
+  id: string
+  manzanaId: string
+  numero: string
+  precio: number | null
+  moneda: string
+  superficie: number | null
+  caracteristicas: string
+  poligono: DxfPoint[]
+}
+
+export type LoteoCalle = {
+  id: string
+  nombre: string
+  tipo: string
+  poligono: DxfPoint[]
+}
+
+export type LoteoDetail = {
+  id: string
+  nombre: string
+  ubicacion: string
+  descripcion: string
+  contorno: DxfPoint[]
+  manzanas: LoteoManzana[]
+  lotes: LoteoLote[]
+  calles: LoteoCalle[]
+  fechaCreacion: string
+}

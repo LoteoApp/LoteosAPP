@@ -73,6 +73,16 @@ Endpoints operativos del backend:
   temporal de un solo uso.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
+- `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una
+  inmobiliaria con razón social, CUIT, teléfono y email.
+- `GET /api/v1/inmobiliarias` (requiere rol `administrador` o
+  `administrativo`): lista las inmobiliarias activas; `?q=` busca por razón
+  social o CUIT.
+- `PATCH /api/v1/inmobiliarias/{id}` (requiere rol `administrador`): modifica
+  los campos enviados de una inmobiliaria activa.
+- `DELETE /api/v1/inmobiliarias/{id}` (requiere rol `administrador`): da de
+  baja lógica a la inmobiliaria (`inmobiliarias.fecha_baja`); la fila se
+  conserva.
 
 ### Content-Security-Policy del frontend
 

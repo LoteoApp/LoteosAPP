@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { useAuth } from '../hooks/use-auth'
-import { getUserRole } from '../lib/getUserRole'
+import { getUserRole } from '../../../shared/auth/roles'
 
 type RequireRoleProps = {
   roles: readonly string[]
