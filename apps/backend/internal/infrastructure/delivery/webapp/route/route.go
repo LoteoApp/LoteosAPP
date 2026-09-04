@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	usersTimeout   = 5 * time.Second
-	clientsTimeout = 5 * time.Second
-	lotesTimeout   = 10 * time.Second
+	usersTimeout    = 5 * time.Second
+	clientsTimeout  = 5 * time.Second
+	agenciesTimeout = 5 * time.Second
+	lotesTimeout    = 10 * time.Second
 
 	// Reading a loteo runs several queries (loteo, manzanas, lotes, calles),
 	// so it gets more room than a request that touches one row.
@@ -41,6 +42,10 @@ type Handlers struct {
 	UpdateClient    *handler.UpdateClientHandler
 	DeleteClient    *handler.DeleteClientHandler
 	ListClients     *handler.ListClientsHandler
+	CreateAgency    *handler.CreateAgencyHandler
+	UpdateAgency    *handler.UpdateAgencyHandler
+	DeleteAgency    *handler.DeleteAgencyHandler
+	ListAgencies    *handler.ListAgenciesHandler
 	CreateLoteo     *handler.CreateLoteoHandler
 	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
 	UpdateLote      *handler.UpdateLoteHandler
@@ -57,6 +62,11 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("PATCH /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.UpdateClient, clientsTimeout)))
 	mux.Handle("DELETE /api/v1/clientes/{id}", requireAuth(handler.Adapt(handlers.DeleteClient, clientsTimeout)))
 	mux.Handle("GET /api/v1/clientes", requireAuth(handler.Adapt(handlers.ListClients, clientsTimeout)))
+
+	mux.Handle("POST /api/v1/inmobiliarias", requireAuth(handler.Adapt(handlers.CreateAgency, agenciesTimeout)))
+	mux.Handle("PATCH /api/v1/inmobiliarias/{id}", requireAuth(handler.Adapt(handlers.UpdateAgency, agenciesTimeout)))
+	mux.Handle("DELETE /api/v1/inmobiliarias/{id}", requireAuth(handler.Adapt(handlers.DeleteAgency, agenciesTimeout)))
+	mux.Handle("GET /api/v1/inmobiliarias", requireAuth(handler.Adapt(handlers.ListAgencies, agenciesTimeout)))
 
 	mux.Handle("POST /api/v1/loteos", requireAuth(handler.Adapt(handlers.CreateLoteo, createLoteoTimeout)))
 	mux.Handle("GET /api/v1/loteos", requireAuth(handler.Adapt(handlers.ListLoteos, loteosReadTimeout)))

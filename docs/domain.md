@@ -59,16 +59,29 @@ se organiza el código de cada funcionalidad.
 ## Inmobiliarias
 
 Alta y gestión de inmobiliarias (agencias externas) asociadas a los loteos,
-desde el módulo **Inmobiliaria**. En el [alta de un loteo](#alta-y-visualización-de-un-loteo)
-se eligen una o más agencias de ese catálogo; el filtro por nombre es en
-el cliente porque el listado es chico y el API las devolverá todas. Hasta
-que exista ese endpoint, el control permanece visible pero deshabilitado para
-no simular una asociación que todavía no puede persistirse.
+desde el módulo **Inmobiliarias**. Una inmobiliaria tiene razón social
+(obligatoria), CUIT, teléfono y email.
+
+- Alta, modificación y baja: solo administrador.
+- Listado y búsqueda por razón social o CUIT: administrador y administrativo.
+- La baja es lógica: la agencia deja de aparecer en el catálogo, pero se
+  conserva la fila y con ella el historial de los loteos y usuarios que la
+  nombran.
+- Dos inmobiliarias activas no pueden compartir CUIT. El CUIT se guarda como
+  11 dígitos, sin separadores, así que da igual cómo se tipee.
+- Las inmobiliarias no acceden al sistema como tales: quien opera es un
+  usuario con rol inmobiliaria.
+
+En el [alta de un loteo](#alta-y-visualización-de-un-loteo) se eligen una o
+más agencias de ese catálogo; el filtro por nombre es en el cliente porque el
+listado es chico y el API las devuelve todas. Hasta que exista la asociación
+loteo–inmobiliaria, el control permanece visible pero deshabilitado para no
+simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
 inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
-vendedor. Campos y permisos de alta a definir en una futura iteración; el
-módulo de inmobiliarias está en construcción.
+vendedor. Asignar un usuario a su agencia (`usuarios.inmobiliaria_id`) queda
+para una futura iteración.
 
 ## Usuarios y roles
 
