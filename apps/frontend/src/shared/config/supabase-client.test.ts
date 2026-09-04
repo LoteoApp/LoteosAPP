@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
-import { supabaseAnonKey, supabaseUrl } from '../../../shared/config/env'
+import { supabaseAnonKey, supabaseUrl } from './env'
 import './supabase-client'
 
 vi.mock('@supabase/supabase-js', () => ({

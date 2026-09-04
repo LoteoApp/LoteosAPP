@@ -43,18 +43,34 @@ apps/backend/
 │   ├── business/
 │   │   ├── domain/
 │   │   │   ├── object.go
+│   │   │   ├── cliente.go
+│   │   │   ├── agency.go
 │   │   │   └── usuario.go
 │   │   ├── gateway/
 │   │   │   ├── object_storage.go
 │   │   │   ├── usuario_repository.go
+│   │   │   ├── cliente_repository.go
+│   │   │   ├── agency_repository.go
 │   │   │   ├── loteo_repository.go
 │   │   │   └── gatewayfake/
 │   │   │       ├── object_storage.go
 │   │   │       ├── user_repository.go
+│   │   │       ├── cliente_repository.go
+│   │   │       ├── agency_repository.go
 │   │   │       └── loteo_repository.go
 │   │   └── usecase/
 │   │       ├── users/
 │   │       │   └── create_user.go
+│   │       ├── clients/
+│   │       │   ├── create_client.go
+│   │       │   ├── list_clients.go
+│   │       │   ├── update_client.go
+│   │       │   └── delete_client.go
+│   │       ├── agencies/
+│   │       │   ├── create_agency.go
+│   │       │   ├── list_agencies.go
+│   │       │   ├── update_agency.go
+│   │       │   └── delete_agency.go
 │   │       └── loteos/
 │   │           ├── create_loteo.go
 │   │           ├── list_loteos.go
@@ -77,6 +93,8 @@ apps/backend/
 │       │   └── postgres/
 │       │       ├── pool.go
 │       │       ├── usuario.go
+│       │       ├── cliente.go
+│       │       ├── agency.go
 │       │       ├── loteo.go
 │       │       └── geometry.go
 │       ├── storage/
@@ -89,6 +107,14 @@ apps/backend/
 │               ├── dto/
 │               │   ├── users/
 │               │   │   └── create_user.go
+│               │   ├── clients/
+│               │   │   ├── create_client.go
+│               │   │   ├── list_clients.go
+│               │   │   └── update_client.go
+│               │   ├── agencies/
+│               │   │   ├── create_agency.go
+│               │   │   ├── list_agencies.go
+│               │   │   └── update_agency.go
 │               │   └── loteos/
 │               │       ├── create_loteo.go
 │               │       ├── list_loteos.go
@@ -98,6 +124,10 @@ apps/backend/
 │               │       └── update_calle.go
 │               ├── handler/
 │               │   ├── create_user.go
+│               │   ├── create_agency.go
+│               │   ├── list_agencies.go
+│               │   ├── update_agency.go
+│               │   ├── delete_agency.go
 │               │   ├── create_loteo.go
 │               │   ├── list_loteos.go
 │               │   ├── get_loteo.go
@@ -164,6 +194,17 @@ vacíos antes de que exista una funcionalidad que los necesite.
 - `internal/infrastructure/delivery/webapp/middleware`: adapta la
   validación de `auth/supabase` a un middleware HTTP; rechaza requests sin
   token válido y expone el llamador autenticado al resto de la request.
+  También expone `RequireActiveAccount`, que corre detrás de `RequireAuth` en
+  toda la API y rechaza con 403 a un caller cuya fila en `usuarios` tenga
+  `fecha_baja` seteado — necesario porque la validación del token es
+  stateless (contra el JWKS, sin ida y vuelta a Supabase), así que un token
+  ya emitido seguiría siendo válido hasta expirar aunque la cuenta esté dada
+  de baja. Un caller sin fila en `usuarios` también es rechazado (403,
+  `actor_not_provisioned`), salvo el caso puntual de bootstrap: un
+  administrador provisionado solo en Supabase, identificado por el claim de
+  rol del propio token, no por la fila ausente. Recibe el repositorio de
+  usuarios a través de una interfaz chica definida en el propio paquete, no
+  de `business/gateway`.
 - `internal/infrastructure/repository/postgres`: implementa los contratos de
   persistencia (`gateway.UserRepository`) con `pgxpool` y SQL explícito, y
   expone la apertura y configuración del pool de conexiones.
@@ -223,19 +264,23 @@ flowchart LR
     deps --> storage["infrastructure/storage/r2"]
     route --> handler["infrastructure/delivery/webapp/handler"]
     route --> middleware["infrastructure/delivery/webapp/middleware"]
+    route --> gateway["business/gateway"]
     middleware --> supabase
     handler --> response["infrastructure/delivery/webapp/response"]
     handler --> usecaseUsers["business/usecase/users"]
     handler --> usecaseClients["business/usecase/clients"]
+    handler --> usecaseAgencies["business/usecase/agencies"]
     handler --> usecaseLoteos["business/usecase/loteos"]
     repo -.implementa.-> gateway["business/gateway"]
     supabase -.implementa.-> gateway
     storage -.implementa.-> gateway
     usecaseUsers --> gateway
     usecaseClients --> gateway
+    usecaseAgencies --> gateway
     usecaseLoteos --> gateway
     usecaseUsers --> domain["business/domain"]
     usecaseClients --> domain
+    usecaseAgencies --> domain
     usecaseLoteos --> domain
     response --> domain
     gateway --> domain
@@ -263,6 +308,51 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
   "message": "El lote solicitado no existe"
 }
 ```
+
+### ABM de inmobiliarias
+
+Una inmobiliaria es una agencia externa asociada a los loteos
+(`docs/domain.md` § Inmobiliarias); no es un usuario. La tabla
+`inmobiliarias` ya existía desde `migrations/00005_create_entity_model.sql`.
+El ABM vive bajo `/api/v1/inmobiliarias`:
+
+- `POST /api/v1/inmobiliarias` — alta con razón social, CUIT, teléfono y
+  email. Solo **administrador**.
+- `GET /api/v1/inmobiliarias` — listado de las activas, con búsqueda por razón
+  social o CUIT en `?q=`. **Administrador** y **administrativo**: el catálogo
+  es lo que se elige al operar un loteo, y no expone datos de personas.
+- `PATCH /api/v1/inmobiliarias/{id}` — modificación parcial. Solo
+  **administrador**.
+- `DELETE /api/v1/inmobiliarias/{id}` — baja lógica. Solo **administrador**.
+
+Decisiones de este recorte:
+
+- **La baja es lógica y se apoya en `inmobiliarias.fecha_baja`.** Borrar la
+  fila rompería las FK que la nombran (`usuarios.inmobiliaria_id`,
+  `inmobiliaria_loteos`). `fecha_baja IS NULL` significa activa, y es lo único
+  que devuelve el listado.
+- **El CUIT se guarda como 11 dígitos, sin separadores.** Se normaliza en el
+  caso de uso antes de persistir; si no, `30-71234567-8` y `30712345678`
+  entrarían como dos agencias distintas y el índice único de la migración
+  `00007` no serviría de nada. Por eso el listado también normaliza un `?q=`
+  que sea un CUIT antes de buscarlo. No se valida el dígito verificador: la
+  intención es rechazar tipeos y texto libre, no validar contra AFIP.
+- **El `PATCH` no puede vaciar un campo opcional a null.** Un campo ausente
+  queda igual y uno en blanco se lee como ausente, como en el ABM de clientes;
+  limpiar CUIT, teléfono o email es una extensión futura, no algo que el API
+  necesite hoy.
+- **La asociación con loteos (`inmobiliaria_loteos`) queda afuera**, junto con
+  conectar el selector de agencias del alta de loteo
+  (`features/lots/api/list-agencies.ts`, todavía un catálogo mock) y la
+  asignación de usuarios con rol inmobiliaria a su agencia
+  (`usuarios.inmobiliaria_id`).
+- **Los identificadores de este módulo están en inglés** (`domain.Agency`,
+  `BusinessName`, `AgencyRepository`, `AgencyListItem`), como pide
+  `AGENTS.md`. Lo que sigue en español es lo que no es un identificador: las
+  columnas de la base, los tags JSON y las rutas que ya publica el API
+  (`razonSocial`, `/api/v1/inmobiliarias`) y los textos que ve el usuario.
+  Las entidades más viejas (`domain.Cliente`, `domain.Usuario`) todavía usan
+  español; unificarlas es un cambio aparte.
 
 ### Loteo: alta, persistencia de la geometría y lectura
 
@@ -504,6 +594,7 @@ apps/frontend/src/
 │   ├── LoteosRoute.tsx         # Inyecta la sesión en el listado de loteos (/lotes)
 │   ├── LoteoDetailRoute.tsx    # Inyecta la sesión en el detalle de loteo (/lotes/:loteoId)
 │   ├── LotsRoute.tsx           # Inyecta la sesión en el alta de loteo (/lotes/nuevo)
+│   ├── AgenciesRoute.tsx       # Inyecta sesión y rol en el ABM de inmobiliarias
 │   ├── Sidebar.tsx             # Navegación lateral con íconos por sección
 │   ├── UserMenu.tsx            # Menú de cuenta en el header, conectado a Supabase
 │   └── providers.tsx           # Cuando existan providers globales
@@ -522,9 +613,25 @@ apps/frontend/src/
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
 │   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
+│   ├── agencies/
+│   │   ├── api/
+│   │   │   └── agencies.ts        # Cliente de /api/v1/inmobiliarias
+│   │   ├── components/
+│   │   │   ├── AgencyEditor.tsx
+│   │   │   ├── AgencyForm.tsx
+│   │   │   ├── AgencyList.tsx
+│   │   │   └── AgencyListItem.tsx
+│   │   ├── hooks/
+│   │   │   └── use-agencies.ts
+│   │   ├── lib/
+│   │   │   ├── cuit.ts            # Normalización y validación del CUIT
+│   │   │   └── resolveFormView.ts
+│   │   ├── pages/
+│   │   │   └── AgenciesPage.tsx   # ABM de inmobiliarias, en /inmobiliarias
+│   │   └── types.ts
 │   └── lots/
 │       ├── api/
-│       │   ├── list-agencies.ts       # Catálogo mock hasta el GET de inmobiliarias
+│       │   ├── list-agencies.ts       # Catálogo mock hasta conectar el GET de inmobiliarias
 │       │   ├── list-loteos.ts         # GET /api/v1/loteos?q= (valida la forma)
 │       │   ├── get-loteo.ts           # GET /api/v1/loteos/{id} (valida la forma)
 │       │   ├── update-lote.ts         # PATCH /api/v1/loteos/{id}/lotes/{loteId}
@@ -554,6 +661,8 @@ apps/frontend/src/
 ├── shared/
 │   ├── api/
 │   │   └── client.ts
+│   ├── auth/
+│   │   └── roles.ts               # Roles de dominio y lectura del rol del usuario
 │   ├── config/
 │   │   └── env.ts
 │   ├── ui/                     # Componentes shadcn (incluye table.tsx) y SaveNotice

@@ -37,10 +37,18 @@ func New(ctx context.Context) (*App, error) {
 	route.RegisterRoutes(mux, route.Handlers{
 		CreateUser:      container.CreateUserHandler,
 		CompleteProfile: container.CompleteProfileHandler,
+		ListUsers:       container.ListUsersHandler,
+		UpdateUser:      container.UpdateUserHandler,
+		DeactivateUser:  container.DeactivateUserHandler,
+		ReactivateUser:  container.ReactivateUserHandler,
 		CreateClient:    container.CreateClientHandler,
 		UpdateClient:    container.UpdateClientHandler,
 		DeleteClient:    container.DeleteClientHandler,
 		ListClients:     container.ListClientsHandler,
+		CreateAgency:    container.CreateAgencyHandler,
+		UpdateAgency:    container.UpdateAgencyHandler,
+		DeleteAgency:    container.DeleteAgencyHandler,
+		ListAgencies:    container.ListAgenciesHandler,
 		CreateLoteo:     container.CreateLoteoHandler,
 		StoreLoteoDxf:   container.StoreLoteoDxfHandler,
 		UpdateLote:      container.UpdateLoteHandler,
@@ -48,7 +56,7 @@ func New(ctx context.Context) (*App, error) {
 		UpdateCalle:     container.UpdateCalleHandler,
 		ListLoteos:      container.ListLoteosHandler,
 		GetLoteo:        container.GetLoteoHandler,
-	}, container.Verifier)
+	}, container.Verifier, container.UserRepository)
 
 	return &App{
 		server:   server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux), route.MaxHandlerTimeout),

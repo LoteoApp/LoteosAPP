@@ -63,16 +63,29 @@ se organiza el código de cada funcionalidad.
 ## Inmobiliarias
 
 Alta y gestión de inmobiliarias (agencias externas) asociadas a los loteos,
-desde el módulo **Inmobiliaria**. En el [alta de un loteo](#alta-y-visualización-de-un-loteo)
-se eligen una o más agencias de ese catálogo; el filtro por nombre es en
-el cliente porque el listado es chico y el API las devolverá todas. Hasta
-que exista ese endpoint, el control permanece visible pero deshabilitado para
-no simular una asociación que todavía no puede persistirse.
+desde el módulo **Inmobiliarias**. Una inmobiliaria tiene razón social
+(obligatoria), CUIT, teléfono y email.
+
+- Alta, modificación y baja: solo administrador.
+- Listado y búsqueda por razón social o CUIT: administrador y administrativo.
+- La baja es lógica: la agencia deja de aparecer en el catálogo, pero se
+  conserva la fila y con ella el historial de los loteos y usuarios que la
+  nombran.
+- Dos inmobiliarias activas no pueden compartir CUIT. El CUIT se guarda como
+  11 dígitos, sin separadores, así que da igual cómo se tipee.
+- Las inmobiliarias no acceden al sistema como tales: quien opera es un
+  usuario con rol inmobiliaria.
+
+En el [alta de un loteo](#alta-y-visualización-de-un-loteo) se eligen una o
+más agencias de ese catálogo; el filtro por nombre es en el cliente porque el
+listado es chico y el API las devuelve todas. Hasta que exista la asociación
+loteo–inmobiliaria, el control permanece visible pero deshabilitado para no
+simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
 inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
-vendedor. Campos y permisos de alta a definir en una futura iteración; el
-módulo de inmobiliarias está en construcción.
+vendedor. Asignar un usuario a su agencia (`usuarios.inmobiliaria_id`) queda
+para una futura iteración.
 
 ## Usuarios y roles
 
@@ -88,6 +101,38 @@ quien asigna loteos y permisos.
 | **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 
 Los clientes no son usuarios del sistema.
+
+### ABM de administrativo, escribano, inmobiliaria y agrimensor
+
+El administrador da de alta, edita (nombre y apellido), da de baja y
+reactiva usuarios con rol administrativo, escribano, inmobiliaria o
+agrimensor desde el módulo **Usuarios**. El email identifica la cuenta en
+el proveedor de identidad y no se edita desde acá; el rol se fija en el
+alta y no cambia después. La baja es lógica (`usuarios.fecha_baja`): el
+usuario deja de poder operar pero su fila se conserva para no romper las FK
+de auditoría (`usuario_modificacion`, `usuario_loteos`, reservas, ventas).
+Reactivar limpia `fecha_baja` y deja al usuario operar de nuevo; no
+restaura ningún otro estado (por ejemplo, no reasigna loteos que se le
+hayan quitado mientras estaba de baja). El administrador no se gestiona
+desde ningún ABM.
+
+Agrimensor iba a tener un ABM propio (`features/surveyors`,
+`/api/v1/agrimensores`, PR #164), pero se deprecó antes de mergear: un
+agrimensor es un usuario con `rol = 'agrimensor'` como cualquier otro, sin
+necesidad de un módulo aparte, así que quedó unificado en esta misma
+pantalla.
+
+La baja bloquea el acceso de inmediato, no solo la visibilidad en el
+listado: `middleware.RequireActiveAccount` corre en cada request autenticado
+(detrás de `RequireAuth`, en toda la API, no solo en `/usuarios`) y rechaza
+con 403 a cualquier caller cuya fila en `usuarios` tenga `fecha_baja`
+seteado. Esto es necesario porque la verificación del token de Supabase es
+stateless (contra el JWKS publicado, sin ida y vuelta a Supabase por
+request): un token ya emitido seguiría siendo válido hasta su expiración
+aunque la cuenta se deshabilitara del lado de Supabase, así que la única
+fuente de verdad sobre si un usuario puede operar es `usuarios.fecha_baja`.
+La cuenta en el proveedor de identidad no se toca al dar de baja ni al
+reactivar.
 
 ### Gestión de roles y permisos
 

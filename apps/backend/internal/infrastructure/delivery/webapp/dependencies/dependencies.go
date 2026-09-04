@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"loteosapp/backend/internal/business/gateway"
+	"loteosapp/backend/internal/business/usecase/agencies"
 	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/users"
@@ -19,10 +20,18 @@ import (
 type Container struct {
 	CreateUserHandler      *handler.CreateUserHandler
 	CompleteProfileHandler *handler.CompleteProfileHandler
+	ListUsersHandler       *handler.ListUsersHandler
+	UpdateUserHandler      *handler.UpdateUserHandler
+	DeactivateUserHandler  *handler.DeactivateUserHandler
+	ReactivateUserHandler  *handler.ReactivateUserHandler
 	CreateClientHandler    *handler.CreateClientHandler
 	UpdateClientHandler    *handler.UpdateClientHandler
 	DeleteClientHandler    *handler.DeleteClientHandler
 	ListClientsHandler     *handler.ListClientsHandler
+	CreateAgencyHandler    *handler.CreateAgencyHandler
+	UpdateAgencyHandler    *handler.UpdateAgencyHandler
+	DeleteAgencyHandler    *handler.DeleteAgencyHandler
+	ListAgenciesHandler    *handler.ListAgenciesHandler
 	CreateLoteoHandler     *handler.CreateLoteoHandler
 	StoreLoteoDxfHandler   *handler.StoreLoteoDxfHandler
 	UpdateLoteHandler      *handler.UpdateLoteHandler
@@ -33,6 +42,7 @@ type Container struct {
 	Pool                   *pgxpool.Pool
 	Verifier               *supabase.Verifier
 	ObjectStorage          gateway.ObjectStorage
+	UserRepository         gateway.UserRepository
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -62,12 +72,23 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	userRepo := postgres.NewUserRepository(pool)
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
+	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
+	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
+	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
+	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
 
 	clienteRepo := postgres.NewClienteRepository(pool)
 	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
 	updateClientHandler := handler.NewUpdateClientHandler(clients.NewUpdateClient(clienteRepo, userRepo))
 	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
 	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
+
+	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
+	createAgencyHandler := handler.NewCreateAgencyHandler(agencies.NewCreateAgency(inmobiliariaRepo, userRepo))
+	updateAgencyHandler := handler.NewUpdateAgencyHandler(agencies.NewUpdateAgency(inmobiliariaRepo, userRepo))
+	deleteAgencyHandler := handler.NewDeleteAgencyHandler(agencies.NewDeleteAgency(inmobiliariaRepo, userRepo))
+	listAgenciesHandler := handler.NewListAgenciesHandler(agencies.NewListAgencies(inmobiliariaRepo))
+
 	loteoRepo := postgres.NewLoteoRepository(pool)
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
 	storeLoteoDxfHandler := handler.NewStoreLoteoDxfHandler(loteos.NewStoreLoteoDxf(loteoRepo, objectStorage))
@@ -80,10 +101,18 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	return &Container{
 		CreateUserHandler:      createUserHandler,
 		CompleteProfileHandler: completeProfileHandler,
+		ListUsersHandler:       listUsersHandler,
+		UpdateUserHandler:      updateUserHandler,
+		DeactivateUserHandler:  deactivateUserHandler,
+		ReactivateUserHandler:  reactivateUserHandler,
 		CreateClientHandler:    createClientHandler,
 		UpdateClientHandler:    updateClientHandler,
 		DeleteClientHandler:    deleteClientHandler,
 		ListClientsHandler:     listClientsHandler,
+		CreateAgencyHandler:    createAgencyHandler,
+		UpdateAgencyHandler:    updateAgencyHandler,
+		DeleteAgencyHandler:    deleteAgencyHandler,
+		ListAgenciesHandler:    listAgenciesHandler,
 		CreateLoteoHandler:     createLoteoHandler,
 		StoreLoteoDxfHandler:   storeLoteoDxfHandler,
 		UpdateLoteHandler:      updateLoteHandler,
@@ -94,5 +123,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		Pool:                   pool,
 		Verifier:               verifier,
 		ObjectStorage:          objectStorage,
+		UserRepository:         userRepo,
 	}, nil
 }

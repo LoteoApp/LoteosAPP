@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabaseClient } from '../config/supabase-client'
+import { supabaseClient } from '../../../shared/config/supabase-client'
 import { AuthContext, type AuthContextValue } from '../hooks/use-auth'
 
 export default function AppAuthProvider({ children }: { children: ReactNode }) {
