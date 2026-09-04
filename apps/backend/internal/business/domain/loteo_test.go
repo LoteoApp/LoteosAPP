@@ -184,6 +184,10 @@ func TestLoteDataValidate(t *testing.T) {
 			data: domain.LoteData{Number: "12", Price: pointerTo(1000.0)},
 			want: domain.ErrInvalidCurrency,
 		},
+		"currency without a price": {
+			data: domain.LoteData{Number: "12", Currency: "ARS"},
+			want: domain.ErrCurrencyWithoutPrice,
+		},
 		"currency that is not a three letter code": {
 			data: domain.LoteData{Number: "12", Currency: "PESOS"},
 			want: domain.ErrInvalidCurrency,
@@ -215,6 +219,112 @@ func TestLoteDataValidate(t *testing.T) {
 		"features past the accepted length": {
 			data: domain.LoteData{Number: "12", Features: strings.Repeat("a", domain.MaxLoteFeaturesLength+1)},
 			want: domain.ErrLoteFeaturesTooLong,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := test.data.Validate()
+			if test.want == nil {
+				if err != nil {
+					t.Fatalf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, test.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
+func TestManzanaDataValidate(t *testing.T) {
+	tests := map[string]struct {
+		data domain.ManzanaData
+		want error
+	}{
+		"only the number": {
+			data: domain.ManzanaData{Number: "A"},
+		},
+		"with services and streets": {
+			data: domain.ManzanaData{
+				Number: "1", HasWater: true, HasSewer: true,
+				CalleIDs: []string{"calle-1", "calle-2", "calle-3", "calle-4"},
+			},
+		},
+		"missing number": {
+			data: domain.ManzanaData{Number: ""},
+			want: domain.ErrInvalidManzanaNumber,
+		},
+		"number past the accepted length": {
+			data: domain.ManzanaData{Number: strings.Repeat("1", domain.MaxManzanaNumberLength+1)},
+			want: domain.ErrInvalidManzanaNumber,
+		},
+		"more than four streets": {
+			data: domain.ManzanaData{Number: "1", CalleIDs: []string{"a", "b", "c", "d", "e"}},
+			want: domain.ErrTooManyManzanaCalles,
+		},
+		"duplicate street": {
+			data: domain.ManzanaData{Number: "1", CalleIDs: []string{"calle-1", "calle-1"}},
+			want: domain.ErrDuplicateManzanaCalle,
+		},
+		"empty street id": {
+			data: domain.ManzanaData{Number: "1", CalleIDs: []string{""}},
+			want: domain.ErrUnknownCalle,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := test.data.Validate()
+			if test.want == nil {
+				if err != nil {
+					t.Fatalf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, test.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
+func TestCalleDataValidate(t *testing.T) {
+	tests := map[string]struct {
+		data domain.CalleData
+		want error
+	}{
+		"name only": {
+			data: domain.CalleData{Name: "Los Álamos"},
+		},
+		"name and type": {
+			data: domain.CalleData{Name: "San Martín", Type: domain.CalleTypeAsfalto},
+		},
+		"tierra": {
+			data: domain.CalleData{Name: "A", Type: domain.CalleTypeTierra},
+		},
+		"brosa": {
+			data: domain.CalleData{Name: "A", Type: domain.CalleTypeBrosa},
+		},
+		"granito": {
+			data: domain.CalleData{Name: "A", Type: domain.CalleTypeGranito},
+		},
+		"missing name": {
+			data: domain.CalleData{Name: ""},
+			want: domain.ErrInvalidCalleName,
+		},
+		"name past the accepted length": {
+			data: domain.CalleData{Name: strings.Repeat("a", domain.MaxCalleNameLength+1)},
+			want: domain.ErrInvalidCalleName,
+		},
+		"unknown type": {
+			data: domain.CalleData{Name: "A", Type: "cemento"},
+			want: domain.ErrInvalidCalleType,
+		},
+		"uppercase type": {
+			data: domain.CalleData{Name: "A", Type: "Asfalto"},
+			want: domain.ErrInvalidCalleType,
 		},
 	}
 

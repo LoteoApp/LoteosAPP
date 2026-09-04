@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import {
   Table,
   TableBody,
@@ -14,6 +15,8 @@ import type { LoteoLote } from '../types'
 type LotesTableProps = {
   lotes: LoteoLote[]
   manzanaNumberById: ReadonlyMap<string, string>
+  selectedLoteId?: string | null
+  onSelectLote?: (loteId: string) => void
 }
 
 const EMPTY_VALUE = '—'
@@ -26,7 +29,24 @@ function areaOf(lote: LoteoLote): string {
   return lote.superficie === null ? EMPTY_VALUE : formatArea(lote.superficie)
 }
 
-export default function LotesTable({ lotes, manzanaNumberById }: LotesTableProps) {
+function handleRowKeyDown(
+  event: KeyboardEvent<HTMLTableRowElement>,
+  loteId: string,
+  onSelectLote: (loteId: string) => void,
+) {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return
+  }
+  event.preventDefault()
+  onSelectLote(loteId)
+}
+
+export default function LotesTable({
+  lotes,
+  manzanaNumberById,
+  selectedLoteId = null,
+  onSelectLote,
+}: LotesTableProps) {
   return (
     <Table>
       <TableCaption>
@@ -49,17 +69,32 @@ export default function LotesTable({ lotes, manzanaNumberById }: LotesTableProps
             </TableCell>
           </TableRow>
         ) : (
-          lotes.map((lote) => (
-            <TableRow key={lote.id}>
-              <TableCell>{manzanaNumberById.get(lote.manzanaId) ?? EMPTY_VALUE}</TableCell>
-              <TableCell>{lote.numero || EMPTY_VALUE}</TableCell>
-              <TableCell className="text-right tabular-nums">{areaOf(lote)}</TableCell>
-              <TableCell className="text-right tabular-nums">{priceOf(lote)}</TableCell>
-              <TableCell className="hidden max-w-xs truncate md:table-cell">
-                {lote.caracteristicas || EMPTY_VALUE}
-              </TableCell>
-            </TableRow>
-          ))
+          lotes.map((lote) => {
+            const selected = lote.id === selectedLoteId
+            const label = lote.numero ? `Lote ${lote.numero}` : 'Lote'
+            return (
+              <TableRow
+                key={lote.id}
+                data-state={selected ? 'selected' : undefined}
+                aria-selected={onSelectLote ? selected : undefined}
+                tabIndex={onSelectLote ? 0 : undefined}
+                className={onSelectLote ? 'cursor-pointer' : undefined}
+                onClick={onSelectLote ? () => onSelectLote(lote.id) : undefined}
+                onKeyDown={
+                  onSelectLote ? (event) => handleRowKeyDown(event, lote.id, onSelectLote) : undefined
+                }
+                aria-label={onSelectLote ? label : undefined}
+              >
+                <TableCell>{manzanaNumberById.get(lote.manzanaId) ?? EMPTY_VALUE}</TableCell>
+                <TableCell>{lote.numero || EMPTY_VALUE}</TableCell>
+                <TableCell className="text-right tabular-nums">{areaOf(lote)}</TableCell>
+                <TableCell className="text-right tabular-nums">{priceOf(lote)}</TableCell>
+                <TableCell className="hidden max-w-xs truncate md:table-cell">
+                  {lote.caracteristicas || EMPTY_VALUE}
+                </TableCell>
+              </TableRow>
+            )
+          })
         )}
       </TableBody>
     </Table>

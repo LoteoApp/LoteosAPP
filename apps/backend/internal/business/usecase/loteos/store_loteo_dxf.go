@@ -94,7 +94,7 @@ func (useCase *storeLoteoDxfUseCase) Execute(
 		return domain.LoteoDxfFile{}, domain.ErrStorageUnavailable.WithCause(err)
 	}
 	if err := useCase.storage.Put(ctx, key, input.Content, input.Size, dxfMimeType); err != nil {
-		return domain.LoteoDxfFile{}, err
+		return domain.LoteoDxfFile{}, fromStorage(err)
 	}
 
 	file, err := useCase.repository.RecordDxfFile(ctx, actor.AuthProviderID, input.LoteoID, domain.NewLoteoDxfFile{

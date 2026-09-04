@@ -19,6 +19,8 @@ import (
 // row, so an id that can't name anything is reported as "not found" instead
 // of surfacing as an unexpected 500.
 const invalidTextRepresentationCode = "22P02"
+const foreignKeyViolationCode = "23503"
+const checkViolationCode = "23514"
 
 // Every insert below writes the geometry as WKT and lets PostgreSQL apply the
 // implicit text -> geometry cast that PostGIS registers, so the write path
@@ -252,7 +254,16 @@ func (repository *LoteoRepository) Get(
 
 func (repository *LoteoRepository) getManzanas(ctx context.Context, loteoID string) ([]domain.Manzana, error) {
 	rows, err := repository.pool.Query(ctx, `
-		SELECT m.id::text, COALESCE(m.numero, ''), ST_AsText(de.geom)
+		SELECT m.id::text, COALESCE(m.numero, ''),
+		       m.tiene_agua, m.tiene_cloaca, m.tiene_luz, m.tiene_gas,
+		       ST_AsText(de.geom),
+		       COALESCE(
+		         (SELECT array_agg(mc.calle_id::text ORDER BY mc.fecha_creacion, mc.id)
+		          FROM manzana_calles mc
+		          JOIN calles c ON c.id = mc.calle_id AND c.loteo_id = m.loteo_id AND c.fecha_baja IS NULL
+		          WHERE mc.manzana_id = m.id AND mc.loteo_id = m.loteo_id AND mc.fecha_baja IS NULL),
+		         '{}'::text[]
+		       )
 		FROM manzanas m
 		LEFT JOIN dxf_entidades de ON de.id = m.dxf_entidad_id
 		WHERE m.loteo_id = $1::uuid AND m.fecha_baja IS NULL
@@ -265,20 +276,69 @@ func (repository *LoteoRepository) getManzanas(ctx context.Context, loteoID stri
 
 	manzanas := make([]domain.Manzana, 0)
 	for rows.Next() {
-		var (
-			manzana domain.Manzana
-			wkt     *string
-		)
-		if err := rows.Scan(&manzana.ID, &manzana.Number, &wkt); err != nil {
-			return nil, err
-		}
-		if manzana.Polygon, err = polygonFromNullableWKT(wkt); err != nil {
+		manzana, err := scanManzana(rows)
+		if err != nil {
 			return nil, err
 		}
 		manzanas = append(manzanas, manzana)
 	}
 
 	return manzanas, rows.Err()
+}
+
+type manzanaRow interface {
+	Scan(dest ...any) error
+}
+
+func scanManzana(row manzanaRow) (domain.Manzana, error) {
+	var (
+		manzana domain.Manzana
+		wkt     *string
+	)
+	if err := row.Scan(
+		&manzana.ID, &manzana.Number,
+		&manzana.HasWater, &manzana.HasSewer, &manzana.HasPower, &manzana.HasGas,
+		&wkt, &manzana.CalleIDs,
+	); err != nil {
+		return domain.Manzana{}, err
+	}
+	if manzana.CalleIDs == nil {
+		manzana.CalleIDs = []string{}
+	}
+	polygon, err := polygonFromNullableWKT(wkt)
+	if err != nil {
+		return domain.Manzana{}, err
+	}
+	manzana.Polygon = polygon
+	return manzana, nil
+}
+
+const getManzanaSQL = `
+		SELECT m.id::text, COALESCE(m.numero, ''),
+		       m.tiene_agua, m.tiene_cloaca, m.tiene_luz, m.tiene_gas,
+		       ST_AsText(de.geom),
+		       COALESCE(
+		         (SELECT array_agg(mc.calle_id::text ORDER BY mc.fecha_creacion, mc.id)
+		          FROM manzana_calles mc
+		          JOIN calles c ON c.id = mc.calle_id AND c.loteo_id = m.loteo_id AND c.fecha_baja IS NULL
+		          WHERE mc.manzana_id = m.id AND mc.loteo_id = m.loteo_id AND mc.fecha_baja IS NULL),
+		         '{}'::text[]
+		       )
+		FROM manzanas m
+		LEFT JOIN dxf_entidades de ON de.id = m.dxf_entidad_id
+		WHERE m.id = $2::uuid AND m.loteo_id = $1::uuid AND m.fecha_baja IS NULL
+	`
+
+type queryRower interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func getManzanaWithQueryer(ctx context.Context, queryer queryRower, loteoID, manzanaID string) (domain.Manzana, error) {
+	manzana, err := scanManzana(queryer.QueryRow(ctx, getManzanaSQL, loteoID, manzanaID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Manzana{}, domain.ErrManzanaNotFound
+	}
+	return manzana, err
 }
 
 func (repository *LoteoRepository) getLotes(ctx context.Context, loteoID string) ([]domain.Lote, error) {
@@ -347,6 +407,31 @@ func (repository *LoteoRepository) getCalles(ctx context.Context, loteoID string
 	}
 
 	return calles, rows.Err()
+}
+
+const getCalleSQL = `
+		SELECT c.id::text, COALESCE(c.nombre, ''), COALESCE(c.tipo, ''), ST_AsText(de.geom)
+		FROM calles c
+		LEFT JOIN dxf_entidades de ON de.id = c.dxf_entidad_id
+		WHERE c.id = $2::uuid AND c.loteo_id = $1::uuid AND c.fecha_baja IS NULL
+	`
+
+func getCalleWithQueryer(ctx context.Context, queryer queryRower, loteoID, calleID string) (domain.Calle, error) {
+	var (
+		calle domain.Calle
+		wkt   *string
+	)
+	err := queryer.QueryRow(ctx, getCalleSQL, loteoID, calleID).Scan(&calle.ID, &calle.Name, &calle.Type, &wkt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Calle{}, domain.ErrCalleNotFound
+	}
+	if err != nil {
+		return domain.Calle{}, err
+	}
+	if calle.Polygon, err = polygonFromNullableWKT(wkt); err != nil {
+		return domain.Calle{}, err
+	}
+	return calle, nil
 }
 
 // insertPlano fills loteo.Manzanas and loteo.Calles in the same order as the
@@ -507,6 +592,147 @@ func (repository *LoteoRepository) UpdateLote(
 	}
 
 	return lote, nil
+}
+
+func (repository *LoteoRepository) UpdateManzana(
+	ctx context.Context,
+	actorAuthProviderID, loteoID, manzanaID string,
+	data domain.ManzanaData,
+) (domain.Manzana, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return domain.Manzana{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE manzanas
+		SET numero = $4,
+		    tiene_agua = $5,
+		    tiene_cloaca = $6,
+		    tiene_luz = $7,
+		    tiene_gas = $8,
+		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid),
+		    fecha_modificacion = now()
+		WHERE id = $3::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
+	`, actorAuthProviderID, loteoID, manzanaID,
+		data.Number, data.HasWater, data.HasSewer, data.HasPower, data.HasGas)
+	if err != nil {
+		return domain.Manzana{}, mapManzanaUpdateError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.Manzana{}, domain.ErrManzanaNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE manzana_calles
+		SET fecha_baja = now(),
+		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid),
+		    fecha_modificacion = now()
+		WHERE manzana_id = $3::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
+	`, actorAuthProviderID, loteoID, manzanaID); err != nil {
+		return domain.Manzana{}, err
+	}
+
+	for _, calleID := range data.CalleIDs {
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO manzana_calles (manzana_id, calle_id, loteo_id, usuario_modificacion)
+			SELECT $3::uuid, c.id, $2::uuid,
+			       (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid)
+			FROM calles c
+			WHERE c.id = $4::uuid AND c.loteo_id = $2::uuid AND c.fecha_baja IS NULL
+		`, actorAuthProviderID, loteoID, manzanaID, calleID)
+		if err != nil {
+			return domain.Manzana{}, mapManzanaCalleError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.Manzana{}, domain.ErrUnknownCalle
+		}
+	}
+
+	manzana, err := getManzanaWithQueryer(ctx, tx, loteoID, manzanaID)
+	if err != nil {
+		return domain.Manzana{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Manzana{}, err
+	}
+
+	return manzana, nil
+}
+
+func mapManzanaUpdateError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case uniqueViolationCode:
+			return domain.ErrManzanaNumberInUse
+		case invalidTextRepresentationCode:
+			return domain.ErrManzanaNotFound
+		}
+	}
+	return err
+}
+
+func mapManzanaCalleError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case foreignKeyViolationCode, invalidTextRepresentationCode:
+			return domain.ErrUnknownCalle
+		}
+	}
+	return err
+}
+
+func (repository *LoteoRepository) UpdateCalle(
+	ctx context.Context,
+	actorAuthProviderID, loteoID, calleID string,
+	data domain.CalleData,
+) (domain.Calle, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return domain.Calle{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE calles
+		SET nombre = $4,
+		    tipo = NULLIF($5, ''),
+		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid),
+		    fecha_modificacion = now()
+		WHERE id = $3::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
+	`, actorAuthProviderID, loteoID, calleID, data.Name, data.Type)
+	if err != nil {
+		return domain.Calle{}, mapCalleUpdateError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.Calle{}, domain.ErrCalleNotFound
+	}
+
+	calle, err := getCalleWithQueryer(ctx, tx, loteoID, calleID)
+	if err != nil {
+		return domain.Calle{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Calle{}, err
+	}
+
+	return calle, nil
+}
+
+func mapCalleUpdateError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case checkViolationCode:
+			return domain.ErrInvalidCalleType
+		case invalidTextRepresentationCode:
+			return domain.ErrCalleNotFound
+		}
+	}
+	return err
 }
 
 func (repository *LoteoRepository) IsAssignedToLoteo(ctx context.Context, authProviderID, loteoID string) (bool, error) {

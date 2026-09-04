@@ -7,22 +7,32 @@ import (
 )
 
 var (
-	ErrInvalidLoteoName     = &Error{Kind: KindInvalid, Code: "invalid_loteo_nombre", Message: "El nombre del loteo es obligatorio"}
-	ErrInvalidGeometry      = &Error{Kind: KindInvalid, Code: "invalid_geometry", Message: "La geometría recibida no es un polígono cerrado válido"}
-	ErrSelfIntersectingRing = &Error{Kind: KindInvalid, Code: "self_intersecting_geometry", Message: "La geometría recibida se cruza consigo misma"}
-	ErrPlanTooLarge         = &Error{Kind: KindInvalid, Code: "plan_too_large", Message: "El plano supera la cantidad de polígonos admitida"}
-	ErrUnknownManzana       = &Error{Kind: KindInvalid, Code: "unknown_manzana", Message: "Un lote referencia una manzana que no está en el plano"}
-	ErrInvalidManzanaRef    = &Error{Kind: KindInvalid, Code: "invalid_manzana_ref", Message: "Cada manzana del plano necesita una referencia propia y no vacía"}
-	ErrPlanWithoutLoteo     = &Error{Kind: KindInvalid, Code: "plan_without_loteo", Message: "El plano no tiene el polígono de la capa LOTEO"}
-	ErrLoteNotFound         = &Error{Kind: KindNotFound, Code: "lote_not_found", Message: "El lote solicitado no existe"}
-	ErrLoteNumberInUse      = &Error{Kind: KindConflict, Code: "lote_numero_in_use", Message: "Ya existe un lote con ese número en este loteo"}
-	ErrInvalidLoteNumber    = &Error{Kind: KindInvalid, Code: "invalid_lote_numero", Message: "El número de lote es obligatorio y no puede superar los 32 caracteres"}
-	ErrInvalidPrice         = &Error{Kind: KindInvalid, Code: "invalid_precio", Message: "El precio debe ser un monto no negativo, de hasta 2 decimales y menor a 1.000.000.000.000"}
-	ErrInvalidCurrency      = &Error{Kind: KindInvalid, Code: "invalid_moneda", Message: "La moneda debe ser un código de tres letras"}
-	ErrInvalidArea          = &Error{Kind: KindInvalid, Code: "invalid_superficie", Message: "La superficie debe ser mayor a cero, de hasta 4 decimales y menor a 100.000.000"}
-	ErrLoteFeaturesTooLong  = &Error{Kind: KindInvalid, Code: "lote_caracteristicas_too_long", Message: "Las características del lote no pueden superar los 2000 caracteres"}
-	ErrLoteoNotFound        = &Error{Kind: KindNotFound, Code: "loteo_not_found", Message: "El loteo solicitado no existe"}
-	ErrInvalidDxfFile       = &Error{Kind: KindInvalid, Code: "invalid_dxf_file", Message: "El archivo DXF es inválido o supera el tamaño permitido"}
+	ErrInvalidLoteoName      = &Error{Kind: KindInvalid, Code: "invalid_loteo_nombre", Message: "El nombre del loteo es obligatorio"}
+	ErrInvalidGeometry       = &Error{Kind: KindInvalid, Code: "invalid_geometry", Message: "La geometría recibida no es un polígono cerrado válido"}
+	ErrSelfIntersectingRing  = &Error{Kind: KindInvalid, Code: "self_intersecting_geometry", Message: "La geometría recibida se cruza consigo misma"}
+	ErrPlanTooLarge          = &Error{Kind: KindInvalid, Code: "plan_too_large", Message: "El plano supera la cantidad de polígonos admitida"}
+	ErrUnknownManzana        = &Error{Kind: KindInvalid, Code: "unknown_manzana", Message: "Un lote referencia una manzana que no está en el plano"}
+	ErrInvalidManzanaRef     = &Error{Kind: KindInvalid, Code: "invalid_manzana_ref", Message: "Cada manzana del plano necesita una referencia propia y no vacía"}
+	ErrPlanWithoutLoteo      = &Error{Kind: KindInvalid, Code: "plan_without_loteo", Message: "El plano no tiene el polígono de la capa LOTEO"}
+	ErrLoteNotFound          = &Error{Kind: KindNotFound, Code: "lote_not_found", Message: "El lote solicitado no existe"}
+	ErrLoteNumberInUse       = &Error{Kind: KindConflict, Code: "lote_numero_in_use", Message: "Ya existe un lote con ese número en este loteo"}
+	ErrInvalidLoteNumber     = &Error{Kind: KindInvalid, Code: "invalid_lote_numero", Message: "El número de lote es obligatorio y no puede superar los 32 caracteres"}
+	ErrInvalidPrice          = &Error{Kind: KindInvalid, Code: "invalid_precio", Message: "El precio debe ser un monto no negativo, de hasta 2 decimales y menor a 1.000.000.000.000"}
+	ErrInvalidCurrency       = &Error{Kind: KindInvalid, Code: "invalid_moneda", Message: "La moneda debe ser un código de tres letras"}
+	ErrCurrencyWithoutPrice  = &Error{Kind: KindInvalid, Code: "currency_without_price", Message: "La moneda solo puede indicarse junto con un precio"}
+	ErrInvalidArea           = &Error{Kind: KindInvalid, Code: "invalid_superficie", Message: "La superficie debe ser mayor a cero, de hasta 4 decimales y menor a 100.000.000"}
+	ErrLoteFeaturesTooLong   = &Error{Kind: KindInvalid, Code: "lote_caracteristicas_too_long", Message: "Las características del lote no pueden superar los 2000 caracteres"}
+	ErrLoteoNotFound         = &Error{Kind: KindNotFound, Code: "loteo_not_found", Message: "El loteo solicitado no existe"}
+	ErrInvalidDxfFile        = &Error{Kind: KindInvalid, Code: "invalid_dxf_file", Message: "El archivo DXF es inválido o supera el tamaño permitido"}
+	ErrManzanaNotFound       = &Error{Kind: KindNotFound, Code: "manzana_not_found", Message: "La manzana solicitada no existe"}
+	ErrInvalidManzanaNumber  = &Error{Kind: KindInvalid, Code: "invalid_manzana_numero", Message: "El número de manzana es obligatorio y no puede superar los 32 caracteres"}
+	ErrManzanaNumberInUse    = &Error{Kind: KindConflict, Code: "manzana_numero_in_use", Message: "Ya existe una manzana con ese número en este loteo"}
+	ErrTooManyManzanaCalles  = &Error{Kind: KindInvalid, Code: "too_many_manzana_calles", Message: "Una manzana no puede tener más de 4 calles"}
+	ErrUnknownCalle          = &Error{Kind: KindInvalid, Code: "unknown_calle", Message: "Una calle de la manzana no pertenece a este loteo"}
+	ErrDuplicateManzanaCalle = &Error{Kind: KindInvalid, Code: "duplicate_manzana_calle", Message: "La manzana no puede repetir una misma calle"}
+	ErrCalleNotFound         = &Error{Kind: KindNotFound, Code: "calle_not_found", Message: "La calle solicitada no existe"}
+	ErrInvalidCalleName      = &Error{Kind: KindInvalid, Code: "invalid_calle_nombre", Message: "El nombre de la calle es obligatorio y no puede superar los 64 caracteres"}
+	ErrInvalidCalleType      = &Error{Kind: KindInvalid, Code: "invalid_calle_tipo", Message: "El tipo de calle debe ser asfalto, tierra, brosa o granito"}
 )
 
 // A DXF plan arrives as JSON from a client we don't control, so the vertex
@@ -41,12 +51,15 @@ const (
 // superficie NUMERIC(12,4). A value past them would either be rejected by
 // PostgreSQL as an unexpected failure or silently rounded.
 const (
-	MaxLoteNumberLength   = 32
-	MaxLoteFeaturesLength = 2_000
-	MaxLotePrice          = 999_999_999_999.99
-	MaxLoteArea           = 99_999_999.9999
-	lotePriceDecimals     = 2
-	loteAreaDecimals      = 4
+	MaxLoteNumberLength    = 32
+	MaxManzanaNumberLength = 32
+	MaxCalleNameLength     = 64
+	MaxManzanaCalles       = 4
+	MaxLoteFeaturesLength  = 2_000
+	MaxLotePrice           = 999_999_999_999.99
+	MaxLoteArea            = 99_999_999.9999
+	lotePriceDecimals      = 2
+	loteAreaDecimals       = 4
 )
 
 // MaxDxfFileBytes bounds the original DXF upload. It mirrors MAX_DXF_FILE_BYTES
@@ -258,6 +271,9 @@ func (data LoteData) Validate() error {
 	if data.Currency != "" && !isCurrencyCode(data.Currency) {
 		return ErrInvalidCurrency
 	}
+	if data.Price == nil && data.Currency != "" {
+		return ErrCurrencyWithoutPrice
+	}
 	if data.Area != nil {
 		if !isStorableAmount(*data.Area, MaxLoteArea, loteAreaDecimals) || *data.Area <= 0 {
 			return ErrInvalidArea
@@ -317,9 +333,43 @@ type Loteo struct {
 }
 
 type Manzana struct {
-	ID      string  `json:"id"`
-	Number  string  `json:"numero"`
-	Polygon Polygon `json:"poligono,omitempty"`
+	ID       string   `json:"id"`
+	Number   string   `json:"numero"`
+	HasWater bool     `json:"tieneAgua"`
+	HasSewer bool     `json:"tieneCloaca"`
+	HasPower bool     `json:"tieneLuz"`
+	HasGas   bool     `json:"tieneGas"`
+	CalleIDs []string `json:"calleIds"`
+	Polygon  Polygon  `json:"poligono,omitempty"`
+}
+
+type ManzanaData struct {
+	Number   string
+	HasWater bool
+	HasSewer bool
+	HasPower bool
+	HasGas   bool
+	CalleIDs []string
+}
+
+func (data ManzanaData) Validate() error {
+	if data.Number == "" || utf8.RuneCountInString(data.Number) > MaxManzanaNumberLength {
+		return ErrInvalidManzanaNumber
+	}
+	if len(data.CalleIDs) > MaxManzanaCalles {
+		return ErrTooManyManzanaCalles
+	}
+	seen := make(map[string]struct{}, len(data.CalleIDs))
+	for _, id := range data.CalleIDs {
+		if id == "" {
+			return ErrUnknownCalle
+		}
+		if _, exists := seen[id]; exists {
+			return ErrDuplicateManzanaCalle
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
 }
 
 type Lote struct {
@@ -338,6 +388,37 @@ type Calle struct {
 	Name    string  `json:"nombre"`
 	Type    string  `json:"tipo"`
 	Polygon Polygon `json:"poligono,omitempty"`
+}
+
+type CalleData struct {
+	Name string
+	Type string
+}
+
+const (
+	CalleTypeAsfalto = "asfalto"
+	CalleTypeTierra  = "tierra"
+	CalleTypeBrosa   = "brosa"
+	CalleTypeGranito = "granito"
+)
+
+func (data CalleData) Validate() error {
+	if data.Name == "" || utf8.RuneCountInString(data.Name) > MaxCalleNameLength {
+		return ErrInvalidCalleName
+	}
+	if data.Type != "" && !isCalleType(data.Type) {
+		return ErrInvalidCalleType
+	}
+	return nil
+}
+
+func isCalleType(value string) bool {
+	switch value {
+	case CalleTypeAsfalto, CalleTypeTierra, CalleTypeBrosa, CalleTypeGranito:
+		return true
+	default:
+		return false
+	}
 }
 
 // LoteoSummary is a loteo as it appears in a listing: identity, how much of a

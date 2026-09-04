@@ -101,6 +101,40 @@ export function pointInPolygon(point: DxfPoint, vertices: DxfPoint[]): boolean {
 // property line), which makes point-in-polygon undefined right where it's
 // evaluated. The vertex average stays clear of that edge case for the
 // convex, simple parcel shapes this validates.
+// Gauss area formula (shoelace). Coordinates are metres (Gauss-Krüger), so
+// the result is m². Returns null when the ring has no interior.
+export function polygonArea(vertices: DxfPoint[]): number | null {
+  const ring = openRing(vertices)
+  if (ring.length < 3) {
+    return null
+  }
+
+  let twice = 0
+  for (let i = 0; i < ring.length; i++) {
+    const current = ring[i]
+    const next = ring[(i + 1) % ring.length]
+    twice += current.x * next.y - next.x * current.y
+  }
+
+  if (Math.abs(twice) < 1e-9) {
+    return null
+  }
+
+  return Math.abs(twice) / 2
+}
+
+function openRing(vertices: DxfPoint[]): DxfPoint[] {
+  if (vertices.length < 2) {
+    return vertices
+  }
+  const first = vertices[0]
+  const last = vertices[vertices.length - 1]
+  if (first.x === last.x && first.y === last.y) {
+    return vertices.slice(0, -1)
+  }
+  return vertices
+}
+
 export function centroid(vertices: DxfPoint[]): DxfPoint {
   let sumX = 0
   let sumY = 0
