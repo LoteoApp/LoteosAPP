@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getUserRole } from './getUserRole'
+import { getUserRole } from './roles'
 
-describe('getUserRole', () => {
+describe('roles', () => {
   it('reads the domain role from app_metadata', () => {
     expect(getUserRole({ app_metadata: { role: 'administrador' } })).toBe('administrador')
   })
