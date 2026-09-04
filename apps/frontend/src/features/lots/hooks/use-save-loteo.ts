@@ -21,11 +21,22 @@ type PendingDxf = {
   file: File
 }
 
+// The id of the created loteo plus any DXF-upload warning, so the caller can
+// clear the form and decide whether to navigate: a null dxfWarning means the
+// alta finished cleanly, a non-null one means the retry UI is still needed here.
+export type SaveOutcome = {
+  loteoId: string
+  dxfWarning: string | null
+}
+
 export type UseSaveLoteoResult = SaveState & {
-  // save resolves to true when the loteo was created (even if the DXF upload
-  // then failed, which is surfaced as dxfWarning), so the caller can clear
-  // the form. It resolves to false when nothing was created.
-  save: (fields: LoteoFieldValues, polygons: DxfPolygon[], dxfFile: File | null) => Promise<boolean>
+  // save resolves to a SaveOutcome when the loteo was created (even if the DXF
+  // upload then failed), and to null when nothing was created.
+  save: (
+    fields: LoteoFieldValues,
+    polygons: DxfPolygon[],
+    dxfFile: File | null,
+  ) => Promise<SaveOutcome | null>
   retryDxf: () => Promise<boolean>
   reset: () => void
 }
@@ -47,11 +58,11 @@ export function useSaveLoteo(accessToken: string | null): UseSaveLoteoResult {
     async (fields: LoteoFieldValues, polygons: DxfPolygon[], dxfFile: File | null) => {
       if (!accessToken) {
         setState({ status: 'error', message: SESSION_EXPIRED_MESSAGE })
-        return false
+        return null
       }
       if (fields.name.trim() === '') {
         setState({ status: 'error', message: NAME_REQUIRED_MESSAGE })
-        return false
+        return null
       }
 
       let payload: CreateLoteoPayload
@@ -62,7 +73,7 @@ export function useSaveLoteo(accessToken: string | null): UseSaveLoteoResult {
           status: 'error',
           message: error instanceof BuildLoteoPayloadError ? error.message : PLAN_PREP_ERROR_MESSAGE,
         })
-        return false
+        return null
       }
 
       setState({ status: 'saving' })
@@ -72,7 +83,7 @@ export function useSaveLoteo(accessToken: string | null): UseSaveLoteoResult {
         created = await createLoteo(payload, accessToken)
       } catch (error) {
         setState({ status: 'error', message: messageFromError(error) })
-        return false
+        return null
       }
 
       let dxfWarning: string | null = null
@@ -86,7 +97,7 @@ export function useSaveLoteo(accessToken: string | null): UseSaveLoteoResult {
       }
 
       setState({ status: 'success', dxfWarning, isRetryingDxf: false })
-      return true
+      return { loteoId: created.id, dxfWarning }
     },
     [accessToken],
   )
