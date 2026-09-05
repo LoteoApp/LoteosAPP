@@ -478,6 +478,54 @@ describe('UsersPage', () => {
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
   })
 
+  it('filters the list by search text, matching nombre, apellido or email', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com' }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', email: 'luis@example.com' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.type(screen.getByLabelText('Buscar'), 'gomez')
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Buscar'))
+    await user.type(screen.getByLabelText('Buscar'), 'ana@example.com')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
+  })
+
+  it('ignores accents and casing when filtering by search text', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.type(screen.getByLabelText('Buscar'), 'PEREZ')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+  })
+
+  it('combines the search text with the rol and estado filters', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo' }),
+      usuario({ nombre: 'Ana', apellido: 'Gómez', rol: 'escribano' }),
+    ]
+    renderUsersPage()
+    await screen.findAllByText(/^Ana /)
+
+    await user.type(screen.getByLabelText('Buscar'), 'ana')
+    await selectOption(user, 'Rol', 'Escribano')
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Ana Gómez')).toBeInTheDocument()
+  })
+
   it('shows a message when the filters have no matches', async () => {
     const user = userEvent.setup()
     stored = [usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo' })]
@@ -506,6 +554,7 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('No hay usuarios cargados todavía.')
 
+    expect(screen.queryByLabelText('Buscar')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Rol')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
   })
@@ -519,6 +568,7 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
 
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Buscar')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
   })
 })

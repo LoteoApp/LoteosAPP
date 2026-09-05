@@ -8,6 +8,7 @@ import UserForm from '../components/UserForm'
 import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
+import { normalizeText } from '../../../shared/lib/normalizeText'
 import { isActivo, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
 
 function matchesRol(usuario: Usuario, filter: RolFilter): boolean {
@@ -21,6 +22,11 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
 }
 
+function matchesSearch(usuario: Usuario, search: string): boolean {
+  const nombreCompleto = normalizeText(`${usuario.nombre} ${usuario.apellido}`)
+  return nombreCompleto.includes(search) || normalizeText(usuario.email).includes(search)
+}
+
 type UsersPageProps = {
   accessToken: string | null
 }
@@ -32,6 +38,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
   const { usuarios, isLoading, isSubmitting, error, create, update, deactivate, reactivate } =
     useUsers(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
+  const [search, setSearch] = useState('')
   const [rolFilter, setRolFilter] = useState<RolFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)
@@ -42,8 +49,12 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
   const formView = resolveFormView(formState, usuarios)
 
+  const normalizedSearch = normalizeText(search.trim())
   const filteredUsuarios = usuarios.filter(
-    (usuario) => matchesRol(usuario, rolFilter) && matchesEstado(usuario, estadoFilter),
+    (usuario) =>
+      matchesRol(usuario, rolFilter) &&
+      matchesEstado(usuario, estadoFilter) &&
+      (normalizedSearch === '' || matchesSearch(usuario, normalizedSearch)),
   )
 
   function validateCreate(values: UsuarioFormValues): string | null {
@@ -160,8 +171,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
           {usuarios.length > 0 && (
             <UsersFilters
+              search={search}
               rolFilter={rolFilter}
               estadoFilter={estadoFilter}
+              onSearchChange={setSearch}
               onRolFilterChange={setRolFilter}
               onEstadoFilterChange={setEstadoFilter}
             />
