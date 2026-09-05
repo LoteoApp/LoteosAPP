@@ -14,6 +14,7 @@ import type { UpdateLoteState } from '../hooks/use-update-lote'
 import type { UpdateManzanaState } from '../hooks/use-update-manzana'
 import type { UpdateLotePayload } from '../lib/loteFormValues'
 import type { LoteoDetail, PlanEntityRef } from '../types'
+import ArchivosSection from './ArchivosSection'
 import CalleEditForm from './CalleEditForm'
 import LoteEditForm from './LoteEditForm'
 import ManzanaEditForm from './ManzanaEditForm'
@@ -22,6 +23,7 @@ const EMPTY_PROMPT = 'Tocá una manzana, un lote o una calle.'
 
 type PlanSelectionPanelProps = {
   canEdit?: boolean
+  accessToken?: string | null
   selected: PlanEntityRef | null
   loteo: LoteoDetail
   polygonLabels: ReadonlyMap<string, string>
@@ -36,6 +38,7 @@ type PlanSelectionPanelProps = {
 
 export default function PlanSelectionPanel({
   canEdit = true,
+  accessToken = null,
   selected,
   loteo,
   polygonLabels,
@@ -89,6 +92,11 @@ export default function PlanSelectionPanel({
           ) : (
             <LoteReadOnly lote={lote} />
           )}
+          <ArchivosSection
+            target={{ kind: 'lote', loteoId: loteo.id, loteId: lote.id }}
+            accessToken={accessToken}
+            canEdit={canEdit}
+          />
         </CardContent>
       </Card>
     )

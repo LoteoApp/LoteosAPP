@@ -72,4 +72,34 @@ type LoteoRepository interface {
 	// in object storage under file.StorageKey. It returns
 	// domain.ErrLoteoNotFound when loteoID names no loteo.
 	RecordDxfFile(ctx context.Context, actorAuthProviderID, loteoID string, file domain.NewLoteoDxfFile) (domain.LoteoDxfFile, error)
+
+	// RecordLoteoArchivo records a foto/plano attached to the loteo itself.
+	// Unlike RecordDxfFile it never supersedes an existing row: a loteo may
+	// carry several active fotos/planos at once. The bytes must already be in
+	// object storage under file.StorageKey. It returns domain.ErrLoteoNotFound
+	// when loteoID names no active loteo.
+	RecordLoteoArchivo(ctx context.Context, actorAuthProviderID, loteoID string, file domain.NewArchivo) (domain.Archivo, error)
+
+	// RecordLoteArchivo records a foto/plano attached to one lote of loteoID.
+	// loteoID scopes the lookup the same way UpdateLote does: a lote that
+	// doesn't belong to loteoID returns domain.ErrLoteNotFound.
+	RecordLoteArchivo(ctx context.Context, actorAuthProviderID, loteoID, loteID string, file domain.NewArchivo) (domain.Archivo, error)
+
+	// ListLoteoArchivos returns the active fotos/planos attached to the loteo
+	// itself, newest first.
+	ListLoteoArchivos(ctx context.Context, loteoID string) ([]domain.Archivo, error)
+
+	// ListLoteArchivos returns the active fotos/planos attached to one lote,
+	// newest first.
+	ListLoteArchivos(ctx context.Context, loteoID, loteID string) ([]domain.Archivo, error)
+
+	// GetArchivo returns one active archivo attached either to loteoID itself
+	// or to one of its lotes. It returns domain.ErrArchivoNotFound when
+	// archivoID names nothing reachable through loteoID, so a caller can't
+	// tell whether the id belongs to another loteo or doesn't exist at all.
+	GetArchivo(ctx context.Context, loteoID, archivoID string) (domain.Archivo, error)
+
+	// DeleteArchivo soft-deletes one active archivo reachable through
+	// loteoID, the same way GetArchivo resolves it.
+	DeleteArchivo(ctx context.Context, actorAuthProviderID, loteoID, archivoID string) error
 }

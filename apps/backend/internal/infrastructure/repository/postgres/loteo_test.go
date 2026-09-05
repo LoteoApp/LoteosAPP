@@ -127,6 +127,46 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 		}
 	})
 
+	t.Run("record loteo archivo", func(t *testing.T) {
+		if _, err := repository.RecordLoteoArchivo(ctx, actor, newUUID(t), domain.NewArchivo{
+			Categoria: "foto", StorageKey: "loteos/x/archivos/a",
+		}); err == nil {
+			t.Error("RecordLoteoArchivo() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("record lote archivo", func(t *testing.T) {
+		if _, err := repository.RecordLoteArchivo(ctx, actor, newUUID(t), newUUID(t), domain.NewArchivo{
+			Categoria: "plano", StorageKey: "loteos/x/lotes/y/archivos/a",
+		}); err == nil {
+			t.Error("RecordLoteArchivo() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("list loteo archivos", func(t *testing.T) {
+		if _, err := repository.ListLoteoArchivos(ctx, newUUID(t)); err == nil {
+			t.Error("ListLoteoArchivos() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("list lote archivos", func(t *testing.T) {
+		if _, err := repository.ListLoteArchivos(ctx, newUUID(t), newUUID(t)); err == nil {
+			t.Error("ListLoteArchivos() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("get archivo", func(t *testing.T) {
+		if _, err := repository.GetArchivo(ctx, newUUID(t), newUUID(t)); err == nil {
+			t.Error("GetArchivo() should fail when the database is unreachable")
+		}
+	})
+
+	t.Run("delete archivo", func(t *testing.T) {
+		if err := repository.DeleteArchivo(ctx, actor, newUUID(t), newUUID(t)); err == nil {
+			t.Error("DeleteArchivo() should fail when the database is unreachable")
+		}
+	})
+
 	t.Run("list", func(t *testing.T) {
 		if _, err := repository.List(ctx, "", unrestrictedScope); err == nil {
 			t.Error("List() should fail when the database is unreachable")
@@ -686,6 +726,155 @@ func TestLoteoRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("records a loteo-level archivo and lists it without superseding others", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		first, err := repository.RecordLoteoArchivo(context.Background(), actor, loteo.ID, domain.NewArchivo{
+			Categoria: "foto", StorageKey: "loteos/" + loteo.ID + "/archivos/a", OriginalName: "a.jpg",
+			MimeType: "image/jpeg", Sha256: "hash-a",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteoArchivo() error = %v", err)
+		}
+		second, err := repository.RecordLoteoArchivo(context.Background(), actor, loteo.ID, domain.NewArchivo{
+			Categoria: "plano", StorageKey: "loteos/" + loteo.ID + "/archivos/b", OriginalName: "b.pdf",
+			MimeType: "application/pdf", Sha256: "hash-b",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteoArchivo() error = %v", err)
+		}
+		if first.ID == "" || first.ID == second.ID {
+			t.Fatalf("RecordLoteoArchivo() ids = %q, %q, want two distinct ids", first.ID, second.ID)
+		}
+
+		archivos, err := repository.ListLoteoArchivos(context.Background(), loteo.ID)
+		if err != nil {
+			t.Fatalf("ListLoteoArchivos() error = %v", err)
+		}
+		if len(archivos) != 2 {
+			t.Fatalf("ListLoteoArchivos() = %d archivos, want 2 (neither supersedes the other)", len(archivos))
+		}
+		// newest first
+		if archivos[0].ID != second.ID || archivos[1].ID != first.ID {
+			t.Errorf("ListLoteoArchivos() order = [%s, %s], want newest first [%s, %s]",
+				archivos[0].ID, archivos[1].ID, second.ID, first.ID)
+		}
+	})
+
+	t.Run("recording a loteo archivo for an unknown loteo returns not found", func(t *testing.T) {
+		_, err := repository.RecordLoteoArchivo(context.Background(), actor, newUUID(t), domain.NewArchivo{
+			Categoria: "foto", StorageKey: "loteos/x/archivos/a", OriginalName: "a.jpg", MimeType: "image/jpeg",
+		})
+		if !errors.Is(err, domain.ErrLoteoNotFound) {
+			t.Fatalf("RecordLoteoArchivo() error = %v, want %v", err, domain.ErrLoteoNotFound)
+		}
+	})
+
+	t.Run("records a lote-level archivo scoped to its loteo", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		loteID := loteo.Lotes[0].ID
+
+		archivo, err := repository.RecordLoteArchivo(context.Background(), actor, loteo.ID, loteID, domain.NewArchivo{
+			Categoria: "plano", StorageKey: "loteos/" + loteo.ID + "/lotes/" + loteID + "/archivos/a",
+			OriginalName: "plano.pdf", MimeType: "application/pdf", Sha256: "hash-a",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteArchivo() error = %v", err)
+		}
+
+		archivos, err := repository.ListLoteArchivos(context.Background(), loteo.ID, loteID)
+		if err != nil {
+			t.Fatalf("ListLoteArchivos() error = %v", err)
+		}
+		if len(archivos) != 1 || archivos[0].ID != archivo.ID {
+			t.Fatalf("ListLoteArchivos() = %#v, want just %#v", archivos, archivo)
+		}
+
+		// A lote of another loteo must not see it.
+		other := createLoteoWithPlan(t, pool, repository, actor)
+		empty, err := repository.ListLoteArchivos(context.Background(), other.ID, loteID)
+		if err != nil {
+			t.Fatalf("ListLoteArchivos() error = %v", err)
+		}
+		if len(empty) != 0 {
+			t.Errorf("ListLoteArchivos() for another loteo = %#v, want none", empty)
+		}
+	})
+
+	t.Run("recording a lote archivo rejects a lote of another loteo", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		other := createLoteoWithPlan(t, pool, repository, actor)
+
+		_, err := repository.RecordLoteArchivo(context.Background(), actor, other.ID, loteo.Lotes[0].ID, domain.NewArchivo{
+			Categoria: "plano", StorageKey: "loteos/x/archivos/a", OriginalName: "a.pdf", MimeType: "application/pdf",
+		})
+		if !errors.Is(err, domain.ErrLoteNotFound) {
+			t.Fatalf("RecordLoteArchivo() error = %v, want %v", err, domain.ErrLoteNotFound)
+		}
+	})
+
+	t.Run("gets and deletes an archivo reachable through its loteo, whether loteo- or lote-level", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		loteID := loteo.Lotes[0].ID
+
+		loteoArchivo, err := repository.RecordLoteoArchivo(context.Background(), actor, loteo.ID, domain.NewArchivo{
+			Categoria: "foto", StorageKey: "loteos/" + loteo.ID + "/archivos/a", OriginalName: "a.jpg", MimeType: "image/jpeg",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteoArchivo() error = %v", err)
+		}
+		loteArchivo, err := repository.RecordLoteArchivo(context.Background(), actor, loteo.ID, loteID, domain.NewArchivo{
+			Categoria: "plano", StorageKey: "loteos/" + loteo.ID + "/lotes/" + loteID + "/archivos/b",
+			OriginalName: "b.pdf", MimeType: "application/pdf",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteArchivo() error = %v", err)
+		}
+
+		if got, err := repository.GetArchivo(context.Background(), loteo.ID, loteoArchivo.ID); err != nil || got.ID != loteoArchivo.ID {
+			t.Fatalf("GetArchivo(loteo-level) = %#v, %v", got, err)
+		}
+		if got, err := repository.GetArchivo(context.Background(), loteo.ID, loteArchivo.ID); err != nil || got.ID != loteArchivo.ID {
+			t.Fatalf("GetArchivo(lote-level) = %#v, %v", got, err)
+		}
+
+		other := createLoteoWithPlan(t, pool, repository, actor)
+		if _, err := repository.GetArchivo(context.Background(), other.ID, loteoArchivo.ID); !errors.Is(err, domain.ErrArchivoNotFound) {
+			t.Fatalf("GetArchivo() from another loteo error = %v, want %v", err, domain.ErrArchivoNotFound)
+		}
+
+		if err := repository.DeleteArchivo(context.Background(), actor, loteo.ID, loteoArchivo.ID); err != nil {
+			t.Fatalf("DeleteArchivo() error = %v", err)
+		}
+		if _, err := repository.GetArchivo(context.Background(), loteo.ID, loteoArchivo.ID); !errors.Is(err, domain.ErrArchivoNotFound) {
+			t.Fatalf("GetArchivo() after delete error = %v, want %v", err, domain.ErrArchivoNotFound)
+		}
+
+		archivos, err := repository.ListLoteoArchivos(context.Background(), loteo.ID)
+		if err != nil {
+			t.Fatalf("ListLoteoArchivos() error = %v", err)
+		}
+		if len(archivos) != 0 {
+			t.Errorf("ListLoteoArchivos() after delete = %#v, want none", archivos)
+		}
+	})
+
+	t.Run("delete rejects an archivo reached through the wrong loteo", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		other := createLoteoWithPlan(t, pool, repository, actor)
+
+		archivo, err := repository.RecordLoteoArchivo(context.Background(), actor, loteo.ID, domain.NewArchivo{
+			Categoria: "foto", StorageKey: "loteos/" + loteo.ID + "/archivos/a", OriginalName: "a.jpg", MimeType: "image/jpeg",
+		})
+		if err != nil {
+			t.Fatalf("RecordLoteoArchivo() error = %v", err)
+		}
+
+		if err := repository.DeleteArchivo(context.Background(), actor, other.ID, archivo.ID); !errors.Is(err, domain.ErrArchivoNotFound) {
+			t.Fatalf("DeleteArchivo() from another loteo error = %v, want %v", err, domain.ErrArchivoNotFound)
+		}
+	})
+
 	t.Run("lists active loteos with their plan counts, ordered by name", func(t *testing.T) {
 		prefix := "ZZ List " + newUUID(t) + " "
 		conPlano := createNamedLoteo(t, pool, repository, actor, prefix+"B", testPlan())
@@ -1068,6 +1257,7 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 	statements := []string{
 		`DELETE FROM usuario_loteos WHERE loteo_id = $1::uuid`,
 		`DELETE FROM archivos WHERE loteo_id = $1::uuid`,
+		`DELETE FROM archivos WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)`,
 		`DELETE FROM lotes WHERE loteo_id = $1::uuid`,
 		`DELETE FROM manzana_calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM calles WHERE loteo_id = $1::uuid`,

@@ -123,3 +123,17 @@ export type LoteoDetail = {
   calles: LoteoCalle[]
   fechaCreacion: string
 }
+
+export type ArchivoCategoria = 'foto' | 'plano'
+
+// Mirrors GET/POST .../archivos: a foto or plano attached to a loteo or one
+// of its lotes. storageKey never reaches the frontend; content is fetched
+// through GET .../archivos/{id}, not exposed as a path here.
+export type Archivo = {
+  id: string
+  categoria: ArchivoCategoria
+  nombreOriginal: string
+  mimeType: string
+  hashSha256: string
+  fechaCreacion: string
+}

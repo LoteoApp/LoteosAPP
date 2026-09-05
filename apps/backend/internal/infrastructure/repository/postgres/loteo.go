@@ -846,6 +846,210 @@ func (repository *LoteoRepository) RecordDxfFile(
 	return recorded, nil
 }
 
+// RecordLoteoArchivo inserts a foto/plano attached to the loteo itself. It
+// never supersedes a prior row: unlike the DXF, a loteo may carry several
+// active fotos/planos at once.
+func (repository *LoteoRepository) RecordLoteoArchivo(
+	ctx context.Context,
+	actorAuthProviderID, loteoID string,
+	file domain.NewArchivo,
+) (domain.Archivo, error) {
+	var recorded domain.Archivo
+	err := repository.pool.QueryRow(ctx, `
+		INSERT INTO archivos (
+			loteo_id, nombre, nombre_original, categoria,
+			storage_key, mime_type, hash_sha256, usuario_modificacion, fecha
+		)
+		SELECT $1::uuid, $2, NULLIF($2, ''), $3,
+		       $4, NULLIF($5, ''), NULLIF($6, ''),
+		       (SELECT id FROM usuarios WHERE auth_provider_id = $7::uuid), now()
+		WHERE EXISTS (SELECT 1 FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL)
+		RETURNING id::text, categoria, storage_key, COALESCE(nombre_original, ''),
+		          COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+	`, loteoID, file.OriginalName, file.Categoria, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
+		&recorded.ID, &recorded.Categoria, &recorded.StorageKey, &recorded.OriginalName,
+		&recorded.MimeType, &recorded.Sha256, &recorded.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Archivo{}, domain.ErrLoteoNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Archivo{}, domain.ErrLoteoNotFound
+		}
+		return domain.Archivo{}, err
+	}
+
+	return recorded, nil
+}
+
+// RecordLoteArchivo inserts a foto/plano attached to one lote. loteoID scopes
+// the lookup so a caller authorized on one loteo can't reach a lote of
+// another by guessing its id.
+func (repository *LoteoRepository) RecordLoteArchivo(
+	ctx context.Context,
+	actorAuthProviderID, loteoID, loteID string,
+	file domain.NewArchivo,
+) (domain.Archivo, error) {
+	var recorded domain.Archivo
+	err := repository.pool.QueryRow(ctx, `
+		INSERT INTO archivos (
+			lote_id, nombre, nombre_original, categoria,
+			storage_key, mime_type, hash_sha256, usuario_modificacion, fecha
+		)
+		SELECT $2::uuid, $3, NULLIF($3, ''), $4,
+		       $5, NULLIF($6, ''), NULLIF($7, ''),
+		       (SELECT id FROM usuarios WHERE auth_provider_id = $8::uuid), now()
+		WHERE EXISTS (
+			SELECT 1 FROM lotes WHERE id = $2::uuid AND loteo_id = $1::uuid AND fecha_baja IS NULL
+		)
+		RETURNING id::text, categoria, storage_key, COALESCE(nombre_original, ''),
+		          COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+	`, loteoID, loteID, file.OriginalName, file.Categoria, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
+		&recorded.ID, &recorded.Categoria, &recorded.StorageKey, &recorded.OriginalName,
+		&recorded.MimeType, &recorded.Sha256, &recorded.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Archivo{}, domain.ErrLoteNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Archivo{}, domain.ErrLoteNotFound
+		}
+		return domain.Archivo{}, err
+	}
+
+	return recorded, nil
+}
+
+// ListLoteoArchivos returns the active fotos/planos attached to the loteo
+// itself. A loteo that doesn't exist simply has none, so this never reports
+// domain.ErrLoteoNotFound; the caller checks existence separately when it
+// needs to distinguish the two.
+func (repository *LoteoRepository) ListLoteoArchivos(ctx context.Context, loteoID string) ([]domain.Archivo, error) {
+	rows, err := repository.pool.Query(ctx, `
+		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
+		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+		FROM archivos
+		WHERE loteo_id = $1::uuid AND categoria IN ('foto', 'plano') AND fecha_baja IS NULL
+		ORDER BY fecha_creacion DESC
+	`, loteoID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return []domain.Archivo{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanArchivos(rows)
+}
+
+// ListLoteArchivos returns the active fotos/planos attached to one lote of
+// loteoID. A lote that doesn't belong to loteoID (or doesn't exist) simply
+// has none, mirroring ListLoteoArchivos.
+func (repository *LoteoRepository) ListLoteArchivos(ctx context.Context, loteoID, loteID string) ([]domain.Archivo, error) {
+	rows, err := repository.pool.Query(ctx, `
+		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
+		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+		FROM archivos
+		WHERE lote_id = $2::uuid
+		  AND lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+		  AND categoria IN ('foto', 'plano') AND fecha_baja IS NULL
+		ORDER BY fecha_creacion DESC
+	`, loteoID, loteID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return []domain.Archivo{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanArchivos(rows)
+}
+
+func scanArchivos(rows pgx.Rows) ([]domain.Archivo, error) {
+	archivos := make([]domain.Archivo, 0)
+	for rows.Next() {
+		var archivo domain.Archivo
+		if err := rows.Scan(
+			&archivo.ID, &archivo.Categoria, &archivo.StorageKey, &archivo.OriginalName,
+			&archivo.MimeType, &archivo.Sha256, &archivo.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		archivos = append(archivos, archivo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return archivos, nil
+}
+
+// GetArchivo returns one active archivo reachable through loteoID, whether
+// it's attached to the loteo itself or to one of its lotes.
+func (repository *LoteoRepository) GetArchivo(ctx context.Context, loteoID, archivoID string) (domain.Archivo, error) {
+	var archivo domain.Archivo
+	err := repository.pool.QueryRow(ctx, `
+		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
+		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
+		FROM archivos
+		WHERE id = $2::uuid
+		  AND fecha_baja IS NULL
+		  AND (loteo_id = $1::uuid OR lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid))
+	`, loteoID, archivoID).Scan(
+		&archivo.ID, &archivo.Categoria, &archivo.StorageKey, &archivo.OriginalName,
+		&archivo.MimeType, &archivo.Sha256, &archivo.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Archivo{}, domain.ErrArchivoNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Archivo{}, domain.ErrArchivoNotFound
+		}
+		return domain.Archivo{}, err
+	}
+
+	return archivo, nil
+}
+
+// DeleteArchivo soft-deletes one active archivo reachable through loteoID,
+// the same way GetArchivo resolves it.
+func (repository *LoteoRepository) DeleteArchivo(
+	ctx context.Context,
+	actorAuthProviderID, loteoID, archivoID string,
+) error {
+	tag, err := repository.pool.Exec(ctx, `
+		UPDATE archivos
+		SET fecha_baja = now(),
+		    fecha_modificacion = now(),
+		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $3::uuid)
+		WHERE id = $2::uuid
+		  AND fecha_baja IS NULL
+		  AND (loteo_id = $1::uuid OR lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid))
+	`, loteoID, archivoID, actorAuthProviderID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.ErrArchivoNotFound
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrArchivoNotFound
+	}
+
+	return nil
+}
+
 // polygonWKT renders a ring as WKT. The ring arrives normalized, with each
 // vertex listed once, and WKT closes a ring by repeating the first vertex.
 func polygonWKT(polygon domain.Polygon) string {

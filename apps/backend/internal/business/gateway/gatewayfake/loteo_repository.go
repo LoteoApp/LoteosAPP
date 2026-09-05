@@ -47,6 +47,41 @@ type LoteoRepository struct {
 	RecordedDxfFile       domain.NewLoteoDxfFile
 	RecordedDxfFileResult domain.LoteoDxfFile
 
+	RecordLoteoArchivoCalls     int
+	RecordLoteoArchivoErr       error
+	RecordedLoteoArchivoLoteoID string
+	RecordedLoteoArchivo        domain.NewArchivo
+	RecordedLoteoArchivoResult  domain.Archivo
+
+	RecordLoteArchivoCalls     int
+	RecordLoteArchivoErr       error
+	RecordedLoteArchivoLoteoID string
+	RecordedLoteArchivoLoteID  string
+	RecordedLoteArchivo        domain.NewArchivo
+	RecordedLoteArchivoResult  domain.Archivo
+
+	ListLoteoArchivosCalls   int
+	ListLoteoArchivosErr     error
+	ListLoteoArchivosLoteoID string
+	ListLoteoArchivosResult  []domain.Archivo
+
+	ListLoteArchivosCalls   int
+	ListLoteArchivosErr     error
+	ListLoteArchivosLoteoID string
+	ListLoteArchivosLoteID  string
+	ListLoteArchivosResult  []domain.Archivo
+
+	GetArchivoCalls   int
+	GetArchivoErr     error
+	GetArchivoLoteoID string
+	GetArchivoID      string
+	GetArchivoResult  domain.Archivo
+
+	DeleteArchivoCalls    int
+	DeleteArchivoErr      error
+	DeletedArchivoLoteoID string
+	DeletedArchivoID      string
+
 	ListCalls  int
 	ListErr    error
 	ListResult []domain.LoteoSummary
@@ -214,4 +249,97 @@ func (fake *LoteoRepository) RecordDxfFile(
 	}
 
 	return fake.RecordedDxfFileResult, nil
+}
+
+func (fake *LoteoRepository) RecordLoteoArchivo(
+	_ context.Context,
+	actorAuthProviderID, loteoID string,
+	file domain.NewArchivo,
+) (domain.Archivo, error) {
+	fake.RecordLoteoArchivoCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.RecordedLoteoArchivoLoteoID = loteoID
+	fake.RecordedLoteoArchivo = file
+	if fake.RecordLoteoArchivoErr != nil {
+		return domain.Archivo{}, fake.RecordLoteoArchivoErr
+	}
+	if fake.RecordedLoteoArchivoResult.ID == "" {
+		return domain.Archivo{
+			ID:           "archivo-loteo-1",
+			Categoria:    file.Categoria,
+			StorageKey:   file.StorageKey,
+			OriginalName: file.OriginalName,
+			MimeType:     file.MimeType,
+			Sha256:       file.Sha256,
+		}, nil
+	}
+
+	return fake.RecordedLoteoArchivoResult, nil
+}
+
+func (fake *LoteoRepository) RecordLoteArchivo(
+	_ context.Context,
+	actorAuthProviderID, loteoID, loteID string,
+	file domain.NewArchivo,
+) (domain.Archivo, error) {
+	fake.RecordLoteArchivoCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.RecordedLoteArchivoLoteoID = loteoID
+	fake.RecordedLoteArchivoLoteID = loteID
+	fake.RecordedLoteArchivo = file
+	if fake.RecordLoteArchivoErr != nil {
+		return domain.Archivo{}, fake.RecordLoteArchivoErr
+	}
+	if fake.RecordedLoteArchivoResult.ID == "" {
+		return domain.Archivo{
+			ID:           "archivo-lote-1",
+			Categoria:    file.Categoria,
+			StorageKey:   file.StorageKey,
+			OriginalName: file.OriginalName,
+			MimeType:     file.MimeType,
+			Sha256:       file.Sha256,
+		}, nil
+	}
+
+	return fake.RecordedLoteArchivoResult, nil
+}
+
+func (fake *LoteoRepository) ListLoteoArchivos(_ context.Context, loteoID string) ([]domain.Archivo, error) {
+	fake.ListLoteoArchivosCalls++
+	fake.ListLoteoArchivosLoteoID = loteoID
+	if fake.ListLoteoArchivosErr != nil {
+		return nil, fake.ListLoteoArchivosErr
+	}
+
+	return fake.ListLoteoArchivosResult, nil
+}
+
+func (fake *LoteoRepository) ListLoteArchivos(_ context.Context, loteoID, loteID string) ([]domain.Archivo, error) {
+	fake.ListLoteArchivosCalls++
+	fake.ListLoteArchivosLoteoID = loteoID
+	fake.ListLoteArchivosLoteID = loteID
+	if fake.ListLoteArchivosErr != nil {
+		return nil, fake.ListLoteArchivosErr
+	}
+
+	return fake.ListLoteArchivosResult, nil
+}
+
+func (fake *LoteoRepository) GetArchivo(_ context.Context, loteoID, archivoID string) (domain.Archivo, error) {
+	fake.GetArchivoCalls++
+	fake.GetArchivoLoteoID = loteoID
+	fake.GetArchivoID = archivoID
+	if fake.GetArchivoErr != nil {
+		return domain.Archivo{}, fake.GetArchivoErr
+	}
+
+	return fake.GetArchivoResult, nil
+}
+
+func (fake *LoteoRepository) DeleteArchivo(_ context.Context, actorAuthProviderID, loteoID, archivoID string) error {
+	fake.DeleteArchivoCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.DeletedArchivoLoteoID = loteoID
+	fake.DeletedArchivoID = archivoID
+	return fake.DeleteArchivoErr
 }

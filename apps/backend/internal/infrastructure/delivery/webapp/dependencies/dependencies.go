@@ -18,31 +18,37 @@ import (
 )
 
 type Container struct {
-	CreateUserHandler      *handler.CreateUserHandler
-	CompleteProfileHandler *handler.CompleteProfileHandler
-	ListUsersHandler       *handler.ListUsersHandler
-	UpdateUserHandler      *handler.UpdateUserHandler
-	DeactivateUserHandler  *handler.DeactivateUserHandler
-	ReactivateUserHandler  *handler.ReactivateUserHandler
-	CreateClientHandler    *handler.CreateClientHandler
-	UpdateClientHandler    *handler.UpdateClientHandler
-	DeleteClientHandler    *handler.DeleteClientHandler
-	ListClientsHandler     *handler.ListClientsHandler
-	CreateAgencyHandler    *handler.CreateAgencyHandler
-	UpdateAgencyHandler    *handler.UpdateAgencyHandler
-	DeleteAgencyHandler    *handler.DeleteAgencyHandler
-	ListAgenciesHandler    *handler.ListAgenciesHandler
-	CreateLoteoHandler     *handler.CreateLoteoHandler
-	StoreLoteoDxfHandler   *handler.StoreLoteoDxfHandler
-	UpdateLoteHandler      *handler.UpdateLoteHandler
-	UpdateManzanaHandler   *handler.UpdateManzanaHandler
-	UpdateCalleHandler     *handler.UpdateCalleHandler
-	ListLoteosHandler      *handler.ListLoteosHandler
-	GetLoteoHandler        *handler.GetLoteoHandler
-	Pool                   *pgxpool.Pool
-	Verifier               *supabase.Verifier
-	ObjectStorage          gateway.ObjectStorage
-	UserRepository         gateway.UserRepository
+	CreateUserHandler        *handler.CreateUserHandler
+	CompleteProfileHandler   *handler.CompleteProfileHandler
+	ListUsersHandler         *handler.ListUsersHandler
+	UpdateUserHandler        *handler.UpdateUserHandler
+	DeactivateUserHandler    *handler.DeactivateUserHandler
+	ReactivateUserHandler    *handler.ReactivateUserHandler
+	CreateClientHandler      *handler.CreateClientHandler
+	UpdateClientHandler      *handler.UpdateClientHandler
+	DeleteClientHandler      *handler.DeleteClientHandler
+	ListClientsHandler       *handler.ListClientsHandler
+	CreateAgencyHandler      *handler.CreateAgencyHandler
+	UpdateAgencyHandler      *handler.UpdateAgencyHandler
+	DeleteAgencyHandler      *handler.DeleteAgencyHandler
+	ListAgenciesHandler      *handler.ListAgenciesHandler
+	CreateLoteoHandler       *handler.CreateLoteoHandler
+	StoreLoteoDxfHandler     *handler.StoreLoteoDxfHandler
+	UpdateLoteHandler        *handler.UpdateLoteHandler
+	UpdateManzanaHandler     *handler.UpdateManzanaHandler
+	UpdateCalleHandler       *handler.UpdateCalleHandler
+	ListLoteosHandler        *handler.ListLoteosHandler
+	GetLoteoHandler          *handler.GetLoteoHandler
+	StoreLoteoArchivoHandler *handler.StoreLoteoArchivoHandler
+	StoreLoteArchivoHandler  *handler.StoreLoteArchivoHandler
+	ListLoteoArchivosHandler *handler.ListLoteoArchivosHandler
+	ListLoteArchivosHandler  *handler.ListLoteArchivosHandler
+	GetArchivoContentHandler *handler.GetArchivoContentHandler
+	DeleteArchivoHandler     *handler.DeleteArchivoHandler
+	Pool                     *pgxpool.Pool
+	Verifier                 *supabase.Verifier
+	ObjectStorage            gateway.ObjectStorage
+	UserRepository           gateway.UserRepository
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -97,32 +103,44 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	updateCalleHandler := handler.NewUpdateCalleHandler(loteos.NewUpdateCalle(loteoRepo))
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
+	storeLoteoArchivoHandler := handler.NewStoreLoteoArchivoHandler(loteos.NewStoreLoteoArchivo(loteoRepo, objectStorage))
+	storeLoteArchivoHandler := handler.NewStoreLoteArchivoHandler(loteos.NewStoreLoteArchivo(loteoRepo, objectStorage))
+	listLoteoArchivosHandler := handler.NewListLoteoArchivosHandler(loteos.NewListLoteoArchivos(loteoRepo))
+	listLoteArchivosHandler := handler.NewListLoteArchivosHandler(loteos.NewListLoteArchivos(loteoRepo))
+	getArchivoContentHandler := handler.NewGetArchivoContentHandler(loteos.NewGetArchivoContent(loteoRepo, objectStorage))
+	deleteArchivoHandler := handler.NewDeleteArchivoHandler(loteos.NewDeleteArchivo(loteoRepo))
 
 	return &Container{
-		CreateUserHandler:      createUserHandler,
-		CompleteProfileHandler: completeProfileHandler,
-		ListUsersHandler:       listUsersHandler,
-		UpdateUserHandler:      updateUserHandler,
-		DeactivateUserHandler:  deactivateUserHandler,
-		ReactivateUserHandler:  reactivateUserHandler,
-		CreateClientHandler:    createClientHandler,
-		UpdateClientHandler:    updateClientHandler,
-		DeleteClientHandler:    deleteClientHandler,
-		ListClientsHandler:     listClientsHandler,
-		CreateAgencyHandler:    createAgencyHandler,
-		UpdateAgencyHandler:    updateAgencyHandler,
-		DeleteAgencyHandler:    deleteAgencyHandler,
-		ListAgenciesHandler:    listAgenciesHandler,
-		CreateLoteoHandler:     createLoteoHandler,
-		StoreLoteoDxfHandler:   storeLoteoDxfHandler,
-		UpdateLoteHandler:      updateLoteHandler,
-		UpdateManzanaHandler:   updateManzanaHandler,
-		UpdateCalleHandler:     updateCalleHandler,
-		ListLoteosHandler:      listLoteosHandler,
-		GetLoteoHandler:        getLoteoHandler,
-		Pool:                   pool,
-		Verifier:               verifier,
-		ObjectStorage:          objectStorage,
-		UserRepository:         userRepo,
+		CreateUserHandler:        createUserHandler,
+		CompleteProfileHandler:   completeProfileHandler,
+		ListUsersHandler:         listUsersHandler,
+		UpdateUserHandler:        updateUserHandler,
+		DeactivateUserHandler:    deactivateUserHandler,
+		ReactivateUserHandler:    reactivateUserHandler,
+		CreateClientHandler:      createClientHandler,
+		UpdateClientHandler:      updateClientHandler,
+		DeleteClientHandler:      deleteClientHandler,
+		ListClientsHandler:       listClientsHandler,
+		CreateAgencyHandler:      createAgencyHandler,
+		UpdateAgencyHandler:      updateAgencyHandler,
+		DeleteAgencyHandler:      deleteAgencyHandler,
+		ListAgenciesHandler:      listAgenciesHandler,
+		CreateLoteoHandler:       createLoteoHandler,
+		StoreLoteoDxfHandler:     storeLoteoDxfHandler,
+		UpdateLoteHandler:        updateLoteHandler,
+		UpdateManzanaHandler:     updateManzanaHandler,
+		UpdateCalleHandler:       updateCalleHandler,
+		ListLoteosHandler:        listLoteosHandler,
+		GetLoteoHandler:          getLoteoHandler,
+		StoreLoteoArchivoHandler: storeLoteoArchivoHandler,
+		StoreLoteArchivoHandler:  storeLoteArchivoHandler,
+		ListLoteoArchivosHandler: listLoteoArchivosHandler,
+		ListLoteArchivosHandler:  listLoteArchivosHandler,
+		GetArchivoContentHandler: getArchivoContentHandler,
+		DeleteArchivoHandler:     deleteArchivoHandler,
+		Pool:                     pool,
+		Verifier:                 verifier,
+		ObjectStorage:            objectStorage,
+		UserRepository:           userRepo,
 	}, nil
 }
