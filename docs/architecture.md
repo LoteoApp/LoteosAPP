@@ -810,7 +810,7 @@ configuración:
 default-src 'self';
 script-src 'self';
 style-src 'self' ['unsafe-inline' solo en dev];
-img-src 'self' data:;
+img-src 'self' data: blob:;
 font-src 'self';
 connect-src 'self' <VITE_SUPABASE_URL exacta> <VITE_API_URL exacta>;
 base-uri 'self';
@@ -837,6 +837,11 @@ object-src 'none';
 - `script-src` no necesita ninguna excepción en ningún entorno: la app solo
   carga scripts externos (`<script type="module" src="...">`), tanto en dev
   (`@vite/client`) como en el bundle de producción.
+- `img-src` suma `blob:` porque `ArchivosSection` renderiza una foto trayendo
+  sus bytes con el token del usuario y armando un `URL.createObjectURL` (ver
+  [Fotos y planos de loteo y lote](#fotos-y-planos-de-loteo-y-lote)). No
+  habilita cargar imágenes de cualquier origen: un `blob:` solo existe si
+  este mismo documento lo creó, el navegador nunca lo resuelve por su cuenta.
 - Como el placeholder ya no depende de que Vite reemplace `%VAR%` en HTML
   estático, no hay forma de que quede sin resolver: la función siempre
   recibe un valor (el de la variable de entorno o el default de

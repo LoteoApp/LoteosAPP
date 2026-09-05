@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
+import { X } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Field, FieldLabel } from '../../../shared/ui/field'
@@ -75,9 +76,11 @@ export default function ArchivosSection({ target, accessToken, canEdit }: Archiv
       )}
 
       {archivos.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        // Fixed-height strip: with more archivos it scrolls sideways instead
+        // of pushing the rest of the panel down.
+        <ul className="flex gap-2 overflow-x-auto pb-1">
           {archivos.map((archivo) => (
-            <ArchivoListItem
+            <ArchivoThumbnail
               key={archivo.id}
               archivo={archivo}
               loteoId={target.loteoId}
@@ -93,7 +96,7 @@ export default function ArchivosSection({ target, accessToken, canEdit }: Archiv
   )
 }
 
-type ArchivoListItemProps = {
+type ArchivoThumbnailProps = {
   archivo: Archivo
   loteoId: string
   accessToken: string | null
@@ -102,7 +105,7 @@ type ArchivoListItemProps = {
   onDelete: () => void
 }
 
-function ArchivoListItem({ archivo, loteoId, accessToken, canEdit, disabled, onDelete }: ArchivoListItemProps) {
+function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, onDelete }: ArchivoThumbnailProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -122,7 +125,7 @@ function ArchivoListItem({ archivo, loteoId, accessToken, canEdit, disabled, onD
         setPreviewUrl(objectUrl)
       })
       .catch(() => {
-        // The row still shows the file name without a preview.
+        // The thumbnail still shows its fallback badge without a preview.
       })
 
     return () => {
@@ -135,41 +138,43 @@ function ArchivoListItem({ archivo, loteoId, accessToken, canEdit, disabled, onD
 
   const isImage = archivo.mimeType.startsWith('image/')
 
+  const content = isImage && previewUrl ? (
+    <img src={previewUrl} alt={archivo.nombreOriginal} className="size-full object-cover" />
+  ) : (
+    <div className="flex size-full items-center justify-center bg-muted text-[0.65rem] font-medium text-muted-foreground">
+      {archivo.categoria === 'plano' ? 'PDF' : 'IMG'}
+    </div>
+  )
+
   return (
-    <li className="flex items-center gap-3 rounded-md border border-border p-2">
-      {isImage && previewUrl ? (
-        <img
-          src={previewUrl}
-          alt={archivo.nombreOriginal}
-          className="size-12 shrink-0 rounded object-cover"
-        />
-      ) : (
-        <div className="flex size-12 shrink-0 items-center justify-center rounded bg-muted text-[0.65rem] font-medium text-muted-foreground">
-          {archivo.categoria === 'plano' ? 'PDF' : 'IMG'}
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">{archivo.nombreOriginal}</p>
-        <p className="text-xs text-muted-foreground">
-          {archivo.categoria === 'foto' ? 'Foto' : 'Plano'}
-        </p>
-      </div>
-
-      {previewUrl && (
+    <li className="relative size-20 shrink-0">
+      {previewUrl ? (
         <a
           href={previewUrl}
           target="_blank"
           rel="noreferrer"
-          className="shrink-0 text-xs text-muted-foreground underline"
+          title={archivo.nombreOriginal}
+          className="block size-full overflow-hidden rounded-md border border-border"
         >
-          Ver
+          {content}
         </a>
+      ) : (
+        <div title={archivo.nombreOriginal} className="size-full overflow-hidden rounded-md border border-border">
+          {content}
+        </div>
       )}
 
       {canEdit && (
-        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onDelete}>
-          Eliminar
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-xs"
+          disabled={disabled}
+          onClick={onDelete}
+          aria-label={`Eliminar ${archivo.nombreOriginal}`}
+          className="absolute -top-1.5 -right-1.5 rounded-full bg-background"
+        >
+          <X aria-hidden />
         </Button>
       )}
     </li>
