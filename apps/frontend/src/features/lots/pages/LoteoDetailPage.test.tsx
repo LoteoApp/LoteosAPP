@@ -279,4 +279,24 @@ describe('LoteoDetailPage', () => {
       'token-123',
     )
   })
+
+  it('clears a stale save error banner when the selection changes', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+    updateLoteMock.mockRejectedValueOnce(
+      new ApiError('Ocurrió un error inesperado.', 'server_error', 500),
+    )
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('button', { name: 'Lote 7' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Lote 8' }))
+
+    expect(screen.queryByText('Ocurrió un error inesperado.')).not.toBeInTheDocument()
+  })
 })
