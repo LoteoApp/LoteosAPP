@@ -510,6 +510,40 @@ describe('UsersPage', () => {
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
   })
 
+  it('clears a stale backend error when cancelling out of the edit form', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    failure = { status: 409, message: 'No se enviaron campos para modificar' }
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText('No se enviaron campos para modificar')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('No se enviaron campos para modificar')).not.toBeInTheDocument()
+  })
+
+  it('clears a stale backend error when cancelling the inline baja confirmation', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    failure = { status: 409, message: 'El usuario ya está dado de baja' }
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByText('El usuario ya está dado de baja')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('El usuario ya está dado de baja')).not.toBeInTheDocument()
+  })
+
   it('hides the list while a form is open', async () => {
     const user = userEvent.setup()
     stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]

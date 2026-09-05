@@ -12,6 +12,7 @@ export type UseUsers = {
   isLoading: boolean
   isSubmitting: boolean
   error: string | null
+  clearError: () => void
   create: (values: UsuarioFormValues) => Promise<string | null>
   update: (id: string, values: UsuarioUpdateValues) => Promise<boolean>
   deactivate: (id: string) => Promise<boolean>
@@ -134,5 +135,7 @@ export function useUsers(token: string): UseUsers {
     [run, token],
   )
 
-  return { usuarios, isLoading, isSubmitting, error, create, update, deactivate, reactivate }
+  const clearError = useCallback(() => setError(null), [])
+
+  return { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate }
 }

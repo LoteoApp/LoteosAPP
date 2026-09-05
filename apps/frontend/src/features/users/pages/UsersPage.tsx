@@ -29,7 +29,7 @@ type UsersPageProps = {
 // for an administrador, so no further role check is needed on top of it.
 export default function UsersPage({ accessToken }: UsersPageProps) {
   const token = accessToken ?? ''
-  const { usuarios, isLoading, isSubmitting, error, create, update, deactivate, reactivate } =
+  const { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate } =
     useUsers(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [rolFilter, setRolFilter] = useState<RolFilter>('todos')
@@ -95,6 +95,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
           <Button
             onClick={() => {
               setCreatedCredentials(null)
+              clearError()
               setFormState({ mode: 'create' })
             }}
           >
@@ -132,7 +133,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                 isSubmitting={isSubmitting}
                 onSubmit={handleCreate}
                 onValidate={validateCreate}
-                onCancel={() => setFormState({ mode: 'closed' })}
+                onCancel={() => {
+                  clearError()
+                  setFormState({ mode: 'closed' })
+                }}
               />
             ) : (
               <UserForm
@@ -145,7 +149,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                 isSubmitting={isSubmitting}
                 onSubmit={(values) => handleUpdate(formView.usuario.id, values)}
                 onValidate={validateEdit}
-                onCancel={() => setFormState({ mode: 'closed' })}
+                onCancel={() => {
+                  clearError()
+                  setFormState({ mode: 'closed' })
+                }}
               />
             )}
           </CardContent>
@@ -181,10 +188,14 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                   isConfirmingBaja={confirmingBajaId === usuario.id}
                   onEdit={() => {
                     setCreatedCredentials(null)
+                    clearError()
                     setFormState({ mode: 'edit', id: usuario.id })
                   }}
                   onStartConfirmBaja={() => setConfirmingBajaId(usuario.id)}
-                  onCancelConfirmBaja={() => setConfirmingBajaId(null)}
+                  onCancelConfirmBaja={() => {
+                    clearError()
+                    setConfirmingBajaId(null)
+                  }}
                   onConfirmBaja={() => handleBaja(usuario)}
                   onReactivar={() => handleReactivar(usuario)}
                 />
