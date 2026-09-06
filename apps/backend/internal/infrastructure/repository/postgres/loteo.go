@@ -344,6 +344,7 @@ func getManzanaWithQueryer(ctx context.Context, queryer queryRower, loteoID, man
 func (repository *LoteoRepository) getLotes(ctx context.Context, loteoID string) ([]domain.Lote, error) {
 	rows, err := repository.pool.Query(ctx, `
 		SELECT lo.id::text, lo.manzana_id::text, COALESCE(lo.numero, ''),
+		       lo.estado_actual,
 		       lo.precio::float8, COALESCE(lo.moneda, ''), lo.superficie::float8,
 		       COALESCE(lo.caracteristicas, ''), ST_AsText(de.geom)
 		FROM lotes lo
@@ -364,6 +365,7 @@ func (repository *LoteoRepository) getLotes(ctx context.Context, loteoID string)
 		)
 		if err := rows.Scan(
 			&lote.ID, &lote.ManzanaID, &lote.Number,
+			&lote.State,
 			&lote.Price, &lote.Currency, &lote.Area,
 			&lote.Features, &wkt,
 		); err != nil {
@@ -482,7 +484,9 @@ func insertPlan(ctx context.Context, tx pgx.Tx, userID *string, loteo *domain.Lo
 
 	loteo.Lotes = make([]domain.Lote, len(loteIDs))
 	for i, id := range loteIDs {
-		loteo.Lotes[i] = domain.Lote{ID: id, ManzanaID: manzanaIDs[plan.Lotes[i].ManzanaIndex]}
+		loteo.Lotes[i] = domain.Lote{
+			ID: id, ManzanaID: manzanaIDs[plan.Lotes[i].ManzanaIndex], State: domain.LotStateAvailable,
+		}
 	}
 
 	loteo.Calles = make([]domain.Calle, len(calleIDs))
@@ -568,11 +572,11 @@ func (repository *LoteoRepository) UpdateLote(
 		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid),
 		    fecha_modificacion = now()
 		WHERE id = $3::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
-		RETURNING id::text, manzana_id::text, COALESCE(numero, ''), precio::float8,
+		RETURNING id::text, manzana_id::text, COALESCE(numero, ''), estado_actual, precio::float8,
 		          COALESCE(moneda, ''), superficie::float8, COALESCE(caracteristicas, '')
 	`, actorAuthProviderID, loteoID, loteID,
 		data.Number, data.Price, data.Currency, data.Area, data.Features).Scan(
-		&lote.ID, &lote.ManzanaID, &lote.Number, &lote.Price,
+		&lote.ID, &lote.ManzanaID, &lote.Number, &lote.State, &lote.Price,
 		&lote.Currency, &lote.Area, &lote.Features,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

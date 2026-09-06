@@ -32,6 +32,7 @@ function loteo(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
         id: 'lt-1',
         manzanaId: 'mz-1',
         numero: '7',
+        estado: 'disponible',
         precio: null,
         moneda: '',
         superficie: null,

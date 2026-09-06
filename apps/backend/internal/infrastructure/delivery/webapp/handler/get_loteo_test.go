@@ -55,8 +55,11 @@ func TestGetLoteoRoute(t *testing.T) {
 			Name:     "Norte",
 			Boundary: domain.Polygon{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}},
 			Manzanas: []domain.Manzana{{ID: "manzana-1", Number: "1"}},
-			Lotes:    []domain.Lote{{ID: "lote-1", ManzanaID: "manzana-1", Number: "7", Price: &price}},
-			Calles:   []domain.Calle{{ID: "calle-1", Name: "Los Álamos"}},
+			Lotes: []domain.Lote{{
+				ID: "lote-1", ManzanaID: "manzana-1", Number: "7",
+				State: domain.LotStateAvailable, Price: &price,
+			}},
+			Calles: []domain.Calle{{ID: "calle-1", Name: "Los Álamos"}},
 		}}
 		verifier := userVerifierStub{principal: supabase.Principal{
 			Subject: "user-1", Roles: []string{domain.RolInmobiliaria},
@@ -78,7 +81,8 @@ func TestGetLoteoRoute(t *testing.T) {
 		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if got.ID != "loteo-1" || len(got.Boundary) != 3 || len(got.Lotes) != 1 || got.Lotes[0].ManzanaID != "manzana-1" {
+		if got.ID != "loteo-1" || len(got.Boundary) != 3 || len(got.Lotes) != 1 ||
+			got.Lotes[0].ManzanaID != "manzana-1" || got.Lotes[0].State != domain.LotStateAvailable {
 			t.Errorf("response = %#v", got)
 		}
 	})

@@ -94,10 +94,19 @@ export type LoteoManzana = {
   poligono: DxfPoint[]
 }
 
+export const LOT_STATES = ['disponible', 'reservado', 'vendido', 'finalizado'] as const
+
+export type LotState = (typeof LOT_STATES)[number]
+
+export function isLotState(value: unknown): value is LotState {
+  return typeof value === 'string' && (LOT_STATES as readonly string[]).includes(value)
+}
+
 export type LoteoLote = {
   id: string
   manzanaId: string
   numero: string
+  estado: LotState
   precio: number | null
   moneda: string
   superficie: number | null

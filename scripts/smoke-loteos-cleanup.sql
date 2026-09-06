@@ -7,6 +7,10 @@
 BEGIN;
 
 DELETE FROM usuario_loteos WHERE loteo_id = :loteo_id::uuid;
+ALTER TABLE lote_estados DISABLE TRIGGER lote_estados_reject_mutation;
+DELETE FROM lote_estados
+WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = :loteo_id::uuid);
+ALTER TABLE lote_estados ENABLE TRIGGER lote_estados_reject_mutation;
 DELETE FROM lotes WHERE loteo_id = :loteo_id::uuid;
 DELETE FROM manzana_calles WHERE loteo_id = :loteo_id::uuid;
 DELETE FROM calles WHERE loteo_id = :loteo_id::uuid;

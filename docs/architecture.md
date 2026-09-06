@@ -407,6 +407,19 @@ obligatorio.
 
 Decisiones de este recorte:
 
+- **La máquina de estados del lote vive en dominio y persistencia.**
+  `domain.LotState` contiene la única matriz de transiciones;
+  `gateway.LotStateRepository` expresa el compare-and-set y el adaptador
+  PostgreSQL bloquea primero la fila de `lotes` con `FOR UPDATE`, verifica el
+  estado esperado, agrega el evento y confirma todo en una transacción corta.
+  El caso de uso resuelve el actor y limita el loteo por rol/asignación. El
+  detalle expone `estado` para cada lote. No hay un endpoint genérico para
+  forzar estados: Reservas, Ventas y Cobranza deben invocar esta capacidad
+  dentro de su propia transaccion comercial.
+- **La UI de esta entrega solo informa el estado.** El cliente valida los
+  cuatro valores del contrato y `LotStateBadge` presenta una etiqueta común
+  en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
+  se ofrece un selector libre.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive

@@ -1,4 +1,5 @@
 import { ApiError, apiFetch } from '../../../shared/api/client'
+import { isLotState } from '../types'
 import type {
   DxfPoint,
   LoteoCalle,
@@ -61,6 +62,7 @@ export function isLote(value: unknown): value is Record<string, unknown> {
     typeof value.id === 'string' &&
     typeof value.manzanaId === 'string' &&
     typeof value.numero === 'string' &&
+    isLotState(value.estado) &&
     (value.precio === null || typeof value.precio === 'number') &&
     typeof value.moneda === 'string' &&
     (value.superficie === null || typeof value.superficie === 'number') &&
@@ -117,6 +119,7 @@ export function toLote(raw: Record<string, unknown>): LoteoLote {
     id: raw.id as string,
     manzanaId: raw.manzanaId as string,
     numero: raw.numero as string,
+    estado: raw.estado as LoteoLote['estado'],
     precio: (raw.precio as number | null) ?? null,
     moneda: raw.moneda as string,
     superficie: (raw.superficie as number | null) ?? null,

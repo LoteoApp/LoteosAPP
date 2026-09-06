@@ -41,6 +41,7 @@ const detailResponse = {
       id: 'lt-1',
       manzanaId: 'mz-1',
       numero: '7',
+      estado: 'disponible',
       precio: 150000,
       moneda: 'USD',
       superficie: 300,
@@ -66,6 +67,7 @@ describe('getLoteo', () => {
     expect(loteo.contorno).toHaveLength(3)
     expect(loteo.manzanas[0]).toMatchObject({ id: 'mz-1', numero: '1' })
     expect(loteo.lotes[0]).toMatchObject({ precio: 150000, moneda: 'USD', superficie: 300 })
+    expect(loteo.lotes[0].estado).toBe('disponible')
     expect(loteo.calles[0].poligono).toEqual([])
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
@@ -110,6 +112,17 @@ describe('getLoteo', () => {
 
   it('rejects a 2xx body that does not carry the expected contract', async () => {
     stubFetch(jsonResponse(200, { id: 'loteo-1', nombre: 'x' }))
+
+    await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(GENERIC_ERROR)
+  })
+
+  it('rejects a lote with an unknown state', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        ...detailResponse,
+        lotes: [{ ...detailResponse.lotes[0], estado: 'bloqueado' }],
+      }),
+    )
 
     await expect(getLoteo('loteo-1', 'token-123')).rejects.toThrow(GENERIC_ERROR)
   })

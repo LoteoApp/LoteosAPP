@@ -9,6 +9,7 @@ function lote(overrides: Partial<LoteoLote> = {}): LoteoLote {
     id: 'lt-1',
     manzanaId: 'mz-1',
     numero: '7',
+    estado: 'disponible',
     precio: 150000,
     moneda: 'USD',
     superficie: 300,
@@ -38,6 +39,7 @@ describe('LotesTable', () => {
     const first = within(rows[1])
     expect(first.getByText('1')).toBeInTheDocument()
     expect(first.getByText('7')).toBeInTheDocument()
+    expect(first.getByText('Disponible')).toBeInTheDocument()
     expect(first.getByText('300 m²')).toBeInTheDocument()
     expect(first.getByText(/150\.000/)).toBeInTheDocument()
   })
@@ -52,7 +54,7 @@ describe('LotesTable', () => {
       />,
     )
 
-    const [, loteCell, superficieCell, precioCell, caracteristicasCell] = within(
+    const [, loteCell, , superficieCell, precioCell, caracteristicasCell] = within(
       screen.getAllByRole('row')[1],
     ).getAllByRole('cell')
     expect(loteCell).toHaveTextContent('—')
@@ -80,6 +82,18 @@ describe('LotesTable', () => {
     render(<LotesTable lotes={[lote(), lote({ id: 'lt-2' })]} manzanaNumberById={manzanaNumberById} />)
 
     expect(screen.getByText('2 lotes')).toBeInTheDocument()
+  })
+
+  it('shows the current state of every lote', () => {
+    render(
+      <LotesTable
+        lotes={[lote({ estado: 'reservado' }), lote({ id: 'lt-2', estado: 'vendido' })]}
+        manzanaNumberById={manzanaNumberById}
+      />,
+    )
+
+    expect(screen.getByText('Reservado')).toBeInTheDocument()
+    expect(screen.getByText('Vendido')).toBeInTheDocument()
   })
 
   it('selects a lote from a row click and from the keyboard', async () => {

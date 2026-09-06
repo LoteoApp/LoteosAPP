@@ -18,6 +18,7 @@ const lote: LoteoLote = {
   id: 'lt-1',
   manzanaId: 'mz-1',
   numero: '12',
+  estado: 'disponible',
   precio: 100,
   moneda: 'ARS',
   superficie: 200,

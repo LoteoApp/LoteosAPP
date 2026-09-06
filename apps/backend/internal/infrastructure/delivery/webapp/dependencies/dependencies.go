@@ -40,6 +40,7 @@ type Container struct {
 	ListLoteosHandler      *handler.ListLoteosHandler
 	SearchLotesHandler     *handler.SearchLotesHandler
 	GetLoteoHandler        *handler.GetLoteoHandler
+	TransitionLotState    loteos.TransitionLotState
 	Pool                   *pgxpool.Pool
 	Verifier               *supabase.Verifier
 	ObjectStorage          gateway.ObjectStorage
@@ -91,6 +92,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	listAgenciesHandler := handler.NewListAgenciesHandler(agencies.NewListAgencies(inmobiliariaRepo))
 
 	loteoRepo := postgres.NewLoteoRepository(pool)
+	lotStateRepo := postgres.NewLotStateRepository(pool)
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
 	storeLoteoDxfHandler := handler.NewStoreLoteoDxfHandler(loteos.NewStoreLoteoDxf(loteoRepo, objectStorage))
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
@@ -99,6 +101,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
 	searchLotesHandler := handler.NewSearchLotesHandler(loteos.NewSearchLotes(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
+	transitionLotState := loteos.NewTransitionLotState(lotStateRepo, userRepo)
 
 	return &Container{
 		CreateUserHandler:      createUserHandler,
@@ -123,6 +126,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		ListLoteosHandler:      listLoteosHandler,
 		SearchLotesHandler:     searchLotesHandler,
 		GetLoteoHandler:        getLoteoHandler,
+		TransitionLotState:    transitionLotState,
 		Pool:                   pool,
 		Verifier:               verifier,
 		ObjectStorage:          objectStorage,
