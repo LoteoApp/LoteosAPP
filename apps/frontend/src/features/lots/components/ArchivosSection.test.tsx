@@ -58,7 +58,7 @@ describe('ArchivosSection', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('uploads a selected file with the chosen categoria', async () => {
+  it('uploads an image file as categoria foto, inferred from its type', async () => {
     const user = userEvent.setup()
     vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([])
     const upload = vi.spyOn(archivosApi, 'uploadLoteoArchivo').mockResolvedValue(archivo)
@@ -66,7 +66,20 @@ describe('ArchivosSection', () => {
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
     await screen.findByText('Todavía no hay archivos.')
 
-    await user.click(screen.getByRole('button', { name: 'Plano' }))
+    const file = new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Subir archivo'), file)
+
+    await waitFor(() => expect(upload).toHaveBeenCalledWith('loteo-1', 'foto', file, 'tok'))
+  })
+
+  it('uploads a PDF file as categoria plano, inferred from its type', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([])
+    const upload = vi.spyOn(archivosApi, 'uploadLoteoArchivo').mockResolvedValue(archivo)
+
+    render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
+    await screen.findByText('Todavía no hay archivos.')
+
     const file = new File(['bytes'], 'plano.pdf', { type: 'application/pdf' })
     await user.upload(screen.getByLabelText('Subir archivo'), file)
 

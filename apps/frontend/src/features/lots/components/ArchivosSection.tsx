@@ -1,14 +1,19 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Upload, X } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
-import { Input } from '../../../shared/ui/input'
-import { Field, FieldLabel } from '../../../shared/ui/field'
-import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/toggle-group'
 import { fetchArchivoContent } from '../api/archivos'
 import { useArchivos, type ArchivoTarget } from '../hooks/use-archivos'
 import type { Archivo, ArchivoCategoria } from '../types'
 
 const ARCHIVO_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf'
+
+// The categoria the backend stores is an implementation detail — the person
+// uploading never chooses "foto" vs. "plano" (that word already means the
+// DXF-derived plan elsewhere in this screen), so it's inferred from the
+// file's own type instead of asked for.
+function categoriaFor(file: File): ArchivoCategoria {
+  return file.type.startsWith('image/') ? 'foto' : 'plano'
+}
 
 type ArchivosSectionProps = {
   target: ArchivoTarget
@@ -18,20 +23,20 @@ type ArchivosSectionProps = {
 
 export default function ArchivosSection({ target, accessToken, canEdit }: ArchivosSectionProps) {
   const { archivos, isLoading, isSubmitting, error, upload, remove } = useArchivos(target, accessToken)
-  const [categoria, setCategoria] = useState<ArchivoCategoria>('foto')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     // Let the same file be picked again right after a failed upload.
     event.target.value = ''
     if (file) {
-      await upload(categoria, file)
+      await upload(categoriaFor(file), file)
     }
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border pt-3">
-      <p className="text-xs font-medium text-muted-foreground">Fotos y planos</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-medium text-muted-foreground">Fotos y documentos</p>
 
       {error && (
         <p className="text-sm text-destructive" role="alert">
@@ -40,32 +45,24 @@ export default function ArchivosSection({ target, accessToken, canEdit }: Archiv
       )}
 
       {canEdit && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Field orientation="horizontal" className="w-fit gap-2">
-            <FieldLabel id={`archivo-categoria-${target.loteoId}`} className="sr-only">
-              Tipo de archivo
-            </FieldLabel>
-            <ToggleGroup
-              variant="outline"
-              value={[categoria]}
-              onValueChange={(next) => {
-                const selected = next[0]
-                if (selected === 'foto' || selected === 'plano') {
-                  setCategoria(selected)
-                }
-              }}
-              aria-labelledby={`archivo-categoria-${target.loteoId}`}
-            >
-              <ToggleGroupItem value="foto">Foto</ToggleGroupItem>
-              <ToggleGroupItem value="plano">Plano</ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
-          <Input
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload aria-hidden />
+            Subir archivo
+          </Button>
+          <input
+            ref={fileInputRef}
             type="file"
             accept={ARCHIVO_ACCEPT}
             onChange={handleFileChange}
             disabled={isSubmitting}
             aria-label="Subir archivo"
+            className="hidden"
           />
         </div>
       )}
@@ -142,7 +139,7 @@ function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, on
     <img src={previewUrl} alt={archivo.nombreOriginal} className="size-full object-cover" />
   ) : (
     <div className="flex size-full items-center justify-center bg-muted text-[0.65rem] font-medium text-muted-foreground">
-      {archivo.categoria === 'plano' ? 'PDF' : 'IMG'}
+      {isImage ? 'IMG' : 'PDF'}
     </div>
   )
 

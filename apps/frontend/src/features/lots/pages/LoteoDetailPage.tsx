@@ -126,11 +126,16 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <LoteoDetailHeader loteo={state.loteo} hasPlan={plan.length > 0} />
-      <ArchivosSection
-        target={{ kind: 'loteo', loteoId: state.loteo.id }}
-        accessToken={accessToken}
-        canEdit={canEdit}
+      <LoteoDetailHeader
+        loteo={state.loteo}
+        hasPlan={plan.length > 0}
+        archivosSlot={
+          <ArchivosSection
+            target={{ kind: 'loteo', loteoId: state.loteo.id }}
+            accessToken={accessToken}
+            canEdit={canEdit}
+          />
+        }
       />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2">

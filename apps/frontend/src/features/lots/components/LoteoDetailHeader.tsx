@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ArrowLeft, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import { cn } from '../../../shared/lib/utils'
@@ -8,9 +9,10 @@ import LoteoStatusBadge from './LoteoStatusBadge'
 type LoteoDetailHeaderProps = {
   loteo: LoteoDetail
   hasPlan: boolean
+  archivosSlot?: ReactNode
 }
 
-export default function LoteoDetailHeader({ loteo, hasPlan }: LoteoDetailHeaderProps) {
+export default function LoteoDetailHeader({ loteo, hasPlan, archivosSlot }: LoteoDetailHeaderProps) {
   const stats = [
     { key: 'Lotes', value: loteo.lotes.length },
     { key: 'Manzanas', value: loteo.manzanas.length },
@@ -45,30 +47,33 @@ export default function LoteoDetailHeader({ loteo, hasPlan }: LoteoDetailHeaderP
         <p className="text-sm text-muted-foreground">{loteo.descripcion}</p>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        {stats.map((stat, index) => (
-          <div
-            key={stat.key}
-            className={cn('flex flex-col', index > 0 && 'border-l border-border pl-5')}
-          >
-            <span className="text-lg font-semibold leading-none tabular-nums">
-              {stat.value}
-            </span>
-            <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-              {stat.key}
-            </span>
-          </div>
-        ))}
-        {createdAt && (
-          <div className="flex flex-col border-l border-border pl-5">
-            <span className="text-lg font-semibold leading-none tabular-nums">
-              {createdAt}
-            </span>
-            <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-              Alta
-            </span>
-          </div>
-        )}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {stats.map((stat, index) => (
+            <div
+              key={stat.key}
+              className={cn('flex flex-col', index > 0 && 'border-l border-border pl-5')}
+            >
+              <span className="text-lg font-semibold leading-none tabular-nums">
+                {stat.value}
+              </span>
+              <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                {stat.key}
+              </span>
+            </div>
+          ))}
+          {createdAt && (
+            <div className="flex flex-col border-l border-border pl-5">
+              <span className="text-lg font-semibold leading-none tabular-nums">
+                {createdAt}
+              </span>
+              <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                Alta
+              </span>
+            </div>
+          )}
+        </div>
+        {archivosSlot}
       </div>
     </header>
   )

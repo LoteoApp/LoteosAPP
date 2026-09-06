@@ -616,6 +616,14 @@ lote). Decisiones:
   quedan fuera de este flujo); el `Content-Type` se limita a
   `image/jpeg`/`png`/`webp` y `application/pdf`, porque lo que se guarda acá
   se sirve de vuelta a un navegador.
+- **`categoria` es un detalle interno, no una elección de quien sube el
+  archivo.** El frontend la infiere del tipo del archivo (imagen → `foto`,
+  cualquier otra cosa → `plano`, ver `categoriaFor` en
+  `features/lots/components/ArchivosSection.tsx`) en vez de pedirla: pedirla
+  no cambiaba ninguna validación ni filtraba el selector de archivos, así que
+  el único efecto real de la elección era confundir "plano" (un documento
+  subido) con "Plano cargado" (el DXF geométrico que ya usa esa palabra en
+  esta misma pantalla).
 - **La baja es lógica y no borra el objeto de R2**, igual que al reemplazar el
   DXF: `fecha_baja` alcanza para que deje de listarse, y no vale la pena la
   complejidad de un borrado sincrónico para un caso de uso de bajo volumen.

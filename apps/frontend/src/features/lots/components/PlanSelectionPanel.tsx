@@ -92,11 +92,13 @@ export default function PlanSelectionPanel({
           ) : (
             <LoteReadOnly lote={lote} />
           )}
-          <ArchivosSection
-            target={{ kind: 'lote', loteoId: loteo.id, loteId: lote.id }}
-            accessToken={accessToken}
-            canEdit={canEdit}
-          />
+          <div className="border-t border-border pt-3">
+            <ArchivosSection
+              target={{ kind: 'lote', loteoId: loteo.id, loteId: lote.id }}
+              accessToken={accessToken}
+              canEdit={canEdit}
+            />
+          </div>
         </CardContent>
       </Card>
     )
