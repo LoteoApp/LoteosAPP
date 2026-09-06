@@ -19,9 +19,18 @@ type ArchivosSectionProps = {
   target: ArchivoTarget
   accessToken: string | null
   canEdit: boolean
+  // The loteo-level usage wraps this in a Card whose CardTitle already reads
+  // "Fotos y documentos" — showing the label a second time here would be
+  // redundant, so that caller turns it off.
+  showLabel?: boolean
 }
 
-export default function ArchivosSection({ target, accessToken, canEdit }: ArchivosSectionProps) {
+export default function ArchivosSection({
+  target,
+  accessToken,
+  canEdit,
+  showLabel = true,
+}: ArchivosSectionProps) {
   const { archivos, isLoading, isSubmitting, error, upload, remove } = useArchivos(target, accessToken)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -36,7 +45,7 @@ export default function ArchivosSection({ target, accessToken, canEdit }: Archiv
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium text-muted-foreground">Fotos y documentos</p>
+      {showLabel && <p className="text-xs font-medium text-muted-foreground">Fotos y documentos</p>}
 
       {error && (
         <p className="text-sm text-destructive" role="alert">

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import ArchivosSection from '../components/ArchivosSection'
 import LoteoDetailHeader from '../components/LoteoDetailHeader'
 import LoteoPlanPanel from '../components/LoteoPlanPanel'
@@ -126,17 +127,21 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <LoteoDetailHeader
-        loteo={state.loteo}
-        hasPlan={plan.length > 0}
-        archivosSlot={
+      <LoteoDetailHeader loteo={state.loteo} hasPlan={plan.length > 0} />
+
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Fotos y documentos</CardTitle>
+        </CardHeader>
+        <CardContent>
           <ArchivosSection
             target={{ kind: 'loteo', loteoId: state.loteo.id }}
             accessToken={accessToken}
             canEdit={canEdit}
+            showLabel={false}
           />
-        }
-      />
+        </CardContent>
+      </Card>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2">
         <LoteoPlanPanel
