@@ -21,6 +21,18 @@ type LoteoRepository struct {
 	ReceivedLoteoID  string
 	ReceivedLoteID   string
 
+	UpdateManzanaCalls  int
+	UpdateManzanaErr    error
+	UpdatedManzana      domain.Manzana
+	ReceivedManzanaData domain.ManzanaData
+	ReceivedManzanaID   string
+
+	UpdateCalleCalls  int
+	UpdateCalleErr    error
+	UpdatedCalle      domain.Calle
+	ReceivedCalleData domain.CalleData
+	ReceivedCalleID   string
+
 	Assigned     bool
 	AssignedErr  error
 	AssignedCall int
@@ -86,6 +98,46 @@ func (fake *LoteoRepository) UpdateLote(
 	}
 
 	return fake.UpdatedLote, nil
+}
+
+func (fake *LoteoRepository) UpdateManzana(
+	_ context.Context,
+	actorAuthProviderID, loteoID, manzanaID string,
+	data domain.ManzanaData,
+) (domain.Manzana, error) {
+	fake.UpdateManzanaCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.ReceivedLoteoID = loteoID
+	fake.ReceivedManzanaID = manzanaID
+	fake.ReceivedManzanaData = data
+	if fake.UpdateManzanaErr != nil {
+		return domain.Manzana{}, fake.UpdateManzanaErr
+	}
+	if fake.UpdatedManzana.ID == "" {
+		return domain.Manzana{ID: manzanaID, Number: data.Number, CalleIDs: data.CalleIDs}, nil
+	}
+
+	return fake.UpdatedManzana, nil
+}
+
+func (fake *LoteoRepository) UpdateCalle(
+	_ context.Context,
+	actorAuthProviderID, loteoID, calleID string,
+	data domain.CalleData,
+) (domain.Calle, error) {
+	fake.UpdateCalleCalls++
+	fake.ActorAuthProviderID = actorAuthProviderID
+	fake.ReceivedLoteoID = loteoID
+	fake.ReceivedCalleID = calleID
+	fake.ReceivedCalleData = data
+	if fake.UpdateCalleErr != nil {
+		return domain.Calle{}, fake.UpdateCalleErr
+	}
+	if fake.UpdatedCalle.ID == "" {
+		return domain.Calle{ID: calleID, Name: data.Name, Type: data.Type}, nil
+	}
+
+	return fake.UpdatedCalle, nil
 }
 
 func (fake *LoteoRepository) List(
