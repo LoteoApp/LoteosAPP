@@ -3,6 +3,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
+import { cn } from '../../../shared/lib/utils'
 import type { NewClientValues } from '../types'
 
 const emptyValues: NewClientValues = {
@@ -100,7 +101,10 @@ export default function NewClientDialog({
           <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {FIELDS.map((field) => (
-                <div key={field.name} className={field.full ? 'sm:col-span-2' : undefined}>
+                <div
+                  key={field.name}
+                  className={cn('flex flex-col gap-1.5', field.full && 'sm:col-span-2')}
+                >
                   <Label htmlFor={`nuevo-cliente-${field.name}`}>{field.label}</Label>
                   <Input
                     id={`nuevo-cliente-${field.name}`}
