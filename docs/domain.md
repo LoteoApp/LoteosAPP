@@ -5,6 +5,24 @@ Describe entidades, roles, reglas de negocio y flujos que el backend y el
 frontend deben implementar. Ver [architecture.md](architecture.md) para cómo
 se organiza el código de cada funcionalidad.
 
+## Estado del lote
+
+Todo lote nace `disponible` y conserva un único estado vigente junto con un
+historial inmutable. Las transiciones admitidas son:
+
+- `disponible -> reservado` al crear una reserva;
+- `disponible -> vendido` para una venta directa;
+- `reservado -> disponible` al vencer o cancelar la reserva;
+- `reservado -> vendido` al convertir la reserva en venta;
+- `vendido -> disponible` al cancelar la venta;
+- `vendido -> finalizado` al completar el pago.
+
+`finalizado` es terminal. Cada evento conserva el origen (`alta`, `reserva`,
+`venta`, `cobranza`, `sistema` o `correccion`), el actor cuando existe, la
+fecha, una razón cuando corresponde y las referencias a reserva o venta. Una
+cancelación manual originada en una reserva o venta exige una justificación.
+El estado vigente solo cambia al agregar un evento al historial.
+
 ## Entidades principales
 
 - **Loteo**: nombre, ubicación (ciudad), descripción, inmobiliarias

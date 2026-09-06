@@ -9,6 +9,7 @@ function lote(overrides: Partial<LoteoLote> = {}): LoteoLote {
     id: 'lt-1',
     manzanaId: 'mz-1',
     numero: '7',
+    estado: 'disponible',
     precio: 150000,
     moneda: 'USD',
     superficie: 300,
