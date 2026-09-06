@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planFromLoteoDetail } from './planFromLoteoDetail'
+import { planFromLoteoDetail, planLabelsFromLoteoDetail } from './planFromLoteoDetail'
 import type { LoteoDetail } from '../types'
 
 const triangle = [
@@ -15,7 +15,7 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
     ubicacion: '',
     descripcion: '',
     contorno: triangle,
-    manzanas: [{ id: 'shared', numero: '1', poligono: triangle }],
+    manzanas: [{ id: 'shared', numero: '1', tieneAgua: false, tieneCloaca: false, tieneLuz: false, tieneGas: false, calleIds: [], poligono: triangle }],
     lotes: [{
       id: 'shared',
       manzanaId: 'shared',
@@ -43,6 +43,23 @@ describe('planFromLoteoDetail', () => {
       'CALLE',
     ])
     expect(polygons.every((polygon) => polygon.vertices.length === 3)).toBe(true)
+    expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.caption).toBe('1')
+    expect(polygons.find((polygon) => polygon.layer === 'MANZANA')?.caption).toBe('1')
+    expect(polygons.find((polygon) => polygon.layer === 'CALLE')?.caption).toBe('Los Álamos')
+  })
+
+  it('omits captions when the number or name has not been loaded yet', () => {
+    const polygons = planFromLoteoDetail(
+      detail({
+        manzanas: [{ ...detail().manzanas[0], numero: '' }],
+        lotes: [{ ...detail().lotes[0], numero: '' }],
+        calles: [{ ...detail().calles[0], nombre: '' }],
+      }),
+    )
+
+    expect(polygons.find((polygon) => polygon.layer === 'MANZANA')?.caption).toBeUndefined()
+    expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.caption).toBeUndefined()
+    expect(polygons.find((polygon) => polygon.layer === 'CALLE')?.caption).toBeUndefined()
   })
 
   it('keeps ids unique even when a lote and a manzana share a database id', () => {
@@ -58,7 +75,7 @@ describe('planFromLoteoDetail', () => {
     const polygons = planFromLoteoDetail(
       detail({
         contorno: [],
-        manzanas: [{ id: 'mz-1', numero: '1', poligono: [] }],
+        manzanas: [{ id: 'mz-1', numero: '1', tieneAgua: false, tieneCloaca: false, tieneLuz: false, tieneGas: false, calleIds: [], poligono: [] }],
       }),
     )
 
@@ -89,5 +106,63 @@ describe('planFromLoteoDetail', () => {
     )
 
     expect(polygons).toEqual([])
+  })
+
+  it('attaches a typed entity ref per layer', () => {
+    const polygons = planFromLoteoDetail(detail())
+
+    expect(polygons.map((polygon) => polygon.entity)).toEqual([
+      { kind: 'loteo' },
+      { kind: 'manzana', id: 'shared' },
+      { kind: 'lote', id: 'shared' },
+      { kind: 'calle', id: 'ca-1' },
+    ])
+  })
+})
+
+describe('planLabelsFromLoteoDetail', () => {
+  it('labels each polygon by its domain name', () => {
+    const labels = planLabelsFromLoteoDetail(detail())
+
+    expect(labels.get('loteo')).toBe('Contorno del loteo')
+    expect(labels.get('manzana-shared')).toBe('Manzana 1')
+    expect(labels.get('lote-shared')).toBe('Lote 1')
+    expect(labels.get('calle-ca-1')).toBe('Calle Los Álamos')
+  })
+
+  it('falls back when a lote or calle has no number or name yet', () => {
+    const labels = planLabelsFromLoteoDetail(
+      detail({
+        lotes: [{ ...detail().lotes[0], numero: '' }],
+        manzanas: [{ ...detail().manzanas[0], numero: '' }],
+        calles: [{ ...detail().calles[0], nombre: '' }],
+      }),
+    )
+
+    expect(labels.get('lote-shared')).toBe('Lote')
+    expect(labels.get('manzana-shared')).toBe('Manzana')
+    expect(labels.get('calle-ca-1')).toBe('Calle')
+  })
+
+  it('skips entities that have no ring', () => {
+    const labels = planLabelsFromLoteoDetail(
+      detail({
+        contorno: [],
+        manzanas: [{
+          id: 'mz-1',
+          numero: '1',
+          tieneAgua: false,
+          tieneCloaca: false,
+          tieneLuz: false,
+          tieneGas: false,
+          calleIds: [],
+          poligono: [],
+        }],
+      }),
+    )
+
+    expect(labels.has('loteo')).toBe(false)
+    expect(labels.has('manzana-mz-1')).toBe(false)
+    expect(labels.has('lote-shared')).toBe(true)
   })
 })

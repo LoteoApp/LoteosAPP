@@ -1,4 +1,6 @@
+import { Info } from 'lucide-react'
 import { cn } from '../../../shared/lib/utils'
+import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import {
   Card,
   CardContent,
@@ -17,6 +19,9 @@ type LoteoPlanPanelProps = {
   visibleLayers: ReadonlySet<DxfLayer>
   onVisibleLayersChange: (layers: ReadonlySet<DxfLayer>) => void
   className?: string
+  selectedPolygonId?: string | null
+  onSelectPolygon?: (polygonId: string | null) => void
+  polygonLabels?: ReadonlyMap<string, string>
 }
 
 export default function LoteoPlanPanel({
@@ -24,8 +29,15 @@ export default function LoteoPlanPanel({
   visibleLayers,
   onVisibleLayersChange,
   className,
+  selectedPolygonId,
+  onSelectPolygon,
+  polygonLabels,
 }: LoteoPlanPanelProps) {
   const hasPlan = polygons.length > 0
+  const lotsCoverManzanas =
+    onSelectPolygon !== undefined &&
+    visibleLayers.has('LOTES') &&
+    visibleLayers.has('MANZANA')
 
   return (
     <Card size="sm" className={cn('flex min-h-0 flex-col', className)}>
@@ -44,10 +56,22 @@ export default function LoteoPlanPanel({
             onVisibleLayersChange={onVisibleLayersChange}
           />
         )}
+        {lotsCoverManzanas ? (
+          <Alert>
+            <Info aria-hidden />
+            <AlertDescription>
+              Los lotes se dibujan encima de las manzanas. Para seleccionar una
+              manzana, apagá la capa Lotes.
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <DxfViewer
           polygons={polygons}
           visibleLayers={visibleLayers}
           emptyMessage={NO_PLAN_MESSAGE}
+          selectedPolygonId={selectedPolygonId}
+          onSelectPolygon={onSelectPolygon}
+          polygonLabels={polygonLabels}
         />
       </CardContent>
     </Card>

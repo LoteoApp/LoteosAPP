@@ -37,16 +37,25 @@ function toPolygon(value: unknown): DxfPoint[] {
   return isPointArray(value) ? value.map((point) => ({ x: point.x, y: point.y })) : []
 }
 
-function isManzana(value: unknown): value is Record<string, unknown> {
+export function isManzana(value: unknown): value is Record<string, unknown> {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.numero === 'string' &&
+    (value.tieneAgua === undefined || typeof value.tieneAgua === 'boolean') &&
+    (value.tieneCloaca === undefined || typeof value.tieneCloaca === 'boolean') &&
+    (value.tieneLuz === undefined || typeof value.tieneLuz === 'boolean') &&
+    (value.tieneGas === undefined || typeof value.tieneGas === 'boolean') &&
+    (value.calleIds === undefined || isStringArray(value.calleIds)) &&
     isOptionalPointArray(value.poligono)
   )
 }
 
-function isLote(value: unknown): value is Record<string, unknown> {
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+export function isLote(value: unknown): value is Record<string, unknown> {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
@@ -60,7 +69,7 @@ function isLote(value: unknown): value is Record<string, unknown> {
   )
 }
 
-function isCalle(value: unknown): value is Record<string, unknown> {
+export function isCalle(value: unknown): value is Record<string, unknown> {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
@@ -90,15 +99,20 @@ function isLoteoDetailResponse(value: unknown): value is Record<string, unknown>
   )
 }
 
-function toManzana(raw: Record<string, unknown>): LoteoManzana {
+export function toManzana(raw: Record<string, unknown>): LoteoManzana {
   return {
     id: raw.id as string,
     numero: raw.numero as string,
+    tieneAgua: raw.tieneAgua === true,
+    tieneCloaca: raw.tieneCloaca === true,
+    tieneLuz: raw.tieneLuz === true,
+    tieneGas: raw.tieneGas === true,
+    calleIds: isStringArray(raw.calleIds) ? raw.calleIds : [],
     poligono: toPolygon(raw.poligono),
   }
 }
 
-function toLote(raw: Record<string, unknown>): LoteoLote {
+export function toLote(raw: Record<string, unknown>): LoteoLote {
   return {
     id: raw.id as string,
     manzanaId: raw.manzanaId as string,
@@ -111,7 +125,7 @@ function toLote(raw: Record<string, unknown>): LoteoLote {
   }
 }
 
-function toCalle(raw: Record<string, unknown>): LoteoCalle {
+export function toCalle(raw: Record<string, unknown>): LoteoCalle {
   return {
     id: raw.id as string,
     nombre: raw.nombre as string,

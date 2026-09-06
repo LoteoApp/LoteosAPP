@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../../shared/api/client'
 import { getLoteo } from '../api/get-loteo'
-import type { LoteoDetail } from '../types'
+import type { LoteoCalle, LoteoDetail, LoteoLote, LoteoManzana } from '../types'
 
 const SESSION_EXPIRED_MESSAGE =
   'Tu sesión expiró. Volvé a iniciar sesión y probá de nuevo.'
@@ -31,7 +31,13 @@ function pending(token: string): UseLoteo {
     : { status: 'loading' }
 }
 
-export function useLoteo(loteoId: string, token: string): UseLoteo {
+export type UseLoteoResult = UseLoteo & {
+  replaceLote: (lote: LoteoLote) => void
+  replaceManzana: (manzana: LoteoManzana) => void
+  replaceCalle: (calle: LoteoCalle) => void
+}
+
+export function useLoteo(loteoId: string, token: string): UseLoteoResult {
   const [state, setState] = useState<UseLoteo>(() => pending(token))
 
   // Reset to the pending state during render when the request key changes, so
@@ -72,5 +78,68 @@ export function useLoteo(loteoId: string, token: string): UseLoteo {
     }
   }, [loteoId, token])
 
-  return state
+  const replaceLote = useCallback((lote: LoteoLote) => {
+    setState((current) => {
+      if (current.status !== 'loaded') {
+        return current
+      }
+      return {
+        ...current,
+        loteo: {
+          ...current.loteo,
+          lotes: current.loteo.lotes.map((item) =>
+            item.id === lote.id
+              ? { ...lote, poligono: lote.poligono.length > 0 ? lote.poligono : item.poligono }
+              : item,
+          ),
+        },
+      }
+    })
+  }, [])
+
+  const replaceManzana = useCallback((manzana: LoteoManzana) => {
+    setState((current) => {
+      if (current.status !== 'loaded') {
+        return current
+      }
+      return {
+        ...current,
+        loteo: {
+          ...current.loteo,
+          manzanas: current.loteo.manzanas.map((item) =>
+            item.id === manzana.id
+              ? {
+                  ...manzana,
+                  poligono: manzana.poligono.length > 0 ? manzana.poligono : item.poligono,
+                }
+              : item,
+          ),
+        },
+      }
+    })
+  }, [])
+
+  const replaceCalle = useCallback((calle: LoteoCalle) => {
+    setState((current) => {
+      if (current.status !== 'loaded') {
+        return current
+      }
+      return {
+        ...current,
+        loteo: {
+          ...current.loteo,
+          calles: current.loteo.calles.map((item) =>
+            item.id === calle.id
+              ? {
+                  ...calle,
+                  poligono: calle.poligono.length > 0 ? calle.poligono : item.poligono,
+                }
+              : item,
+          ),
+        },
+      }
+    })
+  }, [])
+
+  return { ...state, replaceLote, replaceManzana, replaceCalle }
 }

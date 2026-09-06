@@ -12,8 +12,8 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
     descripcion: 'Sobre ruta E-53.',
     contorno: [],
     manzanas: [
-      { id: 'mz-1', numero: '1', poligono: [] },
-      { id: 'mz-2', numero: '2', poligono: [] },
+      { id: 'mz-1', numero: '1', tieneAgua: false, tieneCloaca: false, tieneLuz: false, tieneGas: false, calleIds: [], poligono: [] },
+      { id: 'mz-2', numero: '2', tieneAgua: false, tieneCloaca: false, tieneLuz: false, tieneGas: false, calleIds: [], poligono: [] },
     ],
     lotes: [],
     calles: [{ id: 'ca-1', nombre: 'Los Álamos', tipo: 'asfalto', poligono: [] }],

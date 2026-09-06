@@ -35,6 +35,8 @@ type Container struct {
 	CreateLoteoHandler     *handler.CreateLoteoHandler
 	StoreLoteoDxfHandler   *handler.StoreLoteoDxfHandler
 	UpdateLoteHandler      *handler.UpdateLoteHandler
+	UpdateManzanaHandler   *handler.UpdateManzanaHandler
+	UpdateCalleHandler     *handler.UpdateCalleHandler
 	ListLoteosHandler      *handler.ListLoteosHandler
 	GetLoteoHandler        *handler.GetLoteoHandler
 	Pool                   *pgxpool.Pool
@@ -91,6 +93,8 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createLoteoHandler := handler.NewCreateLoteoHandler(loteos.NewCreateLoteo(loteoRepo))
 	storeLoteoDxfHandler := handler.NewStoreLoteoDxfHandler(loteos.NewStoreLoteoDxf(loteoRepo, objectStorage))
 	updateLoteHandler := handler.NewUpdateLoteHandler(loteos.NewUpdateLote(loteoRepo))
+	updateManzanaHandler := handler.NewUpdateManzanaHandler(loteos.NewUpdateManzana(loteoRepo))
+	updateCalleHandler := handler.NewUpdateCalleHandler(loteos.NewUpdateCalle(loteoRepo))
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
 
@@ -112,6 +116,8 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		CreateLoteoHandler:     createLoteoHandler,
 		StoreLoteoDxfHandler:   storeLoteoDxfHandler,
 		UpdateLoteHandler:      updateLoteHandler,
+		UpdateManzanaHandler:   updateManzanaHandler,
+		UpdateCalleHandler:     updateCalleHandler,
 		ListLoteosHandler:      listLoteosHandler,
 		GetLoteoHandler:        getLoteoHandler,
 		Pool:                   pool,
