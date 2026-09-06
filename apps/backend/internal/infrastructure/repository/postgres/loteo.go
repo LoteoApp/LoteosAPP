@@ -929,7 +929,8 @@ func (repository *LoteoRepository) SearchLotes(
 		var lote domain.LoteSummary
 		if err := rows.Scan(
 			&lote.ID, &lote.Number, &lote.ManzanaID, &lote.ManzanaNumber,
-			&lote.LoteoID, &lote.LoteoName, &lote.Price, &lote.Currency, &lote.Area,
+			&lote.LoteoID, &lote.LoteoName, &lote.State,
+			&lote.Price, &lote.Currency, &lote.Area,
 		); err != nil {
 			return nil, err
 		}
