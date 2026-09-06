@@ -467,6 +467,7 @@ type LoteSummary struct {
 	ManzanaNumber string   `json:"manzanaNumero"`
 	LoteoID       string   `json:"loteoId"`
 	LoteoName     string   `json:"loteoNombre"`
+	State         LotState `json:"estado"`
 	Price         *float64 `json:"precio"`
 	Currency      string   `json:"moneda"`
 	Area          *float64 `json:"superficie"`

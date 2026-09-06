@@ -883,6 +883,7 @@ var searchLotesSQL = `
 		COALESCE(m.numero, ''),
 		l.id::text,
 		l.nombre,
+		lo.estado_actual,
 		lo.precio::float8,
 		COALESCE(lo.moneda, ''),
 		lo.superficie::float8
@@ -896,6 +897,7 @@ var searchLotesSQL = `
 			OR COALESCE(lo.numero, '') ILIKE $2 ESCAPE '\'
 			OR COALESCE(m.numero, '') ILIKE $2 ESCAPE '\'
 			OR l.nombre ILIKE $2 ESCAPE '\')
+		AND ($6 = '' OR lo.estado_actual = $6)
 		AND ` + fmt.Sprintf(loteoScopedPredicate, 3, 4, 5) + `
 	ORDER BY l.nombre, m.numero, lo.numero, lo.id
 `
@@ -905,12 +907,13 @@ var searchLotesSQL = `
 // empty result rather than an error, the same way List does.
 func (repository *LoteoRepository) SearchLotes(
 	ctx context.Context,
-	search string,
+	filter gateway.LoteFilter,
 	scope gateway.LoteoScope,
 ) ([]domain.LoteSummary, error) {
 	rows, err := repository.pool.Query(ctx, searchLotesSQL,
-		search, containsPattern(search),
+		filter.Search, containsPattern(filter.Search),
 		scope.AssigneeAuthProviderID, scope.ByUserAssignment, scope.ByAgencyAssignment,
+		string(filter.State),
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError

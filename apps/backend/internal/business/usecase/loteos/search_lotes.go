@@ -11,6 +11,10 @@ import (
 type SearchLotesInput struct {
 	Actor  Actor
 	Search string
+	// State, when set, keeps only the lotes in that state. A sale form asks
+	// for domain.LotStateAvailable so it never offers a lote that is already
+	// reserved or sold.
+	State domain.LotState
 }
 
 // SearchLotes returns the lotes the actor may see as summaries, so a caller
@@ -39,13 +43,17 @@ func (useCase *searchLotesUseCase) Execute(
 		!domain.HasRole(input.Actor.Roles, domain.RolInmobiliaria) {
 		return nil, domain.ErrNoAutorizado
 	}
+	if input.State != "" && !input.State.IsValid() {
+		return nil, domain.ErrInvalidLotState
+	}
 
 	scope, err := loteoVisibility(input.Actor)
 	if err != nil {
 		return nil, err
 	}
 
-	lotes, err := useCase.repository.SearchLotes(ctx, strings.TrimSpace(input.Search), scope)
+	filter := gateway.LoteFilter{Search: strings.TrimSpace(input.Search), State: input.State}
+	lotes, err := useCase.repository.SearchLotes(ctx, filter, scope)
 	if err != nil {
 		return nil, fromRepository(err)
 	}

@@ -56,7 +56,7 @@ type LoteoRepository struct {
 	SearchLotesCalls  int
 	SearchLotesErr    error
 	SearchLotesResult []domain.LoteSummary
-	SearchLotesSearch string
+	SearchLotesFilter gateway.LoteFilter
 	SearchLotesScope  gateway.LoteoScope
 
 	GetCalls   int
@@ -224,11 +224,11 @@ func (fake *LoteoRepository) RecordDxfFile(
 
 func (fake *LoteoRepository) SearchLotes(
 	_ context.Context,
-	search string,
+	filter gateway.LoteFilter,
 	scope gateway.LoteoScope,
 ) ([]domain.LoteSummary, error) {
 	fake.SearchLotesCalls++
-	fake.SearchLotesSearch = search
+	fake.SearchLotesFilter = filter
 	fake.SearchLotesScope = scope
 	if fake.SearchLotesErr != nil {
 		return nil, fake.SearchLotesErr

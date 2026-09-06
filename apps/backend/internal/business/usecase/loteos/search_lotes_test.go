@@ -37,8 +37,8 @@ func TestSearchLotesLetsUnrestrictedRolesReachEveryLote(t *testing.T) {
 					*repository.SearchLotesScope.AssigneeAuthProviderID,
 				)
 			}
-			if repository.SearchLotesSearch != "7" {
-				t.Errorf("search = %q, want it trimmed", repository.SearchLotesSearch)
+			if repository.SearchLotesFilter.Search != "7" {
+				t.Errorf("search = %q, want it trimmed", repository.SearchLotesFilter.Search)
 			}
 		})
 	}
@@ -102,5 +102,56 @@ func TestSearchLotesReportsARepositoryFailure(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("Execute() error = nil, want the repository failure reported")
+	}
+}
+
+func TestSearchLotesPassesTheRequestedStateToTheRepository(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.LoteoRepository{}
+	useCase := loteos.NewSearchLotes(repository)
+
+	if _, err := useCase.Execute(context.Background(), loteos.SearchLotesInput{
+		Actor: actorWith(domain.RolAdministrador), State: domain.LotStateAvailable,
+	}); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if repository.SearchLotesFilter.State != domain.LotStateAvailable {
+		t.Errorf("state = %q, want %q", repository.SearchLotesFilter.State, domain.LotStateAvailable)
+	}
+}
+
+func TestSearchLotesWithoutAStateLeavesEveryStateReachable(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.LoteoRepository{}
+	useCase := loteos.NewSearchLotes(repository)
+
+	if _, err := useCase.Execute(context.Background(), loteos.SearchLotesInput{
+		Actor: actorWith(domain.RolAdministrador),
+	}); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if repository.SearchLotesFilter.State != "" {
+		t.Errorf("state = %q, want it empty so every state is listed", repository.SearchLotesFilter.State)
+	}
+}
+
+func TestSearchLotesRejectsAnUnknownState(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.LoteoRepository{}
+	useCase := loteos.NewSearchLotes(repository)
+
+	_, err := useCase.Execute(context.Background(), loteos.SearchLotesInput{
+		Actor: actorWith(domain.RolAdministrador), State: domain.LotState("rifado"),
+	})
+	if !errors.Is(err, domain.ErrInvalidLotState) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidLotState)
+	}
+	if repository.SearchLotesCalls != 0 {
+		t.Errorf("SearchLotesCalls = %d, want the repository untouched", repository.SearchLotesCalls)
 	}
 }
