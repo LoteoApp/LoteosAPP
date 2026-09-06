@@ -420,6 +420,21 @@ Decisiones de este recorte:
   cuatro valores del contrato y `LotStateBadge` presenta una etiqueta común
   en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
   se ofrece un selector libre.
+- **La pantalla de venta todavía no persiste nada.** `features/sales` resuelve
+  la selección de lote, cliente e inmobiliaria contra endpoints existentes;
+  el alta de la venta y la transición del lote a `vendido` quedan para la
+  entrega siguiente. `GET /api/v1/lotes` alimenta el buscador de lotes: es la
+  única pieza de backend que agrega, devuelve cada lote con su manzana, su
+  loteo y su estado, y acepta `?q=` y `?estado=`. La pantalla pide
+  `estado=disponible` para no ofrecer un lote reservado o vendido, y el scope
+  por rol es el mismo de `ListLoteos`, así que una inmobiliaria solo alcanza
+  los lotes de los loteos de su agencia.
+- **Ventas no importa `clients` ni `agencies`.** Como una feature no toca los
+  archivos de otra, `SalesPage` recibe `loadLotes`, `loadClientes`,
+  `createCliente` y `loadAgencies` como props, y `app/SalesRoute.tsx` inyecta
+  las implementaciones. `loadAgencies` llega sin definir cuando el usuario
+  tiene rol inmobiliaria: la venta es de su propia agencia, así que el
+  selector no se muestra.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive

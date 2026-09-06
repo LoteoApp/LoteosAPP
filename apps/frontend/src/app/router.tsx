@@ -9,7 +9,7 @@ import LoteosRoute from './LoteosRoute'
 import LoteoDetailRoute from './LoteoDetailRoute'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsPage from '../features/reservations/pages/ReservationsPage'
-import SalesPage from '../features/sales/pages/SalesPage'
+import SalesRoute from './SalesRoute'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersRoute from './UsersRoute'
 import AgenciesRoute from './AgenciesRoute'
@@ -56,7 +56,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/ventas',
-        element: <SalesPage />,
+        element: <SalesRoute />,
       },
       {
         path: '/cobranzas',
