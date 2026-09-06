@@ -435,6 +435,13 @@ Decisiones de este recorte:
   las implementaciones. `loadAgencies` llega sin definir cuando el usuario
   tiene rol inmobiliaria: la venta es de su propia agencia, así que el
   selector no se muestra.
+- **De las tres modalidades de pago solo está implementada `contado`.** El
+  selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`
+  y `entrega_financiada` deshabilitadas y rotuladas «(próximamente)»: la
+  feature que las agregue solo tiene que sumarlas a
+  `AVAILABLE_PAYMENT_METHODS` y agregar sus campos. En contado el monto no se
+  escribe — es el precio del lote elegido, mostrado en su moneda. Un lote sin
+  precio cargado avisa en lugar de dejar seguir.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive

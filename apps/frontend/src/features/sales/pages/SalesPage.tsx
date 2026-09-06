@@ -5,11 +5,13 @@ import AgencyCombobox from '../components/AgencyCombobox'
 import ClientCombobox from '../components/ClientCombobox'
 import LoteCombobox from '../components/LoteCombobox'
 import NewClientDialog from '../components/NewClientDialog'
+import PaymentConditions from '../components/PaymentConditions'
 import type {
   AgencyOption,
   ClienteOption,
   LoteOption,
   NewClientValues,
+  PaymentMethod,
 } from '../types'
 
 export type SalesPageProps = {
@@ -34,6 +36,7 @@ export default function SalesPage({
   const [agencies, setAgencies] = useState<AgencyOption[]>([])
 
   const [lote, setLote] = useState<LoteOption | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
   const [cliente, setCliente] = useState<ClienteOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
 
@@ -117,7 +120,12 @@ export default function SalesPage({
           <CardTitle>Datos de la venta</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <LoteCombobox lotes={lotes} value={lote} onChange={setLote} isLoading={isLoading} />
+          <LoteCombobox
+            lotes={lotes}
+            value={lote}
+            onChange={setLote}
+            isLoading={isLoading}
+          />
           <ClientCombobox
             clientes={clientes}
             value={cliente}
@@ -136,6 +144,12 @@ export default function SalesPage({
               isLoading={isLoading}
             />
           )}
+          <PaymentConditions
+            method={paymentMethod}
+            lote={lote}
+            onMethodChange={setPaymentMethod}
+            disabled={isLoading}
+          />
         </CardContent>
       </Card>
 

@@ -55,3 +55,22 @@ export type NewClientValues = {
 export function clienteOptionLabel(cliente: ClienteOption): string {
   return `${cliente.apellido}, ${cliente.nombre} · DNI ${cliente.dni}`
 }
+
+// The three modalidades of the ventas.modalidad_pago contract. Only `contado`
+// is implemented; the other two are listed so the selector is already in
+// place for the feature that adds them.
+export const PAYMENT_METHODS = ['contado', 'financiado', 'entrega_financiada'] as const
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  contado: 'Contado',
+  financiado: 'Financiado',
+  entrega_financiada: 'Entrega + financiación',
+}
+
+const AVAILABLE_PAYMENT_METHODS: readonly PaymentMethod[] = ['contado']
+
+export function isPaymentMethodAvailable(method: PaymentMethod): boolean {
+  return AVAILABLE_PAYMENT_METHODS.includes(method)
+}
