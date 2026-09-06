@@ -121,6 +121,13 @@ Los dos tests de PostgreSQL borran lo que crearon. El test de R2 escribe en el
 bucket del entorno y también limpia antes de terminar; no correrlo apuntando a
 un bucket de producción.
 
+La suite `postgres.TestLoteoRepository` también cubre el estado inicial, las
+transiciones atómicas, los conflictos por estado esperado obsoleto y dos
+compare-and-set concurrentes sobre el mismo lote. La suite
+`migrate.TestEntityModelStateHistory` aplica las migraciones en un schema
+descartable y verifica el backfill, los triggers, la justificación obligatoria
+y que el historial del lote sea append-only.
+
 ## Prueba manual del alta de loteo
 
 El alta (`POST /api/v1/loteos`), el listado y el detalle ya tienen pantalla; la

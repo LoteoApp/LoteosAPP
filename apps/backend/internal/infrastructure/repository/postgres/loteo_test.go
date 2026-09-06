@@ -67,6 +67,7 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	repository := postgres.NewLoteoRepository(pool)
+	stateRepository := postgres.NewLotStateRepository(pool)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
 
@@ -126,6 +127,25 @@ func TestLoteoRepositoryWithoutAReachableDatabase(t *testing.T) {
 			t.Error("Get() should fail when the database is unreachable")
 		}
 	})
+
+	t.Run("lote state lookup", func(t *testing.T) {
+		exists, err := stateRepository.LotExists(ctx, newUUID(t), newUUID(t), unrestrictedScope)
+		if err == nil {
+			t.Error("LotExists() should fail when the database is unreachable")
+		}
+		if exists {
+			t.Error("LotExists() should not report a lote it could not read")
+		}
+	})
+
+	t.Run("lote state transition", func(t *testing.T) {
+		_, err := stateRepository.Transition(ctx, stateTransition(
+			newUUID(t), newUUID(t), domain.LotStateAvailable, domain.LotStateReserved,
+		))
+		if err == nil {
+			t.Error("Transition() should fail when the database is unreachable")
+		}
+	})
 }
 
 // TestLoteoRepository is an integration test: it needs a real PostgreSQL
@@ -144,7 +164,9 @@ func TestLoteoRepository(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	repository := postgres.NewLoteoRepository(pool)
+	stateRepository := postgres.NewLotStateRepository(pool)
 	actor := createUsuario(t, pool)
+	stateClientID := createStateClient(t, pool)
 
 	t.Run("create without a plan", func(t *testing.T) {
 		loteo, err := repository.Create(context.Background(), actor, domain.NewLoteo{
@@ -258,25 +280,253 @@ func TestLoteoRepository(t *testing.T) {
 		if lote.ManzanaID != loteo.Manzanas[1].ID {
 			t.Errorf("UpdateLote() should keep the lote's manzana, got %q", lote.ManzanaID)
 		}
+		if lote.State != domain.LotStateAvailable {
+			t.Errorf("UpdateLote() state = %q, want %q", lote.State, domain.LotStateAvailable)
+		}
 	})
 
 	t.Run("update a lote clears the values that were not sent", func(t *testing.T) {
 		loteo := createLoteoWithPlan(t, pool, repository, actor)
 		price := 1000.0
 
-		loteID := loteo.Lotes[0].ID
-		if _, err := repository.UpdateLote(context.Background(), actor, loteo.ID, loteID, domain.LoteData{
+		lotID := loteo.Lotes[0].ID
+		if _, err := repository.UpdateLote(context.Background(), actor, loteo.ID, lotID, domain.LoteData{
 			Number: "12", Price: &price, Currency: "ARS",
 		}); err != nil {
 			t.Fatalf("UpdateLote() error = %v", err)
 		}
 
-		lote, err := repository.UpdateLote(context.Background(), actor, loteo.ID, loteID, domain.LoteData{Number: "12"})
+		lote, err := repository.UpdateLote(context.Background(), actor, loteo.ID, lotID, domain.LoteData{Number: "12"})
 		if err != nil {
 			t.Fatalf("UpdateLote() error = %v", err)
 		}
 		if lote.Price != nil || lote.Currency != "" {
 			t.Errorf("UpdateLote() = %#v, want the price cleared", lote)
+		}
+	})
+
+	t.Run("new lotes start available with one history event", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		var state, origin string
+		var events int
+		err := pool.QueryRow(context.Background(), `
+			SELECT lo.estado_actual, max(le.origen), count(le.id)
+			FROM lotes lo
+			JOIN lote_estados le ON le.lote_id = lo.id
+			WHERE lo.id = $1::uuid
+			GROUP BY lo.estado_actual
+		`, loteo.Lotes[0].ID).Scan(&state, &origin, &events)
+		if err != nil {
+			t.Fatalf("read initial lote state: %v", err)
+		}
+		if state != string(domain.LotStateAvailable) || origin != string(domain.LotStateOriginCreation) || events != 1 {
+			t.Fatalf("initial state = %q, origin = %q, events = %d", state, origin, events)
+		}
+	})
+
+	t.Run("transitions current state and history atomically", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		command := stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved)
+		reservationID := createLotReservation(t, pool, actor, stateClientID, loteo.Lotes[0].ID)
+		command.ReservationID = &reservationID
+
+		event, err := stateRepository.Transition(context.Background(), command)
+		if err != nil {
+			t.Fatalf("Transition() error = %v", err)
+		}
+		if event.ID == "" || event.PreviousState != domain.LotStateAvailable || event.State != domain.LotStateReserved || event.OccurredAt.IsZero() {
+			t.Errorf("Transition() = %#v", event)
+		}
+
+		var state string
+		var events int
+		if err := pool.QueryRow(context.Background(), `
+			SELECT lo.estado_actual, count(le.id)
+			FROM lotes lo
+			JOIN lote_estados le ON le.lote_id = lo.id
+			WHERE lo.id = $1::uuid
+			GROUP BY lo.estado_actual
+		`, loteo.Lotes[0].ID).Scan(&state, &events); err != nil {
+			t.Fatalf("read transitioned lote: %v", err)
+		}
+		if state != string(domain.LotStateReserved) || events != 2 {
+			t.Errorf("state = %q with %d events, want reservado with 2", state, events)
+		}
+	})
+
+	t.Run("transition rejects a missing or malformed lote id", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+
+		for name, lotID := range map[string]string{
+			"missing":   newUUID(t),
+			"malformed": "not-a-uuid",
+		} {
+			t.Run(name, func(t *testing.T) {
+				command := stateTransition(loteo.ID, lotID, domain.LotStateAvailable, domain.LotStateReserved)
+				_, err := stateRepository.Transition(context.Background(), command)
+				if !errors.Is(err, domain.ErrLoteNotFound) {
+					t.Fatalf("Transition() error = %v, want %v", err, domain.ErrLoteNotFound)
+				}
+			})
+		}
+	})
+
+	t.Run("transition returns unexpected write errors", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		command := stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved)
+		reservationID := createLotReservation(t, pool, actor, stateClientID, loteo.Lotes[0].ID)
+		command.ReservationID = &reservationID
+		command.ActorID = "not-a-uuid"
+
+		if _, err := stateRepository.Transition(context.Background(), command); err == nil {
+			t.Fatal("Transition() error = nil, want the invalid actor write to fail")
+		}
+		assertLotStateEventCount(t, pool, loteo.Lotes[0].ID, 1)
+	})
+
+	t.Run("rejects a stale expected state without appending history", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		first := stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved)
+		reservationID := createLotReservation(t, pool, actor, stateClientID, loteo.Lotes[0].ID)
+		first.ReservationID = &reservationID
+		if _, err := stateRepository.Transition(context.Background(), first); err != nil {
+			t.Fatalf("first Transition() error = %v", err)
+		}
+
+		stale := stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved)
+		stale.ReservationID = &reservationID
+		_, err := stateRepository.Transition(context.Background(), stale)
+		if !errors.Is(err, domain.ErrLotStateConflict) {
+			t.Fatalf("stale Transition() error = %v, want %v", err, domain.ErrLotStateConflict)
+		}
+		assertLotStateEventCount(t, pool, loteo.Lotes[0].ID, 2)
+	})
+
+	t.Run("orders history from newest to oldest", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		lotID := loteo.Lotes[0].ID
+		reservationID := createLotReservation(t, pool, actor, stateClientID, lotID)
+		commands := []domain.LotStateTransition{
+			stateTransition(loteo.ID, lotID, domain.LotStateAvailable, domain.LotStateReserved),
+			stateTransition(loteo.ID, lotID, domain.LotStateReserved, domain.LotStateAvailable),
+		}
+		for _, command := range commands {
+			command.ReservationID = &reservationID
+			if _, err := stateRepository.Transition(context.Background(), command); err != nil {
+				t.Fatalf("Transition() error = %v", err)
+			}
+		}
+
+		rows, err := pool.Query(context.Background(), `
+			SELECT estado FROM lote_estados
+			WHERE lote_id = $1::uuid
+			ORDER BY fecha_creacion DESC, id DESC
+		`, lotID)
+		if err != nil {
+			t.Fatalf("query lote history: %v", err)
+		}
+		defer rows.Close()
+
+		var states []domain.LotState
+		for rows.Next() {
+			var state domain.LotState
+			if err := rows.Scan(&state); err != nil {
+				t.Fatalf("scan lote history: %v", err)
+			}
+			states = append(states, state)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("read lote history: %v", err)
+		}
+		want := []domain.LotState{domain.LotStateAvailable, domain.LotStateReserved, domain.LotStateAvailable}
+		if len(states) != len(want) {
+			t.Fatalf("history = %v, want %v", states, want)
+		}
+		for index := range want {
+			if states[index] != want[index] {
+				t.Fatalf("history = %v, want %v", states, want)
+			}
+		}
+	})
+
+	t.Run("rejects an invalid transition without appending history", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		command := stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateCompleted)
+
+		_, err := stateRepository.Transition(context.Background(), command)
+		if !errors.Is(err, domain.ErrInvalidLotStateTransition) {
+			t.Fatalf("Transition() error = %v, want %v", err, domain.ErrInvalidLotStateTransition)
+		}
+		assertLotStateEventCount(t, pool, loteo.Lotes[0].ID, 1)
+	})
+
+	t.Run("exactly one concurrent compare-and-set wins", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		reservationID := createLotReservation(t, pool, actor, stateClientID, loteo.Lotes[0].ID)
+		commands := []domain.LotStateTransition{
+			stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved),
+			stateTransition(loteo.ID, loteo.Lotes[0].ID, domain.LotStateAvailable, domain.LotStateReserved),
+		}
+		commands[0].ReservationID = &reservationID
+		commands[1].ReservationID = &reservationID
+
+		start := make(chan struct{})
+		errorsByCall := make(chan error, len(commands))
+		var workers sync.WaitGroup
+		for _, command := range commands {
+			workers.Add(1)
+			go func(command domain.LotStateTransition) {
+				defer workers.Done()
+				<-start
+				_, err := stateRepository.Transition(context.Background(), command)
+				errorsByCall <- err
+			}(command)
+		}
+		close(start)
+		workers.Wait()
+		close(errorsByCall)
+
+		var successes, conflicts int
+		for err := range errorsByCall {
+			switch {
+			case err == nil:
+				successes++
+			case errors.Is(err, domain.ErrLotStateConflict):
+				conflicts++
+			default:
+				t.Fatalf("Transition() error = %v", err)
+			}
+		}
+		if successes != 1 || conflicts != 1 {
+			t.Fatalf("results = %d successes and %d conflicts, want 1 and 1", successes, conflicts)
+		}
+		assertLotStateEventCount(t, pool, loteo.Lotes[0].ID, 2)
+	})
+
+	t.Run("finds a lote only inside the requested scope", func(t *testing.T) {
+		loteo := createLoteoWithPlan(t, pool, repository, actor)
+		viewer := createUsuario(t, pool)
+
+		exists, err := stateRepository.LotExists(context.Background(), loteo.ID, loteo.Lotes[0].ID, userScope(viewer))
+		if err != nil {
+			t.Fatalf("LotExists() error = %v", err)
+		}
+		if exists {
+			t.Error("LotExists() should be false before assignment")
+		}
+
+		assignLoteo(t, pool, viewer, loteo.ID)
+		exists, err = stateRepository.LotExists(context.Background(), loteo.ID, loteo.Lotes[0].ID, userScope(viewer))
+		if err != nil || !exists {
+			t.Fatalf("LotExists() = %v, %v after assignment; want true, nil", exists, err)
+		}
+	})
+
+	t.Run("lote state lookup treats malformed ids as missing", func(t *testing.T) {
+		exists, err := stateRepository.LotExists(context.Background(), "not-a-uuid", "also-not-a-uuid", unrestrictedScope)
+		if err != nil || exists {
+			t.Fatalf("LotExists() = %v, %v; want false, nil", exists, err)
 		}
 	})
 
@@ -296,13 +546,13 @@ func TestLoteoRepository(t *testing.T) {
 	t.Run("update rejects ids that cannot name anything", func(t *testing.T) {
 		loteo := createLoteoWithPlan(t, pool, repository, actor)
 
-		for name, loteID := range map[string]string{
+		for name, lotID := range map[string]string{
 			"unknown uuid": newUUID(t),
 			"not a uuid":   "'; DROP TABLE lotes; --",
 			"empty":        "",
 		} {
 			t.Run(name, func(t *testing.T) {
-				_, err := repository.UpdateLote(context.Background(), actor, loteo.ID, loteID, domain.LoteData{Number: "12"})
+				_, err := repository.UpdateLote(context.Background(), actor, loteo.ID, lotID, domain.LoteData{Number: "12"})
 				if !errors.Is(err, domain.ErrLoteNotFound) {
 					t.Fatalf("UpdateLote() error = %v, want %v", err, domain.ErrLoteNotFound)
 				}
@@ -587,6 +837,9 @@ func TestLoteoRepository(t *testing.T) {
 			if lote.ManzanaID == "" {
 				t.Errorf("lote %q should name its manzana", lote.ID)
 			}
+			if lote.State != domain.LotStateAvailable {
+				t.Errorf("lote %q state = %q, want %q", lote.ID, lote.State, domain.LotStateAvailable)
+			}
 		}
 		if len(got.Calles[0].Polygon) != 4 {
 			t.Errorf("calle polygon = %d vertices, want 4", len(got.Calles[0].Polygon))
@@ -705,13 +958,13 @@ func TestLoteoRepository(t *testing.T) {
 
 // assertDxfEntities checks what only a real database can show: that the rings
 // reached a PostGIS polygon column intact, closed, and on the right layer.
-func assertDxfEntities(t *testing.T, pool *pgxpool.Pool, loteoID string) {
+func assertDxfEntities(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 	t.Helper()
 
 	var layers map[string]int
 	rows, err := pool.Query(context.Background(), `
 		SELECT capa, count(*) FROM dxf_entidades WHERE loteo_id = $1::uuid GROUP BY capa
-	`, loteoID)
+	`, developmentID)
 	if err != nil {
 		t.Fatalf("query dxf_entidades: %v", err)
 	}
@@ -740,7 +993,7 @@ func assertDxfEntities(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 	var wkt string
 	err = pool.QueryRow(context.Background(), `
 		SELECT ST_AsText(geom) FROM dxf_entidades WHERE loteo_id = $1::uuid AND capa = 'LOTEO'
-	`, loteoID).Scan(&wkt)
+	`, developmentID).Scan(&wkt)
 	if err != nil {
 		t.Fatalf("read the loteo geometry: %v", err)
 	}
@@ -749,7 +1002,7 @@ func assertDxfEntities(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 	}
 
 	var dxfEntityID *string
-	if err := pool.QueryRow(context.Background(), `SELECT dxf_entidad_id::text FROM loteos WHERE id = $1::uuid`, loteoID).Scan(&dxfEntityID); err != nil {
+	if err := pool.QueryRow(context.Background(), `SELECT dxf_entidad_id::text FROM loteos WHERE id = $1::uuid`, developmentID).Scan(&dxfEntityID); err != nil {
 		t.Fatalf("read loteos.dxf_entidad_id: %v", err)
 	}
 	if dxfEntityID == nil {
@@ -805,6 +1058,31 @@ func containsLoteo(summaries []domain.LoteoSummary, id string) bool {
 	return false
 }
 
+func stateTransition(developmentID, lotID string, current, next domain.LotState) domain.LotStateTransition {
+	referenceID := "00000000-0000-0000-0000-000000000001"
+	return domain.LotStateTransition{
+		DevelopmentID: developmentID, LotID: lotID,
+		ExpectedState: current, NextState: next,
+		Origin:        domain.LotStateOriginReservation,
+		Reason:        "state transition test",
+		ReservationID: &referenceID,
+	}
+}
+
+func assertLotStateEventCount(t *testing.T, pool *pgxpool.Pool, lotID string, want int) {
+	t.Helper()
+
+	var got int
+	if err := pool.QueryRow(context.Background(), `
+		SELECT count(*) FROM lote_estados WHERE lote_id = $1::uuid
+	`, lotID).Scan(&got); err != nil {
+		t.Fatalf("count lote state events: %v", err)
+	}
+	if got != want {
+		t.Errorf("lote state events = %d, want %d", got, want)
+	}
+}
+
 func createInmobiliaria(t *testing.T, pool *pgxpool.Pool) string {
 	t.Helper()
 
@@ -840,18 +1118,18 @@ func linkUsuarioToInmobiliaria(t *testing.T, pool *pgxpool.Pool, authProviderID,
 	})
 }
 
-func assignInmobiliariaToLoteo(t *testing.T, pool *pgxpool.Pool, inmobiliariaID, loteoID string) {
+func assignInmobiliariaToLoteo(t *testing.T, pool *pgxpool.Pool, inmobiliariaID, developmentID string) {
 	t.Helper()
 
 	if _, err := pool.Exec(context.Background(), `
 		INSERT INTO inmobiliaria_loteos (inmobiliaria_id, loteo_id) VALUES ($1::uuid, $2::uuid)
-	`, inmobiliariaID, loteoID); err != nil {
+	`, inmobiliariaID, developmentID); err != nil {
 		t.Fatalf("assign inmobiliaria to loteo: %v", err)
 	}
 	t.Cleanup(func() {
 		if _, err := pool.Exec(context.Background(), `
 			DELETE FROM inmobiliaria_loteos WHERE inmobiliaria_id = $1::uuid AND loteo_id = $2::uuid
-		`, inmobiliariaID, loteoID); err != nil {
+		`, inmobiliariaID, developmentID); err != nil {
 			t.Errorf("cleanup inmobiliaria loteo assignment: %v", err)
 		}
 	})
@@ -872,30 +1150,113 @@ func createUsuario(t *testing.T, pool *pgxpool.Pool) string {
 	return authProviderID
 }
 
-func assignLoteo(t *testing.T, pool *pgxpool.Pool, authProviderID, loteoID string) {
+func createStateClient(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+
+	id := newUUID(t)
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO clientes (id, nombre, apellido, dni)
+		VALUES ($1::uuid, 'State', 'Test', $2)
+	`, id, id); err != nil {
+		t.Fatalf("create state test client: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM clientes WHERE id = $1::uuid`, id); err != nil {
+			t.Errorf("cleanup state test client: %v", err)
+		}
+	})
+
+	return id
+}
+
+func createLotReservation(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	actorAuthProviderID, clientID, lotID string,
+) string {
+	t.Helper()
+
+	id := newUUID(t)
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO reservas (
+			id, lote_id, cliente_id, vendedor_id, usuario_alta, fecha_vencimiento
+		)
+		SELECT $1::uuid, $2::uuid, $3::uuid, id, id, now() + interval '15 days'
+		FROM usuarios WHERE auth_provider_id = $4::uuid
+	`, id, lotID, clientID, actorAuthProviderID); err != nil {
+		t.Fatalf("create lot reservation: %v", err)
+	}
+
+	return id
+}
+
+func assignLoteo(t *testing.T, pool *pgxpool.Pool, authProviderID, developmentID string) {
 	t.Helper()
 
 	_, err := pool.Exec(context.Background(), `
 		INSERT INTO usuario_loteos (usuario_id, loteo_id)
 		SELECT id, $2::uuid FROM usuarios WHERE auth_provider_id = $1::uuid
-	`, authProviderID, loteoID)
+	`, authProviderID, developmentID)
 	if err != nil {
 		t.Fatalf("assign loteo: %v", err)
 	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `
+			DELETE FROM usuario_loteos
+			WHERE usuario_id = (SELECT id FROM usuarios WHERE auth_provider_id = $1::uuid)
+				AND loteo_id = $2::uuid
+		`, authProviderID, developmentID); err != nil {
+			t.Errorf("cleanup loteo assignment: %v", err)
+		}
+	})
 }
 
 // deleteLoteo removes the rows in reverse dependency order: the plan's tables
 // reference the loteo, and the loteo references its own DXF entity.
-func deleteLoteo(t *testing.T, pool *pgxpool.Pool, loteoID string) {
+func deleteLoteo(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 	t.Helper()
 
-	if loteoID == "" {
+	if developmentID == "" {
+		return
+	}
+
+	tx, err := pool.Begin(context.Background())
+	if err != nil {
+		t.Errorf("begin loteo cleanup: %v", err)
+		return
+	}
+	defer tx.Rollback(context.Background())
+
+	if _, err := tx.Exec(context.Background(), `
+		ALTER TABLE lote_estados DISABLE TRIGGER lote_estados_reject_mutation;
+		ALTER TABLE reserva_estados DISABLE TRIGGER reserva_estados_reject_mutation;
+		ALTER TABLE venta_estados DISABLE TRIGGER venta_estados_reject_mutation;
+	`); err != nil {
+		t.Errorf("disable lote history cleanup protection: %v", err)
+		return
+	}
+	if _, err := tx.Exec(context.Background(), `
+		DELETE FROM lote_estados
+		WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+	`, developmentID); err != nil {
+		t.Errorf("cleanup lote state history: %v", err)
 		return
 	}
 
 	statements := []string{
 		`DELETE FROM usuario_loteos WHERE loteo_id = $1::uuid`,
 		`DELETE FROM archivos WHERE loteo_id = $1::uuid`,
+		`DELETE FROM reserva_estados WHERE reserva_id IN (
+			SELECT id FROM reservas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+		)`,
+		`DELETE FROM venta_estados WHERE venta_id IN (
+			SELECT id FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+		)`,
+		`DELETE FROM planes_pago WHERE venta_id IN (
+			SELECT id FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+		)`,
+		`DELETE FROM reservas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)`,
+		`DELETE FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)`,
 		`DELETE FROM lotes WHERE loteo_id = $1::uuid`,
 		`DELETE FROM manzana_calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM calles WHERE loteo_id = $1::uuid`,
@@ -905,9 +1266,20 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, loteoID string) {
 		`DELETE FROM loteos WHERE id = $1::uuid`,
 	}
 	for _, statement := range statements {
-		if _, err := pool.Exec(context.Background(), statement, loteoID); err != nil {
+		if _, err := tx.Exec(context.Background(), statement, developmentID); err != nil {
 			t.Errorf("cleanup loteo: %v", err)
 			return
 		}
+	}
+	if _, err := tx.Exec(context.Background(), `
+		ALTER TABLE lote_estados ENABLE TRIGGER lote_estados_reject_mutation;
+		ALTER TABLE reserva_estados ENABLE TRIGGER reserva_estados_reject_mutation;
+		ALTER TABLE venta_estados ENABLE TRIGGER venta_estados_reject_mutation;
+	`); err != nil {
+		t.Errorf("enable lote history cleanup protection: %v", err)
+		return
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		t.Errorf("commit loteo cleanup: %v", err)
 	}
 }

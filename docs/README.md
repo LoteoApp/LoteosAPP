@@ -24,8 +24,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
 
 ## Planes
 
-- [Máquina de estados del lote](plans/lote-state-machine.md): diseño propuesto,
-  concurrencia, migración, entregas y decisiones confirmadas para la issue #54.
+- [Máquina de estados del lote](plans/lote-state-machine.md): diseño e
+  implementación del núcleo, concurrencia, migración y decisiones de la issue #54.
 
 ## Regla de mantenimiento
 

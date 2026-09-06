@@ -1,5 +1,7 @@
 # Plan de implementacion: maquina de estados del lote
 
+> Estado: entrega 1 implementada en la rama `feat/54-lote-state-machine`.
+
 ## Objetivo
 
 Implementar la issue [#54](https://github.com/LoteoApp/LoteosAPP/issues/54)
@@ -174,17 +176,18 @@ Materializar el estado vigente sigue el patron ya usado por `reservas` y
 filtrar disponibilidad sin una consulta lateral al ultimo evento.
 
 El `Down` debe retirar triggers, funciones, indices y columnas agregados por esta
-migracion. Como el rollback elimina informacion historica creada despues del
-`Up`, debe documentarse como destructivo y usarse solo en desarrollo.
+migracion sin eliminar las filas del historial. Al retirar las columnas se
+pierden sus metadatos de origen, razon y referencias comerciales, por lo que el
+rollback debe documentarse como destructivo y usarse solo en desarrollo.
 
 ## Dominio y contratos
 
-Crear `internal/business/domain/lote_state.go` con:
+Crear `internal/business/domain/lot_state.go` con:
 
-- `type LoteState string`;
+- `type LotState string`;
 - constantes para los cuatro estados;
-- `CanTransitionTo(next LoteState) bool` o una funcion equivalente;
-- `LoteStateTransition` con lote, origen, destino, actor, fecha y trazabilidad;
+- `CanTransitionTo(next LotState) bool` o una funcion equivalente;
+- `LotStateTransition` con lote, origen, destino, actor, fecha y trazabilidad;
 - errores `*domain.Error`: estado invalido, transicion invalida, conflicto por
   estado actual y lote inexistente.
 
@@ -195,7 +198,7 @@ Crear el contrato bajo `internal/business/gateway`, junto con su fake reusable.
 La operacion principal debe expresar compare-and-set:
 
 ```go
-Transition(ctx context.Context, command domain.LoteStateTransition) (domain.LoteStateEvent, error)
+Transition(ctx context.Context, command domain.LotStateTransition) (domain.LotStateEvent, error)
 ```
 
 El comando incluye el estado esperado. Si otra transaccion gano la carrera, el
@@ -204,7 +207,7 @@ repositorio devuelve un conflicto de dominio en vez de sobrescribir el cambio.
 ## Caso de uso
 
 Crear un caso de uso de una sola operacion en
-`internal/business/usecase/loteos/transition_lote_state.go`:
+`internal/business/usecase/loteos/transition_lot_state.go`:
 
 1. valida identificadores y estado solicitado;
 2. resuelve al actor a partir del `auth_provider_id` cuando la transicion es

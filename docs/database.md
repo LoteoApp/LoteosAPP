@@ -127,7 +127,8 @@ migrations/
 ├── 00004_enable_rls_on_public_tables.sql
 ├── 00005_create_entity_model.sql
 ├── 00006_enforce_single_active_loteo_dxf.sql
-└── 00007_add_inmobiliarias_cuit_idx.sql
+├── 00007_add_inmobiliarias_cuit_idx.sql
+└── 00008_add_lot_state_machine.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -233,6 +234,20 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations down
 
 `down` corre contra la base compartida de Supabase, no una base local
 descartable: no usarlo sin confirmar el impacto con el equipo.
+
+### Máquina de estados del lote
+
+`00008_add_lot_state_machine.sql` materializa el valor vigente en
+`lotes.estado_actual`, crea el evento inicial `disponible` para lotes sin
+historial y sincroniza los que ya tenían eventos. Los eventos anteriores a la
+migración quedan identificados como `sistema` con una razón de migración. Los
+lotes nuevos se inicializan por trigger; otro trigger valida la matriz de
+transiciones y actualiza el valor vigente. `lote_estados` rechaza `UPDATE`,
+`DELETE` y `TRUNCATE`, y su índice `(lote_id, fecha_creacion DESC, id DESC)`
+permite leer el historial en orden estable. El `Down` conserva las filas del
+historial y sus estados, pero elimina los metadatos agregados por esta migración
+(`origen`, `razon` y las referencias comerciales); solo debe usarse sobre una
+base descartable.
 
 ## Reglas del esquema
 

@@ -34,6 +34,7 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
         id: 'lt-1',
         manzanaId: 'mz-1',
         numero: '7',
+        estado: 'disponible',
         precio: 150000,
         moneda: 'USD',
         superficie: 300,
@@ -44,6 +45,7 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
         id: 'lt-2',
         manzanaId: 'mz-2',
         numero: '8',
+        estado: 'reservado',
         precio: 90000,
         moneda: 'USD',
         superficie: 250,
@@ -87,6 +89,8 @@ describe('LoteoDetailPage', () => {
     expect(rows).toHaveLength(3)
     expect(within(rows[1]).getByText(/150\.000/)).toBeInTheDocument()
     expect(within(rows[1]).getByText('300 m²')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Disponible')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('Reservado')).toBeInTheDocument()
   })
 
   it('draws the persisted plan and exposes the layer toggles', async () => {
