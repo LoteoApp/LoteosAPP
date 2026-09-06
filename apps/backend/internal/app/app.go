@@ -55,6 +55,7 @@ func New(ctx context.Context) (*App, error) {
 		UpdateManzana:   container.UpdateManzanaHandler,
 		UpdateCalle:     container.UpdateCalleHandler,
 		ListLoteos:      container.ListLoteosHandler,
+		SearchLotes:     container.SearchLotesHandler,
 		GetLoteo:        container.GetLoteoHandler,
 	}, container.Verifier, container.UserRepository)
 

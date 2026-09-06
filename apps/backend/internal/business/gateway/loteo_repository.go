@@ -34,6 +34,12 @@ type LoteoRepository interface {
 	// may see (see LoteoScope).
 	List(ctx context.Context, search string, scope LoteoScope) ([]domain.LoteoSummary, error)
 
+	// SearchLotes returns the active lotes as summaries, ordered by loteo,
+	// manzana and lote number. search, when non-empty, filters by lote
+	// number, manzana number or loteo name, case-insensitively. scope limits
+	// the result to the loteos the caller may see (see LoteoScope).
+	SearchLotes(ctx context.Context, search string, scope LoteoScope) ([]domain.LoteSummary, error)
+
 	// Get returns one loteo with its manzanas, lotes, calles and the geometry
 	// of each (a nil polygon where an entity has no DXF ring yet). scope
 	// limits visibility the same way as List: a loteo that doesn't exist,

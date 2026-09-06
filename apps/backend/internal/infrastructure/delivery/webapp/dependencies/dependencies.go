@@ -38,6 +38,7 @@ type Container struct {
 	UpdateManzanaHandler   *handler.UpdateManzanaHandler
 	UpdateCalleHandler     *handler.UpdateCalleHandler
 	ListLoteosHandler      *handler.ListLoteosHandler
+	SearchLotesHandler     *handler.SearchLotesHandler
 	GetLoteoHandler        *handler.GetLoteoHandler
 	Pool                   *pgxpool.Pool
 	Verifier               *supabase.Verifier
@@ -96,6 +97,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	updateManzanaHandler := handler.NewUpdateManzanaHandler(loteos.NewUpdateManzana(loteoRepo))
 	updateCalleHandler := handler.NewUpdateCalleHandler(loteos.NewUpdateCalle(loteoRepo))
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
+	searchLotesHandler := handler.NewSearchLotesHandler(loteos.NewSearchLotes(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
 
 	return &Container{
@@ -119,6 +121,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		UpdateManzanaHandler:   updateManzanaHandler,
 		UpdateCalleHandler:     updateCalleHandler,
 		ListLoteosHandler:      listLoteosHandler,
+		SearchLotesHandler:     searchLotesHandler,
 		GetLoteoHandler:        getLoteoHandler,
 		Pool:                   pool,
 		Verifier:               verifier,

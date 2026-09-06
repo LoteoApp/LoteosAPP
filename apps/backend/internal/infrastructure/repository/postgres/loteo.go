@@ -870,3 +870,67 @@ func writePoint(builder *strings.Builder, point domain.Point) {
 	builder.WriteByte(' ')
 	builder.WriteString(strconv.FormatFloat(point.Y, 'f', -1, 64))
 }
+
+var searchLotesSQL = `
+	SELECT
+		lo.id::text,
+		COALESCE(lo.numero, ''),
+		m.id::text,
+		COALESCE(m.numero, ''),
+		l.id::text,
+		l.nombre,
+		lo.precio::float8,
+		COALESCE(lo.moneda, ''),
+		lo.superficie::float8
+	FROM lotes lo
+	JOIN manzanas m ON m.id = lo.manzana_id
+	JOIN loteos l ON l.id = lo.loteo_id
+	WHERE lo.fecha_baja IS NULL
+		AND m.fecha_baja IS NULL
+		AND l.fecha_baja IS NULL
+		AND ($1 = ''
+			OR COALESCE(lo.numero, '') ILIKE $2 ESCAPE '\'
+			OR COALESCE(m.numero, '') ILIKE $2 ESCAPE '\'
+			OR l.nombre ILIKE $2 ESCAPE '\')
+		AND ` + fmt.Sprintf(loteoScopedPredicate, 3, 4, 5) + `
+	ORDER BY l.nombre, m.numero, lo.numero, lo.id
+`
+
+// SearchLotes returns the active lotes as summaries, each carrying its
+// manzana and loteo. An assignee id that can't be parsed as a UUID yields an
+// empty result rather than an error, the same way List does.
+func (repository *LoteoRepository) SearchLotes(
+	ctx context.Context,
+	search string,
+	scope gateway.LoteoScope,
+) ([]domain.LoteSummary, error) {
+	rows, err := repository.pool.Query(ctx, searchLotesSQL,
+		search, containsPattern(search),
+		scope.AssigneeAuthProviderID, scope.ByUserAssignment, scope.ByAgencyAssignment,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return []domain.LoteSummary{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	lotes := make([]domain.LoteSummary, 0)
+	for rows.Next() {
+		var lote domain.LoteSummary
+		if err := rows.Scan(
+			&lote.ID, &lote.Number, &lote.ManzanaID, &lote.ManzanaNumber,
+			&lote.LoteoID, &lote.LoteoName, &lote.Price, &lote.Currency, &lote.Area,
+		); err != nil {
+			return nil, err
+		}
+		lotes = append(lotes, lote)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return lotes, nil
+}
