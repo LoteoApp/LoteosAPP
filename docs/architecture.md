@@ -420,7 +420,6 @@ Decisiones de este recorte:
   cuatro valores del contrato y `LotStateBadge` presenta una etiqueta común
   en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
   se ofrece un selector libre.
-
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive
