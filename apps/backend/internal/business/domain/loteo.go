@@ -373,15 +373,15 @@ func (data ManzanaData) Validate() error {
 }
 
 type Lote struct {
-	ID        string    `json:"id"`
-	ManzanaID string    `json:"manzanaId"`
-	Number    string    `json:"numero"`
+	ID        string   `json:"id"`
+	ManzanaID string   `json:"manzanaId"`
+	Number    string   `json:"numero"`
 	State     LotState `json:"estado"`
-	Price     *float64  `json:"precio"`
-	Currency  string    `json:"moneda"`
-	Area      *float64  `json:"superficie"`
-	Features  string    `json:"caracteristicas"`
-	Polygon   Polygon   `json:"poligono,omitempty"`
+	Price     *float64 `json:"precio"`
+	Currency  string   `json:"moneda"`
+	Area      *float64 `json:"superficie"`
+	Features  string   `json:"caracteristicas"`
+	Polygon   Polygon  `json:"poligono,omitempty"`
 }
 
 type Calle struct {

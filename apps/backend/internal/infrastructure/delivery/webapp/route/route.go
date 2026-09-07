@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	usersTimeout    = 5 * time.Second
-	clientsTimeout  = 5 * time.Second
-	agenciesTimeout = 5 * time.Second
-	lotesTimeout    = 10 * time.Second
+	usersTimeout             = 5 * time.Second
+	clientsTimeout           = 5 * time.Second
+	agenciesTimeout          = 5 * time.Second
+	lotesTimeout             = 10 * time.Second
+	reservationsReadTimeout  = 15 * time.Second
+	reservationsWriteTimeout = 15 * time.Second
 
 	// Reading a loteo runs several queries (loteo, manzanas, lotes, calles),
 	// so it gets more room than a request that touches one row.
@@ -37,27 +39,32 @@ const (
 )
 
 type Handlers struct {
-	CreateUser      *handler.CreateUserHandler
-	CompleteProfile *handler.CompleteProfileHandler
-	ListUsers       *handler.ListUsersHandler
-	UpdateUser      *handler.UpdateUserHandler
-	DeactivateUser  *handler.DeactivateUserHandler
-	ReactivateUser  *handler.ReactivateUserHandler
-	CreateClient    *handler.CreateClientHandler
-	UpdateClient    *handler.UpdateClientHandler
-	DeleteClient    *handler.DeleteClientHandler
-	ListClients     *handler.ListClientsHandler
-	CreateAgency    *handler.CreateAgencyHandler
-	UpdateAgency    *handler.UpdateAgencyHandler
-	DeleteAgency    *handler.DeleteAgencyHandler
-	ListAgencies    *handler.ListAgenciesHandler
-	CreateLoteo     *handler.CreateLoteoHandler
-	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
-	UpdateLote      *handler.UpdateLoteHandler
-	UpdateManzana   *handler.UpdateManzanaHandler
-	UpdateCalle     *handler.UpdateCalleHandler
-	ListLoteos      *handler.ListLoteosHandler
-	GetLoteo        *handler.GetLoteoHandler
+	CreateUser                 *handler.CreateUserHandler
+	CompleteProfile            *handler.CompleteProfileHandler
+	ListUsers                  *handler.ListUsersHandler
+	UpdateUser                 *handler.UpdateUserHandler
+	DeactivateUser             *handler.DeactivateUserHandler
+	ReactivateUser             *handler.ReactivateUserHandler
+	CreateClient               *handler.CreateClientHandler
+	UpdateClient               *handler.UpdateClientHandler
+	DeleteClient               *handler.DeleteClientHandler
+	ListClients                *handler.ListClientsHandler
+	CreateAgency               *handler.CreateAgencyHandler
+	UpdateAgency               *handler.UpdateAgencyHandler
+	DeleteAgency               *handler.DeleteAgencyHandler
+	ListAgencies               *handler.ListAgenciesHandler
+	CreateLoteo                *handler.CreateLoteoHandler
+	StoreLoteoDxf              *handler.StoreLoteoDxfHandler
+	UpdateLote                 *handler.UpdateLoteHandler
+	UpdateManzana              *handler.UpdateManzanaHandler
+	UpdateCalle                *handler.UpdateCalleHandler
+	ListLoteos                 *handler.ListLoteosHandler
+	GetLoteo                   *handler.GetLoteoHandler
+	CreateReservationHandler   *handler.CreateReservationHandler
+	ListReservationsHandler    *handler.ListReservationsHandler
+	GetReservationHandler      *handler.GetReservationHandler
+	CancelReservationHandler   *handler.CancelReservationHandler
+	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
 }
 
 // RegisterRoutes wires every route behind both RequireAuth (a valid token)
@@ -94,4 +101,10 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/lotes/{loteId}", protected(handler.Adapt(handlers.UpdateLote, lotesTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/manzanas/{manzanaId}", protected(handler.Adapt(handlers.UpdateManzana, lotesTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/calles/{calleId}", protected(handler.Adapt(handlers.UpdateCalle, lotesTimeout)))
+
+	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", protected(handler.Adapt(handlers.CreateReservationHandler, reservationsWriteTimeout)))
+	mux.Handle("GET /api/v1/reservas", protected(handler.Adapt(handlers.ListReservationsHandler, reservationsReadTimeout)))
+	mux.Handle("GET /api/v1/reservas/{id}", protected(handler.Adapt(handlers.GetReservationHandler, reservationsReadTimeout)))
+	mux.Handle("POST /api/v1/reservas/{id}/cancelar", protected(handler.Adapt(handlers.CancelReservationHandler, reservationsWriteTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}/vendedores", protected(handler.Adapt(handlers.ListEligibleSellersHandler, reservationsReadTimeout)))
 }

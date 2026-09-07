@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
+import { SaveNotice, useSaveNotice } from '../../../shared/ui/save-notice'
 import LoteoDetailHeader from '../components/LoteoDetailHeader'
 import LoteoPlanPanel from '../components/LoteoPlanPanel'
 import LotesTable from '../components/LotesTable'
@@ -14,10 +15,13 @@ import { useUpdateCalle } from '../hooks/use-update-calle'
 import { useUpdateLote } from '../hooks/use-update-lote'
 import { useUpdateManzana } from '../hooks/use-update-manzana'
 import { planFromLoteoDetail, planLabelsFromLoteoDetail } from '../lib/planFromLoteoDetail'
+import type { LoteoDetail } from '../types'
 
 type LoteoDetailPageProps = {
   accessToken: string | null
   canEdit?: boolean
+  renderReservationAction?: (lote: LoteoDetail['lotes'][number], onCreated: () => void) => ReactNode
+  renderReservationCancelAction?: (lote: LoteoDetail['lotes'][number], onCanceled: () => void) => ReactNode
 }
 
 function BackLink() {
@@ -32,7 +36,12 @@ function BackLink() {
   )
 }
 
-export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoDetailPageProps) {
+export default function LoteoDetailPage({
+  accessToken,
+  canEdit = false,
+  renderReservationAction,
+  renderReservationCancelAction,
+}: LoteoDetailPageProps) {
   const { loteoId = '' } = useParams()
   const { replaceLote, replaceManzana, replaceCalle, ...state } = useLoteo(
     loteoId,
@@ -43,6 +52,8 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
   const manzanaUpdate = useUpdateManzana(accessToken)
   const calleUpdate = useUpdateCalle(accessToken)
   const [manzanaFilter, setManzanaFilter] = useState(ALL_MANZANAS)
+  const reservationNotice = useSaveNotice()
+  const reservationCancelNotice = useSaveNotice()
 
   // React Router keeps this component mounted across a param change, so drop the
   // previous loteo's manzana filter and layer selection when loteoId changes.
@@ -88,6 +99,16 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
       : lotes.filter((lote) => lote.manzanaId === manzanaFilter)
   }, [loteo, manzanaFilter])
 
+  function handleReservationCreated(lote: LoteoDetail['lotes'][number]) {
+    replaceLote({ ...lote, estado: 'reservado' })
+    reservationNotice.show()
+  }
+
+  function handleReservationCanceled(lote: LoteoDetail['lotes'][number]) {
+    replaceLote({ ...lote, estado: 'disponible' })
+    reservationCancelNotice.show()
+  }
+
   if (state.status === 'loading') {
     return (
       <section className="flex flex-col gap-4">
@@ -126,10 +147,12 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
       <LoteoDetailHeader loteo={state.loteo} hasPlan={plan.length > 0} />
+      <SaveNotice token={reservationNotice.token}>Reserva creada</SaveNotice>
+      <SaveNotice token={reservationCancelNotice.token}>Reserva cancelada</SaveNotice>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <LoteoPlanPanel
-          className="md:sticky md:top-4 md:h-[calc(100dvh-7rem)] md:self-start"
+          className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100dvh-7rem)] lg:self-start"
           polygons={plan}
           visibleLayers={layers.visibleLayers}
           onVisibleLayersChange={layers.onVisibleLayersChange}
@@ -138,7 +161,7 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
           polygonLabels={polygonLabels}
         />
 
-        <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex min-h-0 min-w-0 flex-col gap-3">
           <PlanSelectionPanel
             canEdit={canEdit}
             selected={selection.selected}
@@ -169,6 +192,16 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
               }
               return updated !== null
             }}
+            renderReservationAction={
+              renderReservationAction
+                ? (lote) => renderReservationAction(lote, () => handleReservationCreated(lote))
+                : undefined
+            }
+            renderReservationCancelAction={
+              renderReservationCancelAction
+                ? (lote) => renderReservationCancelAction(lote, () => handleReservationCanceled(lote))
+                : undefined
+            }
           />
           <ManzanaFilter
             manzanas={state.loteo.manzanas}
