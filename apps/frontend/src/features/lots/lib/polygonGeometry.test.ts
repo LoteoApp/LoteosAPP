@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DxfPoint } from '../types'
-import { isSimplePolygon, polygonsOverlap } from './polygonGeometry'
+import { isSimplePolygon, polygonArea, polygonsOverlap } from './polygonGeometry'
 
 function points(coords: [number, number][]): DxfPoint[] {
   return coords.map(([x, y]) => ({ x, y }))
@@ -12,6 +12,59 @@ const square = points([
   [10, 10],
   [0, 10],
 ])
+
+describe('polygonArea', () => {
+  it('returns the Gauss (shoelace) area of a closed ring, in square metres', () => {
+    expect(polygonArea(square)).toBe(100)
+    expect(
+      polygonArea(
+        points([
+          [0, 0],
+          [2, 0],
+          [0, 2],
+        ]),
+      ),
+    ).toBe(2)
+  })
+
+  it('is the same clockwise or counterclockwise, and with a repeated closing vertex', () => {
+    const clockwise = points([
+      [0, 0],
+      [0, 10],
+      [10, 10],
+      [10, 0],
+    ])
+    const closed = [...square, square[0]]
+
+    expect(polygonArea(clockwise)).toBe(100)
+    expect(polygonArea(closed)).toBe(100)
+  })
+
+  it('returns null for an empty, open or collinear ring', () => {
+    expect(polygonArea([])).toBeNull()
+    expect(polygonArea(points([[0, 0], [10, 0]]))).toBeNull()
+    expect(
+      polygonArea(
+        points([
+          [0, 0],
+          [10, 0],
+          [20, 0],
+        ]),
+      ),
+    ).toBeNull()
+  })
+
+  it('keeps a 10 by 10 square at Gauss-Krüger-scale coordinates', () => {
+    const parcel = points([
+      [5454366, 6486276],
+      [5454376, 6486276],
+      [5454376, 6486286],
+      [5454366, 6486286],
+    ])
+
+    expect(polygonArea(parcel)).toBe(100)
+  })
+})
 
 describe('isSimplePolygon', () => {
   it('returns true for a polygon whose edges do not cross', () => {

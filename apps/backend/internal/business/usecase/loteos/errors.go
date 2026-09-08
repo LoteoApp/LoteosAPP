@@ -22,3 +22,16 @@ func fromRepository(err error) error {
 
 	return domain.ErrDatabaseUnavailable.WithCause(err)
 }
+
+func fromStorage(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var domainErr *domain.Error
+	if errors.As(err, &domainErr) {
+		return err
+	}
+
+	return domain.ErrStorageUnavailable.WithCause(err)
+}

@@ -61,7 +61,7 @@ export default function AppLayout() {
 
       <Sidebar isOpen={isSidebarOpen} onNavigate={closeSidebarOnMobile} />
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border px-4 md:px-8">
           <Button
             type="button"
@@ -83,7 +83,7 @@ export default function AppLayout() {
           <UserMenu />
         </header>
 
-        <main className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-8 md:py-10">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4 md:px-8 md:py-10">
           <Outlet />
         </main>
       </div>

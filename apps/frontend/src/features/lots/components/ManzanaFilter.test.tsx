@@ -5,7 +5,16 @@ import ManzanaFilter, { ALL_MANZANAS } from './ManzanaFilter'
 import type { LoteoManzana } from '../types'
 
 function manzana(id: string, numero: string): LoteoManzana {
-  return { id, numero, poligono: [] }
+  return {
+    id,
+    numero,
+    tieneAgua: false,
+    tieneCloaca: false,
+    tieneLuz: false,
+    tieneGas: false,
+    calleIds: [],
+    poligono: [],
+  }
 }
 
 const manzanas = [manzana('mz-1', '1'), manzana('mz-2', '2'), manzana('mz-3', '3')]

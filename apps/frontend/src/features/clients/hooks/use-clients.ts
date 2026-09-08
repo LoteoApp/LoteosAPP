@@ -16,13 +16,21 @@ export type UseClients = {
   remove: (id: string) => Promise<boolean>
 }
 
-export function useClients(token: string): UseClients {
+export type UseClientsOptions = {
+  enabled?: boolean
+}
+
+export function useClients(token: string, { enabled = true }: UseClientsOptions = {}): UseClients {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const queryEnabled = enabled && token !== ''
 
   useEffect(() => {
+    if (!queryEnabled) {
+      return
+    }
     const controller = new AbortController()
 
     listClients(token, controller.signal)
@@ -47,7 +55,7 @@ export function useClients(token: string): UseClients {
     return () => {
       controller.abort()
     }
-  }, [token])
+  }, [queryEnabled, token])
 
   const run = useCallback(async (operation: () => Promise<void>): Promise<boolean> => {
     setIsSubmitting(true)
@@ -92,5 +100,5 @@ export function useClients(token: string): UseClients {
     [run, token],
   )
 
-  return { clientes, isLoading, isSubmitting, error, create, update, remove }
+  return { clientes, isLoading: queryEnabled && isLoading, isSubmitting, error: queryEnabled ? error : null, create, update, remove }
 }

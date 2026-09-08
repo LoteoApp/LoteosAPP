@@ -8,9 +8,6 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// UpdateLote sets the values a lot can only get by hand: the DXF layers hold
-// geometry with no text, so the lot number, price, area and description are
-// loaded after the plan is on screen.
 type UpdateLote interface {
 	Execute(ctx context.Context, actor Actor, loteoID, loteID string, data domain.LoteData) (domain.Lote, error)
 }
@@ -23,15 +20,13 @@ func NewUpdateLote(repository gateway.LoteoRepository) UpdateLote {
 	return &updateLoteUseCase{repository: repository}
 }
 
-// Execute authorizes before it validates, so a caller with no permission on
-// the loteo learns nothing about which values the endpoint would accept.
 func (useCase *updateLoteUseCase) Execute(
 	ctx context.Context,
 	actor Actor,
 	loteoID, loteID string,
 	data domain.LoteData,
 ) (domain.Lote, error) {
-	if err := useCase.authorize(ctx, actor, loteoID); err != nil {
+	if err := authorizeEditor(ctx, useCase.repository, actor, loteoID); err != nil {
 		return domain.Lote{}, err
 	}
 
@@ -48,26 +43,4 @@ func (useCase *updateLoteUseCase) Execute(
 	}
 
 	return lote, nil
-}
-
-// authorize lets an administrador edit any loteo and an agrimensor only the
-// ones assigned to them. Every other role is rejected without touching the
-// repository.
-func (useCase *updateLoteUseCase) authorize(ctx context.Context, actor Actor, loteoID string) error {
-	if domain.HasRole(actor.Roles, domain.RolAdministrador) {
-		return nil
-	}
-	if !domain.HasRole(actor.Roles, domain.RolAgrimensor) {
-		return domain.ErrNoAutorizado
-	}
-
-	assigned, err := useCase.repository.IsAssignedToLoteo(ctx, actor.AuthProviderID, loteoID)
-	if err != nil {
-		return fromRepository(err)
-	}
-	if !assigned {
-		return domain.ErrNoAutorizado
-	}
-
-	return nil
 }

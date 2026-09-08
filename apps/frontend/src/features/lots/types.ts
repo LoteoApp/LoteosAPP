@@ -11,6 +11,22 @@ export type DxfPoint = {
   y: number
 }
 
+export type PlanEntityRef =
+  | { kind: 'loteo' }
+  | { kind: 'manzana'; id: string }
+  | { kind: 'lote'; id: string }
+  | { kind: 'calle'; id: string }
+
+export function entityEquals(left: PlanEntityRef, right: PlanEntityRef): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+  if (left.kind === 'loteo') {
+    return true
+  }
+  return 'id' in right && left.id === right.id
+}
+
 export type DxfPolygon = {
   // Synthetic identifier unique per parse result. The DXF `handle` is not
   // reliable for this: entities copied from a block INSERT all share the
@@ -19,6 +35,15 @@ export type DxfPolygon = {
   layer: DxfLayer
   handle: string | null
   vertices: DxfPoint[]
+  // Set only when the polygon comes from a persisted loteo. Polygons
+  // parsed out of a DXF have no database entity yet.
+  entity?: PlanEntityRef
+  // Short label drawn on the plan (lote/manzana number, calle name).
+  // Absent when that value has not been loaded yet.
+  caption?: string
+  // Present only for persisted lote polygons, so the viewer can reflect the
+  // current business state without coupling to the lots feature data source.
+  lotState?: LotState
 }
 
 export type DxfValidationIssueCode =
@@ -64,13 +89,27 @@ export type LoteoSummary = {
 export type LoteoManzana = {
   id: string
   numero: string
+  tieneAgua: boolean
+  tieneCloaca: boolean
+  tieneLuz: boolean
+  tieneGas: boolean
+  calleIds: string[]
   poligono: DxfPoint[]
+}
+
+export const LOT_STATES = ['disponible', 'reservado', 'vendido', 'finalizado'] as const
+
+export type LotState = (typeof LOT_STATES)[number]
+
+export function isLotState(value: unknown): value is LotState {
+  return typeof value === 'string' && (LOT_STATES as readonly string[]).includes(value)
 }
 
 export type LoteoLote = {
   id: string
   manzanaId: string
   numero: string
+  estado: LotState
   precio: number | null
   moneda: string
   superficie: number | null

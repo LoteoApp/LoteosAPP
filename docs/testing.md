@@ -114,17 +114,32 @@ doppler run -- pnpm test:backend
 | Test | Necesita | Qué hace |
 | --- | --- | --- |
 | `postgres.TestUserRepository` | `DATABASE_URL` | SQL real contra la base de Supabase con las migraciones aplicadas. |
-| `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS y que exista un solo archivo DXF activo. |
+| `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote/manzana/calle, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS y que exista un solo archivo DXF activo. |
+| `postgres.TestReservationRepository` | `DATABASE_URL` | Alta, alcance, idempotencia, cancelación y vencimiento de reservas contra PostgreSQL real, incluyendo la consistencia con el estado e historial del lote. |
 | `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
 
 Los dos tests de PostgreSQL borran lo que crearon. El test de R2 escribe en el
 bucket del entorno y también limpia antes de terminar; no correrlo apuntando a
 un bucket de producción.
 
+La suite `postgres.TestLoteoRepository` también cubre el estado inicial, las
+transiciones atómicas, los conflictos por estado esperado obsoleto y dos
+compare-and-set concurrentes sobre el mismo lote. La suite
+`migrate.TestEntityModelStateHistory` aplica las migraciones en un schema
+descartable y verifica el backfill, los triggers, la justificación obligatoria
+y que el historial del lote sea append-only.
+
+La suite del worker usa un proceso falso y contextos con deadline para verificar
+la ejecución inmediata, el lote configurado, los fallos y el apagado sin sleeps
+de duración comercial. Las pruebas de reservas de PostgreSQL deben ejecutarse
+con las migraciones aplicadas y no se consideran realizadas cuando falta
+`DATABASE_URL`.
+
 ## Prueba manual del alta de loteo
 
-El alta (`POST /api/v1/loteos`), el listado y el detalle ya tienen pantalla; la
-carga de datos de un lote (`PATCH .../lotes/{loteId}`) todavía no. `scripts/smoke-loteos.sh`
+El alta (`POST /api/v1/loteos`), el listado y el detalle ya tienen pantalla; el
+detalle permite editar los datos manuales de lotes, manzanas y calles según el
+rol del usuario. `scripts/smoke-loteos.sh`
 prueba el recorrido completo por HTTP como verificación end-to-end
 independiente del frontend: login contra Supabase Auth, alta de un loteo con
 plano, carga de datos de un lote y los caminos de error (número repetido, lote
