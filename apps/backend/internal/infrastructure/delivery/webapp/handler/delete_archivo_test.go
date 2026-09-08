@@ -13,29 +13,29 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-type deleteArchivoStub struct {
-	err          error
-	gotLoteoID   string
-	gotArchivoID string
+type deleteFileStub struct {
+	err        error
+	gotLoteoID string
+	gotFileID  string
 }
 
-func (stub *deleteArchivoStub) Execute(_ context.Context, _ loteos.Actor, loteoID, archivoID string) error {
+func (stub *deleteFileStub) Execute(_ context.Context, _ loteos.Actor, loteoID, archivoID string) error {
 	stub.gotLoteoID = loteoID
-	stub.gotArchivoID = archivoID
+	stub.gotFileID = archivoID
 	return stub.err
 }
 
-func deleteArchivoMux(stub *deleteArchivoStub) *http.ServeMux {
-	h := handler.NewDeleteArchivoHandler(stub)
+func deleteFileMux(stub *deleteFileStub) *http.ServeMux {
+	h := handler.NewDeleteFileHandler(stub)
 	requireAuth := middleware.RequireAuth(administradorVerifier())
 	mux := http.NewServeMux()
 	mux.Handle("DELETE /api/v1/loteos/{loteoId}/archivos/{archivoId}", requireAuth(handler.Adapt(h, 5*time.Second)))
 	return mux
 }
 
-func TestDeleteArchivoHandlerDeletesTheArchivo(t *testing.T) {
-	stub := &deleteArchivoStub{}
-	mux := deleteArchivoMux(stub)
+func TestDeleteFileHandlerDeletesTheFile(t *testing.T) {
+	stub := &deleteFileStub{}
+	mux := deleteFileMux(stub)
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/v1/loteos/loteo-9/archivos/archivo-1", nil)
 	request.Header.Set("Authorization", "Bearer token")
@@ -45,14 +45,14 @@ func TestDeleteArchivoHandlerDeletesTheArchivo(t *testing.T) {
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
-	if stub.gotLoteoID != "loteo-9" || stub.gotArchivoID != "archivo-1" {
-		t.Fatalf("ids = (%q, %q), want (loteo-9, archivo-1)", stub.gotLoteoID, stub.gotArchivoID)
+	if stub.gotLoteoID != "loteo-9" || stub.gotFileID != "archivo-1" {
+		t.Fatalf("ids = (%q, %q), want (loteo-9, archivo-1)", stub.gotLoteoID, stub.gotFileID)
 	}
 }
 
-func TestDeleteArchivoHandlerMapsANotFound(t *testing.T) {
-	stub := &deleteArchivoStub{err: domain.ErrArchivoNotFound}
-	mux := deleteArchivoMux(stub)
+func TestDeleteFileHandlerMapsANotFound(t *testing.T) {
+	stub := &deleteFileStub{err: domain.ErrFileNotFound}
+	mux := deleteFileMux(stub)
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/v1/loteos/loteo-9/archivos/archivo-1", nil)
 	request.Header.Set("Authorization", "Bearer token")
@@ -64,9 +64,9 @@ func TestDeleteArchivoHandlerMapsANotFound(t *testing.T) {
 	}
 }
 
-func TestDeleteArchivoHandlerRejectsRequestsWithoutAToken(t *testing.T) {
-	stub := &deleteArchivoStub{}
-	mux := deleteArchivoMux(stub)
+func TestDeleteFileHandlerRejectsRequestsWithoutAToken(t *testing.T) {
+	stub := &deleteFileStub{}
+	mux := deleteFileMux(stub)
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/v1/loteos/loteo-9/archivos/archivo-1", nil)
 	recorder := httptest.NewRecorder()

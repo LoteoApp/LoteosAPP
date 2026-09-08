@@ -14,50 +14,50 @@ import (
 
 const archivoLoteID = "33333333-3333-3333-3333-333333333333"
 
-func loteArchivoInput(loteoID, loteID, categoria, mimeType, content string) loteos.StoreLoteArchivoInput {
-	return loteos.StoreLoteArchivoInput{
-		LoteoID:   loteoID,
-		LoteID:    loteID,
-		Categoria: categoria,
-		FileName:  "plano.pdf",
-		MimeType:  mimeType,
-		Content:   bytes.NewReader([]byte(content)),
-		Size:      int64(len(content)),
+func loteFileInput(loteoID, loteID, category, mimeType, content string) loteos.StoreLoteFileInput {
+	return loteos.StoreLoteFileInput{
+		LoteoID:  loteoID,
+		LoteID:   loteID,
+		Category: category,
+		FileName: "plano.pdf",
+		MimeType: mimeType,
+		Content:  bytes.NewReader([]byte(content)),
+		Size:     int64(len(content)),
 	}
 }
 
-func TestStoreLoteArchivoStoresBytesThenRecordsTheFile(t *testing.T) {
+func TestStoreLoteFileStoresBytesThenRecordsTheFile(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteFile(repository, storage)
 
 	const content = "%PDF-1.4 fake"
-	archivo, err := useCase.Execute(
+	file, err := useCase.Execute(
 		context.Background(), administrador(),
-		loteArchivoInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", content),
+		loteFileInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", content),
 	)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
 	wantPrefix := "loteos/" + archivoLoteoID + "/lotes/" + archivoLoteID + "/archivos/"
-	if !strings.HasPrefix(archivo.StorageKey, wantPrefix) {
-		t.Fatalf("StorageKey = %q, want prefix %q", archivo.StorageKey, wantPrefix)
+	if !strings.HasPrefix(file.StorageKey, wantPrefix) {
+		t.Fatalf("StorageKey = %q, want prefix %q", file.StorageKey, wantPrefix)
 	}
-	if repository.RecordedLoteArchivoLoteoID != archivoLoteoID || repository.RecordedLoteArchivoLoteID != archivoLoteID {
+	if repository.RecordedLoteFileLoteoID != archivoLoteoID || repository.RecordedLoteFileLoteID != archivoLoteID {
 		t.Fatalf("recorded ids = (%q, %q), want (%q, %q)",
-			repository.RecordedLoteArchivoLoteoID, repository.RecordedLoteArchivoLoteID, archivoLoteoID, archivoLoteID)
+			repository.RecordedLoteFileLoteoID, repository.RecordedLoteFileLoteID, archivoLoteoID, archivoLoteID)
 	}
 }
 
-func TestStoreLoteArchivoRejectsAnUnassignedAgrimensor(t *testing.T) {
+func TestStoreLoteFileRejectsAnUnassignedAgrimensor(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true, Assigned: false}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteFile(repository, storage)
 
 	_, err := useCase.Execute(
 		context.Background(), agrimensor(),
-		loteArchivoInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "x"),
+		loteFileInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "x"),
 	)
 
 	if !errors.Is(err, domain.ErrNoAutorizado) {
@@ -65,30 +65,32 @@ func TestStoreLoteArchivoRejectsAnUnassignedAgrimensor(t *testing.T) {
 	}
 }
 
-func TestStoreLoteArchivoRejectsAFullEntity(t *testing.T) {
-	existing := make([]domain.Archivo, domain.MaxArchivosPerEntity)
-	repository := &gatewayfake.LoteoRepository{Exists: true, ListLoteArchivosResult: existing}
+func TestStoreLoteFileRejectsAFullEntity(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true, RecordLoteFileErr: domain.ErrTooManyFiles}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteFile(repository, storage)
 
 	_, err := useCase.Execute(
 		context.Background(), administrador(),
-		loteArchivoInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "x"),
+		loteFileInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "%PDF-1.4 x"),
 	)
 
-	if !errors.Is(err, domain.ErrTooManyArchivos) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrTooManyArchivos)
+	if !errors.Is(err, domain.ErrTooManyFiles) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrTooManyFiles)
+	}
+	if storage.DeleteCalls != 1 {
+		t.Fatalf("DeleteCalls = %d, want 1 (the orphaned upload is cleaned up)", storage.DeleteCalls)
 	}
 }
 
-func TestStoreLoteArchivoPropagatesALoteNotFoundFromRecording(t *testing.T) {
-	repository := &gatewayfake.LoteoRepository{Exists: true, RecordLoteArchivoErr: domain.ErrLoteNotFound}
+func TestStoreLoteFilePropagatesALoteNotFoundFromRecording(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true, RecordLoteFileErr: domain.ErrLoteNotFound}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteFile(repository, storage)
 
 	_, err := useCase.Execute(
 		context.Background(), administrador(),
-		loteArchivoInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "x"),
+		loteFileInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "%PDF-1.4 x"),
 	)
 
 	if !errors.Is(err, domain.ErrLoteNotFound) {
@@ -96,5 +98,23 @@ func TestStoreLoteArchivoPropagatesALoteNotFoundFromRecording(t *testing.T) {
 	}
 	if storage.DeleteCalls != 1 {
 		t.Fatalf("DeleteCalls = %d, want 1 (the orphaned upload is cleaned up)", storage.DeleteCalls)
+	}
+}
+
+func TestStoreLoteFileRejectsContentThatDoesNotMatchTheDeclaredMimeType(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true}
+	storage := &gatewayfake.ObjectStorage{}
+	useCase := loteos.NewStoreLoteFile(repository, storage)
+
+	_, err := useCase.Execute(
+		context.Background(), administrador(),
+		loteFileInput(archivoLoteoID, archivoLoteID, "plano", "application/pdf", "this is plain text, not a pdf"),
+	)
+
+	if !errors.Is(err, domain.ErrInvalidFile) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidFile)
+	}
+	if storage.PutCalls != 0 {
+		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
 	}
 }

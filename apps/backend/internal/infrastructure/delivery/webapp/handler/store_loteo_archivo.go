@@ -11,56 +11,56 @@ import (
 )
 
 // The multipart envelope adds a little over the raw file; the body cap sits
-// above domain.MaxArchivoFileBytes by that margin, and the use case enforces
+// above domain.MaxFileBytes by that margin, and the use case enforces
 // the real per-file limit on the decoded part.
-const maxArchivoUploadBytes = domain.MaxArchivoFileBytes + (1 << 20)
+const maxFileUploadBytes = domain.MaxFileBytes + (1 << 20)
 
-// archivoFormFile and archivoFormCategoria are the multipart fields a
-// foto/plano upload is read from.
+// fileFormField and categoryFormField are the multipart fields a foto/plano
+// upload is read from.
 const (
-	archivoFormFile      = "archivo"
-	archivoFormCategoria = "categoria"
+	fileFormField     = "archivo"
+	categoryFormField = "categoria"
 )
 
-type StoreLoteoArchivoHandler struct {
-	storeLoteoArchivo loteos.StoreLoteoArchivo
+type StoreLoteoFileHandler struct {
+	storeLoteoFile loteos.StoreLoteoFile
 }
 
-func NewStoreLoteoArchivoHandler(storeLoteoArchivo loteos.StoreLoteoArchivo) *StoreLoteoArchivoHandler {
-	return &StoreLoteoArchivoHandler{storeLoteoArchivo: storeLoteoArchivo}
+func NewStoreLoteoFileHandler(storeLoteoFile loteos.StoreLoteoFile) *StoreLoteoFileHandler {
+	return &StoreLoteoFileHandler{storeLoteoFile: storeLoteoFile}
 }
 
 // Handle attaches a new foto/plano to a loteo. It must run behind
 // middleware.RequireAuth.
-func (handler *StoreLoteoArchivoHandler) Handle(w http.ResponseWriter, request *http.Request) error {
+func (handler *StoreLoteoFileHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 
-	request.Body = http.MaxBytesReader(w, request.Body, maxArchivoUploadBytes)
+	request.Body = http.MaxBytesReader(w, request.Body, maxFileUploadBytes)
 
 	if err := request.ParseMultipartForm(1 << 20); err != nil {
-		return domain.ErrInvalidArchivo.WithCause(err)
+		return domain.ErrInvalidFile.WithCause(err)
 	}
 
-	file, header, err := request.FormFile(archivoFormFile)
+	file, header, err := request.FormFile(fileFormField)
 	if err != nil {
-		return domain.ErrInvalidArchivo.WithCause(err)
+		return domain.ErrInvalidFile.WithCause(err)
 	}
 	defer file.Close()
 
 	actor := loteos.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles}
 
-	archivo, err := handler.storeLoteoArchivo.Execute(request.Context(), actor, loteos.StoreLoteoArchivoInput{
-		LoteoID:   request.PathValue("loteoId"),
-		Categoria: request.FormValue(archivoFormCategoria),
-		FileName:  header.Filename,
-		MimeType:  header.Header.Get("Content-Type"),
-		Content:   file,
-		Size:      header.Size,
+	stored, err := handler.storeLoteoFile.Execute(request.Context(), actor, loteos.StoreLoteoFileInput{
+		LoteoID:  request.PathValue("loteoId"),
+		Category: request.FormValue(categoryFormField),
+		FileName: header.Filename,
+		MimeType: header.Header.Get("Content-Type"),
+		Content:  file,
+		Size:     header.Size,
 	})
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusCreated, dto.ArchivoFromDomain(archivo))
+	response.WriteJSON(w, http.StatusCreated, dto.FileFromDomain(stored))
 	return nil
 }

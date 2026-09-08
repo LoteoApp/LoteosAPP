@@ -14,20 +14,20 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-type listLoteoArchivosStub struct {
-	archivos   []domain.Archivo
+type listLoteoFilesStub struct {
+	files      []domain.File
 	err        error
 	gotLoteoID string
 }
 
-func (stub *listLoteoArchivosStub) Execute(_ context.Context, _ loteos.Actor, loteoID string) ([]domain.Archivo, error) {
+func (stub *listLoteoFilesStub) Execute(_ context.Context, _ loteos.Actor, loteoID string) ([]domain.File, error) {
 	stub.gotLoteoID = loteoID
-	return stub.archivos, stub.err
+	return stub.files, stub.err
 }
 
-func TestListLoteoArchivosHandlerListsTheArchivos(t *testing.T) {
-	stub := &listLoteoArchivosStub{archivos: []domain.Archivo{{ID: "archivo-1", Categoria: "foto"}}}
-	h := handler.NewListLoteoArchivosHandler(stub)
+func TestListLoteoFilesHandlerListsTheFiles(t *testing.T) {
+	stub := &listLoteoFilesStub{files: []domain.File{{ID: "file-1", Category: "foto"}}}
+	h := handler.NewListLoteoFilesHandler(stub)
 	requireAuth := middleware.RequireAuth(administradorVerifier())
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos", requireAuth(handler.Adapt(h, 5*time.Second)))
@@ -45,19 +45,19 @@ func TestListLoteoArchivosHandlerListsTheArchivos(t *testing.T) {
 	}
 
 	var payload struct {
-		Archivos []map[string]any `json:"archivos"`
+		Files []map[string]any `json:"archivos"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if len(payload.Archivos) != 1 || payload.Archivos[0]["id"] != "archivo-1" {
-		t.Fatalf("archivos = %#v, want one archivo-1", payload.Archivos)
+	if len(payload.Files) != 1 || payload.Files[0]["id"] != "file-1" {
+		t.Fatalf("files = %#v, want one file-1", payload.Files)
 	}
 }
 
-func TestListLoteoArchivosHandlerMapsANotFound(t *testing.T) {
-	stub := &listLoteoArchivosStub{err: domain.ErrLoteoNotFound}
-	h := handler.NewListLoteoArchivosHandler(stub)
+func TestListLoteoFilesHandlerMapsANotFound(t *testing.T) {
+	stub := &listLoteoFilesStub{err: domain.ErrLoteoNotFound}
+	h := handler.NewListLoteoFilesHandler(stub)
 	requireAuth := middleware.RequireAuth(administradorVerifier())
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos", requireAuth(handler.Adapt(h, 5*time.Second)))

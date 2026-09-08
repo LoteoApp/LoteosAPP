@@ -10,46 +10,46 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/response"
 )
 
-type StoreLoteArchivoHandler struct {
-	storeLoteArchivo loteos.StoreLoteArchivo
+type StoreLoteFileHandler struct {
+	storeLoteFile loteos.StoreLoteFile
 }
 
-func NewStoreLoteArchivoHandler(storeLoteArchivo loteos.StoreLoteArchivo) *StoreLoteArchivoHandler {
-	return &StoreLoteArchivoHandler{storeLoteArchivo: storeLoteArchivo}
+func NewStoreLoteFileHandler(storeLoteFile loteos.StoreLoteFile) *StoreLoteFileHandler {
+	return &StoreLoteFileHandler{storeLoteFile: storeLoteFile}
 }
 
 // Handle attaches a new foto/plano to one lote. It must run behind
 // middleware.RequireAuth.
-func (handler *StoreLoteArchivoHandler) Handle(w http.ResponseWriter, request *http.Request) error {
+func (handler *StoreLoteFileHandler) Handle(w http.ResponseWriter, request *http.Request) error {
 	principal, _ := middleware.PrincipalFromContext(request.Context())
 
-	request.Body = http.MaxBytesReader(w, request.Body, maxArchivoUploadBytes)
+	request.Body = http.MaxBytesReader(w, request.Body, maxFileUploadBytes)
 
 	if err := request.ParseMultipartForm(1 << 20); err != nil {
-		return domain.ErrInvalidArchivo.WithCause(err)
+		return domain.ErrInvalidFile.WithCause(err)
 	}
 
-	file, header, err := request.FormFile(archivoFormFile)
+	file, header, err := request.FormFile(fileFormField)
 	if err != nil {
-		return domain.ErrInvalidArchivo.WithCause(err)
+		return domain.ErrInvalidFile.WithCause(err)
 	}
 	defer file.Close()
 
 	actor := loteos.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles}
 
-	archivo, err := handler.storeLoteArchivo.Execute(request.Context(), actor, loteos.StoreLoteArchivoInput{
-		LoteoID:   request.PathValue("loteoId"),
-		LoteID:    request.PathValue("loteId"),
-		Categoria: request.FormValue(archivoFormCategoria),
-		FileName:  header.Filename,
-		MimeType:  header.Header.Get("Content-Type"),
-		Content:   file,
-		Size:      header.Size,
+	stored, err := handler.storeLoteFile.Execute(request.Context(), actor, loteos.StoreLoteFileInput{
+		LoteoID:  request.PathValue("loteoId"),
+		LoteID:   request.PathValue("loteId"),
+		Category: request.FormValue(categoryFormField),
+		FileName: header.Filename,
+		MimeType: header.Header.Get("Content-Type"),
+		Content:  file,
+		Size:     header.Size,
 	})
 	if err != nil {
 		return err
 	}
 
-	response.WriteJSON(w, http.StatusCreated, dto.ArchivoFromDomain(archivo))
+	response.WriteJSON(w, http.StatusCreated, dto.FileFromDomain(stored))
 	return nil
 }

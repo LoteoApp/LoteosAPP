@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import PlanSelectionPanel from './PlanSelectionPanel'
+import * as archivosApi from '../api/archivos'
 import type { LoteoDetail } from '../types'
 
 const triangle = [
@@ -397,5 +398,74 @@ describe('PlanSelectionPanel', () => {
     )
 
     expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+  })
+
+  it('never applies an upload from a previously selected lote to the one now shown', async () => {
+    const user = userEvent.setup()
+    const twoLotes = loteo({
+      lotes: [
+        { ...loteo().lotes[0], id: 'lt-1', numero: '7' },
+        { ...loteo().lotes[0], id: 'lt-2', numero: '8' },
+      ],
+    })
+    vi.spyOn(archivosApi, 'listLoteAttachments').mockResolvedValue([])
+    let resolveUpload: (attachment: Awaited<ReturnType<typeof archivosApi.uploadLoteAttachment>>) => void = () => {}
+    vi.spyOn(archivosApi, 'uploadLoteAttachment').mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpload = resolve
+      }),
+    )
+
+    const { rerender } = render(
+      <PlanSelectionPanel
+        accessToken="tok"
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={twoLotes}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+    await screen.findByText('Todavía no hay archivos.')
+
+    const file = new File(['bytes'], 'foto-a.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Subir archivo'), file)
+
+    rerender(
+      <PlanSelectionPanel
+        accessToken="tok"
+        selected={{ kind: 'lote', id: 'lt-2' }}
+        loteo={twoLotes}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-2"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+    await screen.findByText('Todavía no hay archivos.')
+
+    await act(async () => {
+      resolveUpload({
+        id: 'archivo-1',
+        category: 'foto',
+        nombreOriginal: 'foto-a.jpg',
+        mimeType: 'image/jpeg',
+        hashSha256: 'abc123',
+        fechaCreacion: '2026-01-01T00:00:00Z',
+      })
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByRole('button', { name: 'Eliminar foto-a.jpg' })).not.toBeInTheDocument()
+    expect(screen.getByText('Todavía no hay archivos.')).toBeInTheDocument()
   })
 })

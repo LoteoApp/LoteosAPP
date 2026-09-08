@@ -13,24 +13,24 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-type listLoteArchivosStub struct {
-	archivos   []domain.Archivo
+type listLoteFilesStub struct {
+	files      []domain.File
 	err        error
 	gotLoteoID string
 	gotLoteID  string
 }
 
-func (stub *listLoteArchivosStub) Execute(
+func (stub *listLoteFilesStub) Execute(
 	_ context.Context, _ loteos.Actor, loteoID, loteID string,
-) ([]domain.Archivo, error) {
+) ([]domain.File, error) {
 	stub.gotLoteoID = loteoID
 	stub.gotLoteID = loteID
-	return stub.archivos, stub.err
+	return stub.files, stub.err
 }
 
-func TestListLoteArchivosHandlerListsTheArchivos(t *testing.T) {
-	stub := &listLoteArchivosStub{archivos: []domain.Archivo{{ID: "archivo-1"}}}
-	h := handler.NewListLoteArchivosHandler(stub)
+func TestListLoteFilesHandlerListsTheFiles(t *testing.T) {
+	stub := &listLoteFilesStub{files: []domain.File{{ID: "file-1"}}}
+	h := handler.NewListLoteFilesHandler(stub)
 	requireAuth := middleware.RequireAuth(administradorVerifier())
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos", requireAuth(handler.Adapt(h, 5*time.Second)))

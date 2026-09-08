@@ -3,15 +3,15 @@ import { ApiError } from '../../../shared/api/client'
 import { apiUrl } from '../../../shared/config/env'
 import * as client from '../../../shared/api/client'
 import {
-  deleteArchivo,
-  fetchArchivoContent,
-  listLoteArchivos,
-  listLoteoArchivos,
-  uploadLoteArchivo,
-  uploadLoteoArchivo,
+  deleteAttachment,
+  fetchAttachmentContent,
+  listLoteAttachments,
+  listLoteoAttachments,
+  uploadLoteAttachment,
+  uploadLoteoAttachment,
 } from './archivos'
 
-const archivoPayload = {
+const attachmentPayload = {
   id: 'archivo-1',
   categoria: 'foto',
   nombreOriginal: 'foto.jpg',
@@ -25,11 +25,11 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('listLoteoArchivos', () => {
+describe('listLoteoAttachments', () => {
   it('fetches and unwraps the archivos list', async () => {
-    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ archivos: [archivoPayload] })
+    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ archivos: [attachmentPayload] })
 
-    const result = await listLoteoArchivos('loteo 1', 'tok')
+    const result = await listLoteoAttachments('loteo 1', 'tok')
 
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/loteos/loteo%201/archivos', {
       token: 'tok',
@@ -38,7 +38,7 @@ describe('listLoteoArchivos', () => {
     expect(result).toEqual([
       {
         id: 'archivo-1',
-        categoria: 'foto',
+        category: 'foto',
         nombreOriginal: 'foto.jpg',
         mimeType: 'image/jpeg',
         hashSha256: 'abc123',
@@ -50,7 +50,7 @@ describe('listLoteoArchivos', () => {
   it('throws when the response is malformed', async () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ archivos: [{ id: 'x' }] })
 
-    await expect(listLoteoArchivos('loteo-1', 'tok')).rejects.toThrow(
+    await expect(listLoteoAttachments('loteo-1', 'tok')).rejects.toThrow(
       'No se pudieron cargar los archivos, intentá nuevamente.',
     )
   })
@@ -59,15 +59,15 @@ describe('listLoteoArchivos', () => {
     const apiError = new ApiError('no autorizado', 'forbidden', 403)
     vi.spyOn(client, 'apiFetch').mockRejectedValue(apiError)
 
-    await expect(listLoteoArchivos('loteo-1', 'tok')).rejects.toBe(apiError)
+    await expect(listLoteoAttachments('loteo-1', 'tok')).rejects.toBe(apiError)
   })
 })
 
-describe('listLoteArchivos', () => {
+describe('listLoteAttachments', () => {
   it('fetches the archivos scoped to a lote', async () => {
     const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ archivos: [] })
 
-    await listLoteArchivos('loteo-1', 'lote-1', 'tok')
+    await listLoteAttachments('loteo-1', 'lote-1', 'tok')
 
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/loteos/loteo-1/lotes/lote-1/archivos', {
       token: 'tok',
@@ -79,16 +79,16 @@ describe('listLoteArchivos', () => {
     const apiError = new ApiError('no encontrado', 'loteo_not_found', 404)
     vi.spyOn(client, 'apiFetch').mockRejectedValue(apiError)
 
-    await expect(listLoteArchivos('loteo-1', 'lote-1', 'tok')).rejects.toBe(apiError)
+    await expect(listLoteAttachments('loteo-1', 'lote-1', 'tok')).rejects.toBe(apiError)
   })
 })
 
-describe('uploadLoteoArchivo', () => {
+describe('uploadLoteoAttachment', () => {
   it('POSTs the file and categoria as multipart form data', async () => {
-    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue(archivoPayload)
+    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue(attachmentPayload)
     const file = new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' })
 
-    const result = await uploadLoteoArchivo('loteo-1', 'foto', file, 'tok')
+    const result = await uploadLoteoAttachment('loteo-1', 'foto', file, 'tok')
 
     expect(apiFetch).toHaveBeenCalledTimes(1)
     const [path, options] = apiFetch.mock.calls[0]
@@ -105,7 +105,7 @@ describe('uploadLoteoArchivo', () => {
     vi.spyOn(client, 'apiFetch').mockRejectedValue(new Error('boom'))
     const file = new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' })
 
-    await expect(uploadLoteoArchivo('loteo-1', 'foto', file, 'tok')).rejects.toThrow(
+    await expect(uploadLoteoAttachment('loteo-1', 'foto', file, 'tok')).rejects.toThrow(
       'No se pudo subir el archivo, intentá nuevamente.',
     )
   })
@@ -115,25 +115,25 @@ describe('uploadLoteoArchivo', () => {
     vi.spyOn(client, 'apiFetch').mockRejectedValue(apiError)
     const file = new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' })
 
-    await expect(uploadLoteoArchivo('loteo-1', 'foto', file, 'tok')).rejects.toBe(apiError)
+    await expect(uploadLoteoAttachment('loteo-1', 'foto', file, 'tok')).rejects.toBe(apiError)
   })
 
-  it('throws when the response body is not an archivo', async () => {
+  it('throws when the response body is not an attachment', async () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ id: 'x' })
     const file = new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' })
 
-    await expect(uploadLoteoArchivo('loteo-1', 'foto', file, 'tok')).rejects.toThrow(
+    await expect(uploadLoteoAttachment('loteo-1', 'foto', file, 'tok')).rejects.toThrow(
       'No se pudo subir el archivo, intentá nuevamente.',
     )
   })
 })
 
-describe('uploadLoteArchivo', () => {
+describe('uploadLoteAttachment', () => {
   it('POSTs to the lote-scoped endpoint', async () => {
-    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ ...archivoPayload, categoria: 'plano' })
+    const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ ...attachmentPayload, categoria: 'plano' })
     const file = new File(['bytes'], 'plano.pdf', { type: 'application/pdf' })
 
-    await uploadLoteArchivo('loteo-1', 'lote-1', 'plano', file, 'tok')
+    await uploadLoteAttachment('loteo-1', 'lote-1', 'plano', file, 'tok')
 
     const [path] = apiFetch.mock.calls[0]
     expect(path).toBe('/api/v1/loteos/loteo-1/lotes/lote-1/archivos')
@@ -144,15 +144,15 @@ describe('uploadLoteArchivo', () => {
     vi.spyOn(client, 'apiFetch').mockRejectedValue(apiError)
     const file = new File(['bytes'], 'plano.pdf', { type: 'application/pdf' })
 
-    await expect(uploadLoteArchivo('loteo-1', 'lote-1', 'plano', file, 'tok')).rejects.toBe(apiError)
+    await expect(uploadLoteAttachment('loteo-1', 'lote-1', 'plano', file, 'tok')).rejects.toBe(apiError)
   })
 })
 
-describe('deleteArchivo', () => {
+describe('deleteAttachment', () => {
   it('DELETEs the archivo', async () => {
     const apiFetch = vi.spyOn(client, 'apiFetch').mockResolvedValue(undefined)
 
-    await deleteArchivo('loteo-1', 'archivo-1', 'tok')
+    await deleteAttachment('loteo-1', 'archivo-1', 'tok')
 
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/loteos/loteo-1/archivos/archivo-1', {
       method: 'DELETE',
@@ -163,7 +163,7 @@ describe('deleteArchivo', () => {
   it('wraps a non-ApiError failure', async () => {
     vi.spyOn(client, 'apiFetch').mockRejectedValue(new Error('boom'))
 
-    await expect(deleteArchivo('loteo-1', 'archivo-1', 'tok')).rejects.toThrow(
+    await expect(deleteAttachment('loteo-1', 'archivo-1', 'tok')).rejects.toThrow(
       'No se pudo eliminar el archivo, intentá nuevamente.',
     )
   })
@@ -172,11 +172,11 @@ describe('deleteArchivo', () => {
     const apiError = new ApiError('no encontrado', 'archivo_not_found', 404)
     vi.spyOn(client, 'apiFetch').mockRejectedValue(apiError)
 
-    await expect(deleteArchivo('loteo-1', 'archivo-1', 'tok')).rejects.toBe(apiError)
+    await expect(deleteAttachment('loteo-1', 'archivo-1', 'tok')).rejects.toBe(apiError)
   })
 })
 
-describe('fetchArchivoContent', () => {
+describe('fetchAttachmentContent', () => {
   function stubFetch(response: Response) {
     const mock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response)
     vi.stubGlobal('fetch', mock)
@@ -186,7 +186,7 @@ describe('fetchArchivoContent', () => {
   it('fetches the raw bytes with the bearer token', async () => {
     const mock = stubFetch(new Response('hola', { status: 200, headers: { 'Content-Type': 'image/jpeg' } }))
 
-    const result = await fetchArchivoContent('loteo-1', 'archivo-1', 'tok')
+    const result = await fetchAttachmentContent('loteo-1', 'archivo-1', 'tok')
 
     const [url, init] = mock.mock.calls[0]
     expect(url).toBe(`${apiUrl}/api/v1/loteos/loteo-1/archivos/archivo-1`)
@@ -197,7 +197,7 @@ describe('fetchArchivoContent', () => {
   it('maps a backend error response to an ApiError', async () => {
     stubFetch(new Response(JSON.stringify({ code: 'archivo_not_found', message: 'no existe' }), { status: 404 }))
 
-    await expect(fetchArchivoContent('loteo-1', 'archivo-1', 'tok')).rejects.toMatchObject({
+    await expect(fetchAttachmentContent('loteo-1', 'archivo-1', 'tok')).rejects.toMatchObject({
       code: 'archivo_not_found',
       message: 'no existe',
       status: 404,
@@ -212,7 +212,7 @@ describe('fetchArchivoContent', () => {
       }),
     )
 
-    await expect(fetchArchivoContent('loteo-1', 'archivo-1', 'tok')).rejects.toMatchObject({
+    await expect(fetchAttachmentContent('loteo-1', 'archivo-1', 'tok')).rejects.toMatchObject({
       code: 'network_error',
     })
   })
@@ -226,6 +226,6 @@ describe('fetchArchivoContent', () => {
       }),
     )
 
-    await expect(fetchArchivoContent('loteo-1', 'archivo-1', 'tok')).rejects.toBe(abortError)
+    await expect(fetchAttachmentContent('loteo-1', 'archivo-1', 'tok')).rejects.toBe(abortError)
   })
 })

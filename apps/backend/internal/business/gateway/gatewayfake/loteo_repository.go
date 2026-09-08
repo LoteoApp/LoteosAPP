@@ -47,40 +47,40 @@ type LoteoRepository struct {
 	RecordedDxfFile       domain.NewLoteoDxfFile
 	RecordedDxfFileResult domain.LoteoDxfFile
 
-	RecordLoteoArchivoCalls     int
-	RecordLoteoArchivoErr       error
-	RecordedLoteoArchivoLoteoID string
-	RecordedLoteoArchivo        domain.NewArchivo
-	RecordedLoteoArchivoResult  domain.Archivo
+	RecordLoteoFileCalls     int
+	RecordLoteoFileErr       error
+	RecordedLoteoFileLoteoID string
+	RecordedLoteoFile        domain.NewFile
+	RecordedLoteoFileResult  domain.File
 
-	RecordLoteArchivoCalls     int
-	RecordLoteArchivoErr       error
-	RecordedLoteArchivoLoteoID string
-	RecordedLoteArchivoLoteID  string
-	RecordedLoteArchivo        domain.NewArchivo
-	RecordedLoteArchivoResult  domain.Archivo
+	RecordLoteFileCalls     int
+	RecordLoteFileErr       error
+	RecordedLoteFileLoteoID string
+	RecordedLoteFileLoteID  string
+	RecordedLoteFile        domain.NewFile
+	RecordedLoteFileResult  domain.File
 
-	ListLoteoArchivosCalls   int
-	ListLoteoArchivosErr     error
-	ListLoteoArchivosLoteoID string
-	ListLoteoArchivosResult  []domain.Archivo
+	ListLoteoFilesCalls   int
+	ListLoteoFilesErr     error
+	ListLoteoFilesLoteoID string
+	ListLoteoFilesResult  []domain.File
 
-	ListLoteArchivosCalls   int
-	ListLoteArchivosErr     error
-	ListLoteArchivosLoteoID string
-	ListLoteArchivosLoteID  string
-	ListLoteArchivosResult  []domain.Archivo
+	ListLoteFilesCalls   int
+	ListLoteFilesErr     error
+	ListLoteFilesLoteoID string
+	ListLoteFilesLoteID  string
+	ListLoteFilesResult  []domain.File
 
-	GetArchivoCalls   int
-	GetArchivoErr     error
-	GetArchivoLoteoID string
-	GetArchivoID      string
-	GetArchivoResult  domain.Archivo
+	GetFileCalls   int
+	GetFileErr     error
+	GetFileLoteoID string
+	GetFileID      string
+	GetFileResult  domain.File
 
-	DeleteArchivoCalls    int
-	DeleteArchivoErr      error
-	DeletedArchivoLoteoID string
-	DeletedArchivoID      string
+	DeleteFileCalls    int
+	DeleteFileErr      error
+	DeletedFileLoteoID string
+	DeletedFileID      string
 
 	ListCalls  int
 	ListErr    error
@@ -251,22 +251,22 @@ func (fake *LoteoRepository) RecordDxfFile(
 	return fake.RecordedDxfFileResult, nil
 }
 
-func (fake *LoteoRepository) RecordLoteoArchivo(
+func (fake *LoteoRepository) RecordLoteoFile(
 	_ context.Context,
 	actorAuthProviderID, loteoID string,
-	file domain.NewArchivo,
-) (domain.Archivo, error) {
-	fake.RecordLoteoArchivoCalls++
+	file domain.NewFile,
+) (domain.File, error) {
+	fake.RecordLoteoFileCalls++
 	fake.ActorAuthProviderID = actorAuthProviderID
-	fake.RecordedLoteoArchivoLoteoID = loteoID
-	fake.RecordedLoteoArchivo = file
-	if fake.RecordLoteoArchivoErr != nil {
-		return domain.Archivo{}, fake.RecordLoteoArchivoErr
+	fake.RecordedLoteoFileLoteoID = loteoID
+	fake.RecordedLoteoFile = file
+	if fake.RecordLoteoFileErr != nil {
+		return domain.File{}, fake.RecordLoteoFileErr
 	}
-	if fake.RecordedLoteoArchivoResult.ID == "" {
-		return domain.Archivo{
+	if fake.RecordedLoteoFileResult.ID == "" {
+		return domain.File{
 			ID:           "archivo-loteo-1",
-			Categoria:    file.Categoria,
+			Category:     file.Category,
 			StorageKey:   file.StorageKey,
 			OriginalName: file.OriginalName,
 			MimeType:     file.MimeType,
@@ -274,26 +274,26 @@ func (fake *LoteoRepository) RecordLoteoArchivo(
 		}, nil
 	}
 
-	return fake.RecordedLoteoArchivoResult, nil
+	return fake.RecordedLoteoFileResult, nil
 }
 
-func (fake *LoteoRepository) RecordLoteArchivo(
+func (fake *LoteoRepository) RecordLoteFile(
 	_ context.Context,
 	actorAuthProviderID, loteoID, loteID string,
-	file domain.NewArchivo,
-) (domain.Archivo, error) {
-	fake.RecordLoteArchivoCalls++
+	file domain.NewFile,
+) (domain.File, error) {
+	fake.RecordLoteFileCalls++
 	fake.ActorAuthProviderID = actorAuthProviderID
-	fake.RecordedLoteArchivoLoteoID = loteoID
-	fake.RecordedLoteArchivoLoteID = loteID
-	fake.RecordedLoteArchivo = file
-	if fake.RecordLoteArchivoErr != nil {
-		return domain.Archivo{}, fake.RecordLoteArchivoErr
+	fake.RecordedLoteFileLoteoID = loteoID
+	fake.RecordedLoteFileLoteID = loteID
+	fake.RecordedLoteFile = file
+	if fake.RecordLoteFileErr != nil {
+		return domain.File{}, fake.RecordLoteFileErr
 	}
-	if fake.RecordedLoteArchivoResult.ID == "" {
-		return domain.Archivo{
+	if fake.RecordedLoteFileResult.ID == "" {
+		return domain.File{
 			ID:           "archivo-lote-1",
-			Categoria:    file.Categoria,
+			Category:     file.Category,
 			StorageKey:   file.StorageKey,
 			OriginalName: file.OriginalName,
 			MimeType:     file.MimeType,
@@ -301,45 +301,45 @@ func (fake *LoteoRepository) RecordLoteArchivo(
 		}, nil
 	}
 
-	return fake.RecordedLoteArchivoResult, nil
+	return fake.RecordedLoteFileResult, nil
 }
 
-func (fake *LoteoRepository) ListLoteoArchivos(_ context.Context, loteoID string) ([]domain.Archivo, error) {
-	fake.ListLoteoArchivosCalls++
-	fake.ListLoteoArchivosLoteoID = loteoID
-	if fake.ListLoteoArchivosErr != nil {
-		return nil, fake.ListLoteoArchivosErr
+func (fake *LoteoRepository) ListLoteoFiles(_ context.Context, loteoID string) ([]domain.File, error) {
+	fake.ListLoteoFilesCalls++
+	fake.ListLoteoFilesLoteoID = loteoID
+	if fake.ListLoteoFilesErr != nil {
+		return nil, fake.ListLoteoFilesErr
 	}
 
-	return fake.ListLoteoArchivosResult, nil
+	return fake.ListLoteoFilesResult, nil
 }
 
-func (fake *LoteoRepository) ListLoteArchivos(_ context.Context, loteoID, loteID string) ([]domain.Archivo, error) {
-	fake.ListLoteArchivosCalls++
-	fake.ListLoteArchivosLoteoID = loteoID
-	fake.ListLoteArchivosLoteID = loteID
-	if fake.ListLoteArchivosErr != nil {
-		return nil, fake.ListLoteArchivosErr
+func (fake *LoteoRepository) ListLoteFiles(_ context.Context, loteoID, loteID string) ([]domain.File, error) {
+	fake.ListLoteFilesCalls++
+	fake.ListLoteFilesLoteoID = loteoID
+	fake.ListLoteFilesLoteID = loteID
+	if fake.ListLoteFilesErr != nil {
+		return nil, fake.ListLoteFilesErr
 	}
 
-	return fake.ListLoteArchivosResult, nil
+	return fake.ListLoteFilesResult, nil
 }
 
-func (fake *LoteoRepository) GetArchivo(_ context.Context, loteoID, archivoID string) (domain.Archivo, error) {
-	fake.GetArchivoCalls++
-	fake.GetArchivoLoteoID = loteoID
-	fake.GetArchivoID = archivoID
-	if fake.GetArchivoErr != nil {
-		return domain.Archivo{}, fake.GetArchivoErr
+func (fake *LoteoRepository) GetFile(_ context.Context, loteoID, archivoID string) (domain.File, error) {
+	fake.GetFileCalls++
+	fake.GetFileLoteoID = loteoID
+	fake.GetFileID = archivoID
+	if fake.GetFileErr != nil {
+		return domain.File{}, fake.GetFileErr
 	}
 
-	return fake.GetArchivoResult, nil
+	return fake.GetFileResult, nil
 }
 
-func (fake *LoteoRepository) DeleteArchivo(_ context.Context, actorAuthProviderID, loteoID, archivoID string) error {
-	fake.DeleteArchivoCalls++
+func (fake *LoteoRepository) DeleteFile(_ context.Context, actorAuthProviderID, loteoID, archivoID string) error {
+	fake.DeleteFileCalls++
 	fake.ActorAuthProviderID = actorAuthProviderID
-	fake.DeletedArchivoLoteoID = loteoID
-	fake.DeletedArchivoID = archivoID
-	return fake.DeleteArchivoErr
+	fake.DeletedFileLoteoID = loteoID
+	fake.DeletedFileID = archivoID
+	return fake.DeleteFileErr
 }

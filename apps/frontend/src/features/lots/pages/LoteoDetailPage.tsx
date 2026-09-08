@@ -134,7 +134,11 @@ export default function LoteoDetailPage({ accessToken, canEdit = false }: LoteoD
           <CardTitle>Fotos y documentos</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Remounted per loteo: React Router keeps this page mounted across
+              a param change, so a pending upload/delete from the previous
+              loteo must never land on this one once it resolves. */}
           <ArchivosSection
+            key={state.loteo.id}
             target={{ kind: 'loteo', loteoId: state.loteo.id }}
             accessToken={accessToken}
             canEdit={canEdit}

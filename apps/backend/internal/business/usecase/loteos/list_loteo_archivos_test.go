@@ -10,15 +10,15 @@ import (
 	"loteosapp/backend/internal/business/usecase/loteos"
 )
 
-func TestListLoteoArchivosReturnsTheRepositoryResultForAVisibleLoteo(t *testing.T) {
+func TestListLoteoFilesReturnsTheRepositoryResultForAVisibleLoteo(t *testing.T) {
 	t.Parallel()
 
-	want := []domain.Archivo{{ID: "archivo-1", Categoria: "foto"}}
+	want := []domain.File{{ID: "archivo-1", Category: "foto"}}
 	repository := &gatewayfake.LoteoRepository{
-		GetResult:               domain.Loteo{ID: "loteo-1"},
-		ListLoteoArchivosResult: want,
+		GetResult:            domain.Loteo{ID: "loteo-1"},
+		ListLoteoFilesResult: want,
 	}
-	useCase := loteos.NewListLoteoArchivos(repository)
+	useCase := loteos.NewListLoteoFiles(repository)
 
 	got, err := useCase.Execute(context.Background(), administrador(), "loteo-1")
 	if err != nil {
@@ -27,32 +27,32 @@ func TestListLoteoArchivosReturnsTheRepositoryResultForAVisibleLoteo(t *testing.
 	if len(got) != 1 || got[0].ID != "archivo-1" {
 		t.Fatalf("Execute() = %#v, want %#v", got, want)
 	}
-	if repository.ListLoteoArchivosLoteoID != "loteo-1" {
-		t.Errorf("loteo id = %q, want loteo-1", repository.ListLoteoArchivosLoteoID)
+	if repository.ListLoteoFilesLoteoID != "loteo-1" {
+		t.Errorf("loteo id = %q, want loteo-1", repository.ListLoteoFilesLoteoID)
 	}
 }
 
-func TestListLoteoArchivosReportsNotFoundForALoteoOutsideTheActorsScope(t *testing.T) {
+func TestListLoteoFilesReportsNotFoundForALoteoOutsideTheActorsScope(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.LoteoRepository{GetErr: domain.ErrLoteoNotFound}
-	useCase := loteos.NewListLoteoArchivos(repository)
+	useCase := loteos.NewListLoteoFiles(repository)
 
 	_, err := useCase.Execute(context.Background(), actorWith(domain.RolAgrimensor), "loteo-1")
 
 	if !errors.Is(err, domain.ErrLoteoNotFound) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrLoteoNotFound)
 	}
-	if repository.ListLoteoArchivosCalls != 0 {
+	if repository.ListLoteoFilesCalls != 0 {
 		t.Error("Execute() should not list archivos for a loteo outside the actor's scope")
 	}
 }
 
-func TestListLoteoArchivosDeniesAnyOtherActor(t *testing.T) {
+func TestListLoteoFilesDeniesAnyOtherActor(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.LoteoRepository{}
-	useCase := loteos.NewListLoteoArchivos(repository)
+	useCase := loteos.NewListLoteoFiles(repository)
 
 	_, err := useCase.Execute(context.Background(), loteos.Actor{AuthProviderID: "actor-1"}, "loteo-1")
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"io"
 	"strings"
 
@@ -11,98 +12,120 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// StoreLoteoArchivoInput is a foto/plano attached to the loteo itself, as it
+// StoreLoteoFileInput is a foto/plano attached to the loteo itself, as it
 // reaches the use case. Content is already materialized (a file or a
 // buffer), so it can be hashed and then rewound for the upload.
-type StoreLoteoArchivoInput struct {
-	LoteoID   string
-	Categoria string
-	FileName  string
-	MimeType  string
-	Content   io.ReadSeeker
-	Size      int64
+type StoreLoteoFileInput struct {
+	LoteoID  string
+	Category string
+	FileName string
+	MimeType string
+	Content  io.ReadSeeker
+	Size     int64
 }
 
-// StoreLoteoArchivo attaches a new foto/plano to a loteo. Unlike
+// StoreLoteoFile attaches a new foto/plano to a loteo. Unlike
 // StoreLoteoDxf it never supersedes a prior upload: a loteo may carry
 // several active fotos/planos. Only an administrador, or an agrimensor
 // assigned to the loteo, may do this.
-type StoreLoteoArchivo interface {
-	Execute(ctx context.Context, actor Actor, input StoreLoteoArchivoInput) (domain.Archivo, error)
+type StoreLoteoFile interface {
+	Execute(ctx context.Context, actor Actor, input StoreLoteoFileInput) (domain.File, error)
 }
 
-type storeLoteoArchivoUseCase struct {
+type storeLoteoFileUseCase struct {
 	repository gateway.LoteoRepository
 	storage    gateway.ObjectStorage
 }
 
-func NewStoreLoteoArchivo(repository gateway.LoteoRepository, storage gateway.ObjectStorage) StoreLoteoArchivo {
-	return &storeLoteoArchivoUseCase{repository: repository, storage: storage}
+func NewStoreLoteoFile(repository gateway.LoteoRepository, storage gateway.ObjectStorage) StoreLoteoFile {
+	return &storeLoteoFileUseCase{repository: repository, storage: storage}
 }
 
-func (useCase *storeLoteoArchivoUseCase) Execute(
+func (useCase *storeLoteoFileUseCase) Execute(
 	ctx context.Context,
 	actor Actor,
-	input StoreLoteoArchivoInput,
-) (domain.Archivo, error) {
+	input StoreLoteoFileInput,
+) (domain.File, error) {
 	if err := authorizeEditor(ctx, useCase.repository, actor, input.LoteoID); err != nil {
-		return domain.Archivo{}, err
+		return domain.File{}, err
 	}
 
-	if err := validateArchivoUpload(input.Categoria, input.MimeType, input.Content, input.Size); err != nil {
-		return domain.Archivo{}, err
-	}
-
-	existing, err := useCase.repository.ListLoteoArchivos(ctx, input.LoteoID)
-	if err != nil {
-		return domain.Archivo{}, fromRepository(err)
-	}
-	if len(existing) >= domain.MaxArchivosPerEntity {
-		return domain.Archivo{}, domain.ErrTooManyArchivos
+	if err := validateFileUpload(input.Category, input.MimeType, input.Content, input.Size); err != nil {
+		return domain.File{}, err
 	}
 
 	digest, err := hashAndRewind(input.Content)
 	if err != nil {
-		return domain.Archivo{}, domain.ErrInvalidArchivo.WithCause(err)
+		return domain.File{}, domain.ErrInvalidFile.WithCause(err)
 	}
 
-	key, err := newArchivoStorageKey("loteos/" + input.LoteoID)
+	key, err := newFileStorageKey("loteos/" + input.LoteoID)
 	if err != nil {
-		return domain.Archivo{}, domain.ErrStorageUnavailable.WithCause(err)
+		return domain.File{}, domain.ErrStorageUnavailable.WithCause(err)
 	}
 	if err := useCase.storage.Put(ctx, key, input.Content, input.Size, input.MimeType); err != nil {
-		return domain.Archivo{}, fromStorage(err)
+		return domain.File{}, fromStorage(err)
 	}
 
-	archivo, err := useCase.repository.RecordLoteoArchivo(ctx, actor.AuthProviderID, input.LoteoID, domain.NewArchivo{
-		Categoria:    input.Categoria,
+	file, err := useCase.repository.RecordLoteoFile(ctx, actor.AuthProviderID, input.LoteoID, domain.NewFile{
+		Category:     input.Category,
 		StorageKey:   key,
 		OriginalName: strings.TrimSpace(input.FileName),
 		MimeType:     input.MimeType,
 		Sha256:       digest,
 	})
 	if err != nil {
-		return domain.Archivo{}, cleanupAfterRecordFailure(ctx, useCase.storage, key, err)
+		return domain.File{}, cleanupAfterRecordFailure(ctx, useCase.storage, key, err)
 	}
 
-	return archivo, nil
+	return file, nil
 }
 
-func validateArchivoUpload(categoria, mimeType string, content io.ReadSeeker, size int64) error {
-	if !domain.ValidArchivoCategoria(categoria) {
-		return domain.ErrInvalidArchivo
+func validateFileUpload(category, mimeType string, content io.ReadSeeker, size int64) error {
+	if !domain.ValidFileCategory(category) {
+		return domain.ErrInvalidFile
 	}
-	if content == nil || size <= 0 || size > domain.MaxArchivoFileBytes {
-		return domain.ErrInvalidArchivo
+	if content == nil || size <= 0 || size > domain.MaxFileBytes {
+		return domain.ErrInvalidFile
 	}
-	if !domain.ValidArchivoMimeType(mimeType) {
-		return domain.ErrInvalidArchivo
+	if !domain.ValidFileMimeType(mimeType) {
+		return domain.ErrInvalidFile
+	}
+	if err := verifyFileContentSignature(mimeType, content); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func newArchivoStorageKey(prefix string) (string, error) {
+// fileSignatureBytes is enough to hold the longest magic number this
+// package checks for (the WEBP RIFF/WEBP pair, at 12 bytes).
+const fileSignatureBytes = 12
+
+// verifyFileContentSignature rejects an upload whose own bytes don't
+// match the file type it declares in mimeType — a client can claim any
+// Content-Type on the multipart part regardless of what it actually sends.
+func verifyFileContentSignature(mimeType string, content io.ReadSeeker) error {
+	if _, err := content.Seek(0, io.SeekStart); err != nil {
+		return domain.ErrInvalidFile.WithCause(err)
+	}
+	header := make([]byte, fileSignatureBytes)
+	n, err := io.ReadFull(content, header)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return domain.ErrInvalidFile.WithCause(err)
+	}
+	if _, err := content.Seek(0, io.SeekStart); err != nil {
+		return domain.ErrInvalidFile.WithCause(err)
+	}
+
+	if !domain.FileContentMatchesMimeType(mimeType, header[:n]) {
+		return domain.ErrInvalidFile
+	}
+
+	return nil
+}
+
+func newFileStorageKey(prefix string) (string, error) {
 	var suffix [16]byte
 	if _, err := io.ReadFull(rand.Reader, suffix[:]); err != nil {
 		return "", err

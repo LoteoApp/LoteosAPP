@@ -9,58 +9,60 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// ArchivoContent is a foto/plano's own bytes, ready to be streamed back to
+// FileContent is a foto/plano's own bytes, ready to be streamed back to
 // the caller. Body is the object's raw stream; the caller owns it and must
-// close it.
-type ArchivoContent struct {
-	Archivo domain.Archivo
-	Body    io.ReadCloser
+// close it. Size is the exact byte length of Body, so the caller can declare
+// Content-Length and let the transport detect a stream that ends early.
+type FileContent struct {
+	File domain.File
+	Body io.ReadCloser
+	Size int64
 }
 
-// GetArchivoContent reads a foto/plano's bytes back from storage. It applies
+// GetFileContent reads a foto/plano's bytes back from storage. It applies
 // the same visibility rules as GetLoteo: a loteo the actor may not see is
 // reported as domain.ErrLoteoNotFound.
-type GetArchivoContent interface {
-	Execute(ctx context.Context, actor Actor, loteoID, archivoID string) (ArchivoContent, error)
+type GetFileContent interface {
+	Execute(ctx context.Context, actor Actor, loteoID, fileID string) (FileContent, error)
 }
 
-type getArchivoContentUseCase struct {
+type getFileContentUseCase struct {
 	repository gateway.LoteoRepository
 	storage    gateway.ObjectStorage
 }
 
-func NewGetArchivoContent(repository gateway.LoteoRepository, storage gateway.ObjectStorage) GetArchivoContent {
-	return &getArchivoContentUseCase{repository: repository, storage: storage}
+func NewGetFileContent(repository gateway.LoteoRepository, storage gateway.ObjectStorage) GetFileContent {
+	return &getFileContentUseCase{repository: repository, storage: storage}
 }
 
-func (useCase *getArchivoContentUseCase) Execute(
+func (useCase *getFileContentUseCase) Execute(
 	ctx context.Context,
 	actor Actor,
-	loteoID, archivoID string,
-) (ArchivoContent, error) {
+	loteoID, fileID string,
+) (FileContent, error) {
 	scope, err := loteoVisibility(actor)
 	if err != nil {
-		return ArchivoContent{}, err
+		return FileContent{}, err
 	}
 
 	loteoID = strings.TrimSpace(loteoID)
 	if loteoID == "" {
-		return ArchivoContent{}, domain.ErrLoteoNotFound
+		return FileContent{}, domain.ErrLoteoNotFound
 	}
 
 	if _, err := useCase.repository.Get(ctx, loteoID, scope); err != nil {
-		return ArchivoContent{}, fromRepository(err)
+		return FileContent{}, fromRepository(err)
 	}
 
-	archivo, err := useCase.repository.GetArchivo(ctx, loteoID, archivoID)
+	file, err := useCase.repository.GetFile(ctx, loteoID, fileID)
 	if err != nil {
-		return ArchivoContent{}, fromRepository(err)
+		return FileContent{}, fromRepository(err)
 	}
 
-	object, err := useCase.storage.Get(ctx, archivo.StorageKey)
+	object, err := useCase.storage.Get(ctx, file.StorageKey)
 	if err != nil {
-		return ArchivoContent{}, fromStorage(err)
+		return FileContent{}, fromStorage(err)
 	}
 
-	return ArchivoContent{Archivo: archivo, Body: object.Body}, nil
+	return FileContent{File: file, Body: object.Body, Size: object.Size}, nil
 }

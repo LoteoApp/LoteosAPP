@@ -1,6 +1,6 @@
 import { ApiError, apiFetch } from '../../../shared/api/client'
 import { apiUrl } from '../../../shared/config/env'
-import type { Archivo, ArchivoCategoria } from '../types'
+import type { Attachment, AttachmentCategory } from '../types'
 
 const GENERIC_LIST_ERROR = 'No se pudieron cargar los archivos, intentá nuevamente.'
 const GENERIC_UPLOAD_ERROR = 'No se pudo subir el archivo, intentá nuevamente.'
@@ -10,7 +10,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
 }
 
-function isArchivo(value: unknown): value is Archivo {
+function isAttachment(value: unknown): value is Attachment {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
@@ -22,10 +22,10 @@ function isArchivo(value: unknown): value is Archivo {
   )
 }
 
-function toArchivo(value: Record<string, unknown>): Archivo {
+function toAttachment(value: Record<string, unknown>): Attachment {
   return {
     id: value.id as string,
-    categoria: value.categoria as ArchivoCategoria,
+    category: value.categoria as AttachmentCategory,
     nombreOriginal: value.nombreOriginal as string,
     mimeType: value.mimeType as string,
     hashSha256: value.hashSha256 as string,
@@ -33,23 +33,23 @@ function toArchivo(value: Record<string, unknown>): Archivo {
   }
 }
 
-function isArchivoList(value: unknown): value is { archivos: unknown[] } {
+function isAttachmentList(value: unknown): value is { archivos: unknown[] } {
   return isRecord(value) && Array.isArray(value.archivos)
 }
 
-function toArchivos(value: unknown, genericError: string): Archivo[] {
-  if (!isArchivoList(value) || !value.archivos.every(isArchivo)) {
+function toAttachments(value: unknown, genericError: string): Attachment[] {
+  if (!isAttachmentList(value) || !value.archivos.every(isAttachment)) {
     throw new Error(genericError)
   }
 
-  return value.archivos.map(toArchivo)
+  return value.archivos.map(toAttachment)
 }
 
-export async function listLoteoArchivos(
+export async function listLoteoAttachments(
   loteoId: string,
   token: string,
   signal?: AbortSignal,
-): Promise<Archivo[]> {
+): Promise<Attachment[]> {
   let body: unknown
   try {
     body = await apiFetch<unknown>(`/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos`, {
@@ -63,15 +63,15 @@ export async function listLoteoArchivos(
     throw new Error(GENERIC_LIST_ERROR, { cause: error })
   }
 
-  return toArchivos(body, GENERIC_LIST_ERROR)
+  return toAttachments(body, GENERIC_LIST_ERROR)
 }
 
-export async function listLoteArchivos(
+export async function listLoteAttachments(
   loteoId: string,
   loteId: string,
   token: string,
   signal?: AbortSignal,
-): Promise<Archivo[]> {
+): Promise<Attachment[]> {
   let body: unknown
   try {
     body = await apiFetch<unknown>(
@@ -85,27 +85,27 @@ export async function listLoteArchivos(
     throw new Error(GENERIC_LIST_ERROR, { cause: error })
   }
 
-  return toArchivos(body, GENERIC_LIST_ERROR)
+  return toAttachments(body, GENERIC_LIST_ERROR)
 }
 
-function archivoForm(categoria: ArchivoCategoria, file: File): FormData {
+function attachmentForm(category: AttachmentCategory, file: File): FormData {
   const form = new FormData()
-  form.append('categoria', categoria)
+  form.append('categoria', category)
   form.append('archivo', file, file.name)
   return form
 }
 
-export async function uploadLoteoArchivo(
+export async function uploadLoteoAttachment(
   loteoId: string,
-  categoria: ArchivoCategoria,
+  category: AttachmentCategory,
   file: File,
   token: string,
-): Promise<Archivo> {
+): Promise<Attachment> {
   let body: unknown
   try {
     body = await apiFetch<unknown>(`/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos`, {
       method: 'POST',
-      body: archivoForm(categoria, file),
+      body: attachmentForm(category, file),
       token,
     })
   } catch (error) {
@@ -115,24 +115,24 @@ export async function uploadLoteoArchivo(
     throw new Error(GENERIC_UPLOAD_ERROR, { cause: error })
   }
 
-  if (!isArchivo(body)) {
+  if (!isAttachment(body)) {
     throw new Error(GENERIC_UPLOAD_ERROR)
   }
-  return toArchivo(body)
+  return toAttachment(body)
 }
 
-export async function uploadLoteArchivo(
+export async function uploadLoteAttachment(
   loteoId: string,
   loteId: string,
-  categoria: ArchivoCategoria,
+  category: AttachmentCategory,
   file: File,
   token: string,
-): Promise<Archivo> {
+): Promise<Attachment> {
   let body: unknown
   try {
     body = await apiFetch<unknown>(
       `/api/v1/loteos/${encodeURIComponent(loteoId)}/lotes/${encodeURIComponent(loteId)}/archivos`,
-      { method: 'POST', body: archivoForm(categoria, file), token },
+      { method: 'POST', body: attachmentForm(category, file), token },
     )
   } catch (error) {
     if (error instanceof ApiError) {
@@ -141,16 +141,16 @@ export async function uploadLoteArchivo(
     throw new Error(GENERIC_UPLOAD_ERROR, { cause: error })
   }
 
-  if (!isArchivo(body)) {
+  if (!isAttachment(body)) {
     throw new Error(GENERIC_UPLOAD_ERROR)
   }
-  return toArchivo(body)
+  return toAttachment(body)
 }
 
-export async function deleteArchivo(loteoId: string, archivoId: string, token: string): Promise<void> {
+export async function deleteAttachment(loteoId: string, attachmentId: string, token: string): Promise<void> {
   try {
     await apiFetch<void>(
-      `/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos/${encodeURIComponent(archivoId)}`,
+      `/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos/${encodeURIComponent(attachmentId)}`,
       { method: 'DELETE', token },
     )
   } catch (error) {
@@ -161,20 +161,20 @@ export async function deleteArchivo(loteoId: string, archivoId: string, token: s
   }
 }
 
-// fetchArchivoContent bypasses apiFetch: the response is the file's own
+// fetchAttachmentContent bypasses apiFetch: the response is the file's own
 // bytes, not JSON, so it can't go through apiFetch's JSON decoding. The
 // caller turns the blob into an object URL — the API needs the caller's
 // bearer token, so a plain <img src> can't reach it directly.
-export async function fetchArchivoContent(
+export async function fetchAttachmentContent(
   loteoId: string,
-  archivoId: string,
+  attachmentId: string,
   token: string,
   signal?: AbortSignal,
 ): Promise<Blob> {
   let response: Response
   try {
     response = await fetch(
-      `${apiUrl}/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos/${encodeURIComponent(archivoId)}`,
+      `${apiUrl}/api/v1/loteos/${encodeURIComponent(loteoId)}/archivos/${encodeURIComponent(attachmentId)}`,
       { headers: { Authorization: `Bearer ${token}` }, signal },
     )
   } catch (error) {

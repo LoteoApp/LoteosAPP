@@ -124,14 +124,16 @@ export type LoteoDetail = {
   fechaCreacion: string
 }
 
-export type ArchivoCategoria = 'foto' | 'plano'
+export type AttachmentCategory = 'foto' | 'plano'
 
 // Mirrors GET/POST .../archivos: a foto or plano attached to a loteo or one
 // of its lotes. storageKey never reaches the frontend; content is fetched
-// through GET .../archivos/{id}, not exposed as a path here.
-export type Archivo = {
+// through GET .../archivos/{id}, not exposed as a path here. Named
+// Attachment (not File) to avoid colliding with the DOM File type a picked
+// upload arrives as.
+export type Attachment = {
   id: string
-  categoria: ArchivoCategoria
+  category: AttachmentCategory
   nombreOriginal: string
   mimeType: string
   hashSha256: string

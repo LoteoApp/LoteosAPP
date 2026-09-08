@@ -846,89 +846,159 @@ func (repository *LoteoRepository) RecordDxfFile(
 	return recorded, nil
 }
 
-// RecordLoteoArchivo inserts a foto/plano attached to the loteo itself. It
+// RecordLoteoFile inserts a foto/plano attached to the loteo itself. It
 // never supersedes a prior row: unlike the DXF, a loteo may carry several
 // active fotos/planos at once.
-func (repository *LoteoRepository) RecordLoteoArchivo(
+//
+// The existence check, the domain.MaxFilesPerEntity count and the insert
+// all run inside one transaction that locks the loteo row FOR UPDATE first,
+// so two concurrent uploads against the same loteo can't both observe room
+// under the limit and both insert: the second waits for the first's lock,
+// then re-counts and sees the first's row. It returns domain.ErrTooManyFiles
+// once the count is at the limit, so the caller can compensate the object it
+// already wrote to storage.
+func (repository *LoteoRepository) RecordLoteoFile(
 	ctx context.Context,
 	actorAuthProviderID, loteoID string,
-	file domain.NewArchivo,
-) (domain.Archivo, error) {
-	var recorded domain.Archivo
-	err := repository.pool.QueryRow(ctx, `
+	file domain.NewFile,
+) (domain.File, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return domain.File{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var present int
+	err = tx.QueryRow(ctx, `
+		SELECT 1 FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL
+		FOR UPDATE
+	`, loteoID).Scan(&present)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.File{}, domain.ErrLoteoNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.File{}, domain.ErrLoteoNotFound
+		}
+		return domain.File{}, err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM archivos
+		WHERE loteo_id = $1::uuid AND categoria IN ('foto', 'plano') AND fecha_baja IS NULL
+	`, loteoID).Scan(&count); err != nil {
+		return domain.File{}, err
+	}
+	if count >= domain.MaxFilesPerEntity {
+		return domain.File{}, domain.ErrTooManyFiles
+	}
+
+	var recorded domain.File
+	err = tx.QueryRow(ctx, `
 		INSERT INTO archivos (
 			loteo_id, nombre, nombre_original, categoria,
 			storage_key, mime_type, hash_sha256, usuario_modificacion, fecha
 		)
-		SELECT $1::uuid, $2, NULLIF($2, ''), $3,
-		       $4, NULLIF($5, ''), NULLIF($6, ''),
-		       (SELECT id FROM usuarios WHERE auth_provider_id = $7::uuid), now()
-		WHERE EXISTS (SELECT 1 FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL)
+		VALUES (
+			$1::uuid, $2, NULLIF($2, ''), $3,
+			$4, NULLIF($5, ''), NULLIF($6, ''),
+			(SELECT id FROM usuarios WHERE auth_provider_id = $7::uuid), now()
+		)
 		RETURNING id::text, categoria, storage_key, COALESCE(nombre_original, ''),
 		          COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
-	`, loteoID, file.OriginalName, file.Categoria, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
-		&recorded.ID, &recorded.Categoria, &recorded.StorageKey, &recorded.OriginalName,
+	`, loteoID, file.OriginalName, file.Category, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
+		&recorded.ID, &recorded.Category, &recorded.StorageKey, &recorded.OriginalName,
 		&recorded.MimeType, &recorded.Sha256, &recorded.CreatedAt,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Archivo{}, domain.ErrLoteoNotFound
-	}
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return domain.Archivo{}, domain.ErrLoteoNotFound
-		}
-		return domain.Archivo{}, err
+		return domain.File{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.File{}, err
 	}
 
 	return recorded, nil
 }
 
-// RecordLoteArchivo inserts a foto/plano attached to one lote. loteoID scopes
+// RecordLoteFile inserts a foto/plano attached to one lote. loteoID scopes
 // the lookup so a caller authorized on one loteo can't reach a lote of
-// another by guessing its id.
-func (repository *LoteoRepository) RecordLoteArchivo(
+// another by guessing its id. It enforces domain.MaxFilesPerEntity the
+// same atomic way RecordLoteoFile does, locking the lote row instead of
+// the loteo.
+func (repository *LoteoRepository) RecordLoteFile(
 	ctx context.Context,
 	actorAuthProviderID, loteoID, loteID string,
-	file domain.NewArchivo,
-) (domain.Archivo, error) {
-	var recorded domain.Archivo
-	err := repository.pool.QueryRow(ctx, `
+	file domain.NewFile,
+) (domain.File, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return domain.File{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var present int
+	err = tx.QueryRow(ctx, `
+		SELECT 1 FROM lotes WHERE id = $1::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
+		FOR UPDATE
+	`, loteID, loteoID).Scan(&present)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.File{}, domain.ErrLoteNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.File{}, domain.ErrLoteNotFound
+		}
+		return domain.File{}, err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM archivos
+		WHERE lote_id = $1::uuid AND categoria IN ('foto', 'plano') AND fecha_baja IS NULL
+	`, loteID).Scan(&count); err != nil {
+		return domain.File{}, err
+	}
+	if count >= domain.MaxFilesPerEntity {
+		return domain.File{}, domain.ErrTooManyFiles
+	}
+
+	var recorded domain.File
+	err = tx.QueryRow(ctx, `
 		INSERT INTO archivos (
 			lote_id, nombre, nombre_original, categoria,
 			storage_key, mime_type, hash_sha256, usuario_modificacion, fecha
 		)
-		SELECT $2::uuid, $3, NULLIF($3, ''), $4,
-		       $5, NULLIF($6, ''), NULLIF($7, ''),
-		       (SELECT id FROM usuarios WHERE auth_provider_id = $8::uuid), now()
-		WHERE EXISTS (
-			SELECT 1 FROM lotes WHERE id = $2::uuid AND loteo_id = $1::uuid AND fecha_baja IS NULL
+		VALUES (
+			$1::uuid, $2, NULLIF($2, ''), $3,
+			$4, NULLIF($5, ''), NULLIF($6, ''),
+			(SELECT id FROM usuarios WHERE auth_provider_id = $7::uuid), now()
 		)
 		RETURNING id::text, categoria, storage_key, COALESCE(nombre_original, ''),
 		          COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
-	`, loteoID, loteID, file.OriginalName, file.Categoria, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
-		&recorded.ID, &recorded.Categoria, &recorded.StorageKey, &recorded.OriginalName,
+	`, loteID, file.OriginalName, file.Category, file.StorageKey, file.MimeType, file.Sha256, actorAuthProviderID).Scan(
+		&recorded.ID, &recorded.Category, &recorded.StorageKey, &recorded.OriginalName,
 		&recorded.MimeType, &recorded.Sha256, &recorded.CreatedAt,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Archivo{}, domain.ErrLoteNotFound
-	}
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return domain.Archivo{}, domain.ErrLoteNotFound
-		}
-		return domain.Archivo{}, err
+		return domain.File{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.File{}, err
 	}
 
 	return recorded, nil
 }
 
-// ListLoteoArchivos returns the active fotos/planos attached to the loteo
+// ListLoteoFiles returns the active fotos/planos attached to the loteo
 // itself. A loteo that doesn't exist simply has none, so this never reports
 // domain.ErrLoteoNotFound; the caller checks existence separately when it
 // needs to distinguish the two.
-func (repository *LoteoRepository) ListLoteoArchivos(ctx context.Context, loteoID string) ([]domain.Archivo, error) {
+func (repository *LoteoRepository) ListLoteoFiles(ctx context.Context, loteoID string) ([]domain.File, error) {
 	rows, err := repository.pool.Query(ctx, `
 		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
 		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
@@ -939,19 +1009,19 @@ func (repository *LoteoRepository) ListLoteoArchivos(ctx context.Context, loteoI
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return []domain.Archivo{}, nil
+			return []domain.File{}, nil
 		}
 		return nil, err
 	}
 	defer rows.Close()
 
-	return scanArchivos(rows)
+	return scanFiles(rows)
 }
 
-// ListLoteArchivos returns the active fotos/planos attached to one lote of
+// ListLoteFiles returns the active fotos/planos attached to one lote of
 // loteoID. A lote that doesn't belong to loteoID (or doesn't exist) simply
-// has none, mirroring ListLoteoArchivos.
-func (repository *LoteoRepository) ListLoteArchivos(ctx context.Context, loteoID, loteID string) ([]domain.Archivo, error) {
+// has none, mirroring ListLoteoFiles.
+func (repository *LoteoRepository) ListLoteFiles(ctx context.Context, loteoID, loteID string) ([]domain.File, error) {
 	rows, err := repository.pool.Query(ctx, `
 		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
 		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
@@ -964,68 +1034,73 @@ func (repository *LoteoRepository) ListLoteArchivos(ctx context.Context, loteoID
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return []domain.Archivo{}, nil
+			return []domain.File{}, nil
 		}
 		return nil, err
 	}
 	defer rows.Close()
 
-	return scanArchivos(rows)
+	return scanFiles(rows)
 }
 
-func scanArchivos(rows pgx.Rows) ([]domain.Archivo, error) {
-	archivos := make([]domain.Archivo, 0)
+func scanFiles(rows pgx.Rows) ([]domain.File, error) {
+	files := make([]domain.File, 0)
 	for rows.Next() {
-		var archivo domain.Archivo
+		var file domain.File
 		if err := rows.Scan(
-			&archivo.ID, &archivo.Categoria, &archivo.StorageKey, &archivo.OriginalName,
-			&archivo.MimeType, &archivo.Sha256, &archivo.CreatedAt,
+			&file.ID, &file.Category, &file.StorageKey, &file.OriginalName,
+			&file.MimeType, &file.Sha256, &file.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
-		archivos = append(archivos, archivo)
+		files = append(files, file)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return archivos, nil
+	return files, nil
 }
 
-// GetArchivo returns one active archivo reachable through loteoID, whether
-// it's attached to the loteo itself or to one of its lotes.
-func (repository *LoteoRepository) GetArchivo(ctx context.Context, loteoID, archivoID string) (domain.Archivo, error) {
-	var archivo domain.Archivo
+// GetFile returns one active foto/plano reachable through loteoID,
+// whether it's attached to the loteo itself or to one of its lotes. The
+// categoria filter keeps this to the fotos/planos flow: without it, an id
+// from the same loteo would also reach its DXF or any documento_legal, which
+// this flow must never read back or let an agrimensor deactivate.
+func (repository *LoteoRepository) GetFile(ctx context.Context, loteoID, fileID string) (domain.File, error) {
+	var file domain.File
 	err := repository.pool.QueryRow(ctx, `
 		SELECT id::text, categoria, storage_key, COALESCE(nombre_original, ''),
 		       COALESCE(mime_type, ''), COALESCE(hash_sha256, ''), fecha_creacion
 		FROM archivos
 		WHERE id = $2::uuid
 		  AND fecha_baja IS NULL
+		  AND categoria IN ('foto', 'plano')
 		  AND (loteo_id = $1::uuid OR lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid))
-	`, loteoID, archivoID).Scan(
-		&archivo.ID, &archivo.Categoria, &archivo.StorageKey, &archivo.OriginalName,
-		&archivo.MimeType, &archivo.Sha256, &archivo.CreatedAt,
+	`, loteoID, fileID).Scan(
+		&file.ID, &file.Category, &file.StorageKey, &file.OriginalName,
+		&file.MimeType, &file.Sha256, &file.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Archivo{}, domain.ErrArchivoNotFound
+		return domain.File{}, domain.ErrFileNotFound
 	}
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return domain.Archivo{}, domain.ErrArchivoNotFound
+			return domain.File{}, domain.ErrFileNotFound
 		}
-		return domain.Archivo{}, err
+		return domain.File{}, err
 	}
 
-	return archivo, nil
+	return file, nil
 }
 
-// DeleteArchivo soft-deletes one active archivo reachable through loteoID,
-// the same way GetArchivo resolves it.
-func (repository *LoteoRepository) DeleteArchivo(
+// DeleteFile soft-deletes one active foto/plano reachable through
+// loteoID, the same way GetFile resolves it — including the categoria
+// filter, so this can never deactivate a DXF or a documento_legal.
+func (repository *LoteoRepository) DeleteFile(
 	ctx context.Context,
-	actorAuthProviderID, loteoID, archivoID string,
+	actorAuthProviderID, loteoID, fileID string,
 ) error {
 	tag, err := repository.pool.Exec(ctx, `
 		UPDATE archivos
@@ -1034,17 +1109,18 @@ func (repository *LoteoRepository) DeleteArchivo(
 		    usuario_modificacion = (SELECT id FROM usuarios WHERE auth_provider_id = $3::uuid)
 		WHERE id = $2::uuid
 		  AND fecha_baja IS NULL
+		  AND categoria IN ('foto', 'plano')
 		  AND (loteo_id = $1::uuid OR lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid))
-	`, loteoID, archivoID, actorAuthProviderID)
+	`, loteoID, fileID, actorAuthProviderID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return domain.ErrArchivoNotFound
+			return domain.ErrFileNotFound
 		}
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrArchivoNotFound
+		return domain.ErrFileNotFound
 	}
 
 	return nil

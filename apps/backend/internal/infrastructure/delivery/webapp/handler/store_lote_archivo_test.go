@@ -16,29 +16,29 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-type storeLoteArchivoStub struct {
-	archivo  domain.Archivo
+type storeLoteFileStub struct {
+	file     domain.File
 	err      error
 	called   bool
-	gotInput loteos.StoreLoteArchivoInput
+	gotInput loteos.StoreLoteFileInput
 	gotBytes []byte
 }
 
-func (stub *storeLoteArchivoStub) Execute(
+func (stub *storeLoteFileStub) Execute(
 	_ context.Context,
 	_ loteos.Actor,
-	input loteos.StoreLoteArchivoInput,
-) (domain.Archivo, error) {
+	input loteos.StoreLoteFileInput,
+) (domain.File, error) {
 	stub.called = true
 	stub.gotInput = input
 	if input.Content != nil {
 		stub.gotBytes, _ = io.ReadAll(input.Content)
 	}
-	return stub.archivo, stub.err
+	return stub.file, stub.err
 }
 
-func storeLoteArchivoMux(stub *storeLoteArchivoStub, verifier userVerifierStub) *http.ServeMux {
-	h := handler.NewStoreLoteArchivoHandler(stub)
+func storeLoteFileMux(stub *storeLoteFileStub, verifier userVerifierStub) *http.ServeMux {
+	h := handler.NewStoreLoteFileHandler(stub)
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
@@ -46,12 +46,12 @@ func storeLoteArchivoMux(stub *storeLoteArchivoStub, verifier userVerifierStub) 
 	return mux
 }
 
-func TestStoreLoteArchivoHandlerStoresTheFile(t *testing.T) {
-	stub := &storeLoteArchivoStub{archivo: domain.Archivo{ID: "archivo-1", Categoria: "plano"}}
-	mux := storeLoteArchivoMux(stub, administradorVerifier())
+func TestStoreLoteFileHandlerStoresTheFile(t *testing.T) {
+	stub := &storeLoteFileStub{file: domain.File{ID: "file-1", Category: "plano"}}
+	mux := storeLoteFileMux(stub, administradorVerifier())
 
 	content := []byte("%PDF-1.4")
-	body, contentType := multipartArchivoBody(t, "plano", "plano.pdf", "application/pdf", content)
+	body, contentType := multipartFileBody(t, "plano", "plano.pdf", "application/pdf", content)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/lotes/lote-3/archivos", body)
 	request.Header.Set("Content-Type", contentType)
@@ -73,16 +73,16 @@ func TestStoreLoteArchivoHandlerStoresTheFile(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if payload["id"] != "archivo-1" {
-		t.Fatalf("body id = %v, want archivo-1", payload["id"])
+	if payload["id"] != "file-1" {
+		t.Fatalf("body id = %v, want file-1", payload["id"])
 	}
 }
 
-func TestStoreLoteArchivoHandlerMapsALoteNotFound(t *testing.T) {
-	stub := &storeLoteArchivoStub{err: domain.ErrLoteNotFound}
-	mux := storeLoteArchivoMux(stub, administradorVerifier())
+func TestStoreLoteFileHandlerMapsALoteNotFound(t *testing.T) {
+	stub := &storeLoteFileStub{err: domain.ErrLoteNotFound}
+	mux := storeLoteFileMux(stub, administradorVerifier())
 
-	body, contentType := multipartArchivoBody(t, "plano", "plano.pdf", "application/pdf", []byte("x"))
+	body, contentType := multipartFileBody(t, "plano", "plano.pdf", "application/pdf", []byte("x"))
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/lotes/lote-3/archivos", body)
 	request.Header.Set("Content-Type", contentType)
 	request.Header.Set("Authorization", "Bearer token")

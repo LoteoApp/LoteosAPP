@@ -16,62 +16,62 @@ import (
 
 const archivoLoteoID = "22222222-2222-2222-2222-222222222222"
 
-func loteoArchivoInput(loteoID, categoria, mimeType, content string) loteos.StoreLoteoArchivoInput {
-	return loteos.StoreLoteoArchivoInput{
-		LoteoID:   loteoID,
-		Categoria: categoria,
-		FileName:  "foto.jpg",
-		MimeType:  mimeType,
-		Content:   bytes.NewReader([]byte(content)),
-		Size:      int64(len(content)),
+func loteoFileInput(loteoID, category, mimeType, content string) loteos.StoreLoteoFileInput {
+	return loteos.StoreLoteoFileInput{
+		LoteoID:  loteoID,
+		Category: category,
+		FileName: "foto.jpg",
+		MimeType: mimeType,
+		Content:  bytes.NewReader([]byte(content)),
+		Size:     int64(len(content)),
 	}
 }
 
-func TestStoreLoteoArchivoStoresBytesThenRecordsTheFile(t *testing.T) {
+func TestStoreLoteoFileStoresBytesThenRecordsTheFile(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
-	const content = "fake-jpeg-bytes"
-	archivo, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", content),
+	const content = "\xFF\xD8\xFFfake-jpeg-bytes"
+	file, err := useCase.Execute(
+		context.Background(), administrador(), loteoFileInput(archivoLoteoID, "foto", "image/jpeg", content),
 	)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
 	wantPrefix := "loteos/" + archivoLoteoID + "/archivos/"
-	if !strings.HasPrefix(archivo.StorageKey, wantPrefix) {
-		t.Fatalf("StorageKey = %q, want prefix %q", archivo.StorageKey, wantPrefix)
+	if !strings.HasPrefix(file.StorageKey, wantPrefix) {
+		t.Fatalf("StorageKey = %q, want prefix %q", file.StorageKey, wantPrefix)
 	}
-	if storage.PutCalls != 1 || repository.RecordLoteoArchivoCalls != 1 {
-		t.Fatalf("PutCalls = %d, RecordLoteoArchivoCalls = %d, want 1 and 1", storage.PutCalls, repository.RecordLoteoArchivoCalls)
+	if storage.PutCalls != 1 || repository.RecordLoteoFileCalls != 1 {
+		t.Fatalf("PutCalls = %d, RecordLoteoFileCalls = %d, want 1 and 1", storage.PutCalls, repository.RecordLoteoFileCalls)
 	}
-	if archivo.Categoria != "foto" {
-		t.Fatalf("Categoria = %q, want foto", archivo.Categoria)
+	if file.Category != "foto" {
+		t.Fatalf("Category = %q, want foto", file.Category)
 	}
 
-	stored, ok := storage.Contents(archivo.StorageKey)
+	stored, ok := storage.Contents(file.StorageKey)
 	if !ok || string(stored) != content {
 		t.Fatalf("stored object = %q (found %v), want %q", stored, ok, content)
 	}
 
 	digest := sha256.Sum256([]byte(content))
-	if repository.RecordedLoteoArchivo.Sha256 != hex.EncodeToString(digest[:]) {
-		t.Fatalf("recorded sha256 = %q, want %q", repository.RecordedLoteoArchivo.Sha256, hex.EncodeToString(digest[:]))
+	if repository.RecordedLoteoFile.Sha256 != hex.EncodeToString(digest[:]) {
+		t.Fatalf("recorded sha256 = %q, want %q", repository.RecordedLoteoFile.Sha256, hex.EncodeToString(digest[:]))
 	}
 }
 
-func TestStoreLoteoArchivoRejectsRolesOtherThanAdminOrAgrimensor(t *testing.T) {
+func TestStoreLoteoFileRejectsRolesOtherThanAdminOrAgrimensor(t *testing.T) {
 	for _, rol := range []string{domain.RolAdministrativo, domain.RolEscribano, domain.RolInmobiliaria} {
 		t.Run(rol, func(t *testing.T) {
 			repository := &gatewayfake.LoteoRepository{Exists: true}
 			storage := &gatewayfake.ObjectStorage{}
-			useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+			useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 			actor := loteos.Actor{AuthProviderID: "actor-1", Roles: []string{rol}}
 			_, err := useCase.Execute(
-				context.Background(), actor, loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x"),
+				context.Background(), actor, loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "x"),
 			)
 
 			if !errors.Is(err, domain.ErrNoAutorizado) {
@@ -84,13 +84,13 @@ func TestStoreLoteoArchivoRejectsRolesOtherThanAdminOrAgrimensor(t *testing.T) {
 	}
 }
 
-func TestStoreLoteoArchivoRejectsAnUnassignedAgrimensor(t *testing.T) {
+func TestStoreLoteoFileRejectsAnUnassignedAgrimensor(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true, Assigned: false}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 	_, err := useCase.Execute(
-		context.Background(), agrimensor(), loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x"),
+		context.Background(), agrimensor(), loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "x"),
 	)
 
 	if !errors.Is(err, domain.ErrNoAutorizado) {
@@ -98,107 +98,137 @@ func TestStoreLoteoArchivoRejectsAnUnassignedAgrimensor(t *testing.T) {
 	}
 }
 
-func TestStoreLoteoArchivoRejectsAnUnknownCategoria(t *testing.T) {
+func TestStoreLoteoFileRejectsAnUnknownCategory(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 	_, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "dxf", "image/jpeg", "x"),
+		context.Background(), administrador(), loteoFileInput(archivoLoteoID, "dxf", "image/jpeg", "x"),
 	)
 
-	if !errors.Is(err, domain.ErrInvalidArchivo) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidArchivo)
+	if !errors.Is(err, domain.ErrInvalidFile) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidFile)
 	}
 	if storage.PutCalls != 0 {
 		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
 	}
 }
 
-func TestStoreLoteoArchivoRejectsAnUnsupportedMimeType(t *testing.T) {
+func TestStoreLoteoFileRejectsAnUnsupportedMimeType(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 	_, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "foto", "application/zip", "x"),
+		context.Background(), administrador(), loteoFileInput(archivoLoteoID, "foto", "application/zip", "x"),
 	)
 
-	if !errors.Is(err, domain.ErrInvalidArchivo) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidArchivo)
+	if !errors.Is(err, domain.ErrInvalidFile) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidFile)
 	}
 }
 
-func TestStoreLoteoArchivoRejectsAnOversizedFile(t *testing.T) {
+func TestStoreLoteoFileRejectsContentThatDoesNotMatchTheDeclaredMimeType(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
-	input := loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x")
-	input.Size = domain.MaxArchivoFileBytes + 1
+	_, err := useCase.Execute(
+		context.Background(), administrador(),
+		loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "this is plain text, not a jpeg"),
+	)
+
+	if !errors.Is(err, domain.ErrInvalidFile) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidFile)
+	}
+	if storage.PutCalls != 0 {
+		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
+	}
+}
+
+func TestStoreLoteoFileAcceptsEachSupportedMimeTypeWithMatchingContent(t *testing.T) {
+	cases := map[string]string{
+		"image/jpeg":      "\xFF\xD8\xFFrest-of-the-jpeg",
+		"image/png":       "\x89PNG\r\n\x1a\nrest-of-the-png",
+		"image/webp":      "RIFF\x00\x00\x00\x00WEBPrest",
+		"application/pdf": "%PDF-1.7 rest of the pdf",
+	}
+	for mimeType, content := range cases {
+		t.Run(mimeType, func(t *testing.T) {
+			repository := &gatewayfake.LoteoRepository{Exists: true}
+			storage := &gatewayfake.ObjectStorage{}
+			useCase := loteos.NewStoreLoteoFile(repository, storage)
+
+			_, err := useCase.Execute(
+				context.Background(), administrador(), loteoFileInput(archivoLoteoID, "foto", mimeType, content),
+			)
+
+			if err != nil {
+				t.Fatalf("Execute() error = %v, want nil", err)
+			}
+			if storage.PutCalls != 1 {
+				t.Fatalf("PutCalls = %d, want 1", storage.PutCalls)
+			}
+		})
+	}
+}
+
+func TestStoreLoteoFileRejectsAnOversizedFile(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true}
+	storage := &gatewayfake.ObjectStorage{}
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
+
+	input := loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "x")
+	input.Size = domain.MaxFileBytes + 1
 
 	_, err := useCase.Execute(context.Background(), administrador(), input)
 
-	if !errors.Is(err, domain.ErrInvalidArchivo) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidArchivo)
+	if !errors.Is(err, domain.ErrInvalidFile) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInvalidFile)
 	}
 	if storage.PutCalls != 0 {
 		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
 	}
 }
 
-func TestStoreLoteoArchivoRejectsAFullEntity(t *testing.T) {
-	existing := make([]domain.Archivo, domain.MaxArchivosPerEntity)
-	repository := &gatewayfake.LoteoRepository{Exists: true, ListLoteoArchivosResult: existing}
+func TestStoreLoteoFileRejectsAFullEntity(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true, RecordLoteoFileErr: domain.ErrTooManyFiles}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 	_, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x"),
+		context.Background(), administrador(), loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "\xFF\xD8\xFFx"),
 	)
 
-	if !errors.Is(err, domain.ErrTooManyArchivos) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrTooManyArchivos)
+	if !errors.Is(err, domain.ErrTooManyFiles) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrTooManyFiles)
 	}
-	if storage.PutCalls != 0 {
-		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
-	}
-}
-
-func TestStoreLoteoArchivoCleansUpTheUploadWhenRecordingFails(t *testing.T) {
-	repository := &gatewayfake.LoteoRepository{
-		Exists:                true,
-		RecordLoteoArchivoErr: errors.New("connection reset"),
-	}
-	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
-
-	_, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x"),
-	)
-
-	if err == nil {
-		t.Fatal("Execute() error = nil, want an error")
-	}
+	// The quota is enforced atomically at record time (see RecordLoteoFile),
+	// so the object is already in storage by the time the limit is hit and
+	// must be compensated instead of never having been written.
 	if storage.DeleteCalls != 1 {
-		t.Fatalf("DeleteCalls = %d, want 1", storage.DeleteCalls)
+		t.Fatalf("DeleteCalls = %d, want 1 (the orphaned upload is cleaned up)", storage.DeleteCalls)
 	}
 }
 
-func TestStoreLoteoArchivoSurfacesARepositoryFailureWhenListingForTheLimit(t *testing.T) {
-	repository := &gatewayfake.LoteoRepository{Exists: true, ListLoteoArchivosErr: errors.New("connection reset")}
+func TestStoreLoteoFileCleansUpTheUploadWhenRecordingFails(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{
+		Exists:             true,
+		RecordLoteoFileErr: errors.New("connection reset"),
+	}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewStoreLoteoArchivo(repository, storage)
+	useCase := loteos.NewStoreLoteoFile(repository, storage)
 
 	_, err := useCase.Execute(
-		context.Background(), administrador(), loteoArchivoInput(archivoLoteoID, "foto", "image/jpeg", "x"),
+		context.Background(), administrador(), loteoFileInput(archivoLoteoID, "foto", "image/jpeg", "\xFF\xD8\xFFx"),
 	)
 
 	var domainErr *domain.Error
 	if !errors.As(err, &domainErr) || domainErr.Kind != domain.KindUnavailable {
 		t.Fatalf("Execute() error = %v, want an unavailable-kind domain error", err)
 	}
-	if storage.PutCalls != 0 {
-		t.Fatalf("PutCalls = %d, want 0", storage.PutCalls)
+	if storage.DeleteCalls != 1 {
+		t.Fatalf("DeleteCalls = %d, want 1", storage.DeleteCalls)
 	}
 }

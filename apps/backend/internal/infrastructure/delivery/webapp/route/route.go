@@ -29,15 +29,15 @@ const (
 	// before writing one row, so it gets the same room as the alta.
 	uploadDxfTimeout = 60 * time.Second
 
-	// A foto/plano is far smaller than a DXF (domain.MaxArchivoFileBytes),
+	// A foto/plano is far smaller than a DXF (domain.MaxFileBytes),
 	// but still gets its own room to stream to R2 before writing one row.
-	uploadArchivoTimeout = 30 * time.Second
+	uploadFileTimeout = 30 * time.Second
 
 	// Downloading a foto/plano streams it back from R2, up to the same size
 	// a single upload may reach.
-	downloadArchivoTimeout = 30 * time.Second
+	downloadFileTimeout = 30 * time.Second
 
-	archivosTimeout = 5 * time.Second
+	filesTimeout = 5 * time.Second
 
 	// MaxHandlerTimeout is the longest any route registered here may take.
 	// The HTTP server's own deadlines are derived from it, so a handler that
@@ -47,33 +47,33 @@ const (
 )
 
 type Handlers struct {
-	CreateUser        *handler.CreateUserHandler
-	CompleteProfile   *handler.CompleteProfileHandler
-	ListUsers         *handler.ListUsersHandler
-	UpdateUser        *handler.UpdateUserHandler
-	DeactivateUser    *handler.DeactivateUserHandler
-	ReactivateUser    *handler.ReactivateUserHandler
-	CreateClient      *handler.CreateClientHandler
-	UpdateClient      *handler.UpdateClientHandler
-	DeleteClient      *handler.DeleteClientHandler
-	ListClients       *handler.ListClientsHandler
-	CreateAgency      *handler.CreateAgencyHandler
-	UpdateAgency      *handler.UpdateAgencyHandler
-	DeleteAgency      *handler.DeleteAgencyHandler
-	ListAgencies      *handler.ListAgenciesHandler
-	CreateLoteo       *handler.CreateLoteoHandler
-	StoreLoteoDxf     *handler.StoreLoteoDxfHandler
-	UpdateLote        *handler.UpdateLoteHandler
-	UpdateManzana     *handler.UpdateManzanaHandler
-	UpdateCalle       *handler.UpdateCalleHandler
-	ListLoteos        *handler.ListLoteosHandler
-	GetLoteo          *handler.GetLoteoHandler
-	StoreLoteoArchivo *handler.StoreLoteoArchivoHandler
-	StoreLoteArchivo  *handler.StoreLoteArchivoHandler
-	ListLoteoArchivos *handler.ListLoteoArchivosHandler
-	ListLoteArchivos  *handler.ListLoteArchivosHandler
-	GetArchivoContent *handler.GetArchivoContentHandler
-	DeleteArchivo     *handler.DeleteArchivoHandler
+	CreateUser      *handler.CreateUserHandler
+	CompleteProfile *handler.CompleteProfileHandler
+	ListUsers       *handler.ListUsersHandler
+	UpdateUser      *handler.UpdateUserHandler
+	DeactivateUser  *handler.DeactivateUserHandler
+	ReactivateUser  *handler.ReactivateUserHandler
+	CreateClient    *handler.CreateClientHandler
+	UpdateClient    *handler.UpdateClientHandler
+	DeleteClient    *handler.DeleteClientHandler
+	ListClients     *handler.ListClientsHandler
+	CreateAgency    *handler.CreateAgencyHandler
+	UpdateAgency    *handler.UpdateAgencyHandler
+	DeleteAgency    *handler.DeleteAgencyHandler
+	ListAgencies    *handler.ListAgenciesHandler
+	CreateLoteo     *handler.CreateLoteoHandler
+	StoreLoteoDxf   *handler.StoreLoteoDxfHandler
+	UpdateLote      *handler.UpdateLoteHandler
+	UpdateManzana   *handler.UpdateManzanaHandler
+	UpdateCalle     *handler.UpdateCalleHandler
+	ListLoteos      *handler.ListLoteosHandler
+	GetLoteo        *handler.GetLoteoHandler
+	StoreLoteoFile  *handler.StoreLoteoFileHandler
+	StoreLoteFile   *handler.StoreLoteFileHandler
+	ListLoteoFiles  *handler.ListLoteoFilesHandler
+	ListLoteFiles   *handler.ListLoteFilesHandler
+	GetFileContent  *handler.GetFileContentHandler
+	DeleteFile      *handler.DeleteFileHandler
 }
 
 // RegisterRoutes wires every route behind both RequireAuth (a valid token)
@@ -111,10 +111,10 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/manzanas/{manzanaId}", protected(handler.Adapt(handlers.UpdateManzana, lotesTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/calles/{calleId}", protected(handler.Adapt(handlers.UpdateCalle, lotesTimeout)))
 
-	mux.Handle("POST /api/v1/loteos/{loteoId}/archivos", protected(handler.Adapt(handlers.StoreLoteoArchivo, uploadArchivoTimeout)))
-	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos", protected(handler.Adapt(handlers.ListLoteoArchivos, archivosTimeout)))
-	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos", protected(handler.Adapt(handlers.StoreLoteArchivo, uploadArchivoTimeout)))
-	mux.Handle("GET /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos", protected(handler.Adapt(handlers.ListLoteArchivos, archivosTimeout)))
-	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos/{archivoId}", protected(handler.Adapt(handlers.GetArchivoContent, downloadArchivoTimeout)))
-	mux.Handle("DELETE /api/v1/loteos/{loteoId}/archivos/{archivoId}", protected(handler.Adapt(handlers.DeleteArchivo, archivosTimeout)))
+	mux.Handle("POST /api/v1/loteos/{loteoId}/archivos", protected(handler.Adapt(handlers.StoreLoteoFile, uploadFileTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos", protected(handler.Adapt(handlers.ListLoteoFiles, filesTimeout)))
+	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos", protected(handler.Adapt(handlers.StoreLoteFile, uploadFileTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos", protected(handler.Adapt(handlers.ListLoteFiles, filesTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}/archivos/{archivoId}", protected(handler.Adapt(handlers.GetFileContent, downloadFileTimeout)))
+	mux.Handle("DELETE /api/v1/loteos/{loteoId}/archivos/{archivoId}", protected(handler.Adapt(handlers.DeleteFile, filesTimeout)))
 }

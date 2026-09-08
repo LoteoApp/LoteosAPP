@@ -8,26 +8,26 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// ListLoteoArchivos returns the active fotos/planos attached to a loteo
+// ListLoteoFiles returns the active fotos/planos attached to a loteo
 // itself. It applies the same visibility rules as GetLoteo: a loteo the
 // actor may not see is reported as domain.ErrLoteoNotFound.
-type ListLoteoArchivos interface {
-	Execute(ctx context.Context, actor Actor, loteoID string) ([]domain.Archivo, error)
+type ListLoteoFiles interface {
+	Execute(ctx context.Context, actor Actor, loteoID string) ([]domain.File, error)
 }
 
-type listLoteoArchivosUseCase struct {
+type listLoteoFilesUseCase struct {
 	repository gateway.LoteoRepository
 }
 
-func NewListLoteoArchivos(repository gateway.LoteoRepository) ListLoteoArchivos {
-	return &listLoteoArchivosUseCase{repository: repository}
+func NewListLoteoFiles(repository gateway.LoteoRepository) ListLoteoFiles {
+	return &listLoteoFilesUseCase{repository: repository}
 }
 
-func (useCase *listLoteoArchivosUseCase) Execute(
+func (useCase *listLoteoFilesUseCase) Execute(
 	ctx context.Context,
 	actor Actor,
 	loteoID string,
-) ([]domain.Archivo, error) {
+) ([]domain.File, error) {
 	scope, err := loteoVisibility(actor)
 	if err != nil {
 		return nil, err
@@ -42,10 +42,10 @@ func (useCase *listLoteoArchivosUseCase) Execute(
 		return nil, fromRepository(err)
 	}
 
-	archivos, err := useCase.repository.ListLoteoArchivos(ctx, loteoID)
+	files, err := useCase.repository.ListLoteoFiles(ctx, loteoID)
 	if err != nil {
 		return nil, fromRepository(err)
 	}
 
-	return archivos, nil
+	return files, nil
 }

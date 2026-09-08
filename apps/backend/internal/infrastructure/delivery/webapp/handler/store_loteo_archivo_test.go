@@ -17,29 +17,29 @@ import (
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/middleware"
 )
 
-type storeLoteoArchivoStub struct {
-	archivo  domain.Archivo
+type storeLoteoFileStub struct {
+	file     domain.File
 	err      error
 	called   bool
-	gotInput loteos.StoreLoteoArchivoInput
+	gotInput loteos.StoreLoteoFileInput
 	gotBytes []byte
 }
 
-func (stub *storeLoteoArchivoStub) Execute(
+func (stub *storeLoteoFileStub) Execute(
 	_ context.Context,
 	_ loteos.Actor,
-	input loteos.StoreLoteoArchivoInput,
-) (domain.Archivo, error) {
+	input loteos.StoreLoteoFileInput,
+) (domain.File, error) {
 	stub.called = true
 	stub.gotInput = input
 	if input.Content != nil {
 		stub.gotBytes, _ = io.ReadAll(input.Content)
 	}
-	return stub.archivo, stub.err
+	return stub.file, stub.err
 }
 
-func storeLoteoArchivoMux(stub *storeLoteoArchivoStub, verifier userVerifierStub) *http.ServeMux {
-	h := handler.NewStoreLoteoArchivoHandler(stub)
+func storeLoteoFileMux(stub *storeLoteoFileStub, verifier userVerifierStub) *http.ServeMux {
+	h := handler.NewStoreLoteoFileHandler(stub)
 	requireAuth := middleware.RequireAuth(verifier)
 
 	mux := http.NewServeMux()
@@ -47,13 +47,13 @@ func storeLoteoArchivoMux(stub *storeLoteoArchivoStub, verifier userVerifierStub
 	return mux
 }
 
-func multipartArchivoBody(t *testing.T, categoria, fileName, contentType string, content []byte) (*bytes.Buffer, string) {
+func multipartFileBody(t *testing.T, category, fileName, contentType string, content []byte) (*bytes.Buffer, string) {
 	t.Helper()
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	if categoria != "" {
-		if err := writer.WriteField("categoria", categoria); err != nil {
+	if category != "" {
+		if err := writer.WriteField("categoria", category); err != nil {
 			t.Fatalf("write categoria field: %v", err)
 		}
 	}
@@ -78,14 +78,14 @@ func multipartArchivoBody(t *testing.T, categoria, fileName, contentType string,
 	return &body, writer.FormDataContentType()
 }
 
-func TestStoreLoteoArchivoHandlerStoresTheFile(t *testing.T) {
-	stub := &storeLoteoArchivoStub{archivo: domain.Archivo{
-		ID: "archivo-1", Categoria: "foto", OriginalName: "foto.jpg", MimeType: "image/jpeg", Sha256: "abc123",
+func TestStoreLoteoFileHandlerStoresTheFile(t *testing.T) {
+	stub := &storeLoteoFileStub{file: domain.File{
+		ID: "file-1", Category: "foto", OriginalName: "foto.jpg", MimeType: "image/jpeg", Sha256: "abc123",
 	}}
-	mux := storeLoteoArchivoMux(stub, administradorVerifier())
+	mux := storeLoteoFileMux(stub, administradorVerifier())
 
 	content := []byte("fake-jpeg-bytes")
-	body, contentType := multipartArchivoBody(t, "foto", "foto.jpg", "image/jpeg", content)
+	body, contentType := multipartFileBody(t, "foto", "foto.jpg", "image/jpeg", content)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/archivos", body)
 	request.Header.Set("Content-Type", contentType)
@@ -99,7 +99,7 @@ func TestStoreLoteoArchivoHandlerStoresTheFile(t *testing.T) {
 	if !stub.called {
 		t.Fatal("use case not called")
 	}
-	if stub.gotInput.LoteoID != "loteo-9" || stub.gotInput.Categoria != "foto" || stub.gotInput.MimeType != "image/jpeg" {
+	if stub.gotInput.LoteoID != "loteo-9" || stub.gotInput.Category != "foto" || stub.gotInput.MimeType != "image/jpeg" {
 		t.Fatalf("input = %+v, want loteo-9/foto/image/jpeg", stub.gotInput)
 	}
 	if !bytes.Equal(stub.gotBytes, content) {
@@ -110,19 +110,19 @@ func TestStoreLoteoArchivoHandlerStoresTheFile(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if payload["id"] != "archivo-1" || payload["categoria"] != "foto" {
-		t.Fatalf("body = %#v, want archivo-1/foto", payload)
+	if payload["id"] != "file-1" || payload["categoria"] != "foto" {
+		t.Fatalf("body = %#v, want file-1/foto", payload)
 	}
 	if _, exposed := payload["storageKey"]; exposed {
 		t.Fatal("response exposes the internal object-storage key")
 	}
 }
 
-func TestStoreLoteoArchivoHandlerRejectsMissingFilePart(t *testing.T) {
-	stub := &storeLoteoArchivoStub{}
-	mux := storeLoteoArchivoMux(stub, administradorVerifier())
+func TestStoreLoteoFileHandlerRejectsMissingFilePart(t *testing.T) {
+	stub := &storeLoteoFileStub{}
+	mux := storeLoteoFileMux(stub, administradorVerifier())
 
-	body, contentType := multipartArchivoBody(t, "foto", "", "", nil)
+	body, contentType := multipartFileBody(t, "foto", "", "", nil)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/archivos", body)
 	request.Header.Set("Content-Type", contentType)
 	request.Header.Set("Authorization", "Bearer token")
@@ -137,24 +137,24 @@ func TestStoreLoteoArchivoHandlerRejectsMissingFilePart(t *testing.T) {
 	}
 }
 
-func TestStoreLoteoArchivoHandlerMapsUseCaseErrors(t *testing.T) {
+func TestStoreLoteoFileHandlerMapsUseCaseErrors(t *testing.T) {
 	cases := map[string]struct {
 		err  error
 		want int
 	}{
 		"not found": {domain.ErrLoteoNotFound, http.StatusNotFound},
 		"forbidden": {domain.ErrNoAutorizado, http.StatusForbidden},
-		"invalid":   {domain.ErrInvalidArchivo, http.StatusBadRequest},
-		"too many":  {domain.ErrTooManyArchivos, http.StatusBadRequest},
+		"invalid":   {domain.ErrInvalidFile, http.StatusBadRequest},
+		"too many":  {domain.ErrTooManyFiles, http.StatusBadRequest},
 		"conflict":  {domain.ErrLoteNumberInUse, http.StatusConflict},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			stub := &storeLoteoArchivoStub{err: tc.err}
-			mux := storeLoteoArchivoMux(stub, administradorVerifier())
+			stub := &storeLoteoFileStub{err: tc.err}
+			mux := storeLoteoFileMux(stub, administradorVerifier())
 
-			body, contentType := multipartArchivoBody(t, "foto", "foto.jpg", "image/jpeg", []byte("x"))
+			body, contentType := multipartFileBody(t, "foto", "foto.jpg", "image/jpeg", []byte("x"))
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/archivos", body)
 			request.Header.Set("Content-Type", contentType)
 			request.Header.Set("Authorization", "Bearer token")
@@ -168,11 +168,11 @@ func TestStoreLoteoArchivoHandlerMapsUseCaseErrors(t *testing.T) {
 	}
 }
 
-func TestStoreLoteoArchivoHandlerRejectsRequestsWithoutAToken(t *testing.T) {
-	stub := &storeLoteoArchivoStub{}
-	mux := storeLoteoArchivoMux(stub, administradorVerifier())
+func TestStoreLoteoFileHandlerRejectsRequestsWithoutAToken(t *testing.T) {
+	stub := &storeLoteoFileStub{}
+	mux := storeLoteoFileMux(stub, administradorVerifier())
 
-	body, contentType := multipartArchivoBody(t, "foto", "foto.jpg", "image/jpeg", []byte("x"))
+	body, contentType := multipartFileBody(t, "foto", "foto.jpg", "image/jpeg", []byte("x"))
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/loteo-9/archivos", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder := httptest.NewRecorder()

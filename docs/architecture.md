@@ -592,14 +592,24 @@ autorización sigue viviendo en un solo lugar (la misma visibilidad que
 inmobiliaria solo lo asignado). Si el costo de proxear archivos grandes pesa
 en el futuro, se puede evaluar una URL firmada; el contrato de
 `gateway.ObjectStorage` tendría que crecer una operación para eso.
+`GetFileContent` propaga el `Size` leído de storage y el handler lo declara
+como `Content-Length`; si el stream se corta a mitad de camino, el handler
+aborta la conexión (`panic(http.ErrAbortHandler)`) en vez de devolver un 200
+con contenido parcial que el cliente interpretaría como una descarga
+completa.
 
 ### Fotos y planos de loteo y lote
 
 A diferencia del DXF (un archivo que reemplaza al anterior), una foto o plano
-es una **colección**: `StoreLoteoArchivo`/`StoreLoteArchivo`
-(`usecase/loteos`) insertan una fila nueva en `archivos` sin dar de baja las
-existentes, acotadas por `domain.MaxArchivosPerEntity` (20 por loteo o por
-lote). Decisiones:
+es una **colección**: `StoreLoteoFile`/`StoreLoteFile` (`usecase/loteos`)
+insertan una fila nueva en `archivos` sin dar de baja las existentes,
+acotadas por `domain.MaxFilesPerEntity` (20 por loteo o por lote). Ese cupo se
+aplica de forma atómica dentro de `RecordLoteoFile`/`RecordLoteFile`
+(`repository/postgres`): una sola transacción hace `SELECT ... FOR UPDATE`
+sobre el loteo o el lote, cuenta los archivos activos y recién ahí inserta,
+así que dos subidas concurrentes no pueden leer ambas "hay cupo" y terminar
+insertando 21; la que pierde la carrera recibe `domain.ErrTooManyFiles` y el
+caso de uso compensa borrando el objeto que ya había subido a R2. Decisiones:
 
 - **Solo loteo y lote, nunca manzana.** El constraint
   `archivos_loteo_xor_lote_chk` ya modelaba exactamente esas dos unidades
@@ -610,15 +620,21 @@ lote). Decisiones:
   loteo** (`authorizeEditor`, compartida con `update_lote.go`): administrador,
   o agrimensor asignado. La de lectura (listar y descargar) es la misma que
   `GetLoteo` — más amplia, porque ver un archivo no debería requerir poder
-  editarlo.
-- **Categoría y tipo se validan contra listas cerradas.** `categoria` es
-  `foto` o `plano` (`documento_legal`, del futuro módulo de escribano, y `dxf`
-  quedan fuera de este flujo); el `Content-Type` se limita a
-  `image/jpeg`/`png`/`webp` y `application/pdf`, porque lo que se guarda acá
-  se sirve de vuelta a un navegador.
+  editarlo. `GetFile`/`DeleteFile` (`repository/postgres`) filtran
+  `categoria IN ('foto', 'plano')`: sin ese filtro, un id de archivo del mismo
+  loteo también alcanzaría su DXF o cualquier `documento_legal`, categorías
+  que este flujo nunca debe leer ni dar de baja.
+- **Categoría y tipo se validan contra listas cerradas, y el contenido real se
+  verifica contra lo declarado.** `categoria` es `foto` o `plano`
+  (`documento_legal`, del futuro módulo de escribano, y `dxf` quedan fuera de
+  este flujo); el `Content-Type` se limita a `image/jpeg`/`png`/`webp` y
+  `application/pdf`. Como el `Content-Type` de un part multipart lo declara el
+  cliente y no prueba nada sobre los bytes que siguen, `usecase/loteos`
+  también compara los primeros bytes del archivo contra la firma esperada
+  (`domain.ArchivoContentMatchesMimeType`) antes de hashear y subir.
 - **`categoria` es un detalle interno, no una elección de quien sube el
   archivo.** El frontend la infiere del tipo del archivo (imagen → `foto`,
-  cualquier otra cosa → `plano`, ver `categoriaFor` en
+  cualquier otra cosa → `plano`, ver `categoryFor` en
   `features/lots/components/ArchivosSection.tsx`) en vez de pedirla: pedirla
   no cambiaba ninguna validación ni filtraba el selector de archivos, así que
   el único efecto real de la elección era confundir "plano" (un documento
@@ -628,10 +644,15 @@ lote). Decisiones:
   DXF: `fecha_baja` alcanza para que deje de listarse, y no vale la pena la
   complejidad de un borrado sincrónico para un caso de uso de bajo volumen.
 - **El frontend no puede usar `<img src>` directo.** La API exige un Bearer
-  token, que un `src` de imagen no puede enviar. `fetchArchivoContent`
+  token, que un `src` de imagen no puede enviar. `fetchAttachmentContent`
   (`features/lots/api/archivos.ts`) trae el archivo con `fetch` autenticado y
   arma un `URL.createObjectURL`, revocado al desmontar — primer lugar del
   frontend que muestra contenido protegido en vez de solo subirlo.
+- **`ArchivosSection` remonta por la identidad de su destino** (`key={lote.id}`
+  o `key={loteo.id}` en `PlanSelectionPanel`/`LoteoDetailPage`): sin esa key,
+  cambiar de lote seleccionado mientras una subida o baja seguía pendiente
+  podía terminar aplicando el resultado tardío sobre la lista del lote que se
+  estaba viendo ahora, en vez de sobre el que originó la operación.
 
 Un límite de R2 a tener presente al armar las claves es **una escritura por
 segundo sobre la misma clave**. Cada carga usa una clave versionada distinta,

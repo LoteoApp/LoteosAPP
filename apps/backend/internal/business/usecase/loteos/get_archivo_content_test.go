@@ -12,7 +12,7 @@ import (
 	"loteosapp/backend/internal/business/usecase/loteos"
 )
 
-func TestGetArchivoContentStreamsTheStoredBytes(t *testing.T) {
+func TestGetFileContentStreamsTheStoredBytes(t *testing.T) {
 	t.Parallel()
 
 	storage := &gatewayfake.ObjectStorage{}
@@ -20,10 +20,10 @@ func TestGetArchivoContentStreamsTheStoredBytes(t *testing.T) {
 		t.Fatalf("Put() error = %v", err)
 	}
 	repository := &gatewayfake.LoteoRepository{
-		GetResult:        domain.Loteo{ID: "loteo-1"},
-		GetArchivoResult: domain.Archivo{ID: "archivo-1", StorageKey: "loteos/loteo-1/archivos/a", MimeType: "image/jpeg"},
+		GetResult:     domain.Loteo{ID: "loteo-1"},
+		GetFileResult: domain.File{ID: "archivo-1", StorageKey: "loteos/loteo-1/archivos/a", MimeType: "image/jpeg"},
 	}
-	useCase := loteos.NewGetArchivoContent(repository, storage)
+	useCase := loteos.NewGetFileContent(repository, storage)
 
 	content, err := useCase.Execute(context.Background(), administrador(), "loteo-1", "archivo-1")
 	if err != nil {
@@ -38,17 +38,17 @@ func TestGetArchivoContentStreamsTheStoredBytes(t *testing.T) {
 	if string(body) != "hola" {
 		t.Errorf("body = %q, want %q", body, "hola")
 	}
-	if content.Archivo.ID != "archivo-1" {
-		t.Errorf("Archivo.ID = %q, want archivo-1", content.Archivo.ID)
+	if content.File.ID != "archivo-1" {
+		t.Errorf("File.ID = %q, want archivo-1", content.File.ID)
 	}
 }
 
-func TestGetArchivoContentReportsNotFoundForALoteoOutsideTheActorsScope(t *testing.T) {
+func TestGetFileContentReportsNotFoundForALoteoOutsideTheActorsScope(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.LoteoRepository{GetErr: domain.ErrLoteoNotFound}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewGetArchivoContent(repository, storage)
+	useCase := loteos.NewGetFileContent(repository, storage)
 
 	_, err := useCase.Execute(context.Background(), actorWith(domain.RolEscribano), "loteo-1", "archivo-1")
 
@@ -60,29 +60,29 @@ func TestGetArchivoContentReportsNotFoundForALoteoOutsideTheActorsScope(t *testi
 	}
 }
 
-func TestGetArchivoContentPropagatesAnArchivoNotFound(t *testing.T) {
+func TestGetFileContentPropagatesAnFileNotFound(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.LoteoRepository{
-		GetResult:     domain.Loteo{ID: "loteo-1"},
-		GetArchivoErr: domain.ErrArchivoNotFound,
+		GetResult:  domain.Loteo{ID: "loteo-1"},
+		GetFileErr: domain.ErrFileNotFound,
 	}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewGetArchivoContent(repository, storage)
+	useCase := loteos.NewGetFileContent(repository, storage)
 
 	_, err := useCase.Execute(context.Background(), administrador(), "loteo-1", "archivo-1")
 
-	if !errors.Is(err, domain.ErrArchivoNotFound) {
-		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrArchivoNotFound)
+	if !errors.Is(err, domain.ErrFileNotFound) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrFileNotFound)
 	}
 }
 
-func TestGetArchivoContentDeniesAnyOtherActor(t *testing.T) {
+func TestGetFileContentDeniesAnyOtherActor(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.LoteoRepository{}
 	storage := &gatewayfake.ObjectStorage{}
-	useCase := loteos.NewGetArchivoContent(repository, storage)
+	useCase := loteos.NewGetFileContent(repository, storage)
 
 	_, err := useCase.Execute(context.Background(), loteos.Actor{AuthProviderID: "actor-1"}, "loteo-1", "archivo-1")
 

@@ -1,55 +1,55 @@
 import { useCallback, useEffect, useState } from 'react'
 import { messageFromError } from '../../../shared/api/client'
 import {
-  deleteArchivo,
-  listLoteArchivos,
-  listLoteoArchivos,
-  uploadLoteArchivo,
-  uploadLoteoArchivo,
+  deleteAttachment,
+  listLoteAttachments,
+  listLoteoAttachments,
+  uploadLoteAttachment,
+  uploadLoteoAttachment,
 } from '../api/archivos'
-import type { Archivo, ArchivoCategoria } from '../types'
+import type { Attachment, AttachmentCategory } from '../types'
 
-export type ArchivoTarget =
+export type AttachmentTarget =
   | { kind: 'loteo'; loteoId: string }
   | { kind: 'lote'; loteoId: string; loteId: string }
 
 const SESSION_EXPIRED_MESSAGE = 'Tu sesión expiró. Volvé a iniciar sesión y probá de nuevo.'
 
-function list(target: ArchivoTarget, token: string, signal: AbortSignal): Promise<Archivo[]> {
+function list(target: AttachmentTarget, token: string, signal: AbortSignal): Promise<Attachment[]> {
   return target.kind === 'loteo'
-    ? listLoteoArchivos(target.loteoId, token, signal)
-    : listLoteArchivos(target.loteoId, target.loteId, token, signal)
+    ? listLoteoAttachments(target.loteoId, token, signal)
+    : listLoteAttachments(target.loteoId, target.loteId, token, signal)
 }
 
 function upload(
-  target: ArchivoTarget,
-  categoria: ArchivoCategoria,
+  target: AttachmentTarget,
+  category: AttachmentCategory,
   file: File,
   token: string,
-): Promise<Archivo> {
+): Promise<Attachment> {
   return target.kind === 'loteo'
-    ? uploadLoteoArchivo(target.loteoId, categoria, file, token)
-    : uploadLoteArchivo(target.loteoId, target.loteId, categoria, file, token)
+    ? uploadLoteoAttachment(target.loteoId, category, file, token)
+    : uploadLoteAttachment(target.loteoId, target.loteId, category, file, token)
 }
 
-type LoadState = { archivos: Archivo[]; isLoading: boolean; error: string | null }
+type LoadState = { attachments: Attachment[]; isLoading: boolean; error: string | null }
 
 function pending(token: string | null): LoadState {
   return token
-    ? { archivos: [], isLoading: true, error: null }
-    : { archivos: [], isLoading: false, error: SESSION_EXPIRED_MESSAGE }
+    ? { attachments: [], isLoading: true, error: null }
+    : { attachments: [], isLoading: false, error: SESSION_EXPIRED_MESSAGE }
 }
 
-export type UseArchivos = {
-  archivos: Archivo[]
+export type UseAttachments = {
+  attachments: Attachment[]
   isLoading: boolean
   isSubmitting: boolean
   error: string | null
-  upload: (categoria: ArchivoCategoria, file: File) => Promise<boolean>
-  remove: (archivoId: string) => Promise<boolean>
+  upload: (category: AttachmentCategory, file: File) => Promise<boolean>
+  remove: (attachmentId: string) => Promise<boolean>
 }
 
-export function useArchivos(target: ArchivoTarget, token: string | null): UseArchivos {
+export function useAttachments(target: AttachmentTarget, token: string | null): UseAttachments {
   const loteoId = target.loteoId
   const loteId = target.kind === 'lote' ? target.loteId : null
 
@@ -57,7 +57,7 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset to the pending state during render when the request key changes,
-  // so the UI never shows the previous target's archivos while the next
+  // so the UI never shows the previous target's attachments while the next
   // batch loads.
   const requestKey = JSON.stringify([token, loteoId, loteId])
   const [loadedKey, setLoadedKey] = useState(requestKey)
@@ -76,12 +76,12 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
     list(target, token, controller.signal)
       .then((loaded) => {
         if (!controller.signal.aborted) {
-          setState({ archivos: loaded, isLoading: false, error: null })
+          setState({ attachments: loaded, isLoading: false, error: null })
         }
       })
       .catch((loadError: unknown) => {
         if (!controller.signal.aborted) {
-          setState({ archivos: [], isLoading: false, error: messageFromError(loadError) })
+          setState({ attachments: [], isLoading: false, error: messageFromError(loadError) })
         }
       })
 
@@ -92,7 +92,7 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
   }, [loteoId, loteId, token])
 
   const doUpload = useCallback(
-    async (categoria: ArchivoCategoria, file: File): Promise<boolean> => {
+    async (category: AttachmentCategory, file: File): Promise<boolean> => {
       if (!token) {
         setState((current) => ({ ...current, error: SESSION_EXPIRED_MESSAGE }))
         return false
@@ -100,8 +100,8 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
 
       setIsSubmitting(true)
       try {
-        const archivo = await upload(target, categoria, file, token)
-        setState((current) => ({ archivos: [archivo, ...current.archivos], isLoading: false, error: null }))
+        const attachment = await upload(target, category, file, token)
+        setState((current) => ({ attachments: [attachment, ...current.attachments], isLoading: false, error: null }))
         return true
       } catch (uploadError) {
         setState((current) => ({ ...current, error: messageFromError(uploadError) }))
@@ -115,7 +115,7 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
   )
 
   const remove = useCallback(
-    async (archivoId: string): Promise<boolean> => {
+    async (attachmentId: string): Promise<boolean> => {
       if (!token) {
         setState((current) => ({ ...current, error: SESSION_EXPIRED_MESSAGE }))
         return false
@@ -123,10 +123,10 @@ export function useArchivos(target: ArchivoTarget, token: string | null): UseArc
 
       setIsSubmitting(true)
       try {
-        await deleteArchivo(loteoId, archivoId, token)
+        await deleteAttachment(loteoId, attachmentId, token)
         setState((current) => ({
           ...current,
-          archivos: current.archivos.filter((archivo) => archivo.id !== archivoId),
+          attachments: current.attachments.filter((attachment) => attachment.id !== attachmentId),
           error: null,
         }))
         return true

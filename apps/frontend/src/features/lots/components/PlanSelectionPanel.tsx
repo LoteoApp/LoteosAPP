@@ -93,7 +93,10 @@ export default function PlanSelectionPanel({
             <LoteReadOnly lote={lote} />
           )}
           <div className="border-t border-border pt-3">
+            {/* Remounted per lote: a pending upload/delete from the previous
+                selection must never land on this one once it resolves. */}
             <ArchivosSection
+              key={lote.id}
               target={{ kind: 'lote', loteoId: loteo.id, loteId: lote.id }}
               accessToken={accessToken}
               canEdit={canEdit}

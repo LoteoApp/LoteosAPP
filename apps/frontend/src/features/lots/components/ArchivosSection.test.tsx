@@ -3,11 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ArchivosSection from './ArchivosSection'
 import * as archivosApi from '../api/archivos'
-import type { Archivo } from '../types'
+import type { Attachment } from '../types'
 
-const archivo: Archivo = {
+const attachment: Attachment = {
   id: 'archivo-1',
-  categoria: 'foto',
+  category: 'foto',
   nombreOriginal: 'foto.jpg',
   mimeType: 'image/jpeg',
   hashSha256: 'abc123',
@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('ArchivosSection', () => {
   it('shows an empty state when there are no archivos', async () => {
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([])
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([])
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
 
@@ -35,8 +35,8 @@ describe('ArchivosSection', () => {
   })
 
   it('shows an archivo as a thumbnail linking to its preview once fetched', async () => {
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([archivo])
-    vi.spyOn(archivosApi, 'fetchArchivoContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([attachment])
+    vi.spyOn(archivosApi, 'fetchAttachmentContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
 
@@ -45,10 +45,10 @@ describe('ArchivosSection', () => {
   })
 
   it('shows a plano without an image preview as a generic file badge', async () => {
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([
-      { ...archivo, categoria: 'plano', mimeType: 'application/pdf', nombreOriginal: 'plano.pdf' },
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([
+      { ...attachment, category: 'plano', mimeType: 'application/pdf', nombreOriginal: 'plano.pdf' },
     ])
-    vi.spyOn(archivosApi, 'fetchArchivoContent').mockRejectedValue(new Error('boom'))
+    vi.spyOn(archivosApi, 'fetchAttachmentContent').mockRejectedValue(new Error('boom'))
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
 
@@ -60,8 +60,8 @@ describe('ArchivosSection', () => {
 
   it('uploads an image file as categoria foto, inferred from its type', async () => {
     const user = userEvent.setup()
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([])
-    const upload = vi.spyOn(archivosApi, 'uploadLoteoArchivo').mockResolvedValue(archivo)
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([])
+    const upload = vi.spyOn(archivosApi, 'uploadLoteoAttachment').mockResolvedValue(attachment)
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
     await screen.findByText('Todavía no hay archivos.')
@@ -74,8 +74,8 @@ describe('ArchivosSection', () => {
 
   it('uploads a PDF file as categoria plano, inferred from its type', async () => {
     const user = userEvent.setup()
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([])
-    const upload = vi.spyOn(archivosApi, 'uploadLoteoArchivo').mockResolvedValue(archivo)
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([])
+    const upload = vi.spyOn(archivosApi, 'uploadLoteoAttachment').mockResolvedValue(attachment)
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
     await screen.findByText('Todavía no hay archivos.')
@@ -88,9 +88,9 @@ describe('ArchivosSection', () => {
 
   it('removes an archivo when clicking its delete button', async () => {
     const user = userEvent.setup()
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([archivo])
-    vi.spyOn(archivosApi, 'fetchArchivoContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
-    const remove = vi.spyOn(archivosApi, 'deleteArchivo').mockResolvedValue(undefined)
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([attachment])
+    vi.spyOn(archivosApi, 'fetchAttachmentContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
+    const remove = vi.spyOn(archivosApi, 'deleteAttachment').mockResolvedValue(undefined)
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
     await screen.findByRole('img', { name: 'foto.jpg' })
@@ -102,7 +102,7 @@ describe('ArchivosSection', () => {
   })
 
   it('shows the error message when loading fails', async () => {
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockRejectedValue(new Error('boom'))
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockRejectedValue(new Error('boom'))
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit />)
 
@@ -110,8 +110,8 @@ describe('ArchivosSection', () => {
   })
 
   it('hides the upload control and delete buttons in read-only mode', async () => {
-    vi.spyOn(archivosApi, 'listLoteoArchivos').mockResolvedValue([archivo])
-    vi.spyOn(archivosApi, 'fetchArchivoContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
+    vi.spyOn(archivosApi, 'listLoteoAttachments').mockResolvedValue([attachment])
+    vi.spyOn(archivosApi, 'fetchAttachmentContent').mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }))
 
     render(<ArchivosSection target={loteoTarget} accessToken="tok" canEdit={false} />)
 

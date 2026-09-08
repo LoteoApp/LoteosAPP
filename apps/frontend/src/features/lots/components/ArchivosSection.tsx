@@ -1,27 +1,20 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Upload, X } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
-import { fetchArchivoContent } from '../api/archivos'
-import { useArchivos, type ArchivoTarget } from '../hooks/use-archivos'
-import type { Archivo, ArchivoCategoria } from '../types'
+import { fetchAttachmentContent } from '../api/archivos'
+import { useAttachments, type AttachmentTarget } from '../hooks/use-archivos'
+import type { Attachment, AttachmentCategory } from '../types'
 
-const ARCHIVO_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf'
+const ATTACHMENT_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf'
 
-// The categoria the backend stores is an implementation detail — the person
-// uploading never chooses "foto" vs. "plano" (that word already means the
-// DXF-derived plan elsewhere in this screen), so it's inferred from the
-// file's own type instead of asked for.
-function categoriaFor(file: File): ArchivoCategoria {
+function categoryFor(file: File): AttachmentCategory {
   return file.type.startsWith('image/') ? 'foto' : 'plano'
 }
 
 type ArchivosSectionProps = {
-  target: ArchivoTarget
+  target: AttachmentTarget
   accessToken: string | null
   canEdit: boolean
-  // The loteo-level usage wraps this in a Card whose CardTitle already reads
-  // "Fotos y documentos" — showing the label a second time here would be
-  // redundant, so that caller turns it off.
   showLabel?: boolean
 }
 
@@ -31,7 +24,7 @@ export default function ArchivosSection({
   canEdit,
   showLabel = true,
 }: ArchivosSectionProps) {
-  const { archivos, isLoading, isSubmitting, error, upload, remove } = useArchivos(target, accessToken)
+  const { attachments, isLoading, isSubmitting, error, upload, remove } = useAttachments(target, accessToken)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -39,7 +32,7 @@ export default function ArchivosSection({
     // Let the same file be picked again right after a failed upload.
     event.target.value = ''
     if (file) {
-      await upload(categoriaFor(file), file)
+      await upload(categoryFor(file), file)
     }
   }
 
@@ -67,7 +60,7 @@ export default function ArchivosSection({
           <input
             ref={fileInputRef}
             type="file"
-            accept={ARCHIVO_ACCEPT}
+            accept={ATTACHMENT_ACCEPT}
             onChange={handleFileChange}
             disabled={isSubmitting}
             aria-label="Subir archivo"
@@ -77,23 +70,23 @@ export default function ArchivosSection({
       )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando archivos…</p>}
-      {!isLoading && archivos.length === 0 && (
+      {!isLoading && attachments.length === 0 && (
         <p className="text-sm text-muted-foreground">Todavía no hay archivos.</p>
       )}
 
-      {archivos.length > 0 && (
-        // Fixed-height strip: with more archivos it scrolls sideways instead
-        // of pushing the rest of the panel down.
+      {attachments.length > 0 && (
+        // Fixed-height strip: with more attachments it scrolls sideways
+        // instead of pushing the rest of the panel down.
         <ul className="flex gap-2 overflow-x-auto pb-1">
-          {archivos.map((archivo) => (
-            <ArchivoThumbnail
-              key={archivo.id}
-              archivo={archivo}
+          {attachments.map((attachment) => (
+            <AttachmentThumbnail
+              key={attachment.id}
+              attachment={attachment}
               loteoId={target.loteoId}
               accessToken={accessToken}
               canEdit={canEdit}
               disabled={isSubmitting}
-              onDelete={() => remove(archivo.id)}
+              onDelete={() => remove(attachment.id)}
             />
           ))}
         </ul>
@@ -102,8 +95,8 @@ export default function ArchivosSection({
   )
 }
 
-type ArchivoThumbnailProps = {
-  archivo: Archivo
+type AttachmentThumbnailProps = {
+  attachment: Attachment
   loteoId: string
   accessToken: string | null
   canEdit: boolean
@@ -111,7 +104,14 @@ type ArchivoThumbnailProps = {
   onDelete: () => void
 }
 
-function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, onDelete }: ArchivoThumbnailProps) {
+function AttachmentThumbnail({
+  attachment,
+  loteoId,
+  accessToken,
+  canEdit,
+  disabled,
+  onDelete,
+}: AttachmentThumbnailProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -122,7 +122,7 @@ function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, on
     let cancelled = false
     let objectUrl: string | null = null
 
-    fetchArchivoContent(loteoId, archivo.id, accessToken)
+    fetchAttachmentContent(loteoId, attachment.id, accessToken)
       .then((blob) => {
         if (cancelled) {
           return
@@ -140,12 +140,12 @@ function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, on
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [loteoId, archivo.id, accessToken])
+  }, [loteoId, attachment.id, accessToken])
 
-  const isImage = archivo.mimeType.startsWith('image/')
+  const isImage = attachment.mimeType.startsWith('image/')
 
   const content = isImage && previewUrl ? (
-    <img src={previewUrl} alt={archivo.nombreOriginal} className="size-full object-cover" />
+    <img src={previewUrl} alt={attachment.nombreOriginal} className="size-full object-cover" />
   ) : (
     <div className="flex size-full items-center justify-center bg-muted text-[0.65rem] font-medium text-muted-foreground">
       {isImage ? 'IMG' : 'PDF'}
@@ -159,13 +159,13 @@ function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, on
           href={previewUrl}
           target="_blank"
           rel="noreferrer"
-          title={archivo.nombreOriginal}
+          title={attachment.nombreOriginal}
           className="block size-full overflow-hidden rounded-md border border-border"
         >
           {content}
         </a>
       ) : (
-        <div title={archivo.nombreOriginal} className="size-full overflow-hidden rounded-md border border-border">
+        <div title={attachment.nombreOriginal} className="size-full overflow-hidden rounded-md border border-border">
           {content}
         </div>
       )}
@@ -177,7 +177,7 @@ function ArchivoThumbnail({ archivo, loteoId, accessToken, canEdit, disabled, on
           size="icon-xs"
           disabled={disabled}
           onClick={onDelete}
-          aria-label={`Eliminar ${archivo.nombreOriginal}`}
+          aria-label={`Eliminar ${attachment.nombreOriginal}`}
           className="absolute -top-1.5 -right-1.5 rounded-full bg-background"
         >
           <X aria-hidden />
