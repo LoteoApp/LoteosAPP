@@ -127,7 +127,9 @@ migrations/
 ├── 00004_enable_rls_on_public_tables.sql
 ├── 00005_create_entity_model.sql
 ├── 00006_enforce_single_active_loteo_dxf.sql
-└── 00007_add_inmobiliarias_cuit_idx.sql
+├── 00007_add_inmobiliarias_cuit_idx.sql
+├── 00008_add_lot_state_machine.sql
+└── 00009_harden_reservations.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -159,6 +161,15 @@ o si dos comparten valor, en vez de deduplicar por su cuenta. La
 columna `fecha_baja` ya venía de `00005`: la baja de una inmobiliaria es
 lógica (`fecha_baja IS NULL` = activa) porque borrar la fila rompería las FK
 que la nombran (`usuarios.inmobiliaria_id`, `inmobiliaria_loteos`).
+
+`00009_harden_reservations.sql` agrega la identidad idempotente por actor
+(`idempotency_key` y hash del payload), sus validaciones y el índice parcial
+de reservas activas ordenado por vencimiento e ID. También protege las
+transiciones de `reserva_estados` y vuelve inmutables la identidad comercial,
+la fecha de creación y el vencimiento. El `Down` elimina esos metadatos y
+constraints, por lo que no debe ejecutarse sobre datos reales: un rollback
+perdería las claves idempotentes y los hashes, aunque conserva las reservas y
+su historial.
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
@@ -233,6 +244,35 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations down
 
 `down` corre contra la base compartida de Supabase, no una base local
 descartable: no usarlo sin confirmar el impacto con el equipo.
+
+### Máquina de estados del lote
+
+`00008_add_lot_state_machine.sql` materializa el valor vigente en
+`lotes.estado_actual`, crea el evento inicial `disponible` para lotes sin
+historial y sincroniza los que ya tenían eventos. Los eventos anteriores a la
+migración quedan identificados como `sistema` con una razón de migración. Los
+lotes nuevos se inicializan por trigger; otro trigger valida la matriz de
+transiciones y actualiza el valor vigente. `lote_estados` rechaza `UPDATE`,
+`DELETE` y `TRUNCATE`, y su índice `(lote_id, fecha_creacion DESC, id DESC)`
+permite leer el historial en orden estable. El `Down` conserva las filas del
+historial y sus estados, pero elimina los metadatos agregados por esta migración
+(`origen`, `razon` y las referencias comerciales); solo debe usarse sobre una
+base descartable.
+
+### Reservas
+
+`reservas` mantiene una única fila activa por lote y
+`reserva_estados` conserva el historial append-only. La alta crea el evento
+`activa`; cancelación, vencimiento y conversión agregan un único evento
+terminal. `00009` rechaza el alta de un estado distinto de `activa`, las
+transiciones desde un terminal y los cambios directos de los campos
+inmutables. La liberación del lote se escribe junto con el evento de reserva
+mediante la máquina de estados de `lote_estados`.
+
+El worker consulta el índice parcial `reservas_active_expiration_idx`, toma
+candidatos en lotes pequeños y vuelve a verificar la reserva activa y su
+vencimiento después de bloquear lote y reserva. Así un reintento o una segunda
+instancia puede omitir un candidato ya procesado sin duplicar eventos.
 
 ## Reglas del esquema
 

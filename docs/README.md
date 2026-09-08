@@ -22,6 +22,13 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
 - [Secrets con Doppler](secrets.md): setup del CLI, cómo correr comandos con
   secrets inyectados y cómo administrar valores por config.
 
+## Planes
+
+- [Máquina de estados del lote](plans/lote-state-machine.md): diseño e
+  implementación del núcleo, concurrencia, migración y decisiones de la issue #54.
+- [Reservas de lotes](plans/reservations.md): circuito completo, decisiones
+  confirmadas, reutilización del motor de estados, frontend y tolerancia a fallos.
+
 ## Regla de mantenimiento
 
 Cuando una decisión técnica afecte la forma de levantar, probar o desplegar el

@@ -5,6 +5,24 @@ Describe entidades, roles, reglas de negocio y flujos que el backend y el
 frontend deben implementar. Ver [architecture.md](architecture.md) para cómo
 se organiza el código de cada funcionalidad.
 
+## Estado del lote
+
+Todo lote nace `disponible` y conserva un único estado vigente junto con un
+historial inmutable. Las transiciones admitidas son:
+
+- `disponible -> reservado` al crear una reserva;
+- `disponible -> vendido` para una venta directa;
+- `reservado -> disponible` al vencer o cancelar la reserva;
+- `reservado -> vendido` al convertir la reserva en venta;
+- `vendido -> disponible` al cancelar la venta;
+- `vendido -> finalizado` al completar el pago.
+
+`finalizado` es terminal. Cada evento conserva el origen (`alta`, `reserva`,
+`venta`, `cobranza`, `sistema` o `correccion`), el actor cuando existe, la
+fecha, una razón cuando corresponde y las referencias a reserva o venta. Una
+cancelación manual originada en una reserva o venta exige una justificación.
+El estado vigente solo cambia al agregar un evento al historial.
+
 ## Entidades principales
 
 - **Loteo**: nombre, ubicación (ciudad), descripción, inmobiliarias
@@ -16,7 +34,7 @@ se organiza el código de cada funcionalidad.
   asignado manualmente en el sistema, precio, superficie, características,
   estado.
 - **Calle**: pertenece a un loteo; polígono (capa `CALLE` del DXF); nombre
-  asignado manualmente en el sistema.
+  y tipo (`asfalto`, `tierra`, `brosa`, `granito`) asignados manualmente.
 - **Cliente**: nombre y apellido, DNI, celular, mail. No tiene acceso al
   sistema. Puede tener múltiples lotes en distintos estados (en compra, en
   financiación, finalizados).
@@ -47,11 +65,15 @@ se organiza el código de cada funcionalidad.
 5. Las capas son solo geometría, sin texto: el número de cada lote y el
    nombre de cada calle no se extraen del DXF; se cargan manualmente tras
    visualizar el plano.
-6. Visualización con navegación por capas: loteo → manzana → lote.
-7. Carga de datos por lote (clic sobre el lote): precio, superficie,
-   características.
-8. Carga de datos por manzana: hasta 4 calles que la rodean.
-9. Documentación legal del loteo (escrituras, certificaciones, poderes,
+6. Visualización con navegación por capas: loteo → manzana, lote o calle.
+7. Carga de datos por lote (clic sobre el lote): precio, superficie
+   (si no hay un valor guardado, se precarga con Gauss sobre la poligonal
+   cerrada del plano, en m², y se puede corregir a mano), características.
+8. Carga de datos por manzana (clic sobre la manzana): número, servicios
+   (agua, cloaca, luz, gas) y hasta 4 calles del loteo que la rodean.
+9. Carga de datos por calle (clic sobre la calle): nombre y tipo de
+   superficie (`asfalto`, `tierra`, `brosa`, `granito`).
+10. Documentación legal del loteo (escrituras, certificaciones, poderes,
    cartas documento) se carga y consulta desde esta misma vista, a cargo del
    escribano asignado. No existe una sección de menú separada para esto; el
    detalle de esta funcionalidad queda para una futura iteración.
@@ -92,9 +114,9 @@ quien asigna loteos y permisos.
 |---|---|---|
 | **Administrador** | Control total: crea usuarios, asigna permisos y loteos, gestiona ventas, cobranzas, edición/eliminación de lotes | — |
 | **Administrativo** | Visualizar información, editar ciertos datos (configurable, ver [Roles y permisos](#gestión-de-roles-y-permisos)), cargar ventas | Crear usuarios, asignar permisos, vender por sí mismo sin definición del admin, editar/eliminar lotes |
-| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes en loteos asignados; editar loteos/manzanas/lotes | Operar loteos no asignados |
-| **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas o lotes |
-| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
+| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes/calles en loteos asignados; editar loteos/manzanas/lotes/calles | Operar loteos no asignados |
+| **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas, lotes o calles |
+| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 
 Los clientes no son usuarios del sistema.
 
@@ -150,15 +172,34 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 ## Reservas
 
 - Solo lotes individuales (no manzanas ni loteos completos).
-- Quién reserva: inmobiliaria, administrativo o administrador
-  (`usuario_alta`).
+- Quién reserva: usuario activo con rol `administrador`, `administrativo` o
+  `inmobiliaria` (`usuario_alta`). La inmobiliaria solo puede reservar en un
+  loteo asignado a su agencia y siempre queda como vendedor responsable.
 - Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
-  inmobiliaria, la agencia se lee de `usuarios.inmobiliaria_id`.
+  `inmobiliaria`, debe pertenecer a una agencia activa asignada al loteo.
+  Administrador y administrativo lo eligen desde el catálogo de vendedores
+  elegibles; no se amplía por eso su acceso al ABM de usuarios.
 - Estado vigente en `reservas.estado_actual`; las transiciones se registran
-  solo en `reserva_estados`. Solo una reserva `activa` por lote.
-- Duración: 15 días, sin costo, sin registro de pago.
-- Al vencer sin concretar venta, el lote vuelve a estar disponible
-  automáticamente.
+  solo en `reserva_estados`. Solo una reserva `activa` por lote. Los estados
+  `cancelada`, `vencida` y `convertida` son terminales para este circuito.
+- Duración: exactamente 360 horas desde el instante autoritativo del servidor,
+  sin costo, prórroga ni edición manual. Se persiste como `TIMESTAMPTZ` y se
+  muestra en `America/Argentina/Buenos_Aires`.
+- Crear reserva mueve el lote de `disponible` a `reservado`. Cancelar antes
+  del vencimiento, o vencerla, mueve el lote de `reservado` a `disponible` en
+  la misma transacción.
+- Cancelar exige una justificación y solo lo puede hacer el vendedor
+  responsable, otro usuario de la misma agencia con alcance vigente, un
+  administrativo o un administrador. Una repetición sobre una reserva ya
+  cancelada devuelve el resultado existente sin agregar otro evento.
+- La creación acepta una clave de idempotencia por actor: repetir la misma
+  clave y payload devuelve la misma reserva; reutilizarla con otro payload es
+  un conflicto.
+- El historial conserva sus referencias aunque usuarios o clientes sean
+  dados de baja. Las bajas impiden nuevas operaciones, pero no eliminan la
+  auditoría.
+- Un worker del backend regulariza reservas vencidas al iniciar y luego cada
+  minuto por defecto; un retraso del worker no extiende el plazo comercial.
 
 ## Venta
 
@@ -226,7 +267,7 @@ stateDiagram-v2
   solo en parte: rechaza el anillo abierto, colineal, de área nula o que se
   cruza a sí mismo, pero **todavía no detecta superposiciones entre entidades
   de una misma capa** (ver `docs/architecture.md` § Alta de loteo y
-  [#17](https://github.com/LoteoApp/LoteosAPP/issues/17)).
+  [#176](https://github.com/LoteoApp/LoteosAPP/issues/176)).
 - Como las capas no traen texto, el número de cada lote y el nombre de cada
   calle no se pueden asociar automáticamente al polígono; se asignan
   manualmente en el sistema tras visualizar el plano.

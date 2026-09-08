@@ -47,6 +47,16 @@ type LoteoRepository interface {
 	// returns domain.ErrLoteNotFound.
 	UpdateLote(ctx context.Context, actorAuthProviderID, loteoID, loteID string, data domain.LoteData) (domain.Lote, error)
 
+	// UpdateManzana sets the manually loaded values of one manzana. loteoID
+	// scopes the lookup the same way as UpdateLote. A manzana that doesn't
+	// belong to loteoID returns domain.ErrManzanaNotFound.
+	UpdateManzana(ctx context.Context, actorAuthProviderID, loteoID, manzanaID string, data domain.ManzanaData) (domain.Manzana, error)
+
+	// UpdateCalle sets the manually loaded values of one calle. loteoID
+	// scopes the lookup the same way as UpdateLote. A calle that doesn't
+	// belong to loteoID returns domain.ErrCalleNotFound.
+	UpdateCalle(ctx context.Context, actorAuthProviderID, loteoID, calleID string, data domain.CalleData) (domain.Calle, error)
+
 	// IsAssignedToLoteo reports whether the user has the loteo assigned. It
 	// answers only that question: what an assignment allows is a decision
 	// for the use case.

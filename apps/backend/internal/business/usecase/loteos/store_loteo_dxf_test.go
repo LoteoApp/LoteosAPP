@@ -212,6 +212,24 @@ func TestStoreLoteoDxfReturnsStorageErrorWithoutRecording(t *testing.T) {
 	}
 }
 
+func TestStoreLoteoDxfClassifiesUnexpectedStorageError(t *testing.T) {
+	repository := &gatewayfake.LoteoRepository{Exists: true}
+	storage := &gatewayfake.ObjectStorage{PutErr: errors.New("connection refused")}
+	useCase := loteos.NewStoreLoteoDxf(repository, storage)
+
+	_, err := useCase.Execute(context.Background(), administrador(), dxfInput(dxfLoteoID, validDxf))
+	if !errors.Is(err, domain.ErrStorageUnavailable) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrStorageUnavailable)
+	}
+	var domainErr *domain.Error
+	if !errors.As(err, &domainErr) || domainErr.Cause == nil {
+		t.Fatalf("Execute() error = %v, want a domain error with cause", err)
+	}
+	if repository.RecordDxfFileCalls != 0 {
+		t.Fatalf("RecordDxfFileCalls = %d, want 0", repository.RecordDxfFileCalls)
+	}
+}
+
 func TestStoreLoteoDxfDeletesObjectWhenRecordFails(t *testing.T) {
 	repository := &gatewayfake.LoteoRepository{Exists: true, RecordDxfFileErr: errors.New("insert failed")}
 	storage := &gatewayfake.ObjectStorage{}

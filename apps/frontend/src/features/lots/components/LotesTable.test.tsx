@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import LotesTable from './LotesTable'
 import type { LoteoLote } from '../types'
 
@@ -8,6 +9,7 @@ function lote(overrides: Partial<LoteoLote> = {}): LoteoLote {
     id: 'lt-1',
     manzanaId: 'mz-1',
     numero: '7',
+    estado: 'disponible',
     precio: 150000,
     moneda: 'USD',
     superficie: 300,
@@ -37,6 +39,7 @@ describe('LotesTable', () => {
     const first = within(rows[1])
     expect(first.getByText('1')).toBeInTheDocument()
     expect(first.getByText('7')).toBeInTheDocument()
+    expect(first.getByText('Disponible')).toBeInTheDocument()
     expect(first.getByText('300 m²')).toBeInTheDocument()
     expect(first.getByText(/150\.000/)).toBeInTheDocument()
   })
@@ -51,7 +54,7 @@ describe('LotesTable', () => {
       />,
     )
 
-    const [, loteCell, superficieCell, precioCell, caracteristicasCell] = within(
+    const [, loteCell, , superficieCell, precioCell, caracteristicasCell] = within(
       screen.getAllByRole('row')[1],
     ).getAllByRole('cell')
     expect(loteCell).toHaveTextContent('—')
@@ -79,5 +82,48 @@ describe('LotesTable', () => {
     render(<LotesTable lotes={[lote(), lote({ id: 'lt-2' })]} manzanaNumberById={manzanaNumberById} />)
 
     expect(screen.getByText('2 lotes')).toBeInTheDocument()
+  })
+
+  it('shows the current state of every lote', () => {
+    render(
+      <LotesTable
+        lotes={[lote({ estado: 'reservado' }), lote({ id: 'lt-2', estado: 'vendido' })]}
+        manzanaNumberById={manzanaNumberById}
+      />,
+    )
+
+    expect(screen.getByText('Reservado')).toBeInTheDocument()
+    expect(screen.getByText('Vendido')).toBeInTheDocument()
+  })
+
+  it('selects a lote from a row click and from the keyboard', async () => {
+    const user = userEvent.setup()
+    const onSelectLote = vi.fn()
+
+    render(
+      <LotesTable
+        lotes={[lote(), lote({ id: 'lt-2', numero: '8' })]}
+        manzanaNumberById={manzanaNumberById}
+        selectedLoteId="lt-1"
+        onSelectLote={onSelectLote}
+      />,
+    )
+
+    expect(screen.getByRole('row', { name: 'Lote 7' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('row', { name: 'Lote 8' }))
+    expect(onSelectLote).toHaveBeenCalledWith('lt-2')
+
+    screen.getByRole('row', { name: 'Lote 7' }).focus()
+    await user.keyboard('{Enter}')
+    expect(onSelectLote).toHaveBeenCalledWith('lt-1')
+
+    onSelectLote.mockClear()
+    await user.keyboard(' ')
+    expect(onSelectLote).toHaveBeenCalledWith('lt-1')
+
+    onSelectLote.mockClear()
+    await user.keyboard('a')
+    expect(onSelectLote).not.toHaveBeenCalled()
   })
 })
