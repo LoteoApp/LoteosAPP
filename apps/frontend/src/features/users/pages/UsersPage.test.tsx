@@ -527,7 +527,7 @@ describe('UsersPage', () => {
     expect(screen.queryByText('No se enviaron campos para modificar')).not.toBeInTheDocument()
   })
 
-  it('clears a stale backend error when cancelling the inline baja confirmation', async () => {
+  it('clears a stale backend error when cancelling the inline deactivation confirmation', async () => {
     const user = userEvent.setup()
     stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
     renderUsersPage()
@@ -542,6 +542,20 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Cancelar' }))
 
     expect(screen.queryByText('El usuario ya está dado de baja')).not.toBeInTheDocument()
+  })
+
+  it('keeps a stale list load error visible when cancelling out of the create form', async () => {
+    const user = userEvent.setup()
+    failure = { status: 503, message: 'Servicio no disponible' }
+    renderUsersPage()
+    expect(await screen.findByText('Servicio no disponible')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Servicio no disponible')).toBeInTheDocument()
+    expect(screen.queryByText('No hay usuarios cargados todavía.')).not.toBeInTheDocument()
   })
 
   it('hides the list while a form is open', async () => {

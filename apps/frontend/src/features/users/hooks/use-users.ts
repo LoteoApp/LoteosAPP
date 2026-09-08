@@ -23,7 +23,8 @@ export function useUsers(token: string): UseUsers {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -34,11 +35,11 @@ export function useUsers(token: string): UseUsers {
           return
         }
         setUsuarios(loaded)
-        setError(null)
+        setListError(null)
       })
       .catch((loadError: unknown) => {
         if (!controller.signal.aborted) {
-          setError(messageOf(loadError))
+          setListError(messageOf(loadError))
         }
       })
       .finally(() => {
@@ -56,10 +57,10 @@ export function useUsers(token: string): UseUsers {
     setIsSubmitting(true)
     try {
       await operation()
-      setError(null)
+      setMutationError(null)
       return true
     } catch (operationError) {
-      setError(messageOf(operationError))
+      setMutationError(messageOf(operationError))
       return false
     } finally {
       setIsSubmitting(false)
@@ -72,10 +73,10 @@ export function useUsers(token: string): UseUsers {
       try {
         const { usuario, temporaryPassword } = await createUser(token, values)
         setUsuarios((current) => [...current, usuario])
-        setError(null)
+        setMutationError(null)
         return temporaryPassword
       } catch (createError) {
-        setError(messageOf(createError))
+        setMutationError(messageOf(createError))
         return null
       } finally {
         setIsSubmitting(false)
@@ -135,7 +136,17 @@ export function useUsers(token: string): UseUsers {
     [run, token],
   )
 
-  const clearError = useCallback(() => setError(null), [])
+  const clearError = useCallback(() => setMutationError(null), [])
 
-  return { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate }
+  return {
+    usuarios,
+    isLoading,
+    isSubmitting,
+    error: listError ?? mutationError,
+    clearError,
+    create,
+    update,
+    deactivate,
+    reactivate,
+  }
 }
