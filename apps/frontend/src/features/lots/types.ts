@@ -41,6 +41,9 @@ export type DxfPolygon = {
   // Short label drawn on the plan (lote/manzana number, calle name).
   // Absent when that value has not been loaded yet.
   caption?: string
+  // Present only for persisted lote polygons, so the viewer can reflect the
+  // current business state without coupling to the lots feature data source.
+  lotState?: LotState
 }
 
 export type DxfValidationIssueCode =

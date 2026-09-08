@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router'
 import { useAuth } from '../features/auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../shared/auth/roles'
+import { getUserRole, RESERVATION_ROLES, ROLE } from '../shared/auth/roles'
 
 type NavItem = {
   to: string
@@ -26,7 +26,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { to: '/lotes', label: 'Lotes', icon: LandPlot },
   { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/reservas', label: 'Reservas', icon: CalendarCheck },
+  { to: '/reservas', label: 'Reservas', icon: CalendarCheck, roles: RESERVATION_ROLES },
   { to: '/ventas', label: 'Ventas', icon: Handshake },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog, roles: [ROLE.administrador] },

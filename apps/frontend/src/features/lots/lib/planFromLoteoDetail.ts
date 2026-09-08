@@ -65,6 +65,7 @@ export function planFromLoteoDetail(loteo: LoteoDetail): DxfPolygon[] {
         vertices: lote.poligono,
         entity: { kind: 'lote', id: lote.id },
         caption: lote.numero || undefined,
+        lotState: lote.estado,
       })
     }
   }

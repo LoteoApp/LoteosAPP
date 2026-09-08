@@ -281,6 +281,61 @@ func TestEntityModelStateHistory(t *testing.T) {
 		}
 	})
 
+	t.Run("protects reservation identity and idempotency", func(t *testing.T) {
+		_, err := db.ExecContext(ctx, `
+			UPDATE reservas
+			SET fecha_vencimiento = fecha_vencimiento + interval '1 hour'
+			WHERE id = '00000000-0000-0000-0000-000000000030'
+		`)
+		assertIntegrityViolation(t, err)
+
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO reservas (
+				id, lote_id, cliente_id, vendedor_id, usuario_alta,
+				fecha_vencimiento, idempotency_key, idempotency_payload_hash
+			) VALUES (
+				'00000000-0000-0000-0000-000000000050',
+				'00000000-0000-0000-0000-000000000013',
+				'00000000-0000-0000-0000-000000000020',
+				'00000000-0000-0000-0000-000000000001',
+				'00000000-0000-0000-0000-000000000001',
+				now() + interval '15 days', 'reservation-key',
+				repeat('0', 64)
+			)
+		`)
+		if err != nil {
+			t.Fatalf("insert idempotent reservation: %v", err)
+		}
+
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO reserva_estados (reserva_id, estado)
+			VALUES ('00000000-0000-0000-0000-000000000050', 'cancelada')
+		`)
+		assertCheckViolation(t, err)
+
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO reservas (
+				id, lote_id, cliente_id, vendedor_id, usuario_alta,
+				fecha_vencimiento, idempotency_key, idempotency_payload_hash
+			) VALUES (
+				'00000000-0000-0000-0000-000000000051',
+				'00000000-0000-0000-0000-000000000014',
+				'00000000-0000-0000-0000-000000000020',
+				'00000000-0000-0000-0000-000000000001',
+				'00000000-0000-0000-0000-000000000001',
+				now() + interval '15 days', 'reservation-key',
+				repeat('1', 64)
+			)
+		`)
+		assertUniqueViolation(t, err)
+
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO reserva_estados (reserva_id, estado)
+			VALUES ('00000000-0000-0000-0000-000000000030', 'cancelada')
+		`)
+		assertCheckViolation(t, err)
+	})
+
 	t.Run("keeps history append only", func(t *testing.T) {
 		_, err := db.ExecContext(ctx, `
 			UPDATE reserva_estados
@@ -469,6 +524,18 @@ func assertForeignKeyViolation(t *testing.T, err error) {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "23503" {
 		t.Fatalf("operation error = %v, want SQLSTATE 23503", err)
+	}
+}
+
+func assertUniqueViolation(t *testing.T, err error) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("operation succeeded, want unique violation")
+	}
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+		t.Fatalf("operation error = %v, want SQLSTATE 23505", err)
 	}
 }
 

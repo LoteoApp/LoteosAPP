@@ -45,6 +45,7 @@ describe('planFromLoteoDetail', () => {
     ])
     expect(polygons.every((polygon) => polygon.vertices.length === 3)).toBe(true)
     expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.caption).toBe('1')
+    expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.lotState).toBe('disponible')
     expect(polygons.find((polygon) => polygon.layer === 'MANZANA')?.caption).toBe('1')
     expect(polygons.find((polygon) => polygon.layer === 'CALLE')?.caption).toBe('Los Álamos')
   })

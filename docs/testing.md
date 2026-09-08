@@ -115,6 +115,7 @@ doppler run -- pnpm test:backend
 | --- | --- | --- |
 | `postgres.TestUserRepository` | `DATABASE_URL` | SQL real contra la base de Supabase con las migraciones aplicadas. |
 | `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote/manzana/calle, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS y que exista un solo archivo DXF activo. |
+| `postgres.TestReservationRepository` | `DATABASE_URL` | Alta, alcance, idempotencia, cancelación y vencimiento de reservas contra PostgreSQL real, incluyendo la consistencia con el estado e historial del lote. |
 | `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
 
 Los dos tests de PostgreSQL borran lo que crearon. El test de R2 escribe en el
@@ -127,6 +128,12 @@ compare-and-set concurrentes sobre el mismo lote. La suite
 `migrate.TestEntityModelStateHistory` aplica las migraciones en un schema
 descartable y verifica el backfill, los triggers, la justificación obligatoria
 y que el historial del lote sea append-only.
+
+La suite del worker usa un proceso falso y contextos con deadline para verificar
+la ejecución inmediata, el lote configurado, los fallos y el apagado sin sleeps
+de duración comercial. Las pruebas de reservas de PostgreSQL deben ejecutarse
+con las migraciones aplicadas y no se consideran realizadas cuando falta
+`DATABASE_URL`.
 
 ## Prueba manual del alta de loteo
 
