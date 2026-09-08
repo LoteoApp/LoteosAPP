@@ -44,7 +44,9 @@ func NewReservationRepository(pool *pgxpool.Pool, clocks ...reservationClock) *R
 }
 
 func (repository *ReservationRepository) Create(ctx context.Context, command gateway.CreateReservationCommand) (domain.Reservation, error) {
-	reservation, err := repository.create(ctx, command)
+	reservation, err := retryReservationCreate(ctx, func() (domain.Reservation, error) {
+		return repository.create(ctx, command)
+	})
 	if err == nil || !errors.Is(err, errRetryReservationWrite) {
 		return reservation, err
 	}
@@ -52,6 +54,19 @@ func (repository *ReservationRepository) Create(ctx context.Context, command gat
 }
 
 var errRetryReservationWrite = errors.New("retry reservation write")
+
+func retryReservationCreate(ctx context.Context, create func() (domain.Reservation, error)) (domain.Reservation, error) {
+	for attempt := 0; attempt < reservationRetryCount; attempt++ {
+		reservation, err := create()
+		if err == nil || errors.Is(err, errRetryReservationWrite) || !isTransientDBError(err) || attempt == reservationRetryCount-1 {
+			return reservation, err
+		}
+		if err := waitForReservationRetry(ctx, attempt); err != nil {
+			return domain.Reservation{}, err
+		}
+	}
+	return domain.Reservation{}, nil
+}
 
 func (repository *ReservationRepository) create(ctx context.Context, command gateway.CreateReservationCommand) (domain.Reservation, error) {
 	tx, err := repository.pool.Begin(ctx)
@@ -190,7 +205,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 	} else if !errors.Is(activeErr, pgx.ErrNoRows) {
 		return domain.Reservation{}, activeErr
 	}
-	if lotNumber == "" || lotPrice == nil {
+	if lotNumber == "" || lotPrice == nil || *lotPrice <= 0 {
 		return domain.Reservation{}, domain.ErrReservationLotIncomplete
 	}
 	if lotState != domain.LotStateAvailable {
@@ -569,13 +584,8 @@ func (repository *ReservationRepository) expireWithRetry(ctx context.Context, id
 		if err == nil || !isTransientDBError(err) || attempt == reservationRetryCount-1 {
 			return processed, err
 		}
-		backoff := time.Duration(20*(1<<attempt)+rand.Intn(20)) * time.Millisecond
-		timer := time.NewTimer(backoff)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return false, ctx.Err()
-		case <-timer.C:
+		if err := waitForReservationRetry(ctx, attempt); err != nil {
+			return false, err
 		}
 	}
 	return false, nil
@@ -623,7 +633,7 @@ func (repository *ReservationRepository) expireOne(ctx context.Context, id strin
 		return false, nil
 	}
 	if !lotExists || lotDeleted != nil {
-		if err := expireDetachedReservationTx(ctx, tx, id); err != nil {
+		if err := expireReservationWithoutLotTransitionTx(ctx, tx, id, "La reserva venció automáticamente; el lote ya no está activo"); err != nil {
 			return false, err
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -650,7 +660,13 @@ func (repository *ReservationRepository) expireOne(ctx context.Context, id strin
 		return false, nil
 	}
 	if lotState != domain.LotStateReserved {
-		return false, domain.ErrReservationLotUnavailable
+		if err := expireReservationWithoutLotTransitionTx(ctx, tx, id, "La reserva venció automáticamente; el lote ya no estaba reservado"); err != nil {
+			return false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	if err := expireReservationTx(ctx, tx, loteoID, lotID, id, effectiveNow); err != nil {
 		return false, err
@@ -695,12 +711,24 @@ func expireReservationTx(ctx context.Context, tx pgx.Tx, loteoID, lotID, reserva
 	return err
 }
 
-func expireDetachedReservationTx(ctx context.Context, tx pgx.Tx, reservationID string) error {
+func expireReservationWithoutLotTransitionTx(ctx context.Context, tx pgx.Tx, reservationID, reason string) error {
 	_, err := tx.Exec(ctx, `
 		INSERT INTO reserva_estados (reserva_id, estado, razon)
 		VALUES ($1::uuid, 'vencida', $2)
-	`, reservationID, "La reserva venció automáticamente; el lote ya no está activo")
+	`, reservationID, reason)
 	return mapReservationWriteError(err)
+}
+
+func waitForReservationRetry(ctx context.Context, attempt int) error {
+	backoff := time.Duration(20*(1<<attempt)+rand.Intn(20)) * time.Millisecond
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 const reservationColumns = `

@@ -11,12 +11,11 @@ import (
 )
 
 const (
-	usersTimeout             = 5 * time.Second
-	clientsTimeout           = 5 * time.Second
-	agenciesTimeout          = 5 * time.Second
-	lotesTimeout             = 10 * time.Second
-	reservationsReadTimeout  = 15 * time.Second
-	reservationsWriteTimeout = 15 * time.Second
+	usersTimeout        = 5 * time.Second
+	clientsTimeout      = 5 * time.Second
+	agenciesTimeout     = 5 * time.Second
+	lotesTimeout        = 10 * time.Second
+	reservationsTimeout = 15 * time.Second
 
 	// Reading a loteo runs several queries (loteo, manzanas, lotes, calles),
 	// so it gets more room than a request that touches one row.
@@ -102,9 +101,9 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/manzanas/{manzanaId}", protected(handler.Adapt(handlers.UpdateManzana, lotesTimeout)))
 	mux.Handle("PATCH /api/v1/loteos/{loteoId}/calles/{calleId}", protected(handler.Adapt(handlers.UpdateCalle, lotesTimeout)))
 
-	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", protected(handler.Adapt(handlers.CreateReservationHandler, reservationsWriteTimeout)))
-	mux.Handle("GET /api/v1/reservas", protected(handler.Adapt(handlers.ListReservationsHandler, reservationsReadTimeout)))
-	mux.Handle("GET /api/v1/reservas/{id}", protected(handler.Adapt(handlers.GetReservationHandler, reservationsReadTimeout)))
-	mux.Handle("POST /api/v1/reservas/{id}/cancelar", protected(handler.Adapt(handlers.CancelReservationHandler, reservationsWriteTimeout)))
-	mux.Handle("GET /api/v1/loteos/{loteoId}/vendedores", protected(handler.Adapt(handlers.ListEligibleSellersHandler, reservationsReadTimeout)))
+	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", protected(handler.Adapt(handlers.CreateReservationHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/reservas", protected(handler.Adapt(handlers.ListReservationsHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/reservas/{id}", protected(handler.Adapt(handlers.GetReservationHandler, reservationsTimeout)))
+	mux.Handle("POST /api/v1/reservas/{id}/cancelar", protected(handler.Adapt(handlers.CancelReservationHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/loteos/{loteoId}/vendedores", protected(handler.Adapt(handlers.ListEligibleSellersHandler, reservationsTimeout)))
 }

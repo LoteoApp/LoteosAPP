@@ -45,6 +45,40 @@ describe('reservation hooks', () => {
 		await waitFor(() => expect(listReservationsMock).toHaveBeenCalledTimes(2))
 	})
 
+	it('keeps the previous page while a new query loads', async () => {
+		const loadedPage = { ...page, reservas: [created], total: 1, paginas: 1 }
+		let resolveNext: ((value: typeof page) => void) | undefined
+		listReservationsMock
+			.mockResolvedValueOnce(loadedPage)
+			.mockImplementationOnce(() => new Promise((resolve) => { resolveNext = resolve }))
+		const { result, rerender } = renderHook(({ search }) => useReservations('token', { q: search }), {
+			initialProps: { search: 'old' },
+		})
+		await waitFor(() => expect(result.current.page).toEqual(loadedPage))
+
+		rerender({ search: 'new' })
+		await waitFor(() => expect(result.current.isLoading).toBe(true))
+		expect(result.current.page).toEqual(loadedPage)
+
+		resolveNext?.(page)
+		await waitFor(() => expect(result.current.isLoading).toBe(false))
+	})
+
+	it('debounces search changes before requesting reservations', async () => {
+		listReservationsMock.mockResolvedValue(page)
+		const { rerender } = renderHook(({ search }) => useReservations('token', { q: search }), {
+			initialProps: { search: '' },
+		})
+		await waitFor(() => expect(listReservationsMock).toHaveBeenCalledTimes(1))
+
+		rerender({ search: 'A' })
+		rerender({ search: 'An' })
+		rerender({ search: 'Ana' })
+		expect(listReservationsMock).toHaveBeenCalledTimes(1)
+		await waitFor(() => expect(listReservationsMock).toHaveBeenCalledTimes(2))
+		expect(listReservationsMock).toHaveBeenLastCalledWith('token', { q: 'Ana' }, expect.any(AbortSignal))
+	})
+
 	it('prepends a created reservation without reloading the list', async () => {
 		listReservationsMock.mockResolvedValue(page)
 		const { result } = renderHook(() => useReservations('token', {}))

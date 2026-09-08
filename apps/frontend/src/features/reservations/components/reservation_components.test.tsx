@@ -64,9 +64,9 @@ describe('reservation components', () => {
 		const onStateChange = vi.fn()
 		render(<ReservationFilters search="Ana" state="" onSearchChange={onSearchChange} onStateChange={onStateChange} />)
 		await user.type(screen.getByRole('searchbox', { name: 'Buscar' }), ' Pérez')
-	await user.click(screen.getByRole('combobox', { name: 'Estado' }))
-	await user.click(screen.getByRole('option', { name: 'Canceladas' }))
 		expect(onSearchChange).toHaveBeenCalled()
+		await user.click(screen.getByRole('combobox', { name: 'Estado' }))
+		await user.click(screen.getByRole('option', { name: 'Canceladas' }))
 		expect(onStateChange).toHaveBeenCalledWith('cancelada')
 	})
 

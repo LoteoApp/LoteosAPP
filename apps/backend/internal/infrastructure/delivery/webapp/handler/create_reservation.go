@@ -34,6 +34,6 @@ func (handler *CreateReservationHandler) Handle(w http.ResponseWriter, request *
 	if err != nil {
 		return err
 	}
-	response.WriteJSON(w, http.StatusCreated, dto.ReservationResponse{Reservation: reservation})
+	response.WriteJSON(w, http.StatusCreated, reservation)
 	return nil
 }

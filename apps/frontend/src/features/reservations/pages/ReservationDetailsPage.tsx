@@ -18,13 +18,14 @@ export default function ReservationDetailsPage({ accessToken = '' }: Reservation
   const [error, setError] = useState<string | null>(null)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const mutations = useReservationMutations(token)
+  const queryEnabled = token !== ''
   const latestRequestRef = useRef({ id, token })
   const requestKey = JSON.stringify([id, token])
   const [loadedKey, setLoadedKey] = useState(requestKey)
   if (requestKey !== loadedKey) {
     setLoadedKey(requestKey)
     setReservation(null)
-    setIsLoading(true)
+    setIsLoading(queryEnabled)
     setError(null)
     setIsCancelDialogOpen(false)
   }
@@ -34,13 +35,14 @@ export default function ReservationDetailsPage({ accessToken = '' }: Reservation
   }, [id, token])
 
   useEffect(() => {
+    if (!queryEnabled) return
     const controller = new AbortController()
     getReservation(token, id, controller.signal)
       .then((loaded) => { if (!controller.signal.aborted) { setReservation(loaded); setError(null) } })
       .catch((loadError: unknown) => { if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la reserva.') })
       .finally(() => { if (!controller.signal.aborted) setIsLoading(false) })
     return () => controller.abort()
-  }, [id, token])
+  }, [id, queryEnabled, token])
 
   async function handleCancel(reason: string) {
     if (!reservation) return false
@@ -62,16 +64,16 @@ export default function ReservationDetailsPage({ accessToken = '' }: Reservation
   return (
     <section className="flex flex-col gap-4">
       <Link to="/reservas" className="w-fit text-sm text-muted-foreground hover:text-foreground">Volver a reservas</Link>
-      {isLoading && <p className="text-muted-foreground">Cargando reserva…</p>}
-      {error && <Alert variant="destructive"><AlertTitle>No se pudo cargar la reserva</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-      {!isLoading && !error && reservation && <>
+      {queryEnabled && isLoading && <p className="text-muted-foreground">Cargando reserva…</p>}
+      {queryEnabled && error && <Alert variant="destructive"><AlertTitle>No se pudo cargar la reserva</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+      {queryEnabled && !isLoading && !error && reservation && <>
         <ReservationDetails reservation={reservation} />
         {reservation.estado === 'activa' && <>
           <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>
           {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
         </>}
       </>}
-      {!isLoading && !error && !reservation && <Button render={<Link to="/reservas" />}>Volver a reservas</Button>}
+      {queryEnabled && !isLoading && !error && !reservation && <Button render={<Link to="/reservas" />}>Volver a reservas</Button>}
     </section>
   )
 }

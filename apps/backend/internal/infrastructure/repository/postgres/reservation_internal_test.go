@@ -49,6 +49,34 @@ func TestReservationErrorHelpers(t *testing.T) {
 	}
 }
 
+func TestRetryReservationCreate(t *testing.T) {
+	t.Run("retries transient database errors", func(t *testing.T) {
+		attempts := 0
+		reservation, err := retryReservationCreate(context.Background(), func() (domain.Reservation, error) {
+			attempts++
+			if attempts < reservationRetryCount {
+				return domain.Reservation{}, &pgconn.PgError{Code: "40P01"}
+			}
+			return domain.Reservation{ID: "reservation-1"}, nil
+		})
+		if err != nil || reservation.ID != "reservation-1" || attempts != reservationRetryCount {
+			t.Fatalf("retryReservationCreate() = (%#v, %v) after %d attempts", reservation, err, attempts)
+		}
+	})
+
+	t.Run("does not retry permanent errors", func(t *testing.T) {
+		attempts := 0
+		permanent := errors.New("permanent")
+		_, err := retryReservationCreate(context.Background(), func() (domain.Reservation, error) {
+			attempts++
+			return domain.Reservation{}, permanent
+		})
+		if !errors.Is(err, permanent) || attempts != 1 {
+			t.Fatalf("retryReservationCreate() error = %v after %d attempts", err, attempts)
+		}
+	})
+}
+
 func TestRepositoryErrorMappings(t *testing.T) {
 	t.Parallel()
 	nonConstraint := errors.New("database failure")

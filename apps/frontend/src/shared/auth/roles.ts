@@ -10,6 +10,8 @@ export const ROLE = {
 
 export type DomainRole = (typeof ROLE)[keyof typeof ROLE]
 
+export const RESERVATION_ROLES = [ROLE.administrador, ROLE.administrativo, ROLE.inmobiliaria] as const
+
 type RoleSource = {
   app_metadata?: { role?: string | null; [key: string]: unknown } | null
 }

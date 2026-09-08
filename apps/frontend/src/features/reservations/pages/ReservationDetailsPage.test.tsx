@@ -31,7 +31,7 @@ function renderPage(path = '/reservas/reservation-1') {
 	render(
 		<MemoryRouter initialEntries={[path]}>
 			<Routes>
-				<Route path="/reservas/:id" element={<ReservationDetailsPage />} />
+				<Route path="/reservas/:id" element={<ReservationDetailsPage accessToken="token" />} />
 			</Routes>
 		</MemoryRouter>,
 	)
@@ -47,6 +47,16 @@ afterEach(() => {
 })
 
 describe('ReservationDetailsPage', () => {
+	it('does not request details before the session token is available', async () => {
+		render(
+			<MemoryRouter initialEntries={['/reservas/reservation-1']}>
+				<Routes><Route path="/reservas/:id" element={<ReservationDetailsPage />} /></Routes>
+			</MemoryRouter>,
+		)
+		await Promise.resolve()
+		expect(getReservationMock).not.toHaveBeenCalled()
+	})
+
 	it('loads an active reservation and refreshes it after cancellation', async () => {
 		const current = reservation()
 		getReservationMock.mockResolvedValue(current)
@@ -97,7 +107,7 @@ describe('ReservationDetailsPage', () => {
 		render(
 			<MemoryRouter initialEntries={['/reservas/reservation-1']}>
 				<Navigation />
-				<Routes><Route path="/reservas/:id" element={<ReservationDetailsPage />} /></Routes>
+				<Routes><Route path="/reservas/:id" element={<ReservationDetailsPage accessToken="token" />} /></Routes>
 			</MemoryRouter>,
 		)
 		await screen.findByText('Las Acacias')

@@ -19,6 +19,7 @@ export type UseReservationsOptions = {
 }
 
 const emptyPage: ReservationPage = { reservas: [], pagina: 1, porPagina: 25, total: 0, paginas: 0 }
+const SEARCH_DEBOUNCE_MS = 300
 
 function matchesFilters(reservation: Reservation, filters: ReservationListFilters): boolean {
   if (filters.pagina && filters.pagina !== 1) return false
@@ -47,14 +48,21 @@ export function useReservations(
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const search = filters.q?.trim() ?? ''
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const queryEnabled = enabled && token !== ''
-  const filterKey = JSON.stringify(filters)
+  const filterKey = JSON.stringify({ ...filters, q: debouncedSearch || undefined })
   const requestFilters = useMemo(() => JSON.parse(filterKey) as ReservationListFilters, [filterKey])
   const requestKey = JSON.stringify([token, filterKey, refreshKey, enabled])
   const [loadedKey, setLoadedKey] = useState(requestKey)
   if (requestKey !== loadedKey) {
     setLoadedKey(requestKey)
-    setPage(emptyPage)
     setIsLoading(queryEnabled)
     setError(null)
   }

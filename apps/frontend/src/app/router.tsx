@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router'
 import AppLayout from './AppLayout'
 import RequireAuth from '../features/auth/components/RequireAuth'
 import RequireRole from '../features/auth/components/RequireRole'
-import { ROLE } from '../shared/auth/roles'
+import { RESERVATION_ROLES, ROLE } from '../shared/auth/roles'
 import LoginPage from '../features/auth/pages/LoginPage'
 import LotsRoute from './LotsRoute'
 import LoteosRoute from './LoteosRoute'
@@ -53,11 +53,19 @@ export const router = createBrowserRouter([
       },
       {
         path: '/reservas',
-        element: <ReservationsRoute />,
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <ReservationsRoute />
+          </RequireRole>
+        ),
       },
       {
         path: '/reservas/:id',
-        element: <ReservationDetailsRoute />,
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <ReservationDetailsRoute />
+          </RequireRole>
+        ),
       },
       {
         path: '/ventas',

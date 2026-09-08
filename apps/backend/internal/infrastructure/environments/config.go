@@ -47,7 +47,10 @@ type Migration struct {
 // repository.
 func LoadServer() (Server, error) {
 	var env environment
-	worker, err := loadReservationExpiry(&env)
+	worker, err := loadReservationExpiry()
+	if err != nil {
+		return Server{}, err
+	}
 
 	cfg := Server{
 		DatabaseURL:            env.required("DATABASE_URL"),
@@ -64,9 +67,6 @@ func LoadServer() (Server, error) {
 		ReservationExpiry: worker,
 	}
 
-	if err != nil {
-		return Server{}, err
-	}
 	if err := env.err(); err != nil {
 		return Server{}, err
 	}
@@ -74,7 +74,7 @@ func LoadServer() (Server, error) {
 	return cfg, nil
 }
 
-func loadReservationExpiry(env *environment) (ReservationExpiry, error) {
+func loadReservationExpiry() (ReservationExpiry, error) {
 	enabled, err := strconv.ParseBool(envOrDefault("RESERVATION_EXPIRY_ENABLED", "true"))
 	if err != nil {
 		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_ENABLED must be true or false")

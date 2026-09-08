@@ -165,6 +165,17 @@ func TestReservationRepository(t *testing.T) {
 		t.Fatalf("Create() incomplete lot error = %v, want %v", err, domain.ErrReservationLotIncomplete)
 	}
 	if _, err := pool.Exec(context.Background(), `
+		UPDATE lotes SET numero = '1', precio = 0 WHERE id = $1::uuid
+	`, lotID); err != nil {
+		t.Fatalf("set zero lot price: %v", err)
+	}
+	zeroPriceCommand := command
+	zeroPriceCommand.IdempotencyKey = "reservation-zero-price-" + newUUID(t)
+	zeroPriceCommand.IdempotencyPayloadHash = strings.Repeat("e", 64)
+	if _, err := repository.Create(context.Background(), zeroPriceCommand); !errors.Is(err, domain.ErrReservationLotIncomplete) {
+		t.Fatalf("Create() zero price error = %v, want %v", err, domain.ErrReservationLotIncomplete)
+	}
+	if _, err := pool.Exec(context.Background(), `
 		UPDATE lotes SET numero = '1', precio = 100000 WHERE id = $1::uuid
 	`, lotID); err != nil {
 		t.Fatalf("restore lot commercial data: %v", err)
@@ -311,6 +322,53 @@ func TestReservationExpiryRegularizesDeletedLot(t *testing.T) {
 	}
 	if state != string(domain.ReservationStateExpired) {
 		t.Fatalf("detached state = %q", state)
+	}
+}
+
+func TestReservationExpiryRegularizesLotOutsideReservedState(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set, skipping postgres integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	repository := postgres.NewReservationRepository(pool, clock)
+	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
+		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID,
+		IdempotencyKey: "reservation-state-drift-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("7", 64),
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO lote_estados (lote_id, estado, origen, razon)
+		VALUES ($1::uuid, 'disponible', 'sistema', 'Simulación de desincronización')
+	`, lotID); err != nil {
+		t.Fatalf("move lot outside reserved state: %v", err)
+	}
+
+	clock.now = now
+	report, err := repository.ExpireDue(context.Background(), now, 1)
+	if err != nil {
+		t.Fatalf("ExpireDue() error = %v", err)
+	}
+	if report.Processed != 1 || report.Skipped != 0 || len(report.Failures) != 0 {
+		t.Fatalf("expiration report = %#v", report)
+	}
+	var state string
+	if err := pool.QueryRow(context.Background(), `SELECT estado_actual FROM reservas WHERE id = $1::uuid`, reservation.ID).Scan(&state); err != nil {
+		t.Fatalf("read regularized reservation: %v", err)
+	}
+	if state != string(domain.ReservationStateExpired) {
+		t.Fatalf("regularized reservation state = %q", state)
 	}
 }
 

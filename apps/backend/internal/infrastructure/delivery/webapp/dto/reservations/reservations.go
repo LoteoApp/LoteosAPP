@@ -14,7 +14,3 @@ type CancelReservationRequest struct {
 type SellersResponse struct {
 	Vendedores []domain.SellerOption `json:"vendedores"`
 }
-
-type ReservationResponse struct {
-	domain.Reservation
-}

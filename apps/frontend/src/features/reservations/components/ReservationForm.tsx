@@ -4,6 +4,7 @@ import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
+import { newIdempotencyKey } from '../lib/idempotencyKey'
 import type { ReservationClient, ReservationDraft, ReservationLot, ReservationLoteoOption, SellerOption } from '../types'
 
 type Props = {
@@ -51,7 +52,7 @@ export default function ReservationForm({
 }: Props) {
   const [localClienteId, setLocalClienteId] = useState('')
   const [localVendedorId, setLocalVendedorId] = useState('')
-  const [localIdempotencyKey, setLocalIdempotencyKey] = useState(() => `${Date.now()}-${Math.random()}`)
+  const [localIdempotencyKey, setLocalIdempotencyKey] = useState(newIdempotencyKey)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const selectedLote = lots.find((lot) => lot.id === selectedLoteId)
   const clienteId = draft?.clienteId ?? localClienteId
@@ -82,7 +83,7 @@ export default function ReservationForm({
       idempotencyKey ?? localIdempotencyKey,
     )
     if (completed) {
-      if (idempotencyKey === undefined) setLocalIdempotencyKey(`${Date.now()}-${Math.random()}`)
+      if (idempotencyKey === undefined) setLocalIdempotencyKey(newIdempotencyKey())
       setClienteId('')
       setVendedorId('')
       setFieldErrors({})
