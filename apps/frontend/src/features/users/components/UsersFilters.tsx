@@ -24,9 +24,9 @@ export default function UsersFilters({
   onEstadoFilterChange,
 }: UsersFiltersProps) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <SearchField
-        id="buscar-usuario"
+        id="user-search"
         placeholder="Nombre, apellido o correo"
         value={search}
         onChange={onSearchChange}

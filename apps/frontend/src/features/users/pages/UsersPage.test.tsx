@@ -478,7 +478,7 @@ describe('UsersPage', () => {
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
   })
 
-  it('filters the list by search text, matching nombre, apellido or email', async () => {
+  it('filters the list by search text, matching first name, last name or email', async () => {
     const user = userEvent.setup()
     stored = [
       usuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com' }),
@@ -510,20 +510,28 @@ describe('UsersPage', () => {
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
   })
 
-  it('combines the search text with the rol and estado filters', async () => {
+  it('combines the search text with the role and status filters', async () => {
     const user = userEvent.setup()
     stored = [
-      usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo' }),
-      usuario({ nombre: 'Ana', apellido: 'Gómez', rol: 'escribano' }),
+      usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo', fechaBaja: null }),
+      usuario({ nombre: 'Ana', apellido: 'Torres', rol: 'administrativo', fechaBaja: '2026-01-15T00:00:00Z' }),
+      usuario({ nombre: 'Ana', apellido: 'Gómez', rol: 'escribano', fechaBaja: null }),
     ]
     renderUsersPage()
     await screen.findAllByText(/^Ana /)
 
     await user.type(screen.getByLabelText('Buscar'), 'ana')
-    await selectOption(user, 'Rol', 'Escribano')
+    await selectOption(user, 'Rol', 'Administrativo')
 
-    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
-    expect(screen.getByText('Ana Gómez')).toBeInTheDocument()
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.getByText('Ana Torres')).toBeInTheDocument()
+    expect(screen.queryByText('Ana Gómez')).not.toBeInTheDocument()
+
+    await selectOption(user, 'Estado', 'Activos')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Ana Torres')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ana Gómez')).not.toBeInTheDocument()
   })
 
   it('shows a message when the filters have no matches', async () => {

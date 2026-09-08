@@ -22,9 +22,9 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
 }
 
-function matchesSearch(usuario: Usuario, search: string): boolean {
-  const nombreCompleto = normalizeText(`${usuario.nombre} ${usuario.apellido}`)
-  return nombreCompleto.includes(search) || normalizeText(usuario.email).includes(search)
+function matchesSearch(user: Usuario, search: string): boolean {
+  const fullName = normalizeText(`${user.nombre} ${user.apellido}`)
+  return fullName.includes(search) || normalizeText(user.email).includes(search)
 }
 
 type UsersPageProps = {
