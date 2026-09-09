@@ -3,6 +3,7 @@ package environments_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"loteosapp/backend/internal/infrastructure/environments"
 )
@@ -55,6 +56,9 @@ func TestLoadServer(t *testing.T) {
 		if cfg.FrontendOrigin != "http://localhost:5173" {
 			t.Errorf("FrontendOrigin = %q, want %q", cfg.FrontendOrigin, "http://localhost:5173")
 		}
+		if !cfg.ReservationExpiry.Enabled || cfg.ReservationExpiry.Interval != time.Minute || cfg.ReservationExpiry.Batch != 50 || cfg.ReservationExpiry.Timeout != 10*time.Second {
+			t.Errorf("ReservationExpiry = %+v, want enabled defaults", cfg.ReservationExpiry)
+		}
 	})
 
 	t.Run("reads the storage settings", func(t *testing.T) {
@@ -81,6 +85,10 @@ func TestLoadServer(t *testing.T) {
 		t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/loteosapp")
 		t.Setenv("FRONTEND_ORIGIN", "https://app.loteosapp.com")
 		t.Setenv("PORT", "9090")
+		t.Setenv("RESERVATION_EXPIRY_ENABLED", "false")
+		t.Setenv("RESERVATION_EXPIRY_INTERVAL", "2m")
+		t.Setenv("RESERVATION_EXPIRY_BATCH", "12")
+		t.Setenv("RESERVATION_EXPIRY_TIMEOUT", "25s")
 
 		cfg, err := environments.LoadServer()
 		if err != nil {
@@ -96,7 +104,30 @@ func TestLoadServer(t *testing.T) {
 		if cfg.Port != "9090" {
 			t.Errorf("Port = %q, want %q", cfg.Port, "9090")
 		}
+		wantWorker := environments.ReservationExpiry{Enabled: false, Interval: 2 * time.Minute, Batch: 12, Timeout: 25 * time.Second}
+		if cfg.ReservationExpiry != wantWorker {
+			t.Errorf("ReservationExpiry = %+v, want %+v", cfg.ReservationExpiry, wantWorker)
+		}
 	})
+
+	for _, test := range []struct {
+		name  string
+		env   string
+		value string
+	}{
+		{name: "enabled", env: "RESERVATION_EXPIRY_ENABLED", value: "sometimes"},
+		{name: "interval", env: "RESERVATION_EXPIRY_INTERVAL", value: "0s"},
+		{name: "batch", env: "RESERVATION_EXPIRY_BATCH", value: "0"},
+		{name: "timeout", env: "RESERVATION_EXPIRY_TIMEOUT", value: "-1s"},
+	} {
+		t.Run("rejects invalid "+test.name, func(t *testing.T) {
+			setRequiredServerEnv(t)
+			t.Setenv(test.env, test.value)
+			if _, err := environments.LoadServer(); err == nil {
+				t.Fatalf("LoadServer() error = nil for %s=%q", test.env, test.value)
+			}
+		})
+	}
 
 	required := []string{
 		"DATABASE_URL",

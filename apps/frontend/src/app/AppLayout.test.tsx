@@ -239,4 +239,10 @@ describe('AppLayout', () => {
 
     expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
   })
+
+  it('hides reservations for roles that cannot use the reservation API', () => {
+    renderLayoutAt('/lotes', 'agrimensor')
+
+    expect(screen.queryByRole('link', { name: 'Reservas' })).not.toBeInTheDocument()
+  })
 })

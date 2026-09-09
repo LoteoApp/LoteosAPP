@@ -115,6 +115,31 @@ func transitionLotState(
 	if current != command.ExpectedState {
 		return domain.LotStateEvent{}, domain.ErrLotStateConflict
 	}
+	return insertLotStateEvent(ctx, tx, command, current, true)
+}
+
+func transitionLotStateWithLockedLot(
+	ctx context.Context,
+	tx pgx.Tx,
+	command domain.LotStateTransition,
+	current domain.LotState,
+) (domain.LotStateEvent, error) {
+	if err := command.Validate(); err != nil {
+		return domain.LotStateEvent{}, err
+	}
+	return insertLotStateEvent(ctx, tx, command, current, false)
+}
+
+func insertLotStateEvent(
+	ctx context.Context,
+	tx pgx.Tx,
+	command domain.LotStateTransition,
+	current domain.LotState,
+	verifyApplied bool,
+) (domain.LotStateEvent, error) {
+	if current != command.ExpectedState {
+		return domain.LotStateEvent{}, domain.ErrLotStateConflict
+	}
 
 	event := domain.LotStateEvent{
 		LotID:         command.LotID,
@@ -126,7 +151,7 @@ func transitionLotState(
 		ReservationID: command.ReservationID,
 		SaleID:        command.SaleID,
 	}
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		INSERT INTO lote_estados (
 			lote_id, estado, origen, razon, usuario_modificacion,
 			reserva_id, venta_id
@@ -141,6 +166,10 @@ func transitionLotState(
 	).Scan(&event.ID, &event.OccurredAt)
 	if err != nil {
 		return domain.LotStateEvent{}, mapLotStateWriteError(err)
+	}
+
+	if !verifyApplied {
+		return event, nil
 	}
 
 	var applied domain.LotState

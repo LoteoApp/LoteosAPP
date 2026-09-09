@@ -1,10 +1,14 @@
+import { useState, type ReactNode } from 'react'
+import { Pencil } from 'lucide-react'
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '../../../shared/ui/card'
+import { Button } from '../../../shared/ui/button'
 import { formatArea } from '../../../shared/lib/formatArea'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import type { UpdateCallePayload } from '../api/update-calle'
@@ -32,6 +36,8 @@ type PlanSelectionPanelProps = {
   onSaveManzana: (manzanaId: string, payload: UpdateManzanaPayload) => Promise<boolean>
   calleUpdateState: UpdateCalleState
   onSaveCalle: (calleId: string, payload: UpdateCallePayload) => Promise<boolean>
+  renderReservationAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
+  renderReservationCancelAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
 }
 
 export default function PlanSelectionPanel({
@@ -46,8 +52,18 @@ export default function PlanSelectionPanel({
   onSaveManzana,
   calleUpdateState,
   onSaveCalle,
+  renderReservationAction,
+  renderReservationCancelAction,
 }: PlanSelectionPanelProps) {
   const title = titleFor(selected, loteo, polygonLabels, selectedPolygonId)
+  const selectedKey = selectionKey(selected)
+  const [trackedSelectionKey, setTrackedSelectionKey] = useState(selectedKey)
+  const [editingSelectionKey, setEditingSelectionKey] = useState<string | null>(null)
+
+  if (selectedKey !== trackedSelectionKey) {
+    setTrackedSelectionKey(selectedKey)
+    setEditingSelectionKey(null)
+  }
 
   if (selected === null || selected.kind === 'loteo') {
     return (
@@ -73,14 +89,39 @@ export default function PlanSelectionPanel({
       )
     }
 
+    const isEditing = canEdit && editingSelectionKey === selectedKey
+    const showEditAction = canEdit && !isEditing
+
     return (
-      <Card size="sm">
+      <Card size="sm" className="overflow-visible">
         <CardHeader>
           <CardTitle>{title}</CardTitle>
-          <CardDescription>Número, precio, superficie y características.</CardDescription>
+          <CardDescription>
+            {isEditing
+              ? 'Número, precio, superficie y características.'
+              : 'Datos del lote. Habilitá la edición para modificarlo.'}
+          </CardDescription>
+          {(showEditAction || renderReservationAction || renderReservationCancelAction) && (
+            <CardAction>
+              <div className="flex flex-wrap justify-end gap-2">
+                {showEditAction && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingSelectionKey(selectedKey)}
+                  >
+                    <Pencil aria-hidden />
+                    Habilitar edición
+                  </Button>
+                )}
+                {renderReservationAction && lote.estado === 'disponible' && renderReservationAction(lote)}
+                {renderReservationCancelAction && lote.estado === 'reservado' && renderReservationCancelAction(lote)}
+              </div>
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
-          {canEdit ? (
+          {isEditing ? (
             <LoteEditForm
               lote={lote}
               updateState={updateState}
@@ -235,6 +276,16 @@ function CalleReadOnly({ calle }: { calle: LoteoDetail['calles'][number] }) {
       <ReadOnlyRow label="Tipo" value={calle.tipo} />
     </dl>
   )
+}
+
+function selectionKey(selected: PlanEntityRef | null): string {
+  if (selected === null) {
+    return ''
+  }
+  if (selected.kind === 'loteo') {
+    return 'loteo'
+  }
+  return `${selected.kind}:${selected.id}`
 }
 
 function loteCountOf(loteo: LoteoDetail, manzanaId: string): number {

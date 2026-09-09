@@ -25,13 +25,14 @@ type ApiFetchOptions = {
   body?: unknown
   token?: string | null
   signal?: AbortSignal
+  headers?: Record<string, string>
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
-  { method = 'GET', body, token, signal }: ApiFetchOptions = {},
+  { method = 'GET', body, token, signal, headers: extraHeaders }: ApiFetchOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { ...extraHeaders }
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }

@@ -83,6 +83,25 @@ Endpoints operativos del backend:
 - `DELETE /api/v1/inmobiliarias/{id}` (requiere rol `administrador`): da de
   baja lógica a la inmobiliaria (`inmobiliarias.fecha_baja`); la fila se
   conserva.
+- `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas` (requiere cuenta
+  activa con rol `administrador`, `administrativo` o `inmobiliaria`): crea una
+  reserva de 360 horas. Recibe `clienteId` y, para los roles administrativos,
+  `vendedorId`; exige el header `Idempotency-Key`.
+- `GET /api/v1/reservas` y `GET /api/v1/reservas/{id}`: listan o consultan
+  reservas dentro del alcance del actor. El listado admite `estado`,
+  `loteoId`, `q`, `pagina` y `porPagina`.
+- `POST /api/v1/reservas/{id}/cancelar`: cancela una reserva activa con el
+  body `{ "razon": "..." }`, si el actor tiene el alcance vigente.
+- `GET /api/v1/loteos/{loteoId}/vendedores`: devuelve el catálogo mínimo de
+  vendedores elegibles para ese loteo, sin otorgar acceso adicional al ABM de
+  usuarios.
+
+El backend ejecuta el vencimiento automático al iniciar y cada minuto. Se
+puede deshabilitar o ajustar sin recompilar mediante las variables
+`RESERVATION_EXPIRY_ENABLED`, `RESERVATION_EXPIRY_INTERVAL`,
+`RESERVATION_EXPIRY_BATCH` y `RESERVATION_EXPIRY_TIMEOUT`; los valores por
+defecto son `true`, `1m`, `50` y `10s`. El worker no extiende reservas: si se
+retrasa, la siguiente alta o ejecución regulariza los vencimientos pendientes.
 
 ### Content-Security-Policy del frontend
 
@@ -194,6 +213,10 @@ Compose usa estos valores por defecto:
 ```text
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
+RESERVATION_EXPIRY_ENABLED=true
+RESERVATION_EXPIRY_INTERVAL=1m
+RESERVATION_EXPIRY_BATCH=50
+RESERVATION_EXPIRY_TIMEOUT=10s
 ```
 
 `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_PORT` solo los usa

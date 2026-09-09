@@ -72,7 +72,8 @@ describe('PlanSelectionPanel', () => {
     expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
   })
 
-  it('shows the lote form for a selected lote', () => {
+  it('shows lote data before enabling edit mode', async () => {
+    const user = userEvent.setup()
     render(
       <PlanSelectionPanel
         selected={{ kind: 'lote', id: 'lt-1' }}
@@ -89,6 +90,11 @@ describe('PlanSelectionPanel', () => {
     )
 
     expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText('Número')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+
     expect(screen.getByLabelText('Número')).toHaveValue('7')
   })
 
@@ -217,6 +223,7 @@ describe('PlanSelectionPanel', () => {
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
     expect(onSave).toHaveBeenCalledWith(
       'lt-1',

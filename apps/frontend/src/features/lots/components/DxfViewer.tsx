@@ -31,6 +31,11 @@ const LAYER_PAINT: Record<DxfLayer, { fill: string; stroke: string }> = {
   CALLE: { fill: 'var(--chart-4)', stroke: 'var(--chart-4)' },
 }
 
+const RESERVED_LOT_PAINT = {
+  fill: 'var(--lot-reserved)',
+  stroke: 'var(--lot-reserved-foreground)',
+}
+
 const ZOOM_IN = 1 / 1.2
 const ZOOM_OUT = 1.2
 const DRAG_THRESHOLD_PX = 8
@@ -38,6 +43,8 @@ const SELECTED_FILL_OPACITY = 0.55
 const DEFAULT_FILL_OPACITY = 0.28
 const SELECTED_STROKE_WIDTH = 3
 const DEFAULT_STROKE_WIDTH = 1.5
+const RESERVED_FILL_OPACITY = 0.72
+const RESERVED_STROKE_WIDTH = 2
 
 type PointerPosition = { x: number; y: number }
 
@@ -109,6 +116,12 @@ export default function DxfViewer({
   }
 
   const hasGeometry = polygons.length > 0
+
+  function paintFor(polygon: DxfPolygon) {
+    return polygon.layer === 'LOTES' && polygon.lotState === 'reservado'
+      ? RESERVED_LOT_PAINT
+      : LAYER_PAINT[polygon.layer]
+  }
 
   useEffect(() => {
     const svg = svgRef.current
@@ -300,17 +313,18 @@ export default function DxfViewer({
         onClick={handleBackgroundClick}
       >
         {visiblePolygons.map((polygon) => {
-          const paint = LAYER_PAINT[polygon.layer]
+          const paint = paintFor(polygon)
           const selected = polygon.id === selectedPolygonId
+          const reserved = polygon.layer === 'LOTES' && polygon.lotState === 'reservado'
           const label = polygonLabels?.get(polygon.id) ?? DXF_LAYER_LABELS[polygon.layer]
           return (
             <g key={polygon.id} className="outline-none">
               <path
                 d={polygonPaths.get(polygon.id) ?? ''}
                 fill={paint.fill}
-                fillOpacity={selected ? SELECTED_FILL_OPACITY : DEFAULT_FILL_OPACITY}
+                fillOpacity={selected ? SELECTED_FILL_OPACITY : reserved ? RESERVED_FILL_OPACITY : DEFAULT_FILL_OPACITY}
                 stroke={paint.stroke}
-                strokeWidth={selected ? SELECTED_STROKE_WIDTH : DEFAULT_STROKE_WIDTH}
+                strokeWidth={selected ? SELECTED_STROKE_WIDTH : reserved ? RESERVED_STROKE_WIDTH : DEFAULT_STROKE_WIDTH}
                 vectorEffect="non-scaling-stroke"
                 className={
                   interactive

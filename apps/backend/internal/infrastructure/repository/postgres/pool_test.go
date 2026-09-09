@@ -72,3 +72,17 @@ func TestOpenPoolRejectsInvalidConnectionString(t *testing.T) {
 		t.Error("OpenPool() returned a pool alongside an error")
 	}
 }
+
+func TestOpenPoolClosesWhenPingFails(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	pool, err := OpenPool(ctx, "postgres://user:password@127.0.0.1:1/postgres?sslmode=disable")
+	if err == nil {
+		pool.Close()
+		t.Fatal("OpenPool() error = nil, want ping failure")
+	}
+	if pool != nil {
+		t.Error("OpenPool() returned a pool alongside a ping error")
+	}
+}

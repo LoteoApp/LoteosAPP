@@ -50,7 +50,7 @@ export function useLoteo(loteoId: string, token: string): UseLoteoResult {
   }
 
   useEffect(() => {
-    if (token === '') {
+    if (token === '' || loteoId === '') {
       return
     }
 

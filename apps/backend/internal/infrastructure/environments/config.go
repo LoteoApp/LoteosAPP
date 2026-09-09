@@ -3,7 +3,9 @@ package environments
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type Server struct {
@@ -13,6 +15,14 @@ type Server struct {
 	SupabaseURL            string
 	SupabaseServiceRoleKey string
 	Storage                Storage
+	ReservationExpiry      ReservationExpiry
+}
+
+type ReservationExpiry struct {
+	Enabled  bool
+	Interval time.Duration
+	Batch    int
+	Timeout  time.Duration
 }
 
 // Storage addresses the Cloudflare R2 bucket that holds uploaded files.
@@ -37,6 +47,10 @@ type Migration struct {
 // repository.
 func LoadServer() (Server, error) {
 	var env environment
+	worker, err := loadReservationExpiry()
+	if err != nil {
+		return Server{}, err
+	}
 
 	cfg := Server{
 		DatabaseURL:            env.required("DATABASE_URL"),
@@ -50,6 +64,7 @@ func LoadServer() (Server, error) {
 			AccessKeyID:     env.required("CLOUDFLARE_R2_ACCESS_KEY_ID"),
 			SecretAccessKey: env.required("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
 		},
+		ReservationExpiry: worker,
 	}
 
 	if err := env.err(); err != nil {
@@ -57,6 +72,26 @@ func LoadServer() (Server, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadReservationExpiry() (ReservationExpiry, error) {
+	enabled, err := strconv.ParseBool(envOrDefault("RESERVATION_EXPIRY_ENABLED", "true"))
+	if err != nil {
+		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_ENABLED must be true or false")
+	}
+	interval, err := time.ParseDuration(envOrDefault("RESERVATION_EXPIRY_INTERVAL", "1m"))
+	if err != nil || interval <= 0 {
+		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_INTERVAL must be a positive duration")
+	}
+	batch, err := strconv.Atoi(envOrDefault("RESERVATION_EXPIRY_BATCH", "50"))
+	if err != nil || batch < 1 {
+		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_BATCH must be a positive integer")
+	}
+	timeout, err := time.ParseDuration(envOrDefault("RESERVATION_EXPIRY_TIMEOUT", "10s"))
+	if err != nil || timeout <= 0 {
+		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_TIMEOUT must be a positive duration")
+	}
+	return ReservationExpiry{Enabled: enabled, Interval: interval, Batch: batch, Timeout: timeout}, nil
 }
 
 func LoadMigration() (Migration, error) {

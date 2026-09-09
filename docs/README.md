@@ -26,6 +26,8 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
 
 - [Máquina de estados del lote](plans/lote-state-machine.md): diseño e
   implementación del núcleo, concurrencia, migración y decisiones de la issue #54.
+- [Reservas de lotes](plans/reservations.md): circuito completo, decisiones
+  confirmadas, reutilización del motor de estados, frontend y tolerancia a fallos.
 
 ## Regla de mantenimiento
 

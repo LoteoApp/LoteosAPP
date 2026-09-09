@@ -172,15 +172,34 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 ## Reservas
 
 - Solo lotes individuales (no manzanas ni loteos completos).
-- Quién reserva: inmobiliaria, administrativo o administrador
-  (`usuario_alta`).
+- Quién reserva: usuario activo con rol `administrador`, `administrativo` o
+  `inmobiliaria` (`usuario_alta`). La inmobiliaria solo puede reservar en un
+  loteo asignado a su agencia y siempre queda como vendedor responsable.
 - Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
-  inmobiliaria, la agencia se lee de `usuarios.inmobiliaria_id`.
+  `inmobiliaria`, debe pertenecer a una agencia activa asignada al loteo.
+  Administrador y administrativo lo eligen desde el catálogo de vendedores
+  elegibles; no se amplía por eso su acceso al ABM de usuarios.
 - Estado vigente en `reservas.estado_actual`; las transiciones se registran
-  solo en `reserva_estados`. Solo una reserva `activa` por lote.
-- Duración: 15 días, sin costo, sin registro de pago.
-- Al vencer sin concretar venta, el lote vuelve a estar disponible
-  automáticamente.
+  solo en `reserva_estados`. Solo una reserva `activa` por lote. Los estados
+  `cancelada`, `vencida` y `convertida` son terminales para este circuito.
+- Duración: exactamente 360 horas desde el instante autoritativo del servidor,
+  sin costo, prórroga ni edición manual. Se persiste como `TIMESTAMPTZ` y se
+  muestra en `America/Argentina/Buenos_Aires`.
+- Crear reserva mueve el lote de `disponible` a `reservado`. Cancelar antes
+  del vencimiento, o vencerla, mueve el lote de `reservado` a `disponible` en
+  la misma transacción.
+- Cancelar exige una justificación y solo lo puede hacer el vendedor
+  responsable, otro usuario de la misma agencia con alcance vigente, un
+  administrativo o un administrador. Una repetición sobre una reserva ya
+  cancelada devuelve el resultado existente sin agregar otro evento.
+- La creación acepta una clave de idempotencia por actor: repetir la misma
+  clave y payload devuelve la misma reserva; reutilizarla con otro payload es
+  un conflicto.
+- El historial conserva sus referencias aunque usuarios o clientes sean
+  dados de baja. Las bajas impiden nuevas operaciones, pero no eliminan la
+  auditoría.
+- Un worker del backend regulariza reservas vencidas al iniciar y luego cada
+  minuto por defecto; un retraso del worker no extiende el plazo comercial.
 
 ## Venta
 
