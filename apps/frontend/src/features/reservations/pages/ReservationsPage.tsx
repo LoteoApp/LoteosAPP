@@ -5,6 +5,7 @@ import { Button } from '../../../shared/ui/button'
 import CancelReservationDialog from '../components/CancelReservationDialog'
 import ReservationFilters from '../components/ReservationFilters'
 import ReservationsList from '../components/ReservationsList'
+import ReservationsPagination from '../components/ReservationsPagination'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
 import { useReservations } from '../hooks/use-reservations'
 import type { ReservationState } from '../types'
@@ -58,21 +59,11 @@ export default function ReservationsPage({ accessToken = '' }: ReservationsPageP
         />
         {reservations.error && <Alert variant="destructive"><AlertDescription>{reservations.error}</AlertDescription></Alert>}
         {reservations.isLoading ? <p className="text-sm text-muted-foreground">Cargando reservas…</p> : <ReservationsList reservations={reservations.page.reservas} onCancel={(reservation) => { mutations.reset(); setCancelingId(reservation.id) }} />}
-        {reservations.page.paginas > 1 && (
-          <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Paginación de reservas">
-            <p className="text-sm text-muted-foreground">
-              Página {reservations.page.pagina} de {reservations.page.paginas} · {reservations.page.total} reservas
-            </p>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" disabled={reservations.page.pagina <= 1 || reservations.isLoading} onClick={() => setPageNumber((page) => Math.max(1, page - 1))}>
-                Anterior
-              </Button>
-              <Button type="button" variant="outline" disabled={reservations.page.pagina >= reservations.page.paginas || reservations.isLoading} onClick={() => setPageNumber((page) => Math.min(reservations.page.paginas, page + 1))}>
-                Siguiente
-              </Button>
-            </div>
-          </nav>
-        )}
+        <ReservationsPagination
+          page={reservations.page}
+          isLoading={reservations.isLoading}
+          onPageChange={setPageNumber}
+        />
       </section>
       {selectedReservation && <CancelReservationDialog reservation={selectedReservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
     </section>

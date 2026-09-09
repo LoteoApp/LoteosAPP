@@ -53,6 +53,60 @@ const labels = new Map([
 ])
 
 describe('PlanSelectionPanel', () => {
+  it('shows the price, the meta line and the reservation summary of a lote', () => {
+    const reserved = loteo({
+      lotes: [{
+        ...loteo().lotes[0],
+        estado: 'reservado',
+        precio: 150000,
+        moneda: 'USD',
+        superficie: 300,
+      }],
+      manzanas: [{ ...loteo().manzanas[0], calleIds: ['ca-1'] }],
+    })
+
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={reserved}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+        renderReservationSummary={() => <p>Reservado por Ana Pérez</p>}
+      />,
+    )
+
+    expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText(/150\.000/)).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1 · 300 m² · Los Álamos')).toBeInTheDocument()
+    expect(screen.getByText(/por m²/)).toBeInTheDocument()
+    expect(screen.getByText('Reservado por Ana Pérez')).toBeInTheDocument()
+  })
+
+  it('offers the sale action as coming soon', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Pasar a venta' })).toBeDisabled()
+  })
+
   it('prompts the user when nothing is selected', () => {
     render(
       <PlanSelectionPanel
@@ -90,7 +144,7 @@ describe('PlanSelectionPanel', () => {
     )
 
     expect(screen.getByText('Lote 7')).toBeInTheDocument()
-    expect(screen.getByText('Número')).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1')).toBeInTheDocument()
     expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
@@ -158,7 +212,9 @@ describe('PlanSelectionPanel', () => {
       />,
     )
 
-    expect(screen.getByText('Número')).toBeInTheDocument()
+    expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Habilitar edición' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument()
   })

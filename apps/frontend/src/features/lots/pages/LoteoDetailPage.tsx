@@ -3,9 +3,12 @@ import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { SaveNotice, useSaveNotice } from '../../../shared/ui/save-notice'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../shared/ui/tabs'
 import LoteoDetailHeader from '../components/LoteoDetailHeader'
 import LoteoPlanPanel from '../components/LoteoPlanPanel'
-import LotesTable from '../components/LotesTable'
+import LoteoSummaryPanel from '../components/LoteoSummaryPanel'
+import LotesList from '../components/LotesList'
+import LotesToolbar from '../components/LotesToolbar'
 import ManzanaFilter, { ALL_MANZANAS } from '../components/ManzanaFilter'
 import PlanSelectionPanel from '../components/PlanSelectionPanel'
 import { useLayerVisibility } from '../hooks/use-layer-visibility'
@@ -15,13 +18,25 @@ import { useUpdateCalle } from '../hooks/use-update-calle'
 import { useUpdateLote } from '../hooks/use-update-lote'
 import { useUpdateManzana } from '../hooks/use-update-manzana'
 import { planFromLoteoDetail, planLabelsFromLoteoDetail } from '../lib/planFromLoteoDetail'
-import type { LoteoDetail } from '../types'
+import { countLotesByState } from '../lib/lotStateVisuals'
+import type { LoteoDetail, LotState } from '../types'
+
+const SUMMARY_TAB = 'resumen'
+const LOTS_TAB = 'lotes'
+const RESERVATIONS_TAB = 'reservas'
 
 type LoteoDetailPageProps = {
   accessToken: string | null
   canEdit?: boolean
   renderReservationAction?: (lote: LoteoDetail['lotes'][number], onCreated: () => void) => ReactNode
-  renderReservationCancelAction?: (lote: LoteoDetail['lotes'][number], onCanceled: () => void) => ReactNode
+  renderReservations?: (
+    loteo: LoteoDetail,
+    onReservationCanceled: (loteId: string) => void,
+  ) => ReactNode
+  renderReservationSummary?: (
+    lote: LoteoDetail['lotes'][number],
+    onReservationCanceled: () => void,
+  ) => ReactNode
 }
 
 function BackLink() {
@@ -40,7 +55,8 @@ export default function LoteoDetailPage({
   accessToken,
   canEdit = false,
   renderReservationAction,
-  renderReservationCancelAction,
+  renderReservations,
+  renderReservationSummary,
 }: LoteoDetailPageProps) {
   const { loteoId = '' } = useParams()
   const { replaceLote, replaceManzana, replaceCalle, ...state } = useLoteo(
@@ -51,7 +67,10 @@ export default function LoteoDetailPage({
   const loteUpdate = useUpdateLote(accessToken)
   const manzanaUpdate = useUpdateManzana(accessToken)
   const calleUpdate = useUpdateCalle(accessToken)
+  const [search, setSearch] = useState('')
   const [manzanaFilter, setManzanaFilter] = useState(ALL_MANZANAS)
+  const [stateFilter, setStateFilter] = useState<ReadonlySet<LotState>>(new Set())
+  const [tab, setTab] = useState(SUMMARY_TAB)
   const reservationNotice = useSaveNotice()
   const reservationCancelNotice = useSaveNotice()
 
@@ -60,7 +79,10 @@ export default function LoteoDetailPage({
   const [trackedLoteoId, setTrackedLoteoId] = useState(loteoId)
   if (loteoId !== trackedLoteoId) {
     setTrackedLoteoId(loteoId)
+    setSearch('')
     setManzanaFilter(ALL_MANZANAS)
+    setStateFilter(new Set())
+    setTab(SUMMARY_TAB)
     layers.reset()
     loteUpdate.reset()
     manzanaUpdate.reset()
@@ -84,6 +106,9 @@ export default function LoteoDetailPage({
   const [trackedSelection, setTrackedSelection] = useState(selectedKey)
   if (selectedKey !== trackedSelection) {
     setTrackedSelection(selectedKey)
+    if (selectedKey !== '' && selectedKey !== 'loteo') {
+      setTab(LOTS_TAB)
+    }
     loteUpdate.reset()
     manzanaUpdate.reset()
     calleUpdate.reset()
@@ -92,12 +117,11 @@ export default function LoteoDetailPage({
     () => new Map((loteo?.manzanas ?? []).map((manzana) => [manzana.id, manzana.numero])),
     [loteo],
   )
-  const filteredLotes = useMemo(() => {
-    const lotes = loteo?.lotes ?? []
-    return manzanaFilter === ALL_MANZANAS
-      ? lotes
-      : lotes.filter((lote) => lote.manzanaId === manzanaFilter)
-  }, [loteo, manzanaFilter])
+  const stateCounts = useMemo(() => countLotesByState(loteo?.lotes ?? []), [loteo])
+  const filteredLotes = useMemo(
+    () => filterLotes(loteo?.lotes ?? [], search, stateFilter, manzanaFilter, manzanaNumberById),
+    [loteo, search, stateFilter, manzanaFilter, manzanaNumberById],
+  )
 
   function handleReservationCreated(lote: LoteoDetail['lotes'][number]) {
     replaceLote({ ...lote, estado: 'reservado' })
@@ -107,6 +131,13 @@ export default function LoteoDetailPage({
   function handleReservationCanceled(lote: LoteoDetail['lotes'][number]) {
     replaceLote({ ...lote, estado: 'disponible' })
     reservationCancelNotice.show()
+  }
+
+  function handleReservationCanceledForLote(loteId: string) {
+    const lote = loteo?.lotes.find((item) => item.id === loteId)
+    if (lote) {
+      handleReservationCanceled(lote)
+    }
   }
 
   if (state.status === 'loading') {
@@ -152,7 +183,7 @@ export default function LoteoDetailPage({
 
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <LoteoPlanPanel
-          className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100dvh-7rem)] lg:self-start"
+          className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100dvh-15rem)] lg:self-start"
           polygons={plan}
           visibleLayers={layers.visibleLayers}
           onVisibleLayersChange={layers.onVisibleLayersChange}
@@ -161,61 +192,140 @@ export default function LoteoDetailPage({
           polygonLabels={polygonLabels}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
-          <PlanSelectionPanel
-            canEdit={canEdit}
-            selected={selection.selected}
-            loteo={state.loteo}
-            polygonLabels={polygonLabels}
-            selectedPolygonId={selection.selectedPolygonId}
-            updateState={loteUpdate}
-            onSave={async (loteId, payload) => {
-              const updated = await loteUpdate.update(state.loteo.id, loteId, payload)
-              if (updated) {
-                replaceLote(updated)
+        <Tabs
+          value={tab}
+          onValueChange={(next) => setTab(String(next))}
+          className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-4 lg:h-[calc(100dvh-15rem)] lg:self-start"
+        >
+          <TabsList variant="line" className="h-auto! w-full justify-start gap-4 px-0">
+            <TabsTrigger value={SUMMARY_TAB} className="min-h-11 flex-none md:min-h-9">
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value={LOTS_TAB} className="min-h-11 flex-none md:min-h-9">
+              Lotes
+              <TabCount value={state.loteo.lotes.length} />
+            </TabsTrigger>
+            {renderReservations && (
+              <TabsTrigger value={RESERVATIONS_TAB} className="min-h-11 flex-none md:min-h-9">
+                Reservas
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          <TabsContent value={SUMMARY_TAB} className="min-h-0 overflow-y-auto">
+            <LoteoSummaryPanel loteo={state.loteo} />
+          </TabsContent>
+
+          <TabsContent value={LOTS_TAB} className="flex min-h-0 flex-col gap-3">
+            <ManzanaFilter
+              manzanas={state.loteo.manzanas}
+              value={manzanaFilter}
+              onChange={setManzanaFilter}
+            />
+            <LotesToolbar
+              search={search}
+              onSearchChange={setSearch}
+              states={stateFilter}
+              onStatesChange={setStateFilter}
+              counts={stateCounts}
+            />
+
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border p-1">
+              <LotesList
+                lotes={filteredLotes}
+                manzanaNumberById={manzanaNumberById}
+                selectedLoteId={selection.selected?.kind === 'lote' ? selection.selected.id : null}
+                onSelectLote={(loteId) => selection.selectEntity({ kind: 'lote', id: loteId })}
+              />
+            </div>
+
+            <PlanSelectionPanel
+              canEdit={canEdit}
+              selected={selection.selected}
+              loteo={state.loteo}
+              polygonLabels={polygonLabels}
+              selectedPolygonId={selection.selectedPolygonId}
+              updateState={loteUpdate}
+              onSave={async (loteId, payload) => {
+                const updated = await loteUpdate.update(state.loteo.id, loteId, payload)
+                if (updated) {
+                  replaceLote(updated)
+                }
+                return updated !== null
+              }}
+              manzanaUpdateState={manzanaUpdate}
+              onSaveManzana={async (manzanaId, payload) => {
+                const updated = await manzanaUpdate.update(state.loteo.id, manzanaId, payload)
+                if (updated) {
+                  replaceManzana(updated)
+                }
+                return updated !== null
+              }}
+              calleUpdateState={calleUpdate}
+              onSaveCalle={async (calleId, payload) => {
+                const updated = await calleUpdate.update(state.loteo.id, calleId, payload)
+                if (updated) {
+                  replaceCalle(updated)
+                }
+                return updated !== null
+              }}
+              renderReservationAction={
+                renderReservationAction
+                  ? (lote) => renderReservationAction(lote, () => handleReservationCreated(lote))
+                  : undefined
               }
-              return updated !== null
-            }}
-            manzanaUpdateState={manzanaUpdate}
-            onSaveManzana={async (manzanaId, payload) => {
-              const updated = await manzanaUpdate.update(state.loteo.id, manzanaId, payload)
-              if (updated) {
-                replaceManzana(updated)
+              renderReservationSummary={
+                renderReservationSummary
+                  ? (lote) => renderReservationSummary(lote, () => handleReservationCanceled(lote))
+                  : undefined
               }
-              return updated !== null
-            }}
-            calleUpdateState={calleUpdate}
-            onSaveCalle={async (calleId, payload) => {
-              const updated = await calleUpdate.update(state.loteo.id, calleId, payload)
-              if (updated) {
-                replaceCalle(updated)
-              }
-              return updated !== null
-            }}
-            renderReservationAction={
-              renderReservationAction
-                ? (lote) => renderReservationAction(lote, () => handleReservationCreated(lote))
-                : undefined
-            }
-            renderReservationCancelAction={
-              renderReservationCancelAction
-                ? (lote) => renderReservationCancelAction(lote, () => handleReservationCanceled(lote))
-                : undefined
-            }
-          />
-          <ManzanaFilter
-            manzanas={state.loteo.manzanas}
-            value={manzanaFilter}
-            onChange={setManzanaFilter}
-          />
-          <LotesTable
-            lotes={filteredLotes}
-            manzanaNumberById={manzanaNumberById}
-            selectedLoteId={selection.selected?.kind === 'lote' ? selection.selected.id : null}
-            onSelectLote={(loteId) => selection.selectEntity({ kind: 'lote', id: loteId })}
-          />
-        </div>
+            />
+          </TabsContent>
+
+          {renderReservations && (
+            <TabsContent value={RESERVATIONS_TAB} className="min-h-0 overflow-y-auto">
+              {renderReservations(state.loteo, handleReservationCanceledForLote)}
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </section>
   )
+}
+
+function TabCount({ value }: { value: number }) {
+  return (
+    <span
+      aria-hidden
+      className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground"
+    >
+      {value}
+    </span>
+  )
+}
+
+function filterLotes(
+  lotes: LoteoDetail['lotes'],
+  search: string,
+  states: ReadonlySet<LotState>,
+  manzanaId: string,
+  manzanaNumberById: ReadonlyMap<string, string>,
+): LoteoDetail['lotes'] {
+  const term = search.trim().toLocaleLowerCase()
+  return lotes.filter((lote) => {
+    if (manzanaId !== ALL_MANZANAS && lote.manzanaId !== manzanaId) {
+      return false
+    }
+    if (states.size > 0 && !states.has(lote.estado)) {
+      return false
+    }
+    if (term === '') {
+      return true
+    }
+    const manzana = manzanaNumberById.get(lote.manzanaId) ?? ''
+    return (
+      lote.numero.toLocaleLowerCase().includes(term) ||
+      manzana.toLocaleLowerCase().includes(term)
+    )
+  })
 }

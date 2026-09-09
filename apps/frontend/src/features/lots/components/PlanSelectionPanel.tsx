@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { Pencil } from 'lucide-react'
+import { BadgeDollarSign, Pencil } from 'lucide-react'
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -37,7 +36,7 @@ type PlanSelectionPanelProps = {
   calleUpdateState: UpdateCalleState
   onSaveCalle: (calleId: string, payload: UpdateCallePayload) => Promise<boolean>
   renderReservationAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
-  renderReservationCancelAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
+  renderReservationSummary?: (lote: LoteoDetail['lotes'][number]) => ReactNode
 }
 
 export default function PlanSelectionPanel({
@@ -53,7 +52,7 @@ export default function PlanSelectionPanel({
   calleUpdateState,
   onSaveCalle,
   renderReservationAction,
-  renderReservationCancelAction,
+  renderReservationSummary,
 }: PlanSelectionPanelProps) {
   const title = titleFor(selected, loteo, polygonLabels, selectedPolygonId)
   const selectedKey = selectionKey(selected)
@@ -95,32 +94,22 @@ export default function PlanSelectionPanel({
     return (
       <Card size="sm" className="overflow-visible">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>
-            {isEditing
-              ? 'Número, precio, superficie y características.'
-              : 'Datos del lote. Habilitá la edición para modificarlo.'}
+          <CardTitle className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="text-base font-semibold">{title}</span>
+            <span className="text-xl font-semibold tabular-nums md:text-2xl">
+              {lote.precio === null ? '—' : formatCurrency(lote.precio, lote.moneda)}
+            </span>
+          </CardTitle>
+          <CardDescription className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span>{loteMeta(lote, loteo)}</span>
+            {pricePerSquareMeter(lote) && (
+              <span className="tabular-nums">{pricePerSquareMeter(lote)}</span>
+            )}
           </CardDescription>
-          {(showEditAction || renderReservationAction || renderReservationCancelAction) && (
-            <CardAction>
-              <div className="flex flex-wrap justify-end gap-2">
-                {showEditAction && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingSelectionKey(selectedKey)}
-                  >
-                    <Pencil aria-hidden />
-                    Habilitar edición
-                  </Button>
-                )}
-                {renderReservationAction && lote.estado === 'disponible' && renderReservationAction(lote)}
-                {renderReservationCancelAction && lote.estado === 'reservado' && renderReservationCancelAction(lote)}
-              </div>
-            </CardAction>
-          )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
+          {renderReservationSummary?.(lote)}
+
           {isEditing ? (
             <LoteEditForm
               lote={lote}
@@ -128,7 +117,27 @@ export default function PlanSelectionPanel({
               onSave={(payload) => onSave(lote.id, payload)}
             />
           ) : (
-            <LoteReadOnly lote={lote} />
+            lote.caracteristicas && <p className="text-sm">{lote.caracteristicas}</p>
+          )}
+
+          {!isEditing && (
+            <div className="flex flex-wrap gap-2">
+              {renderReservationAction && lote.estado === 'disponible' && renderReservationAction(lote)}
+              <Button type="button" variant="outline" disabled title="Próximamente">
+                <BadgeDollarSign aria-hidden />
+                Pasar a venta
+              </Button>
+              {showEditAction && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingSelectionKey(selectedKey)}
+                >
+                  <Pencil aria-hidden />
+                  Habilitar edición
+                </Button>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -208,29 +217,34 @@ export default function PlanSelectionPanel({
   )
 }
 
+function loteMeta(lote: LoteoDetail['lotes'][number], loteo: LoteoDetail): string {
+  const manzana = loteo.manzanas.find((item) => item.id === lote.manzanaId)
+  const calles = (manzana?.calleIds ?? [])
+    .map((id) => loteo.calles.find((calle) => calle.id === id)?.nombre)
+    .filter((nombre): nombre is string => Boolean(nombre))
+
+  return [
+    manzana?.numero ? `Manzana ${manzana.numero}` : null,
+    lote.superficie === null ? null : formatArea(lote.superficie),
+    ...calles,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ')
+}
+
+function pricePerSquareMeter(lote: LoteoDetail['lotes'][number]): string | null {
+  if (lote.precio === null || lote.superficie === null || lote.superficie === 0) {
+    return null
+  }
+  return `${formatCurrency(lote.precio / lote.superficie, lote.moneda)} por m²`
+}
+
 function ReadOnlyRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-border/60 pb-2 last:border-b-0 last:pb-0">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="text-sm">{value || '—'}</dd>
     </div>
-  )
-}
-
-function LoteReadOnly({ lote }: { lote: LoteoDetail['lotes'][number] }) {
-  return (
-    <dl className="grid gap-3 sm:grid-cols-2">
-      <ReadOnlyRow label="Número" value={lote.numero} />
-      <ReadOnlyRow
-        label="Precio"
-        value={lote.precio === null ? '—' : formatCurrency(lote.precio, lote.moneda)}
-      />
-      <ReadOnlyRow
-        label="Superficie"
-        value={lote.superficie === null ? '—' : formatArea(lote.superficie)}
-      />
-      <ReadOnlyRow label="Características" value={lote.caracteristicas} />
-    </dl>
   )
 }
 
