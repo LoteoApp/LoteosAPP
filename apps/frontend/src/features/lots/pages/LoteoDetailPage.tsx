@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { SaveNotice, useSaveNotice } from '../../../shared/ui/save-notice'
+import ArchivosSection from '../components/ArchivosSection'
 import LoteoDetailHeader from '../components/LoteoDetailHeader'
 import LoteoPlanPanel from '../components/LoteoPlanPanel'
 import LotesTable from '../components/LotesTable'
@@ -150,6 +152,24 @@ export default function LoteoDetailPage({
       <SaveNotice token={reservationNotice.token}>Reserva creada</SaveNotice>
       <SaveNotice token={reservationCancelNotice.token}>Reserva cancelada</SaveNotice>
 
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Fotos y documentos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Remounted per loteo: React Router keeps this page mounted across
+              a param change, so a pending upload/delete from the previous
+              loteo must never land on this one once it resolves. */}
+          <ArchivosSection
+            key={state.loteo.id}
+            target={{ kind: 'loteo', loteoId: state.loteo.id }}
+            accessToken={accessToken}
+            canEdit={canEdit}
+            showLabel={false}
+          />
+        </CardContent>
+      </Card>
+
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <LoteoPlanPanel
           className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100dvh-7rem)] lg:self-start"
@@ -164,6 +184,7 @@ export default function LoteoDetailPage({
         <div className="flex min-h-0 min-w-0 flex-col gap-3">
           <PlanSelectionPanel
             canEdit={canEdit}
+            accessToken={accessToken}
             selected={selection.selected}
             loteo={state.loteo}
             polygonLabels={polygonLabels}

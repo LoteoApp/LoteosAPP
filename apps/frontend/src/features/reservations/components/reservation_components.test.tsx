@@ -66,7 +66,7 @@ describe('reservation components', () => {
 		await user.type(screen.getByRole('searchbox', { name: 'Buscar' }), ' Pérez')
 		expect(onSearchChange).toHaveBeenCalled()
 		await user.click(screen.getByRole('combobox', { name: 'Estado' }))
-		await user.click(screen.getByRole('option', { name: 'Canceladas' }))
+		await user.click(await screen.findByRole('option', { name: 'Canceladas' }))
 		expect(onStateChange).toHaveBeenCalledWith('cancelada')
 	})
 
@@ -125,9 +125,9 @@ describe('reservation components', () => {
 		expect(screen.getByText('Seleccioná un cliente.')).not.toBeNull()
 
 	await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
-	await user.click(screen.getByRole('option', { name: /Pérez, Ana/ }))
+	await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
 	await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
-	await user.click(screen.getByRole('option', { name: /Gómez, Beto/ }))
+	await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
 		await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
 		expect(onSubmit).toHaveBeenCalledWith({ loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1' }, expect.any(String))
 	})

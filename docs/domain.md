@@ -114,7 +114,7 @@ quien asigna loteos y permisos.
 |---|---|---|
 | **Administrador** | Control total: crea usuarios, asigna permisos y loteos, gestiona ventas, cobranzas, edición/eliminación de lotes | — |
 | **Administrativo** | Visualizar información, editar ciertos datos (configurable, ver [Roles y permisos](#gestión-de-roles-y-permisos)), cargar ventas | Crear usuarios, asignar permisos, vender por sí mismo sin definición del admin, editar/eliminar lotes |
-| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes/calles en loteos asignados; editar loteos/manzanas/lotes/calles | Operar loteos no asignados |
+| **Agrimensor** | Cargar DXF; cargar fotos y planos del loteo o de un lote (no de una manzana); editar información de manzanas/lotes/calles en loteos asignados | Operar loteos no asignados |
 | **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas, lotes o calles |
 | **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 

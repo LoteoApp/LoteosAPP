@@ -79,6 +79,12 @@ apps/backend/
 │   │           ├── update_lote.go
 │   │           ├── update_manzana.go
 │   │           ├── update_calle.go
+│   │           ├── store_loteo_archivo.go
+│   │           ├── store_lote_archivo.go
+│   │           ├── list_loteo_archivos.go
+│   │           ├── list_lote_archivos.go
+│   │           ├── get_archivo_content.go
+│   │           ├── delete_archivo.go
 │   │           ├── authorize_editor.go
 │   │           ├── visibility.go
 │   │           └── errors.go
@@ -121,7 +127,8 @@ apps/backend/
 │               │       ├── store_loteo_dxf.go
 │               │       ├── update_lote.go
 │               │       ├── update_manzana.go
-│               │       └── update_calle.go
+│               │       ├── update_calle.go
+│               │       └── archivo.go
 │               ├── handler/
 │               │   ├── create_user.go
 │               │   ├── create_agency.go
@@ -134,7 +141,13 @@ apps/backend/
 │               │   ├── store_loteo_dxf.go
 │               │   ├── update_lote.go
 │               │   ├── update_manzana.go
-│               │   └── update_calle.go
+│               │   ├── update_calle.go
+│               │   ├── store_loteo_archivo.go
+│               │   ├── store_lote_archivo.go
+│               │   ├── list_loteo_archivos.go
+│               │   ├── list_lote_archivos.go
+│               │   ├── get_archivo_content.go
+│               │   └── delete_archivo.go
 │               ├── middleware/
 │               │   └── auth.go
 │               ├── response/
@@ -378,8 +391,8 @@ Decisiones de este recorte:
 ### Loteo: alta, persistencia de la geometría y lectura
 
 El DXF lo parsea el frontend; el backend recibe la geometría ya extraída, la
-valida y la persiste (`docs/domain.md` § Alta y visualización). Siete endpoints
-cubren el alta, la carga de datos y la lectura:
+valida y la persiste (`docs/domain.md` § Alta y visualización). Trece
+endpoints cubren el alta, la carga de datos, la lectura y las fotos/planos:
 
 - `POST /api/v1/loteos` — alta del loteo con su plano. Solo **administrador**:
   un agrimensor trabaja sobre loteos asignados, y un loteo que todavía no
@@ -408,6 +421,20 @@ cubren el alta, la carga de datos y la lectura:
 - `PATCH /api/v1/loteos/{loteoId}/calles/{calleId}` — nombre y tipo
   (`asfalto`, `tierra`, `brosa`, `granito`; vacío se guarda como sin tipo).
   **Administrador**, o **agrimensor** sobre un loteo asignado.
+- `POST /api/v1/loteos/{loteoId}/archivos` y
+  `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos` — suben una foto o
+  plano (`multipart/form-data`, campos `archivo` y `categoria`), a diferencia
+  del DXF sin reemplazar los ya cargados. **Administrador**, o **agrimensor**
+  sobre un loteo asignado.
+- `GET /api/v1/loteos/{loteoId}/archivos` y
+  `GET /api/v1/loteos/{loteoId}/lotes/{loteId}/archivos` — listan las fotos y
+  planos activos, más recientes primero. Misma visibilidad que la lectura del
+  loteo (ver más abajo).
+- `GET /api/v1/loteos/{loteoId}/archivos/{archivoId}` — streamea el contenido
+  de una foto o plano. Misma visibilidad que la lectura del loteo.
+- `DELETE /api/v1/loteos/{loteoId}/archivos/{archivoId}` — baja lógica de una
+  foto o plano (no borra el objeto de R2). **Administrador**, o **agrimensor**
+  sobre un loteo asignado.
 
 **Visibilidad de la lectura por rol** (`GET`): **administrador** y
 **administrativo** ven todos los loteos; **agrimensor** y **escribano** ven
@@ -591,13 +618,75 @@ implementa porque ningún archivo del dominio se acerca. Si R2 igual rechaza
 una subida, el adaptador traduce `EntityTooLarge` a `ErrInvalidObjectSize`,
 para que salga como entrada inválida y no como un 503.
 
-Una decisión queda abierta hasta que haya más consumidores
-([#15](https://github.com/LoteoApp/LoteosAPP/issues/15)):
+**Cómo se leen los archivos** ([#15](https://github.com/LoteoApp/LoteosAPP/issues/15)):
+`GET /api/v1/loteos/{loteoId}/archivos/{archivoId}` streamea el contenido a
+través del backend — nunca una URL firmada directa a R2 —, así la
+autorización sigue viviendo en un solo lugar (la misma visibilidad que
+`GetLoteo`: administrador/administrativo ven cualquiera, agrimensor/escribano/
+inmobiliaria solo lo asignado). Si el costo de proxear archivos grandes pesa
+en el futuro, se puede evaluar una URL firmada; el contrato de
+`gateway.ObjectStorage` tendría que crecer una operación para eso.
+`GetFileContent` propaga el `Size` leído de storage y el handler lo declara
+como `Content-Length`; si el stream se corta a mitad de camino, el handler
+aborta la conexión (`panic(http.ErrAbortHandler)`) en vez de devolver un 200
+con contenido parcial que el cliente interpretaría como una descarga
+completa.
 
-- **Cómo se leen los archivos.** Hoy solo se puede a través del backend, que
-  es lo más simple y mantiene la autorización en un solo lugar. Si el costo
-  de proxear archivos grandes pesa, se evalúa URL firmada; el contrato tendría
-  que crecer una operación.
+### Fotos y planos de loteo y lote
+
+A diferencia del DXF (un archivo que reemplaza al anterior), una foto o plano
+es una **colección**: `StoreLoteoFile`/`StoreLoteFile` (`usecase/loteos`)
+insertan una fila nueva en `archivos` sin dar de baja las existentes,
+acotadas por `domain.MaxFilesPerEntity` (20 por loteo o por lote). Ese cupo se
+aplica de forma atómica dentro de `RecordLoteoFile`/`RecordLoteFile`
+(`repository/postgres`): una sola transacción hace `SELECT ... FOR UPDATE`
+sobre el loteo o el lote, cuenta los archivos activos y recién ahí inserta,
+así que dos subidas concurrentes no pueden leer ambas "hay cupo" y terminar
+insertando 21; la que pierde la carrera recibe `domain.ErrTooManyFiles` y el
+caso de uso compensa borrando el objeto que ya había subido a R2. Decisiones:
+
+- **Solo loteo y lote, nunca manzana.** El constraint
+  `archivos_loteo_xor_lote_chk` ya modelaba exactamente esas dos unidades
+  antes de este trabajo; no hizo falta tocar el esquema. Se decidió no sumar
+  `manzana_id` porque no hay un caso de uso concreto para documentación a ese
+  nivel (una manzana son ~400 m², demasiado chica como unidad propia).
+- **La autorización de escritura es la misma que el resto de la edición del
+  loteo** (`authorizeEditor`, compartida con `update_lote.go`): administrador,
+  o agrimensor asignado. La de lectura (listar y descargar) es la misma que
+  `GetLoteo` — más amplia, porque ver un archivo no debería requerir poder
+  editarlo. `GetFile`/`DeleteFile` (`repository/postgres`) filtran
+  `categoria IN ('foto', 'plano')`: sin ese filtro, un id de archivo del mismo
+  loteo también alcanzaría su DXF o cualquier `documento_legal`, categorías
+  que este flujo nunca debe leer ni dar de baja.
+- **Categoría y tipo se validan contra listas cerradas, y el contenido real se
+  verifica contra lo declarado.** `categoria` es `foto` o `plano`
+  (`documento_legal`, del futuro módulo de escribano, y `dxf` quedan fuera de
+  este flujo); el `Content-Type` se limita a `image/jpeg`/`png`/`webp` y
+  `application/pdf`. Como el `Content-Type` de un part multipart lo declara el
+  cliente y no prueba nada sobre los bytes que siguen, `usecase/loteos`
+  también compara los primeros bytes del archivo contra la firma esperada
+  (`domain.ArchivoContentMatchesMimeType`) antes de hashear y subir.
+- **`categoria` es un detalle interno, no una elección de quien sube el
+  archivo.** El frontend la infiere del tipo del archivo (imagen → `foto`,
+  cualquier otra cosa → `plano`, ver `categoryFor` en
+  `features/lots/components/ArchivosSection.tsx`) en vez de pedirla: pedirla
+  no cambiaba ninguna validación ni filtraba el selector de archivos, así que
+  el único efecto real de la elección era confundir "plano" (un documento
+  subido) con "Plano cargado" (el DXF geométrico que ya usa esa palabra en
+  esta misma pantalla).
+- **La baja es lógica y no borra el objeto de R2**, igual que al reemplazar el
+  DXF: `fecha_baja` alcanza para que deje de listarse, y no vale la pena la
+  complejidad de un borrado sincrónico para un caso de uso de bajo volumen.
+- **El frontend no puede usar `<img src>` directo.** La API exige un Bearer
+  token, que un `src` de imagen no puede enviar. `fetchAttachmentContent`
+  (`features/lots/api/archivos.ts`) trae el archivo con `fetch` autenticado y
+  arma un `URL.createObjectURL`, revocado al desmontar — primer lugar del
+  frontend que muestra contenido protegido en vez de solo subirlo.
+- **`ArchivosSection` remonta por la identidad de su destino** (`key={lote.id}`
+  o `key={loteo.id}` en `PlanSelectionPanel`/`LoteoDetailPage`): sin esa key,
+  cambiar de lote seleccionado mientras una subida o baja seguía pendiente
+  podía terminar aplicando el resultado tardío sobre la lista del lote que se
+  estaba viendo ahora, en vez de sobre el que originó la operación.
 
 Un límite de R2 a tener presente al armar las claves es **una escritura por
 segundo sobre la misma clave**. Cada carga usa una clave versionada distinta,
@@ -672,9 +761,11 @@ apps/frontend/src/
 │       │   ├── update-manzana.ts      # PATCH /api/v1/loteos/{id}/manzanas/{manzanaId}
 │       │   ├── update-calle.ts        # PATCH /api/v1/loteos/{id}/calles/{calleId}
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
-│       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
-│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes, panel de selección y visor DXF
+│       │   ├── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
+│       │   └── archivos.ts            # POST/GET/DELETE .../archivos (loteo y lote)
+│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes, panel de selección, visor DXF y ArchivosSection (fotos/planos)
 │       ├── hooks/
+│       │   ├── use-archivos.ts        # Lista, sube y borra fotos/planos de un loteo o un lote
 │       │   ├── use-loteo-fields.ts
 │       │   ├── use-dxf-plan.ts
 │       │   ├── use-layer-visibility.ts # Capas visibles del visor, compartido por alta y detalle
@@ -793,7 +884,7 @@ configuración:
 default-src 'self';
 script-src 'self';
 style-src 'self' ['unsafe-inline' solo en dev];
-img-src 'self' data:;
+img-src 'self' data: blob:;
 font-src 'self';
 connect-src 'self' <VITE_SUPABASE_URL exacta> <VITE_API_URL exacta>;
 base-uri 'self';
@@ -820,6 +911,11 @@ object-src 'none';
 - `script-src` no necesita ninguna excepción en ningún entorno: la app solo
   carga scripts externos (`<script type="module" src="...">`), tanto en dev
   (`@vite/client`) como en el bundle de producción.
+- `img-src` suma `blob:` porque `ArchivosSection` renderiza una foto trayendo
+  sus bytes con el token del usuario y armando un `URL.createObjectURL` (ver
+  [Fotos y planos de loteo y lote](#fotos-y-planos-de-loteo-y-lote)). No
+  habilita cargar imágenes de cualquier origen: un `blob:` solo existe si
+  este mismo documento lo creó, el navegador nunca lo resuelve por su cuenta.
 - Como el placeholder ya no depende de que Vite reemplace `%VAR%` en HTML
   estático, no hay forma de que quede sin resolver: la función siempre
   recibe un valor (el de la variable de entorno o el default de

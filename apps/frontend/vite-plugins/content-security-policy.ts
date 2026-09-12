@@ -13,7 +13,10 @@ export function buildContentSecurityPolicy({ apiUrl, supabaseUrl, isDev }: CspOp
     `default-src 'self'`,
     `script-src 'self'`,
     `style-src ${styleSrc}`,
-    `img-src 'self' data:`,
+    // blob: lets ArchivosSection render a foto fetched with the caller's
+    // bearer token (URL.createObjectURL) — the browser never fetches it
+    // itself, so this doesn't open up loading images from anywhere else.
+    `img-src 'self' data: blob:`,
     `font-src 'self'`,
     `connect-src 'self' ${supabaseUrl} ${apiUrl}`,
     `base-uri 'self'`,
