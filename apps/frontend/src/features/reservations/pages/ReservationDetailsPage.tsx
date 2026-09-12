@@ -1,21 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
-import { getReservation } from '../api/reservations'
+import { downloadReservationReceipt, getReservation } from '../api/reservations'
 import CancelReservationDialog from '../components/CancelReservationDialog'
 import ReservationDetails from '../components/ReservationDetails'
+import ReservationDetailsPageSkeleton from '../components/ReservationDetailsPageSkeleton'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
 import type { Reservation } from '../types'
 
-type ReservationDetailsPageProps = { accessToken?: string }
+type ReservationDetailsPageProps = {
+  accessToken?: string
+  renderPlan?: (reservation: Reservation) => ReactNode
+}
 
-export default function ReservationDetailsPage({ accessToken = '' }: ReservationDetailsPageProps) {
+export default function ReservationDetailsPage({ accessToken = '', renderPlan }: ReservationDetailsPageProps) {
   const token = accessToken
   const { id = '' } = useParams()
   const [reservation, setReservation] = useState<Reservation | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [receiptError, setReceiptError] = useState<string | null>(null)
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const mutations = useReservationMutations(token)
   const queryEnabled = token !== ''
@@ -56,6 +62,25 @@ export default function ReservationDetailsPage({ accessToken = '' }: Reservation
     return true
   }
 
+  async function handleDownloadReceipt() {
+    if (!reservation) return
+    setIsDownloadingReceipt(true)
+    setReceiptError(null)
+    try {
+      const blob = await downloadReservationReceipt(token, reservation.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `comprobante-reserva-${reservation.id}.pdf`
+      anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (downloadError) {
+      setReceiptError(downloadError instanceof Error ? downloadError.message : 'No se pudo descargar el comprobante.')
+    } finally {
+      setIsDownloadingReceipt(false)
+    }
+  }
+
   function closeCancelDialog() {
     setIsCancelDialogOpen(false)
     mutations.reset()
@@ -64,14 +89,19 @@ export default function ReservationDetailsPage({ accessToken = '' }: Reservation
   return (
     <section className="flex flex-col gap-4">
       <Link to="/reservas" className="w-fit text-sm text-muted-foreground hover:text-foreground">Volver a reservas</Link>
-      {queryEnabled && isLoading && <p className="text-muted-foreground">Cargando reserva…</p>}
+      {queryEnabled && isLoading && <ReservationDetailsPageSkeleton />}
       {queryEnabled && error && <Alert variant="destructive"><AlertTitle>No se pudo cargar la reserva</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       {queryEnabled && !isLoading && !error && reservation && <>
+        {renderPlan?.(reservation)}
         <ReservationDetails reservation={reservation} />
-        {reservation.estado === 'activa' && <>
-          <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="w-fit" onClick={handleDownloadReceipt} disabled={isDownloadingReceipt}>
+            {isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante'}
+          </Button>
+          {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>}
           {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
-        </>}
+        </div>
+        {receiptError && <Alert variant="destructive"><AlertTitle>No se pudo descargar el comprobante</AlertTitle><AlertDescription>{receiptError}</AlertDescription></Alert>}
       </>}
       {queryEnabled && !isLoading && !error && !reservation && <Button render={<Link to="/reservas" />}>Volver a reservas</Button>}
     </section>

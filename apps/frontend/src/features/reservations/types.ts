@@ -31,6 +31,31 @@ export type ReservationLot = {
   precio: number | null
 }
 
+export type ReservationCreateLot = ReservationLot & {
+  manzanaId: string
+  moneda: string
+  superficie: number | null
+  caracteristicas: string
+}
+
+export type ReservationCreateBlock = {
+  id: string
+  numero: string
+  tieneAgua: boolean
+  tieneCloaca: boolean
+  tieneLuz: boolean
+  tieneGas: boolean
+}
+
+export type ReservationCreateDevelopment = {
+  id: string
+  nombre: string
+  ubicacion: string
+  descripcion: string
+  manzanas: ReservationCreateBlock[]
+  lotes: ReservationCreateLot[]
+}
+
 export type ReservationDraft = {
   clienteId: string
   vendedorId: string
@@ -58,6 +83,11 @@ export type Reservation = {
   fechaCreacion: string
   fechaModificacion: string
   historial?: ReservationHistoryEntry[]
+  inmobiliaria?: {
+    id: string
+    razonSocial: string
+  }
+  puedeCancelar?: boolean
 }
 
 export type SellerOption = ReservationActor

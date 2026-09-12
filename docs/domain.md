@@ -101,9 +101,9 @@ loteo–inmobiliaria, el control permanece visible pero deshabilitado para no
 simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
-inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
-vendedor. Asignar un usuario a su agencia (`usuarios.inmobiliaria_id`) queda
-para una futura iteración.
+inmobiliaria de una reserva. `reservas.inmobiliaria_id` conserva la agencia
+interviniente para mantener el alcance histórico aunque el usuario cambie de
+agencia. La venta mantiene su regla actual de derivar la agencia del vendedor.
 
 ## Usuarios y roles
 
@@ -179,6 +179,13 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
   `inmobiliaria`, debe pertenecer a una agencia activa asignada al loteo.
   Administrador y administrativo lo eligen desde el catálogo de vendedores
   elegibles; no se amplía por eso su acceso al ABM de usuarios.
+- Inmobiliaria interviniente: se persiste en `reservas.inmobiliaria_id` para
+  conservar el alcance histórico, incluyendo las reservas creadas por un
+  administrativo a nombre de un vendedor de inmobiliaria. La inmobiliaria
+  ve todas las reservas de esa agencia aunque luego cambie la asignación del
+  loteo; un administrativo ve todas las reservas. Registros anteriores se
+  completan desde la agencia del vendedor cuando es posible y el resto queda
+  con `NULL`.
 - Estado vigente en `reservas.estado_actual`; las transiciones se registran
   solo en `reserva_estados`. Solo una reserva `activa` por lote. Los estados
   `cancelada`, `vencida` y `convertida` son terminales para este circuito.
@@ -188,9 +195,10 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 - Crear reserva mueve el lote de `disponible` a `reservado`. Cancelar antes
   del vencimiento, o vencerla, mueve el lote de `reservado` a `disponible` en
   la misma transacción.
-- Cancelar exige una justificación y solo lo puede hacer el vendedor
-  responsable, otro usuario de la misma agencia con alcance vigente, un
-  administrativo o un administrador. Una repetición sobre una reserva ya
+- Cancelar exige una justificación y solo lo puede hacer un usuario
+  administrativo, un administrador o un usuario de la inmobiliaria persistida
+  en la reserva. `puedeCancelar` se calcula en el servidor y la API vuelve a
+  validar el permiso al cancelar. Una repetición sobre una reserva ya
   cancelada devuelve el resultado existente sin agregar otro evento.
 - La creación acepta una clave de idempotencia por actor: repetir la misma
   clave y payload devuelve la misma reserva; reutilizarla con otro payload es
@@ -200,6 +208,13 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
   auditoría.
 - Un worker del backend regulariza reservas vencidas al iniciar y luego cada
   minuto por defecto; un retraso del worker no extiende el plazo comercial.
+- El comprobante PDF descargable muestra el loteo y el lote, cliente, vendedor,
+  inmobiliaria, fechas y fecha de emisión. Incluye un croquis de referencia sin
+  escala con el lote reservado resaltado; los demás lotes se muestran sin
+  estado ni numeración. Si el lote no tiene geometría cargada, el comprobante
+  lo informa en lugar del croquis. También aclara que es un comprobante, no
+  implica una venta, puede cancelarlo el cliente o la inmobiliaria y se cancela
+  automáticamente si no se concreta la venta en 15 días.
 
 ## Venta
 

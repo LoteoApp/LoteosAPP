@@ -10,6 +10,9 @@ import (
 type ReservationScope struct {
 	AssigneeAuthProviderID *string
 	ByAgencyAssignment     bool
+	// ActorAuthProviderID is used only to calculate action permissions in a
+	// response. It never narrows administrative reads.
+	ActorAuthProviderID *string
 }
 
 type CreateReservationCommand struct {

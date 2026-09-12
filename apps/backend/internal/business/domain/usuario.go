@@ -34,6 +34,7 @@ type Usuario struct {
 	Nombre         string     `json:"nombre"`
 	Apellido       string     `json:"apellido"`
 	Rol            Rol        `json:"rol"`
+	InmobiliariaID *string    `json:"inmobiliariaId,omitempty"`
 	PerfilCompleto bool       `json:"perfilCompleto"`
 	FechaBaja      *time.Time `json:"fechaBaja"`
 	CreatedAt      time.Time  `json:"createdAt"`

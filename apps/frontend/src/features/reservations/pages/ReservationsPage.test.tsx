@@ -17,7 +17,7 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
 		cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
 		vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrador' },
 		usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' }, estado: 'activa',
-		fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [],
+		fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [], puedeCancelar: true,
 		...overrides,
 	}
 }
@@ -38,6 +38,7 @@ describe('ReservationsPage', () => {
 		defaultMocks()
 		render(<MemoryRouter><ReservationsPage /></MemoryRouter>)
 		expect(screen.getByRole('heading', { name: 'Reservas' })).toBeInTheDocument()
+		expect(screen.queryByRole('heading', { name: 'Reservas cargadas' })).not.toBeInTheDocument()
 		expect(screen.getByRole('link', { name: 'Abrir visor de lotes' })).toHaveAttribute('href', '/lotes')
 		expect(screen.queryByRole('heading', { name: 'Nueva reserva' })).not.toBeInTheDocument()
 		expect(screen.queryByRole('combobox', { name: 'Loteo' })).not.toBeInTheDocument()
@@ -69,20 +70,64 @@ describe('ReservationsPage', () => {
 	it('changes pages using the server pagination controls', async () => {
 		const user = userEvent.setup()
 		defaultMocks()
-		useReservationsMock.mockReturnValue({
-			page: { reservas: [reservation()], pagina: 2, porPagina: 25, total: 51, paginas: 3 },
+		useReservationsMock.mockImplementation((_token, filters) => ({
+			page: {
+				reservas: [reservation()],
+				pagina: filters.pagina ?? 1,
+				porPagina: 25,
+				total: 51,
+				paginas: 3,
+			},
 			isLoading: false,
 			error: null,
 			refresh: vi.fn(),
-		})
+		}))
 
 		render(<MemoryRouter><ReservationsPage /></MemoryRouter>)
+		expect(screen.getByText('Página 1 de 3 · 51 reservas')).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'Siguiente' }))
 		expect(screen.getByText('Página 2 de 3 · 51 reservas')).toBeInTheDocument()
 		await user.click(screen.getByRole('button', { name: 'Anterior' }))
-		await user.click(screen.getByRole('button', { name: 'Siguiente' }))
 
 		const calls = useReservationsMock.mock.calls
 		expect(calls.some(([, filters]) => filters.pagina === 1)).toBe(true)
 		expect(calls.some(([, filters]) => filters.pagina === 2)).toBe(true)
+	})
+
+	it('returns to the first page when filters change', async () => {
+		const user = userEvent.setup()
+		defaultMocks()
+		useReservationsMock.mockImplementation((_token, filters) => ({
+			page: {
+				reservas: [reservation()],
+				pagina: filters.pagina ?? 1,
+				porPagina: 25,
+				total: 51,
+				paginas: 3,
+			},
+			isLoading: false,
+			error: null,
+			refresh: vi.fn(),
+		}))
+
+		render(<MemoryRouter><ReservationsPage /></MemoryRouter>)
+		await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+		await user.type(screen.getByRole('searchbox', { name: 'Buscar' }), 'Ana')
+
+		expect(useReservationsMock).toHaveBeenLastCalledWith('', {
+			q: 'Ana',
+			estado: undefined,
+			pagina: 1,
+		})
+
+		await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+		await user.click(screen.getByRole('combobox', { name: 'Estado' }))
+		await user.click(screen.getByRole('option', { name: 'Canceladas' }))
+
+		expect(useReservationsMock).toHaveBeenLastCalledWith('', {
+			q: 'Ana',
+			estado: 'cancelada',
+			pagina: 1,
+		})
 	})
 })

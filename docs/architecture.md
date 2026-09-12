@@ -315,9 +315,11 @@ Las reservas viven en `business/domain/reservation.go`, con el contrato
 `business/gateway.ReservationRepository` y su fake en `gateway/gatewayfake`.
 Cada operación tiene un caso de uso independiente bajo
 `business/usecase/reservations`: alta, listado, detalle, cancelación,
-catálogo de vendedores y procesamiento de vencimientos. Los DTOs de estas
-rutas están en `delivery/webapp/dto/reservations` y cada ruta tiene su handler
-propio.
+comprobante, catálogo de vendedores y procesamiento de vencimientos. El caso
+de uso del comprobante primero consulta la reserva con el alcance del actor y,
+solo después de autorizarla, carga el plano histórico usando el `loteoId`
+persistido en esa reserva. Los DTOs de estas rutas están en
+`delivery/webapp/dto/reservations` y cada ruta tiene su handler propio.
 
 `repository/postgres/reservation.go` mantiene la atomicidad comercial: protege
 la vigencia del loteo con un lock compartido, bloquea exclusivamente el lote y
@@ -673,7 +675,7 @@ apps/frontend/src/
 │       │   ├── update-calle.ts        # PATCH /api/v1/loteos/{id}/calles/{calleId}
 │       │   ├── create-loteo.ts        # POST /api/v1/loteos
 │       │   └── upload-loteo-dxf.ts    # PUT /api/v1/loteos/{id}/dxf
-│       ├── components/                # Formulario, cards, banda del listado, tabla de lotes, panel de selección y visor DXF
+│       ├── components/                # Formulario, cards, banda del listado, lista y filtros de lotes, inspector de selección, resumen, leyenda de estados y visor DXF
 │       ├── hooks/
 │       │   ├── use-loteo-fields.ts
 │       │   ├── use-dxf-plan.ts
@@ -689,7 +691,7 @@ apps/frontend/src/
 │       ├── lib/                       # Parseo DXF a geometría SVG, armado del payload y plano del detalle
 │       ├── pages/
 │       │   ├── LoteosListPage.tsx     # Listado de loteos (zócalo panorámico), en /lotes
-│       │   ├── LoteoDetailPage.tsx    # Detalle de un loteo, en /lotes/:loteoId
+│       │   ├── LoteoDetailPage.tsx    # Detalle de un loteo (plano + pestañas Resumen/Lotes/Reservas), en /lotes/:loteoId
 │       │   └── LotsPage.tsx           # Alta de loteo, en /lotes/nuevo
 │       └── types.ts
 ├── shared/
@@ -699,7 +701,7 @@ apps/frontend/src/
 │   │   └── roles.ts               # Roles de dominio y lectura del rol del usuario
 │   ├── config/
 │   │   └── env.ts
-│   ├── ui/                     # Componentes shadcn (incluye table.tsx) y SaveNotice
+│   ├── ui/                     # Componentes shadcn (incluye table.tsx y tabs.tsx) y SaveNotice
 │   └── lib/                    # cn + formatCurrency / formatArea / formatDate
 ├── index.css
 └── main.tsx
@@ -709,11 +711,19 @@ También se crea cada directorio solamente cuando tenga contenido real.
 
 La feature `features/reservations` contiene su cliente API, hooks, formulario,
 filtros, lista, detalle, badge de estado y cancelación. `app` compone la sesión,
-los permisos y los datos de lotes: `/reservas` muestra el listado y el detalle,
-`/reservas/:id` muestra una reserva individual, y `LoteoDetailRoute` inyecta
-las acciones de reservar y cancelar en el panel de un lote, según el rol y el
-alcance devueltos por la API. `features/lots` no importa archivos internos de
-reservas; recibe las acciones mediante render props.
+los permisos y los datos de lotes: `/reservas` muestra el listado,
+`/reservas/nueva/:loteoId/:loteId` crea una reserva en una pantalla completa con
+el plano del loteo, y `/reservas/:id` muestra una reserva individual junto con
+el plano y su comprobante PDF. El alta permite crear clientes con el modal
+reutilizable `CreateClientDialog`, compuesto con el formulario compartido de
+clientes. `LoteoDetailRoute` inyecta la acción de reservar, el resumen de la
+reserva activa del lote seleccionado
+(con cancelar y ver reserva) y la lista de reservas del loteo en su pestaña,
+según el rol y el alcance devueltos por la API. `features/lots` no importa
+archivos internos de reservas; recibe esas piezas mediante render props
+(`renderReservationAction`, `renderReservationSummary`, `renderReservations`) y
+expone callbacks para liberar el lote en el plano cuando se cancela una
+reserva.
 
 ### Dirección de dependencias
 

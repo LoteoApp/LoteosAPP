@@ -62,6 +62,7 @@ type Handlers struct {
 	CreateReservationHandler   *handler.CreateReservationHandler
 	ListReservationsHandler    *handler.ListReservationsHandler
 	GetReservationHandler      *handler.GetReservationHandler
+	ReservationReceiptHandler  *handler.ReservationReceiptHandler
 	CancelReservationHandler   *handler.CancelReservationHandler
 	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
 }
@@ -104,6 +105,7 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", protected(handler.Adapt(handlers.CreateReservationHandler, reservationsTimeout)))
 	mux.Handle("GET /api/v1/reservas", protected(handler.Adapt(handlers.ListReservationsHandler, reservationsTimeout)))
 	mux.Handle("GET /api/v1/reservas/{id}", protected(handler.Adapt(handlers.GetReservationHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/reservas/{id}/comprobante", protected(handler.Adapt(handlers.ReservationReceiptHandler, reservationsTimeout)))
 	mux.Handle("POST /api/v1/reservas/{id}/cancelar", protected(handler.Adapt(handlers.CancelReservationHandler, reservationsTimeout)))
 	mux.Handle("GET /api/v1/loteos/{loteoId}/vendedores", protected(handler.Adapt(handlers.ListEligibleSellersHandler, reservationsTimeout)))
 }

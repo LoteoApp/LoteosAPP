@@ -44,6 +44,7 @@ type Container struct {
 	CreateReservationHandler   *handler.CreateReservationHandler
 	ListReservationsHandler    *handler.ListReservationsHandler
 	GetReservationHandler      *handler.GetReservationHandler
+	ReservationReceiptHandler  *handler.ReservationReceiptHandler
 	CancelReservationHandler   *handler.CancelReservationHandler
 	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
 	TransitionLotState         loteos.TransitionLotState
@@ -111,7 +112,9 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	reservationRepo := postgres.NewReservationRepository(pool)
 	createReservationHandler := handler.NewCreateReservationHandler(reservations.NewCreateReservation(reservationRepo, userRepo))
 	listReservationsHandler := handler.NewListReservationsHandler(reservations.NewListReservations(reservationRepo))
-	getReservationHandler := handler.NewGetReservationHandler(reservations.NewGetReservation(reservationRepo))
+	getReservation := reservations.NewGetReservation(reservationRepo)
+	getReservationHandler := handler.NewGetReservationHandler(getReservation)
+	reservationReceiptHandler := handler.NewReservationReceiptHandler(reservations.NewGetReservationReceipt(reservationRepo, loteoRepo))
 	cancelReservationHandler := handler.NewCancelReservationHandler(reservations.NewCancelReservation(reservationRepo, userRepo))
 	listEligibleSellersHandler := handler.NewListEligibleSellersHandler(reservations.NewListEligibleSellers(reservationRepo))
 	var reservationExpiryWorker *worker.ReservationExpiryWorker
@@ -149,6 +152,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		CreateReservationHandler:   createReservationHandler,
 		ListReservationsHandler:    listReservationsHandler,
 		GetReservationHandler:      getReservationHandler,
+		ReservationReceiptHandler:  reservationReceiptHandler,
 		CancelReservationHandler:   cancelReservationHandler,
 		ListEligibleSellersHandler: listEligibleSellersHandler,
 		TransitionLotState:         transitionLotState,

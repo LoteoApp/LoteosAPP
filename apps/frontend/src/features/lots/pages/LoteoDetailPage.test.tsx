@@ -89,7 +89,8 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
 function renderPage(
   path = '/lotes/loteo-1',
   renderReservationAction?: ComponentProps<typeof LoteoDetailPage>['renderReservationAction'],
-  renderReservationCancelAction?: ComponentProps<typeof LoteoDetailPage>['renderReservationCancelAction'],
+  renderReservationSummary?: ComponentProps<typeof LoteoDetailPage>['renderReservationSummary'],
+  renderReservations?: ComponentProps<typeof LoteoDetailPage>['renderReservations'],
 ) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -102,13 +103,22 @@ function renderPage(
               accessToken="token-123"
               canEdit
               renderReservationAction={renderReservationAction}
-              renderReservationCancelAction={renderReservationCancelAction}
+              renderReservationSummary={renderReservationSummary}
+              renderReservations={renderReservations}
             />
           }
         />
       </Routes>
     </MemoryRouter>,
   )
+}
+
+function lotesRows() {
+  return within(screen.getByRole('list', { name: 'Lotes del loteo' })).getAllByRole('listitem')
+}
+
+function planButton(name: string) {
+  return within(screen.getByRole('group', { name: 'Plano del loteo' })).getByRole('button', { name })
 }
 
 afterEach(() => {
@@ -125,12 +135,14 @@ describe('LoteoDetailPage', () => {
     expect(await screen.findByRole('heading', { name: 'Las Acacias' })).toBeInTheDocument()
     expect(screen.getByText('Río Ceballos, Córdoba')).toBeInTheDocument()
 
-    const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(3)
-    expect(within(rows[1]).getByText(/150\.000/)).toBeInTheDocument()
-    expect(within(rows[1]).getByText('300 m²')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Disponible')).toBeInTheDocument()
-    expect(within(rows[2]).getByText('Reservado')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Lotes' }))
+
+    const rows = lotesRows()
+    expect(rows).toHaveLength(2)
+    expect(within(rows[0]).getByText(/150\.000/)).toBeInTheDocument()
+    expect(within(rows[0]).getByText('300 m²')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lote 7 · Mz 1 · Disponible' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lote 8 · Mz 2 · Reservado' })).toBeInTheDocument()
   })
 
   it('draws the persisted plan and exposes the layer toggles', async () => {
@@ -156,12 +168,12 @@ describe('LoteoDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar desde visor' }))
 
     expect(await screen.findByText('Reserva creada')).toBeInTheDocument()
-    expect(within(screen.getAllByRole('row')[1]).getByText('Reservado')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lote 7 · Mz 1 · Reservado' })).toBeInTheDocument()
     expect(
       screen
         .getByRole('group', { name: 'Plano del loteo' })
         .querySelector('[aria-label="Lote 7"]'),
-    ).toHaveAttribute('fill', 'var(--lot-reserved)')
+    ).toHaveAttribute('fill', 'var(--lot-reserved-plan)')
     expect(renderReservationAction).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'lt-1', estado: 'disponible' }),
       expect.any(Function),
@@ -170,43 +182,155 @@ describe('LoteoDetailPage', () => {
 
   it('marks the selected lot as available in the plan after cancellation', async () => {
     const user = userEvent.setup()
-    const renderReservationCancelAction = vi.fn(
+    const renderReservationSummary = vi.fn(
       (_lote: LoteoLote, onCanceled: () => void) => (
         <button type="button" onClick={onCanceled}>Cancelar desde visor</button>
       ),
     )
     getLoteoMock.mockResolvedValue(detail())
-    renderPage('/lotes/loteo-1', undefined, renderReservationCancelAction)
+    renderPage('/lotes/loteo-1', undefined, renderReservationSummary)
 
     await screen.findByRole('heading', { name: 'Las Acacias' })
-    await user.click(screen.getByRole('button', { name: 'Lote 8' }))
+    await user.click(planButton('Lote 8'))
     await user.click(screen.getByRole('button', { name: 'Cancelar desde visor' }))
 
     expect(screen.getByText('Reserva cancelada')).toBeInTheDocument()
-    expect(within(screen.getAllByRole('row')[2]).getByText('Disponible')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lote 8 · Mz 2 · Disponible' })).toBeInTheDocument()
     expect(
       screen
         .getByRole('group', { name: 'Plano del loteo' })
         .querySelector('[aria-label="Lote 8"]'),
-    ).toHaveAttribute('fill', 'var(--chart-3)')
-    expect(renderReservationCancelAction).toHaveBeenCalledWith(
+    ).toHaveAttribute('fill', 'var(--lot-available-plan)')
+    expect(renderReservationSummary).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'lt-2', estado: 'reservado' }),
       expect.any(Function),
     )
   })
 
-  it('filters the lotes table by manzana', async () => {
+  it('filters the lotes with the search box', async () => {
+    const user = userEvent.setup()
     getLoteoMock.mockResolvedValue(detail())
     renderPage()
 
     await screen.findByRole('heading', { name: 'Las Acacias' })
-    expect(screen.getAllByRole('row')).toHaveLength(3)
+    await user.click(screen.getByRole('tab', { name: 'Lotes' }))
+    expect(lotesRows()).toHaveLength(2)
 
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Manzana' }), 'mz-2')
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar lote o manzana' }), '8')
 
-    const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(2)
-    expect(within(rows[1]).getByText('8')).toBeInTheDocument()
+    expect(lotesRows()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Lote 8 · Mz 2 · Reservado' })).toBeInTheDocument()
+  })
+
+  it('filters by the exact manzana id even when lot and manzana numbers overlap', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(
+      detail({
+        manzanas: [
+          { ...detail().manzanas[0], id: 'mz-1', numero: '1' },
+          { ...detail().manzanas[1], id: 'mz-10', numero: '10' },
+        ],
+        lotes: [
+          { ...detail().lotes[0], id: 'lt-7', manzanaId: 'mz-1', numero: '7' },
+          { ...detail().lotes[1], id: 'lt-1', manzanaId: 'mz-10', numero: '1' },
+        ],
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('tab', { name: 'Lotes' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Manzana' }), 'mz-1')
+
+    expect(lotesRows()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Lote 7 · Mz 1 · Disponible' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Lote 1 · Mz 10 · Reservado' })).not.toBeInTheDocument()
+  })
+
+  it('filters the lotes by state', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('tab', { name: 'Lotes' }))
+
+    const filters = within(screen.getByRole('group', { name: 'Filtrar por estado' }))
+    await user.click(filters.getByRole('button', { name: 'Reservado' }))
+
+    expect(lotesRows()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Lote 8 · Mz 2 · Reservado' })).toBeInTheDocument()
+  })
+
+  it('opens on the summary tab with the lotes counted by state', async () => {
+    getLoteoMock.mockResolvedValue(detail())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+
+    expect(screen.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('1 Disponible')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 Reservado')).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Lotes del loteo' })).not.toBeInTheDocument()
+  })
+
+  it('jumps to the lotes tab when the user picks something on the plan', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('button', { name: 'Lote 7' }))
+
+    expect(screen.getByRole('tab', { name: 'Lotes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('list', { name: 'Lotes del loteo' })).toBeInTheDocument()
+  })
+
+  it('goes back to the summary tab when navigating to another loteo', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockImplementation(async (loteoId) =>
+      loteoId === 'loteo-2' ? detail({ id: 'loteo-2', nombre: 'Altos del Sur' }) : detail(),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('tab', { name: 'Lotes' }))
+    expect(screen.getByRole('tab', { name: 'Lotes' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('link', { name: 'ir a loteo-2' }))
+
+    await screen.findByRole('heading', { name: 'Altos del Sur' })
+    expect(screen.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('hides the reservations tab when the user cannot see reservations', async () => {
+    getLoteoMock.mockResolvedValue(detail())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+
+    expect(screen.queryByRole('tab', { name: 'Reservas' })).not.toBeInTheDocument()
+  })
+
+  it('frees the lote in the plan when a reservation is canceled from the reservations tab', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+    renderPage('/lotes/loteo-1', undefined, undefined, (loteo, onReservationCanceled) => (
+      <button type="button" onClick={() => onReservationCanceled(loteo.lotes[1].id)}>
+        Cancelar reserva del lote 8
+      </button>
+    ))
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('tab', { name: 'Reservas' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar reserva del lote 8' }))
+
+    expect(screen.getByText('Reserva cancelada')).toBeInTheDocument()
+    expect(
+      screen
+        .getByRole('group', { name: 'Plano del loteo' })
+        .querySelector('[aria-label="Lote 8"]'),
+    ).toHaveAttribute('fill', 'var(--lot-available-plan)')
   })
 
   it('shows a not-found panel when the loteo does not exist', async () => {
@@ -230,7 +354,7 @@ describe('LoteoDetailPage', () => {
     expect(screen.getByText('No se pudo cargar el loteo, intentá nuevamente.')).toBeInTheDocument()
   })
 
-  it('drops the previous manzana filter when navigating to another loteo', async () => {
+  it('drops the previous search when navigating to another loteo', async () => {
     getLoteoMock.mockImplementation(async (loteoId) =>
       loteoId === 'loteo-2'
         ? detail({
@@ -250,16 +374,16 @@ describe('LoteoDetailPage', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Las Acacias' })
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Manzana' }), 'mz-2')
-    expect(screen.getAllByRole('row')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('tab', { name: 'Lotes' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar lote o manzana' }), '8')
+    expect(lotesRows()).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('link', { name: 'ir a loteo-2' }))
 
     await screen.findByRole('heading', { name: 'Altos del Sur' })
-    expect(screen.getByRole('combobox', { name: 'Manzana' })).toHaveValue('')
-    const rows = screen.getAllByRole('row')
-    expect(within(rows[1]).getByText('90')).toBeInTheDocument()
-    expect(within(rows[2]).getByText('91')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Lotes' }))
+    expect(screen.getByRole('searchbox', { name: 'Buscar lote o manzana' })).toHaveValue('')
+    expect(lotesRows()).toHaveLength(2)
   })
 
   it('tells the user when the loteo has no plan yet', async () => {
@@ -304,21 +428,22 @@ describe('LoteoDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(await screen.findByText('Lote guardado')).toBeInTheDocument()
-    expect(within(screen.getAllByRole('row')[1]).getByText('12')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lote 12 · Mz 1 · Disponible' })).toBeInTheDocument()
   })
 
-  it('selects a lote from the table and shows its data without opening edit mode', async () => {
+  it('selects a lote from the list and shows its data without opening edit mode', async () => {
     const user = userEvent.setup()
     getLoteoMock.mockResolvedValue(detail())
     renderPage()
 
     await screen.findByRole('heading', { name: 'Las Acacias' })
-    await user.click(screen.getByRole('row', { name: 'Lote 8' }))
+    await user.click(screen.getByRole('tab', { name: 'Lotes' }))
+    await user.click(screen.getByRole('button', { name: 'Lote 8 · Mz 2 · Reservado' }))
 
-    expect(screen.getByText('Número')).toBeInTheDocument()
+    expect(screen.getByText('Manzana 2 · 250 m²')).toBeInTheDocument()
     expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Habilitar edición' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Lote 8' })).toHaveAttribute('aria-pressed', 'true')
+    expect(planButton('Lote 8')).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('starts a newly selected lote in read-only mode after another lote was edited', async () => {
@@ -331,7 +456,7 @@ describe('LoteoDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
     expect(screen.getByLabelText('Número')).toHaveValue('7')
 
-    await user.click(screen.getByRole('button', { name: 'Lote 8' }))
+    await user.click(planButton('Lote 8'))
 
     expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Habilitar edición' })).toBeInTheDocument()
@@ -385,7 +510,7 @@ describe('LoteoDetailPage', () => {
 
     expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Lote 8' }))
+    await user.click(planButton('Lote 8'))
 
     expect(screen.queryByText('Ocurrió un error inesperado.')).not.toBeInTheDocument()
   })

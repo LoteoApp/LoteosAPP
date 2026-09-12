@@ -76,6 +76,17 @@ func CanCancelReservation(actorRole Rol, actorID, sellerID string, sameAgency, a
 	return actorRole == RolInmobiliaria && sameAgency && agencyAssigned
 }
 
+func CanCancelReservationForAgency(actorRole Rol, actorAgency, reservationAgency *string) bool {
+	if IsAdministrativeRole(actorRole) {
+		return true
+	}
+	return actorRole == RolInmobiliaria && samePointer(actorAgency, reservationAgency)
+}
+
+func samePointer(left, right *string) bool {
+	return left != nil && right != nil && *left == *right
+}
+
 func ValidateReservationReason(reason string) error {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
@@ -106,6 +117,11 @@ type ReservationActor struct {
 	Rol      Rol    `json:"rol"`
 }
 
+type ReservationAgency struct {
+	ID           string `json:"id"`
+	BusinessName string `json:"razonSocial"`
+}
+
 type ReservationHistoryEntry struct {
 	ID      string            `json:"id"`
 	Estado  ReservationState  `json:"estado"`
@@ -123,7 +139,9 @@ type Reservation struct {
 	Cliente           Cliente                   `json:"cliente"`
 	Vendedor          ReservationActor          `json:"vendedor"`
 	UsuarioAlta       ReservationActor          `json:"usuarioAlta"`
+	Inmobiliaria      *ReservationAgency        `json:"inmobiliaria,omitempty"`
 	Estado            ReservationState          `json:"estado"`
+	PuedeCancelar     bool                      `json:"puedeCancelar"`
 	FechaVencimiento  time.Time                 `json:"fechaVencimiento"`
 	FechaCreacion     time.Time                 `json:"fechaCreacion"`
 	FechaModificacion time.Time                 `json:"fechaModificacion"`

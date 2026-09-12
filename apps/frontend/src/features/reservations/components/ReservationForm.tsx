@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
@@ -18,6 +18,7 @@ type Props = {
   isSubmitting: boolean
   error: string | null
   fixedTarget?: boolean
+  disabled?: boolean
   onLoteoChange?: (value: string) => void
   onLoteChange?: (value: string) => void
   onReset?: () => void
@@ -27,6 +28,10 @@ type Props = {
   onCompleted?: () => void
   draft?: ReservationDraft
   onDraftChange?: (draft: ReservationDraft) => void
+  sellerIsFixed?: boolean
+  fixedSeller?: SellerOption
+  sellerRequired?: boolean
+  renderClientAction?: ReactNode
 }
 
 export default function ReservationForm({
@@ -40,6 +45,7 @@ export default function ReservationForm({
   isSubmitting,
   error,
   fixedTarget = false,
+  disabled = false,
   onLoteoChange,
   onLoteChange,
   onReset,
@@ -49,6 +55,10 @@ export default function ReservationForm({
   onCompleted,
   draft,
   onDraftChange,
+  sellerIsFixed = false,
+  fixedSeller,
+  sellerRequired = sellers.length > 1,
+  renderClientAction,
 }: Props) {
   const [localClienteId, setLocalClienteId] = useState('')
   const [localVendedorId, setLocalVendedorId] = useState('')
@@ -68,18 +78,28 @@ export default function ReservationForm({
     else setLocalVendedorId(value)
   }
 
+  function clearFieldError(field: string) {
+    setFieldErrors((current) => {
+      if (!(field in current)) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextErrors: Record<string, string> = {}
     if (!selectedLoteoId) nextErrors.loteo = 'Seleccioná un loteo.'
     if (!selectedLoteId) nextErrors.lote = 'Seleccioná un lote.'
     if (!clienteId) nextErrors.cliente = 'Seleccioná un cliente.'
-    if (sellers.length > 1 && !vendedorId) nextErrors.vendedor = 'Seleccioná un vendedor.'
+    const selectedSellerId = sellerIsFixed ? fixedSeller?.id ?? sellers[0]?.id ?? '' : vendedorId
+    if (sellerRequired && !selectedSellerId) nextErrors.vendedor = 'Seleccioná un vendedor.'
     setFieldErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
     const completed = await onSubmit(
-      { loteoId: selectedLoteoId, loteId: selectedLoteId, clienteId, vendedorId: vendedorId || (sellers.length === 1 ? sellers[0].id : undefined) },
+      { loteoId: selectedLoteoId, loteId: selectedLoteId, clienteId, vendedorId: selectedSellerId || undefined },
       idempotencyKey ?? localIdempotencyKey,
     )
     if (completed) {
@@ -136,24 +156,36 @@ export default function ReservationForm({
             value={clienteId}
             placeholder={clients.length ? 'Seleccioná un cliente' : 'No hay clientes activos'}
             options={clients.map((client) => ({ value: client.id, label: `${client.apellido}, ${client.nombre} · DNI ${client.dni}` }))}
-            onChange={setClienteId}
+            onChange={(value) => { setClienteId(value); clearFieldError('cliente') }}
             error={fieldErrors.cliente}
             disabled={clients.length === 0}
+            action={renderClientAction}
+            onOpenChange={(open) => { if (open) clearFieldError('cliente') }}
           />
-          <ReservationSelectField
-            id="reserva-vendedor"
-            label="Vendedor"
-            value={vendedorId}
-            placeholder={isLoadingSellers ? 'Cargando vendedores…' : 'Seleccioná un vendedor'}
-            options={sellers.map((seller) => ({ value: seller.id, label: `${seller.apellido}, ${seller.nombre}` }))}
-            onChange={setVendedorId}
-            error={fieldErrors.vendedor}
-            disabled={isLoadingSellers || sellers.length === 0}
-          />
+          {sellerIsFixed ? (
+            <Field>
+              <FieldLabel>Vendedor</FieldLabel>
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                {fixedSeller ? `${fixedSeller.apellido}, ${fixedSeller.nombre}` : isLoadingSellers ? 'Cargando vendedor…' : 'No hay un vendedor habilitado'}
+              </div>
+            </Field>
+          ) : (
+            <ReservationSelectField
+              id="reserva-vendedor"
+              label="Vendedor"
+              value={vendedorId}
+              placeholder={isLoadingSellers ? 'Cargando vendedores…' : 'Seleccioná un vendedor'}
+              options={sellers.map((seller) => ({ value: seller.id, label: `${seller.apellido}, ${seller.nombre}` }))}
+              onChange={(value) => { setVendedorId(value); clearFieldError('vendedor') }}
+              error={fieldErrors.vendedor}
+              disabled={isLoadingSellers || sellers.length === 0}
+              onOpenChange={(open) => { if (open) clearFieldError('vendedor') }}
+            />
+          )}
           <p className="text-sm text-muted-foreground">La fecha de vencimiento se calcula con la hora oficial del servidor.</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
-            <Button type="submit" disabled={isSubmitting || clients.length === 0 || sellers.length === 0}>
+            <Button type="submit" disabled={isSubmitting || disabled || clients.length === 0 || sellers.length === 0}>
               {isSubmitting ? 'Guardando…' : 'Confirmar reserva'}
             </Button>
           </div>
@@ -172,6 +204,8 @@ function ReservationSelectField({
   onChange,
   error,
   disabled = false,
+  action,
+  onOpenChange,
 }: {
   id: string
   label: string
@@ -181,14 +215,22 @@ function ReservationSelectField({
   onChange: (value: string) => void
   error?: string
   disabled?: boolean
+  action?: ReactNode
+  onOpenChange?: (open: boolean) => void
 }) {
   const errorId = `${id}-error`
-  const emptyValue = `${id}-empty`
+    const emptyValue = `${id}-empty`
   return (
     <Field data-invalid={Boolean(error)}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {action ? (
+        <div className="flex items-center justify-between gap-3">
+          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+          {action}
+        </div>
+      ) : <FieldLabel htmlFor={id}>{label}</FieldLabel>}
       <Select
         value={value || emptyValue}
+        onOpenChange={onOpenChange}
         onValueChange={(nextValue) => {
           const selectedValue = nextValue ?? emptyValue
           onChange(selectedValue === emptyValue ? '' : selectedValue)
