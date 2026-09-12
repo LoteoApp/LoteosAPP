@@ -478,6 +478,62 @@ describe('UsersPage', () => {
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
   })
 
+  it('filters the list by search text, matching first name, last name or email', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com' }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', email: 'luis@example.com' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.type(screen.getByLabelText('Buscar'), 'gomez')
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Buscar'))
+    await user.type(screen.getByLabelText('Buscar'), 'ana@example.com')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
+  })
+
+  it('ignores accents and casing when filtering by search text', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.type(screen.getByLabelText('Buscar'), 'PEREZ')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+  })
+
+  it('combines the search text with the role and status filters', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo', fechaBaja: null }),
+      usuario({ nombre: 'Ana', apellido: 'Torres', rol: 'administrativo', fechaBaja: '2026-01-15T00:00:00Z' }),
+      usuario({ nombre: 'Ana', apellido: 'Gómez', rol: 'escribano', fechaBaja: null }),
+    ]
+    renderUsersPage()
+    await screen.findAllByText(/^Ana /)
+
+    await user.type(screen.getByLabelText('Buscar'), 'ana')
+    await selectOption(user, 'Rol', 'Administrativo')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.getByText('Ana Torres')).toBeInTheDocument()
+    expect(screen.queryByText('Ana Gómez')).not.toBeInTheDocument()
+
+    await selectOption(user, 'Estado', 'Activos')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Ana Torres')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ana Gómez')).not.toBeInTheDocument()
+  })
+
   it('shows a message when the filters have no matches', async () => {
     const user = userEvent.setup()
     stored = [usuario({ nombre: 'Ana', apellido: 'Pérez', rol: 'administrativo' })]
@@ -506,8 +562,57 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('No hay usuarios cargados todavía.')
 
+    expect(screen.queryByLabelText('Buscar')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Rol')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
+  })
+
+  it('clears a stale backend error when cancelling out of the edit form', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    failure = { status: 409, message: 'No se enviaron campos para modificar' }
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText('No se enviaron campos para modificar')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('No se enviaron campos para modificar')).not.toBeInTheDocument()
+  })
+
+  it('clears a stale backend error when cancelling the inline deactivation confirmation', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    failure = { status: 409, message: 'El usuario ya está dado de baja' }
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByText('El usuario ya está dado de baja')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('El usuario ya está dado de baja')).not.toBeInTheDocument()
+  })
+
+  it('keeps a stale list load error visible when cancelling out of the create form', async () => {
+    const user = userEvent.setup()
+    failure = { status: 503, message: 'Servicio no disponible' }
+    renderUsersPage()
+    expect(await screen.findByText('Servicio no disponible')).toBeInTheDocument()
+
+    failure = null
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Servicio no disponible')).toBeInTheDocument()
+    expect(screen.queryByText('No hay usuarios cargados todavía.')).not.toBeInTheDocument()
   })
 
   it('hides the list while a form is open', async () => {
@@ -519,6 +624,7 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
 
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Buscar')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
   })
 })

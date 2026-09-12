@@ -68,12 +68,17 @@ func TestWithCORS(t *testing.T) {
 		var called bool
 		request := httptest.NewRequest(http.MethodOptions, "/api/v1/loteos", nil)
 		request.Header.Set("Origin", frontendOrigin)
+		request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+		request.Header.Set("Access-Control-Request-Headers", "authorization, content-type, idempotency-key")
 		recorder := httptest.NewRecorder()
 
 		server.WithCORS(frontendOrigin, okHandler(&called)).ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusNoContent {
 			t.Errorf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+		}
+		if got := recorder.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, Idempotency-Key" {
+			t.Errorf("Access-Control-Allow-Headers = %q", got)
 		}
 		if called {
 			t.Error("a preflight should not reach the wrapped handler")

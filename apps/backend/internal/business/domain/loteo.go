@@ -376,6 +376,7 @@ type Lote struct {
 	ID        string   `json:"id"`
 	ManzanaID string   `json:"manzanaId"`
 	Number    string   `json:"numero"`
+	State     LotState `json:"estado"`
 	Price     *float64 `json:"precio"`
 	Currency  string   `json:"moneda"`
 	Area      *float64 `json:"superficie"`

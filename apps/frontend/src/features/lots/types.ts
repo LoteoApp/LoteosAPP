@@ -41,6 +41,9 @@ export type DxfPolygon = {
   // Short label drawn on the plan (lote/manzana number, calle name).
   // Absent when that value has not been loaded yet.
   caption?: string
+  // Present only for persisted lote polygons, so the viewer can reflect the
+  // current business state without coupling to the lots feature data source.
+  lotState?: LotState
 }
 
 export type DxfValidationIssueCode =
@@ -94,10 +97,19 @@ export type LoteoManzana = {
   poligono: DxfPoint[]
 }
 
+export const LOT_STATES = ['disponible', 'reservado', 'vendido', 'finalizado'] as const
+
+export type LotState = (typeof LOT_STATES)[number]
+
+export function isLotState(value: unknown): value is LotState {
+  return typeof value === 'string' && (LOT_STATES as readonly string[]).includes(value)
+}
+
 export type LoteoLote = {
   id: string
   manzanaId: string
   numero: string
+  estado: LotState
   precio: number | null
   moneda: string
   superficie: number | null

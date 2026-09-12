@@ -322,6 +322,27 @@ los que importan e implementan los contratos del negocio. Por lo tanto:
 }
 ```
 
+### Reservas y vencimiento
+
+Las reservas viven en `business/domain/reservation.go`, con el contrato
+`business/gateway.ReservationRepository` y su fake en `gateway/gatewayfake`.
+Cada operación tiene un caso de uso independiente bajo
+`business/usecase/reservations`: alta, listado, detalle, cancelación,
+catálogo de vendedores y procesamiento de vencimientos. Los DTOs de estas
+rutas están en `delivery/webapp/dto/reservations` y cada ruta tiene su handler
+propio.
+
+`repository/postgres/reservation.go` mantiene la atomicidad comercial: protege
+la vigencia del loteo con un lock compartido, bloquea exclusivamente el lote y
+luego la reserva, y reutiliza
+`transitionLotState(ctx, tx, command)` para escribir el evento del lote en la
+misma transacción que el historial de la reserva. El worker
+`infrastructure/worker/reservation_expiry.go` ejecuta el caso de uso al
+iniciar y periódicamente; cada vencimiento usa una transacción independiente,
+revalida estado y plazo después de los locks y tolera varias instancias sin
+un mutex en memoria. `internal/app` inicia y detiene el worker antes de cerrar
+el pool.
+
 ### ABM de inmobiliarias
 
 Una inmobiliaria es una agencia externa asociada a los loteos
@@ -434,6 +455,19 @@ obligatorio.
 
 Decisiones de este recorte:
 
+- **La máquina de estados del lote vive en dominio y persistencia.**
+  `domain.LotState` contiene la única matriz de transiciones;
+  `gateway.LotStateRepository` expresa el compare-and-set y el adaptador
+  PostgreSQL bloquea primero la fila de `lotes` con `FOR UPDATE`, verifica el
+  estado esperado, agrega el evento y confirma todo en una transacción corta.
+  El caso de uso resuelve el actor y limita el loteo por rol/asignación. El
+  detalle expone `estado` para cada lote. No hay un endpoint genérico para
+  forzar estados: Reservas, Ventas y Cobranza deben invocar esta capacidad
+  dentro de su propia transaccion comercial.
+- **La UI de esta entrega solo informa el estado.** El cliente valida los
+  cuatro valores del contrato y `LotStateBadge` presenta una etiqueta común
+  en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
+  se ofrece un selector libre.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive
@@ -764,6 +798,14 @@ apps/frontend/src/
 
 También se crea cada directorio solamente cuando tenga contenido real.
 
+La feature `features/reservations` contiene su cliente API, hooks, formulario,
+filtros, lista, detalle, badge de estado y cancelación. `app` compone la sesión,
+los permisos y los datos de lotes: `/reservas` muestra el listado y el detalle,
+`/reservas/:id` muestra una reserva individual, y `LoteoDetailRoute` inyecta
+las acciones de reservar y cancelar en el panel de un lote, según el rol y el
+alcance devueltos por la API. `features/lots` no importa archivos internos de
+reservas; recibe las acciones mediante render props.
+
 ### Dirección de dependencias
 
 ```text
@@ -786,6 +828,9 @@ app → features → shared
   archivo); no debe convertirse en un directorio genérico de helpers.
 - Una feature no importa archivos internos de otra. La composición entre
   funcionalidades ocurre en `app`.
+- `features/reservations` sigue la misma separación por API, hooks,
+  componentes, páginas y tipos; usa `shared/api` y `shared/ui`, pero no
+  importa internals de `features/lots`, `features/clients` ni `features/auth`.
 - Se prefieren imports directos y no se crean archivos `index.ts` globales que
   reexporten gran parte de la aplicación.
 

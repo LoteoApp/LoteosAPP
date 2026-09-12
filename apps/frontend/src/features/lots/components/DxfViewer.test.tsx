@@ -39,6 +39,18 @@ describe('DxfViewer', () => {
     expect(svg.querySelector('[aria-label="Manzana"]')).toBeNull()
   })
 
+  it('uses the reserved lot paint for reserved lot polygons', () => {
+    const reserved = { ...polygons[2], lotState: 'reservado' as const }
+    render(<DxfViewer polygons={[reserved]} visibleLayers={new Set(['LOTES'])} />)
+
+    const lotPath = screen
+      .getByRole('img', { name: 'Plano del loteo' })
+      .querySelector('[aria-label="Lotes"]')
+
+    expect(lotPath).toHaveAttribute('fill', 'var(--lot-reserved)')
+    expect(lotPath).toHaveAttribute('stroke', 'var(--lot-reserved-foreground)')
+  })
+
   it('draws the lote and manzana numbers at the center of each polygon', () => {
     const labeled = polygons.map((polygon) => {
       if (polygon.layer === 'LOTES') return { ...polygon, caption: '7' }

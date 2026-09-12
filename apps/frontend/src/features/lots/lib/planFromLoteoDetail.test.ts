@@ -20,6 +20,7 @@ function detail(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
       id: 'shared',
       manzanaId: 'shared',
       numero: '1',
+      estado: 'disponible',
       precio: null,
       moneda: '',
       superficie: null,
@@ -44,6 +45,7 @@ describe('planFromLoteoDetail', () => {
     ])
     expect(polygons.every((polygon) => polygon.vertices.length === 3)).toBe(true)
     expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.caption).toBe('1')
+    expect(polygons.find((polygon) => polygon.layer === 'LOTES')?.lotState).toBe('disponible')
     expect(polygons.find((polygon) => polygon.layer === 'MANZANA')?.caption).toBe('1')
     expect(polygons.find((polygon) => polygon.layer === 'CALLE')?.caption).toBe('Los Álamos')
   })
@@ -87,6 +89,7 @@ describe('planFromLoteoDetail', () => {
           id: 'lt-1',
           manzanaId: 'mz-1',
           numero: '1',
+          estado: 'disponible',
           precio: null,
           moneda: '',
           superficie: null,

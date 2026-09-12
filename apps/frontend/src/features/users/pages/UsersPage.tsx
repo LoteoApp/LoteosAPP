@@ -8,6 +8,7 @@ import UserForm from '../components/UserForm'
 import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
+import { normalizeText } from '../../../shared/lib/normalizeText'
 import { isActivo, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
 
 function matchesRol(usuario: Usuario, filter: RolFilter): boolean {
@@ -21,6 +22,11 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
 }
 
+function matchesSearch(user: Usuario, search: string): boolean {
+  const fullName = normalizeText(`${user.nombre} ${user.apellido}`)
+  return fullName.includes(search) || normalizeText(user.email).includes(search)
+}
+
 type UsersPageProps = {
   accessToken: string | null
 }
@@ -29,9 +35,10 @@ type UsersPageProps = {
 // for an administrador, so no further role check is needed on top of it.
 export default function UsersPage({ accessToken }: UsersPageProps) {
   const token = accessToken ?? ''
-  const { usuarios, isLoading, isSubmitting, error, create, update, deactivate, reactivate } =
+  const { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate } =
     useUsers(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
+  const [search, setSearch] = useState('')
   const [rolFilter, setRolFilter] = useState<RolFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)
@@ -42,8 +49,12 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
   const formView = resolveFormView(formState, usuarios)
 
+  const normalizedSearch = normalizeText(search.trim())
   const filteredUsuarios = usuarios.filter(
-    (usuario) => matchesRol(usuario, rolFilter) && matchesEstado(usuario, estadoFilter),
+    (usuario) =>
+      matchesRol(usuario, rolFilter) &&
+      matchesEstado(usuario, estadoFilter) &&
+      (normalizedSearch === '' || matchesSearch(usuario, normalizedSearch)),
   )
 
   function validateCreate(values: UsuarioFormValues): string | null {
@@ -95,6 +106,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
           <Button
             onClick={() => {
               setCreatedCredentials(null)
+              clearError()
               setFormState({ mode: 'create' })
             }}
           >
@@ -132,7 +144,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                 isSubmitting={isSubmitting}
                 onSubmit={handleCreate}
                 onValidate={validateCreate}
-                onCancel={() => setFormState({ mode: 'closed' })}
+                onCancel={() => {
+                  clearError()
+                  setFormState({ mode: 'closed' })
+                }}
               />
             ) : (
               <UserForm
@@ -145,7 +160,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                 isSubmitting={isSubmitting}
                 onSubmit={(values) => handleUpdate(formView.usuario.id, values)}
                 onValidate={validateEdit}
-                onCancel={() => setFormState({ mode: 'closed' })}
+                onCancel={() => {
+                  clearError()
+                  setFormState({ mode: 'closed' })
+                }}
               />
             )}
           </CardContent>
@@ -160,8 +178,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
           {usuarios.length > 0 && (
             <UsersFilters
+              search={search}
               rolFilter={rolFilter}
               estadoFilter={estadoFilter}
+              onSearchChange={setSearch}
               onRolFilterChange={setRolFilter}
               onEstadoFilterChange={setEstadoFilter}
             />
@@ -181,10 +201,14 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                   isConfirmingBaja={confirmingBajaId === usuario.id}
                   onEdit={() => {
                     setCreatedCredentials(null)
+                    clearError()
                     setFormState({ mode: 'edit', id: usuario.id })
                   }}
                   onStartConfirmBaja={() => setConfirmingBajaId(usuario.id)}
-                  onCancelConfirmBaja={() => setConfirmingBajaId(null)}
+                  onCancelConfirmBaja={() => {
+                    clearError()
+                    setConfirmingBajaId(null)
+                  }}
                   onConfirmBaja={() => handleBaja(usuario)}
                   onReactivar={() => handleReactivar(usuario)}
                 />
