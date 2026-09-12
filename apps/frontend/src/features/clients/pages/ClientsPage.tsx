@@ -4,21 +4,15 @@ import { getUserRole, ROLE } from '../../../shared/auth/roles'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
-import { Input } from '../../../shared/ui/input'
-import { Label } from '../../../shared/ui/label'
+import { SearchField } from '../../../shared/ui/search-field'
+import { normalizeText } from '../../../shared/lib/normalizeText'
 import { useClients } from '../hooks/use-clients'
 import ClientForm from '../components/ClientForm'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { toClienteFormValues, type Cliente, type ClienteFormValues } from '../types'
 
-const DIACRITICS_PATTERN = /[\u0300-\u036f]/g
-
-function normalize(value: string): string {
-  return value.normalize('NFD').replace(DIACRITICS_PATTERN, '').toLowerCase()
-}
-
 function matchesSearch(cliente: Cliente, search: string): boolean {
-  const nombreCompleto = normalize(`${cliente.nombre} ${cliente.apellido}`)
+  const nombreCompleto = normalizeText(`${cliente.nombre} ${cliente.apellido}`)
   return nombreCompleto.includes(search) || cliente.dni.toLowerCase().includes(search)
 }
 
@@ -35,7 +29,7 @@ export default function ClientsPage() {
 
   const formView = resolveFormView(formState, clientes)
 
-  const normalizedSearch = normalize(search.trim())
+  const normalizedSearch = normalizeText(search.trim())
   const filteredClientes = normalizedSearch
     ? clientes.filter((cliente) => matchesSearch(cliente, normalizedSearch))
     : clientes
@@ -126,17 +120,13 @@ export default function ClientsPage() {
           )}
 
           {clientes.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="buscar-cliente">Buscar</Label>
-              <Input
-                id="buscar-cliente"
-                type="search"
-                placeholder="Nombre, apellido o DNI"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="max-w-sm"
-              />
-            </div>
+            <SearchField
+              id="buscar-cliente"
+              placeholder="Nombre, apellido o DNI"
+              value={search}
+              onChange={setSearch}
+              inputClassName="max-w-sm"
+            />
           )}
 
           {clientes.length > 0 && filteredClientes.length === 0 && (

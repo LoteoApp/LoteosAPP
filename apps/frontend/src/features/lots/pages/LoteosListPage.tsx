@@ -3,8 +3,7 @@ import { Plus } from 'lucide-react'
 import { Link } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
-import { Input } from '../../../shared/ui/input'
-import { Label } from '../../../shared/ui/label'
+import { SearchField } from '../../../shared/ui/search-field'
 import { useLoteos } from '../hooks/use-loteos'
 import LoteoZocaloCard from '../components/LoteoZocaloCard'
 
@@ -45,17 +44,13 @@ export default function LoteosListPage({ accessToken }: LoteosListPageProps) {
       </header>
 
       {showSearch && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="buscar-loteo">Buscar</Label>
-          <Input
-            id="buscar-loteo"
-            type="search"
-            placeholder="Nombre o ubicación"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="sm:max-w-xs"
-          />
-        </div>
+        <SearchField
+          id="buscar-loteo"
+          placeholder="Nombre o ubicación"
+          value={search}
+          onChange={setSearch}
+          inputClassName="sm:max-w-xs"
+        />
       )}
 
       {isLoading && loteos.length === 0 && (
