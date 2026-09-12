@@ -3,6 +3,7 @@ import { ApiError } from '../../../shared/api/client'
 import {
 	cancelReservation,
 	createReservation,
+	downloadReservationReceipt,
 	getReservation,
 	isReservationConflict,
 	listEligibleSellers,
@@ -10,11 +11,14 @@ import {
 } from './reservations'
 import { RESERVATION_STATES } from '../types'
 
-const apiFetchMock = vi.hoisted(() => vi.fn<(path: string, options?: Record<string, unknown>) => Promise<unknown>>())
+const { apiFetchMock, apiFetchBlobMock } = vi.hoisted(() => ({
+	apiFetchMock: vi.fn<(path: string, options?: Record<string, unknown>) => Promise<unknown>>(),
+	apiFetchBlobMock: vi.fn<(path: string, options?: Record<string, unknown>) => Promise<Blob>>(),
+}))
 
 vi.mock('../../../shared/api/client', async (importOriginal) => {
 	const original = await importOriginal<typeof import('../../../shared/api/client')>()
-	return { ...original, apiFetch: apiFetchMock }
+	return { ...original, apiFetch: apiFetchMock, apiFetchBlob: apiFetchBlobMock }
 })
 
 function reservation(overrides: Record<string, unknown> = {}) {
@@ -35,7 +39,11 @@ function reservation(overrides: Record<string, unknown> = {}) {
 	}
 }
 
-afterEach(() => apiFetchMock.mockReset())
+afterEach(() => {
+	apiFetchMock.mockReset()
+	apiFetchBlobMock.mockReset()
+	vi.unstubAllGlobals()
+})
 
 describe('reservation API', () => {
 	it('exposes the complete reservation state vocabulary', () => {
@@ -79,6 +87,26 @@ describe('reservation API', () => {
 			'/api/v1/reservas/reservation%2F1/cancelar',
 			{ method: 'POST', token: 'token', body: { razon: 'Cliente desistió' } },
 		])
+	})
+
+	it('downloads the generated receipt through the shared API client and preserves failures', async () => {
+		apiFetchBlobMock.mockResolvedValueOnce(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))
+		const file = await downloadReservationReceipt('token', 'reservation/1')
+		expect(file.type).toBe('application/pdf')
+		expect(file.size).toBe(8)
+		expect(apiFetchBlobMock).toHaveBeenCalledWith(
+			'/api/v1/reservas/reservation%2F1/comprobante',
+			{ token: 'token' },
+		)
+
+		apiFetchBlobMock.mockRejectedValueOnce(
+			new ApiError('No se puede acceder a este comprobante.', 'reservation_not_found', 404),
+		)
+		await expect(downloadReservationReceipt('token', 'missing')).rejects.toMatchObject({
+			code: 'reservation_not_found',
+			message: 'No se puede acceder a este comprobante.',
+			status: 404,
+		})
 	})
 
 	it('validates the seller catalog and rejects malformed responses', async () => {

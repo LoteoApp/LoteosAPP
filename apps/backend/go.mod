@@ -3,6 +3,8 @@ module loteosapp/backend
 go 1.26.6
 
 require (
+	codeberg.org/go-fonts/dejavu v0.4.0
+	codeberg.org/go-pdf/fpdf v0.12.0
 	github.com/MicahParks/keyfunc/v3 v3.8.1
 	github.com/aws/aws-sdk-go-v2 v1.43.8
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.38

@@ -47,10 +47,6 @@ export default function ReservationsPage({ accessToken = '' }: ReservationsPageP
         <Button render={<Link to="/lotes" />}>Abrir visor de lotes</Button>
       </div>
       <section className="grid gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Reservas cargadas</h2>
-          <p className="text-sm text-muted-foreground">Para crear una reserva, abrí un loteo y seleccioná un lote disponible en el visor.</p>
-        </div>
         <ReservationFilters
           search={search}
           state={state}

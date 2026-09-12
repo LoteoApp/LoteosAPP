@@ -33,7 +33,7 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
 		cliente: { id: client.id, nombre: client.nombre, apellido: client.apellido, dni: client.dni },
 		vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrador' },
 		usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
-		estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z',
+		estado: 'activa', puedeCancelar: true, fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z',
 		fechaModificacion: '2026-09-06T12:00:00Z', historial: [], ...overrides,
 	}
 }
@@ -79,8 +79,13 @@ describe('reservation components', () => {
 		render(<MemoryRouter><ReservationsList reservations={[reservation(), reservation({ id: 'reservation-2', estado: 'vencida' })]} onCancel={onCancel} /></MemoryRouter>)
 		expect(screen.getAllByRole('link', { name: 'Las Acacias' })[0]).toHaveAttribute('href', '/reservas/reservation-1')
 		expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
-	await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+		await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 		expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'reservation-1' }))
+
+		cleanup()
+		render(<MemoryRouter><ReservationsList reservations={[reservation({ puedeCancelar: false })]} onCancel={onCancel} /></MemoryRouter>)
+		expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
+		expect(screen.getByRole('link', { name: 'Ver loteo Las Acacias' })).toHaveAttribute('href', '/lotes/loteo-1')
 	})
 
 	it('renders reservation details and its audit history', () => {
@@ -125,9 +130,9 @@ describe('reservation components', () => {
 		expect(screen.getByText('Seleccioná un cliente.')).not.toBeNull()
 
 	await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
-	await user.click(screen.getByRole('option', { name: /Pérez, Ana/ }))
+	await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
 	await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
-	await user.click(screen.getByRole('option', { name: /Gómez, Beto/ }))
+	await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
 		await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
 		expect(onSubmit).toHaveBeenCalledWith({ loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1' }, expect.any(String))
 	})

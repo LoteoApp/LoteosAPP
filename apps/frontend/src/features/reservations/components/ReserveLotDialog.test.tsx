@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import type { ReservationClient, ReservationLot, SellerOption } from '../types'
 import ReserveLotDialog from './ReserveLotDialog'
 
@@ -41,6 +42,22 @@ beforeEach(() => {
 })
 
 describe('ReserveLotDialog', () => {
+	it('opens the full-screen reservation route without loading the modal catalogs', () => {
+		configureMocks()
+		render(
+			<MemoryRouter>
+				<ReserveLotDialog accessToken="token" loteoId="loteo-1" lote={lot} navigationOnly onCreated={vi.fn()} />
+			</MemoryRouter>,
+		)
+
+		expect(screen.getByRole('link', { name: 'Reservar lote' })).toHaveAttribute(
+			'href',
+			'/reservas/nueva/loteo-1/lot-12345678',
+		)
+		expect(useEligibleSellersMock).not.toHaveBeenCalled()
+		expect(useReservationMutationsMock).not.toHaveBeenCalled()
+	})
+
 	it('submits the selected lot and closes after success', async () => {
 		const user = userEvent.setup()
 		const onCreated = vi.fn()

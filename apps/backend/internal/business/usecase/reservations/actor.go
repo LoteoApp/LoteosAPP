@@ -28,14 +28,15 @@ func resolveActor(ctx context.Context, users gateway.UserRepository, actor Actor
 }
 
 func reservationScope(actor Actor) (gateway.ReservationScope, error) {
+	actorID := actor.AuthProviderID
 	if domain.HasRole(actor.Roles, domain.RolAdministrador) || domain.HasRole(actor.Roles, domain.RolAdministrativo) {
-		return gateway.ReservationScope{}, nil
+		return gateway.ReservationScope{ActorAuthProviderID: &actorID}, nil
 	}
 	if !domain.HasRole(actor.Roles, domain.RolInmobiliaria) {
 		return gateway.ReservationScope{}, domain.ErrNoAutorizado
 	}
 	id := actor.AuthProviderID
-	return gateway.ReservationScope{AssigneeAuthProviderID: &id, ByAgencyAssignment: true}, nil
+	return gateway.ReservationScope{AssigneeAuthProviderID: &id, ByAgencyAssignment: true, ActorAuthProviderID: &actorID}, nil
 }
 
 func hasReservationWriteRole(roles []string) bool {

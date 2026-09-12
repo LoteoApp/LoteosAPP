@@ -15,6 +15,7 @@ export default function ReservationDetails({ reservation }: { reservation: Reser
           <Info label="Cliente" value={`${reservation.cliente.nombre} ${reservation.cliente.apellido} · DNI ${reservation.cliente.dni}`} />
           <Info label="Vendedor" value={`${reservation.vendedor.nombre} ${reservation.vendedor.apellido}`} />
           <Info label="Cargada por" value={`${reservation.usuarioAlta.nombre} ${reservation.usuarioAlta.apellido}`} />
+          {reservation.inmobiliaria && <Info label="Inmobiliaria interviniente" value={reservation.inmobiliaria.razonSocial} />}
           <Info label="Creada" value={formatDateTime(reservation.fechaCreacion)} />
           <Info label="Vencimiento" value={formatDateTime(reservation.fechaVencimiento)} />
         </CardContent>

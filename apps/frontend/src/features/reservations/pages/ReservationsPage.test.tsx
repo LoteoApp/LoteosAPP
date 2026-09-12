@@ -17,7 +17,7 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
 		cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
 		vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrador' },
 		usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' }, estado: 'activa',
-		fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [],
+		fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [], puedeCancelar: true,
 		...overrides,
 	}
 }
@@ -38,6 +38,7 @@ describe('ReservationsPage', () => {
 		defaultMocks()
 		render(<MemoryRouter><ReservationsPage /></MemoryRouter>)
 		expect(screen.getByRole('heading', { name: 'Reservas' })).toBeInTheDocument()
+		expect(screen.queryByRole('heading', { name: 'Reservas cargadas' })).not.toBeInTheDocument()
 		expect(screen.getByRole('link', { name: 'Abrir visor de lotes' })).toHaveAttribute('href', '/lotes')
 		expect(screen.queryByRole('heading', { name: 'Nueva reserva' })).not.toBeInTheDocument()
 		expect(screen.queryByRole('combobox', { name: 'Loteo' })).not.toBeInTheDocument()

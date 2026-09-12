@@ -51,7 +51,7 @@ const reservation: Reservation = {
   cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
   vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'inmobiliaria' },
   usuarioAlta: { id: 'actor-1', nombre: 'Beto', apellido: 'Gómez', rol: 'inmobiliaria' },
-  estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [],
+  estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [], puedeCancelar: true,
 }
 
 function renderRoute() {
@@ -88,6 +88,22 @@ describe('LoteoDetailRoute', () => {
       { loteoId: 'loteo-1', loteId: 'lot-1', estado: 'activa', porPagina: 1 },
       { enabled: true },
     )
+  })
+
+  it('hides cancellation when the server denies permission', () => {
+    useAuthMock.mockReturnValue({ session: { access_token: 'token' }, user: { app_metadata: { role: 'inmobiliaria' } } })
+    useReservationsMock.mockReturnValue({
+      page: { reservas: [{ ...reservation, puedeCancelar: false }], pagina: 1, porPagina: 25, total: 1, paginas: 1 },
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+      prepend: vi.fn(),
+    })
+
+    renderRoute()
+
+    expect(screen.queryByRole('button', { name: 'Cancelar reserva' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver reserva' })).toBeInTheDocument()
   })
 
   it('creates a reservation from the visor', async () => {

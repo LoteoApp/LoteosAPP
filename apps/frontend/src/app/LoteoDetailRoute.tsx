@@ -3,7 +3,6 @@ import { Clock, ExternalLink, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { formatDateTime } from '../shared/lib/formatDateTime'
 import { useAuth } from '../features/auth/hooks/use-auth'
-import { useClients } from '../features/clients/hooks/use-clients'
 import { getUserRole, ROLE } from '../shared/auth/roles'
 import { Alert, AlertDescription, AlertTitle } from '../shared/ui/alert'
 import { Button } from '../shared/ui/button'
@@ -25,7 +24,6 @@ export default function LoteoDetailRoute() {
   const canEdit = role === ROLE.administrador || role === ROLE.agrimensor
   const canReserve = role === ROLE.administrador || role === ROLE.administrativo || role === ROLE.inmobiliaria
   const token = session?.access_token ?? ''
-  const clients = useClients(token, { enabled: canReserve })
   const mutations = useReservationMutations(token)
   const [cancelTarget, setCancelTarget] = useState<{
     reservation: Reservation
@@ -39,9 +37,7 @@ export default function LoteoDetailRoute() {
           accessToken={session?.access_token ?? ''}
           loteoId={loteoId}
           lote={lote}
-          clients={clients.clientes}
-          isLoadingClients={clients.isLoading}
-          clientsError={clients.error}
+          navigationOnly
           onCreated={onCreated}
         />
       )
@@ -199,14 +195,14 @@ function LotReservationSummary({
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onSelect({ reservation, onCanceled, refresh: reservations.refresh })}
-        >
-          <X aria-hidden />
-          Cancelar reserva
-        </Button>
+        {reservation.puedeCancelar === true && <Button
+            type="button"
+            variant="outline"
+            onClick={() => onSelect({ reservation, onCanceled, refresh: reservations.refresh })}
+          >
+            <X aria-hidden />
+            Cancelar reserva
+          </Button>}
         <Link
           to={`/reservas/${reservation.id}`}
           className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-lot-reserved-foreground/30 px-3 text-sm font-medium hover:bg-lot-reserved-foreground/10"

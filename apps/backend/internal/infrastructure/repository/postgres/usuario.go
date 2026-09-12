@@ -13,7 +13,7 @@ import (
 
 const uniqueViolationCode = "23505"
 
-const usuarioColumns = `id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, fecha_baja, created_at`
+const usuarioColumns = `id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, fecha_baja, created_at, inmobiliaria_id::text`
 
 type UserRepository struct {
 	pool *pgxpool.Pool
@@ -244,6 +244,6 @@ func scanTargets(usuario *domain.Usuario) []any {
 	return []any{
 		&usuario.ID, &usuario.AuthProviderID, &usuario.Email, &usuario.Nombre,
 		&usuario.Apellido, &usuario.Rol, &usuario.PerfilCompleto, &usuario.FechaBaja,
-		&usuario.CreatedAt,
+		&usuario.CreatedAt, &usuario.InmobiliariaID,
 	}
 }

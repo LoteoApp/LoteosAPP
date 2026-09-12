@@ -19,12 +19,13 @@ export default function ReservationsList({ reservations, onCancel }: {
               <div className="grid gap-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link to={`/reservas/${reservation.id}`} className="font-medium hover:underline">{reservation.loteoNombre}</Link>
+                  <Link to={`/lotes/${reservation.loteoId}`} className="text-sm text-muted-foreground hover:underline" aria-label={`Ver loteo ${reservation.loteoNombre}`}>Ver loteo</Link>
                   <ReservationStatusBadge state={reservation.estado} />
                 </div>
                 <p className="text-sm">{reservation.loteNumero ? `Lote ${reservation.loteNumero}` : 'Lote sin número'} · {reservation.cliente.nombre} {reservation.cliente.apellido}</p>
                 <p className="text-sm text-muted-foreground">Vence: {formatDateTime(reservation.fechaVencimiento)}</p>
               </div>
-              {reservation.estado === 'activa' && <Button variant="outline" onClick={() => onCancel(reservation)}>Cancelar</Button>}
+              {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" onClick={() => onCancel(reservation)}>Cancelar</Button>}
             </CardContent>
           </Card>
         </li>

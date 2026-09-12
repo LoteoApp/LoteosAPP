@@ -129,7 +129,8 @@ migrations/
 ├── 00006_enforce_single_active_loteo_dxf.sql
 ├── 00007_add_inmobiliarias_cuit_idx.sql
 ├── 00008_add_lot_state_machine.sql
-└── 00009_harden_reservations.sql
+├── 00009_harden_reservations.sql
+└── 00010_add_reservation_agency.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -170,6 +171,13 @@ la fecha de creación y el vencimiento. El `Down` elimina esos metadatos y
 constraints, por lo que no debe ejecutarse sobre datos reales: un rollback
 perdería las claves idempotentes y los hashes, aunque conserva las reservas y
 su historial.
+
+`00010_add_reservation_agency.sql` agrega `reservas.inmobiliaria_id` nullable,
+recupera la agencia histórica desde el vendedor cuando existe, crea un índice
+para el alcance por inmobiliaria y la incluye entre los campos inmutables de
+la reserva. Si el vendedor histórico no permite recuperar la agencia, queda
+`NULL`; el `Down` restaura el trigger anterior y elimina índice y columna, por
+lo que se perdería esa atribución histórica.
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
