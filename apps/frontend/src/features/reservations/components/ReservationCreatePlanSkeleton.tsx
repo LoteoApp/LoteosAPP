@@ -1,16 +1,10 @@
 export default function ReservationCreatePlanSkeleton() {
   return (
     <div
-      role="status"
-      aria-label="Cargando los datos para crear la reserva…"
-      aria-live="polite"
-      className="flex h-[28rem] min-w-0 flex-col rounded-xl bg-card p-3 ring-1 ring-foreground/10"
+      aria-hidden="true"
+      className="flex h-72 min-w-0 flex-col rounded-xl bg-card p-3 ring-1 ring-foreground/10 sm:h-[28rem]"
     >
-      <span className="sr-only">Cargando los datos para crear la reserva…</span>
-      <div
-        aria-hidden="true"
-        className="flex min-h-0 flex-1 animate-pulse flex-col gap-3 motion-reduce:animate-none"
-      >
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
           <div className="h-4 w-16 rounded-full bg-muted" />
           <div className="h-4 w-24 rounded-full bg-muted" />

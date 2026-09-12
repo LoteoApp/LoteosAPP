@@ -5,7 +5,7 @@ import { Button } from '../../../shared/ui/button'
 import { downloadReservationReceipt, getReservation } from '../api/reservations'
 import CancelReservationDialog from '../components/CancelReservationDialog'
 import ReservationDetails from '../components/ReservationDetails'
-import ReservationDetailsPlanSkeleton from '../components/ReservationDetailsPlanSkeleton'
+import ReservationDetailsPageSkeleton from '../components/ReservationDetailsPageSkeleton'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
 import type { Reservation } from '../types'
 
@@ -89,7 +89,7 @@ export default function ReservationDetailsPage({ accessToken = '', renderPlan }:
   return (
     <section className="flex flex-col gap-4">
       <Link to="/reservas" className="w-fit text-sm text-muted-foreground hover:text-foreground">Volver a reservas</Link>
-      {queryEnabled && isLoading && <ReservationDetailsPlanSkeleton />}
+      {queryEnabled && isLoading && <ReservationDetailsPageSkeleton />}
       {queryEnabled && error && <Alert variant="destructive"><AlertTitle>No se pudo cargar la reserva</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       {queryEnabled && !isLoading && !error && reservation && <>
         {renderPlan?.(reservation)}

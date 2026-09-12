@@ -3,11 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import CancelReservationForm from './CancelReservationForm'
+import ReservationCreatePageSkeleton from './ReservationCreatePageSkeleton'
 import ReservationDetails from './ReservationDetails'
+import ReservationDetailsPageSkeleton from './ReservationDetailsPageSkeleton'
 import ReservationFilters from './ReservationFilters'
 import ReservationForm from './ReservationForm'
 import ReservationStatusBadge from './ReservationStatusBadge'
 import ReservationsList from './ReservationsList'
+import ReservationsListSkeleton from './ReservationsListSkeleton'
 import type { Reservation, ReservationClient, ReservationLot, ReservationLoteoOption, SellerOption } from '../types'
 
 const lot: ReservationLot = {
@@ -154,4 +157,41 @@ describe('reservation components', () => {
 		expect(screen.getByText('Cargando vendedores…')).toBeInTheDocument()
 	})
 
+})
+
+describe('ReservationCreatePageSkeleton', () => {
+	it('announces a single loading region without exposing placeholder content', () => {
+		render(<ReservationCreatePageSkeleton />)
+		const placeholders = screen.getAllByRole('status')
+		expect(placeholders).toHaveLength(1)
+		expect(placeholders[0]).toHaveAccessibleName('Cargando los datos para crear la reserva…')
+		expect(placeholders[0]).toHaveAttribute('aria-live', 'polite')
+		expect(screen.queryByRole('button')).not.toBeInTheDocument()
+		expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+	})
+})
+
+describe('ReservationDetailsPageSkeleton', () => {
+	it('announces a single loading region without exposing placeholder content', () => {
+		render(<ReservationDetailsPageSkeleton />)
+		const placeholders = screen.getAllByRole('status')
+		expect(placeholders).toHaveLength(1)
+		expect(placeholders[0]).toHaveAccessibleName('Cargando el detalle de la reserva…')
+		expect(placeholders[0]).toHaveAttribute('aria-live', 'polite')
+		expect(screen.queryByRole('button')).not.toBeInTheDocument()
+		expect(screen.queryByRole('list')).not.toBeInTheDocument()
+	})
+})
+
+describe('ReservationsListSkeleton', () => {
+	it('announces a single loading region with the requested amount of placeholder rows', () => {
+		const { container } = render(<ReservationsListSkeleton rows={2} />)
+		const placeholders = screen.getAllByRole('status')
+		expect(placeholders).toHaveLength(1)
+		expect(placeholders[0]).toHaveAccessibleName('Cargando reservas…')
+		expect(placeholders[0]).toHaveAttribute('aria-live', 'polite')
+		expect(container.querySelectorAll('li')).toHaveLength(2)
+		expect(screen.queryByRole('button')).not.toBeInTheDocument()
+		expect(screen.queryByRole('link')).not.toBeInTheDocument()
+	})
 })

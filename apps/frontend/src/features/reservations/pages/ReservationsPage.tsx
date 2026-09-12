@@ -5,6 +5,7 @@ import { Button } from '../../../shared/ui/button'
 import CancelReservationDialog from '../components/CancelReservationDialog'
 import ReservationFilters from '../components/ReservationFilters'
 import ReservationsList from '../components/ReservationsList'
+import ReservationsListSkeleton from '../components/ReservationsListSkeleton'
 import ReservationsPagination from '../components/ReservationsPagination'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
 import { useReservations } from '../hooks/use-reservations'
@@ -54,7 +55,7 @@ export default function ReservationsPage({ accessToken = '' }: ReservationsPageP
           onStateChange={(value) => { setState(value); setPageNumber(1) }}
         />
         {reservations.error && <Alert variant="destructive"><AlertDescription>{reservations.error}</AlertDescription></Alert>}
-        {reservations.isLoading ? <p className="text-sm text-muted-foreground">Cargando reservas…</p> : <ReservationsList reservations={reservations.page.reservas} onCancel={(reservation) => { mutations.reset(); setCancelingId(reservation.id) }} />}
+        {reservations.isLoading ? <ReservationsListSkeleton /> : <ReservationsList reservations={reservations.page.reservas} onCancel={(reservation) => { mutations.reset(); setCancelingId(reservation.id) }} />}
         <ReservationsPagination
           page={reservations.page}
           isLoading={reservations.isLoading}

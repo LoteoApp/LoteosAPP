@@ -1,21 +1,24 @@
 type ReservationDetailsPlanSkeletonProps = {
   message?: string
+  presentational?: boolean
 }
 
 export default function ReservationDetailsPlanSkeleton({
   message = 'Cargando el detalle de la reserva…',
+  presentational = false,
 }: ReservationDetailsPlanSkeletonProps) {
+  const regionProps = presentational
+    ? ({ 'aria-hidden': true } as const)
+    : ({ role: 'status', 'aria-label': message, 'aria-live': 'polite' } as const)
   return (
     <div
-      role="status"
-      aria-label={message}
-      aria-live="polite"
-      className="flex h-[28rem] min-w-0 flex-col rounded-xl bg-card p-3 ring-1 ring-foreground/10"
+      {...regionProps}
+      className="flex h-72 min-w-0 flex-col rounded-xl bg-card p-3 ring-1 ring-foreground/10 sm:h-[28rem]"
     >
-      <span className="sr-only">{message}</span>
+      {!presentational && <span className="sr-only">{message}</span>}
       <div
         aria-hidden="true"
-        className="flex min-h-0 flex-1 animate-pulse flex-col gap-3 motion-reduce:animate-none"
+        className={`flex min-h-0 flex-1 flex-col gap-3 ${presentational ? '' : 'animate-pulse motion-reduce:animate-none'}`}
       >
         <div className="h-4 w-16 rounded-full bg-muted" />
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-muted/30">

@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
-import ReservationCreatePlanSkeleton from '../components/ReservationCreatePlanSkeleton'
+import ReservationCreatePageSkeleton from '../components/ReservationCreatePageSkeleton'
 import ReservationForm from '../components/ReservationForm'
 import { downloadReservationReceipt } from '../api/reservations'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
@@ -87,11 +87,7 @@ export default function ReservationCreatePage({
       <section className="flex min-h-0 flex-1 flex-col gap-4">
         <BackLink loteoId={loteoId} />
         <ReservationCreateHeader />
-        <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
-          <div className="min-w-0 lg:col-span-5">
-            <ReservationCreatePlanSkeleton />
-          </div>
-        </div>
+        <ReservationCreatePageSkeleton />
       </section>
     )
   }
