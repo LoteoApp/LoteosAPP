@@ -5,6 +5,7 @@ import { useLayerVisibility } from '../features/lots/hooks/use-layer-visibility'
 import { useLoteo } from '../features/lots/hooks/use-loteo'
 import { planFromLoteoDetail, planLabelsFromLoteoDetail } from '../features/lots/lib/planFromLoteoDetail'
 import type { LoteoDetail } from '../features/lots/types'
+import ReservationDetailsPlanSkeleton from '../features/reservations/components/ReservationDetailsPlanSkeleton'
 import type { Reservation } from '../features/reservations/types'
 
 type ReservationLoteoPlanProps = {
@@ -46,9 +47,9 @@ export default function ReservationLoteoPlan({
 
 export function ReservationDetailsPlan({ accessToken, reservation }: { accessToken: string; reservation: Reservation }) {
   const state = useLoteo(reservation.loteoId, accessToken)
-  if (state.status === 'loading') return <p className="text-sm text-muted-foreground">Cargando plano del loteo…</p>
+  if (state.status === 'loading') return <ReservationDetailsPlanSkeleton message="Cargando plano del loteo…" />
   if (state.status !== 'loaded') {
     return <Alert variant="destructive"><AlertDescription>No se pudo cargar el plano del loteo.</AlertDescription></Alert>
   }
-  return <ReservationLoteoPlan loteo={state.loteo} selectedLoteId={reservation.loteId} />
+  return <ReservationLoteoPlan loteo={state.loteo} selectedLoteId={reservation.loteId} variant="reference" />
 }

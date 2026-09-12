@@ -25,7 +25,17 @@ export default function ReservationsList({ reservations, onCancel }: {
                 <p className="text-sm">{reservation.loteNumero ? `Lote ${reservation.loteNumero}` : 'Lote sin número'} · {reservation.cliente.nombre} {reservation.cliente.apellido}</p>
                 <p className="text-sm text-muted-foreground">Vence: {formatDateTime(reservation.fechaVencimiento)}</p>
               </div>
-              {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" onClick={() => onCancel(reservation)}>Cancelar</Button>}
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <Button render={(
+                  <Link
+                    to={`/reservas/${reservation.id}`}
+                    aria-label={`Ver detalle de la reserva del ${reservation.loteNumero ? `lote ${reservation.loteNumero}` : 'lote sin número'} en ${reservation.loteoNombre}`}
+                  />
+                )}>
+                  Ver detalle
+                </Button>
+                {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" onClick={() => onCancel(reservation)}>Cancelar</Button>}
+              </div>
             </CardContent>
           </Card>
         </li>

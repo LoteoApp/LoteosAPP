@@ -1,7 +1,12 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import ReservationLoteoPlan from './ReservationLoteoPlan'
+import { describe, expect, it, vi } from 'vitest'
+import ReservationLoteoPlan, { ReservationDetailsPlan } from './ReservationLoteoPlan'
 import type { LoteoDetail } from '../features/lots/types'
+import type { Reservation } from '../features/reservations/types'
+
+const useLoteoMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../features/lots/hooks/use-loteo', () => ({ useLoteo: useLoteoMock }))
 
 const triangle = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]
 const loteo: LoteoDetail = {
@@ -12,6 +17,14 @@ const loteo: LoteoDetail = {
     { id: 'lot-2', manzanaId: 'block-1', numero: '8', estado: 'disponible', precio: 130000, moneda: 'USD', superficie: 310, caracteristicas: '', poligono: triangle },
   ],
   calles: [], fechaCreacion: '2026-08-20T12:00:00Z',
+}
+const reservation: Reservation = {
+  id: 'reservation-1', loteoId: loteo.id, loteoNombre: loteo.nombre, loteId: 'lot-1', loteNumero: '7',
+  cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
+  vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrador' },
+  usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
+  estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z',
+  fechaModificacion: '2026-09-06T12:00:00Z',
 }
 
 describe('ReservationLoteoPlan', () => {
@@ -43,5 +56,31 @@ describe('ReservationLoteoPlan', () => {
     expect(plan.getByText('7')).toBeInTheDocument()
     expect(plan.queryByText('8')).not.toBeInTheDocument()
     expect(contour).toHaveAttribute('fill', 'none')
+  })
+
+  it('uses the reference presentation in reservation details', () => {
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+
+    render(<ReservationDetailsPlan accessToken="token" reservation={reservation} />)
+    const plan = within(screen.getByRole('img', { name: 'Plano del loteo' }))
+    const selected = plan.getByLabelText('Lote 7')
+    const other = plan.getByLabelText('Lote 8')
+
+    expect(selected).toHaveAttribute('aria-description', 'Disponible')
+    expect(plan.getByText('7')).toBeInTheDocument()
+    expect(other).toHaveAttribute('fill', 'var(--plan-block)')
+    expect(other).not.toHaveAttribute('aria-description')
+    expect(plan.queryByText('8')).not.toBeInTheDocument()
+  })
+
+  it('shows an accessible detail placeholder while the plan is loading', () => {
+    useLoteoMock.mockReturnValue({ status: 'loading' })
+
+    render(<ReservationDetailsPlan accessToken="token" reservation={reservation} />)
+
+    const placeholder = screen.getByRole('status', { name: 'Cargando plano del loteo…' })
+    expect(placeholder).not.toHaveAttribute('aria-busy')
+    expect(placeholder).toHaveAttribute('aria-live', 'polite')
+    expect(screen.queryByRole('img', { name: 'Plano del loteo' })).not.toBeInTheDocument()
   })
 })

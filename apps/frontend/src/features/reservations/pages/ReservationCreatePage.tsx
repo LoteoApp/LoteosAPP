@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
+import ReservationCreatePlanSkeleton from '../components/ReservationCreatePlanSkeleton'
 import ReservationForm from '../components/ReservationForm'
 import { downloadReservationReceipt } from '../api/reservations'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
@@ -82,7 +83,17 @@ export default function ReservationCreatePage({
   }
 
   if (loteoStatus === 'loading') {
-    return <section className="flex flex-col gap-4"><BackLink loteoId={loteoId} /><p className="text-muted-foreground">Cargando el loteo…</p></section>
+    return (
+      <section className="flex min-h-0 flex-1 flex-col gap-4">
+        <BackLink loteoId={loteoId} />
+        <ReservationCreateHeader />
+        <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
+          <div className="min-w-0 lg:col-span-5">
+            <ReservationCreatePlanSkeleton />
+          </div>
+        </div>
+      </section>
+    )
   }
 
   if (loteoStatus !== 'loaded' || loteo === null) {
@@ -97,10 +108,7 @@ export default function ReservationCreatePage({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
       <BackLink loteoId={loteo.id} />
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Nueva reserva</h1>
-        <p className="text-sm text-muted-foreground">Corroborá el loteo y el lote antes de asociar el cliente.</p>
-      </div>
+      <ReservationCreateHeader />
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
           {renderPlan}
@@ -164,6 +172,15 @@ export default function ReservationCreatePage({
 
 function BackLink({ loteoId }: { loteoId: string }) {
   return <Link to={`/lotes/${loteoId}`} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft aria-hidden className="size-4" />Volver al loteo</Link>
+}
+
+function ReservationCreateHeader() {
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold text-foreground">Nueva reserva</h1>
+      <p className="text-sm text-muted-foreground">Corroborá el loteo y el lote antes de asociar el cliente.</p>
+    </div>
+  )
 }
 
 function Info({ label, value }: { label: string; value: string }) {

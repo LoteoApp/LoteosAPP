@@ -116,7 +116,12 @@ describe('ReservationCreatePage', () => {
   it('shows loading and unavailable loteo states without opening the reservation form', () => {
     configureMocks()
     renderPage({ loteoStatus: 'loading' })
-    expect(screen.getByText('Cargando el loteo…')).toBeInTheDocument()
+    const placeholder = screen.getByRole('status', { name: 'Cargando los datos para crear la reserva…' })
+    expect(placeholder).not.toHaveAttribute('aria-busy')
+    expect(placeholder).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByRole('heading', { name: 'Nueva reserva' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Volver al loteo' })).toHaveAttribute('href', '/lotes/loteo-1')
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument()
 
     cleanup()
     renderPage({ loteoStatus: 'not-found', loteo: null })

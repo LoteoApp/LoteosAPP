@@ -53,6 +53,17 @@ afterEach(() => {
 })
 
 describe('ReservationDetailsPage', () => {
+	it('shows an accessible detail placeholder while the reservation is loading', () => {
+		getReservationMock.mockImplementation(() => new Promise(() => undefined))
+
+		renderPage()
+
+		const placeholder = screen.getByRole('status', { name: 'Cargando el detalle de la reserva…' })
+		expect(placeholder).not.toHaveAttribute('aria-busy')
+		expect(placeholder).toHaveAttribute('aria-live', 'polite')
+		expect(screen.getByRole('link', { name: 'Volver a reservas' })).toHaveAttribute('href', '/reservas')
+	})
+
 	it('does not request details before the session token is available', async () => {
 		render(
 			<MemoryRouter initialEntries={['/reservas/reservation-1']}>

@@ -76,8 +76,10 @@ describe('reservation components', () => {
 		expect(screen.getByText('No hay reservas que coincidan con los filtros.')).toBeInTheDocument()
 
 		cleanup()
-		render(<MemoryRouter><ReservationsList reservations={[reservation(), reservation({ id: 'reservation-2', estado: 'vencida' })]} onCancel={onCancel} /></MemoryRouter>)
+		render(<MemoryRouter><ReservationsList reservations={[reservation(), reservation({ id: 'reservation-2', loteNumero: '8', estado: 'vencida' })]} onCancel={onCancel} /></MemoryRouter>)
 		expect(screen.getAllByRole('link', { name: 'Las Acacias' })[0]).toHaveAttribute('href', '/reservas/reservation-1')
+		expect(screen.getByRole('link', { name: 'Ver detalle de la reserva del lote 7 en Las Acacias' })).toHaveAttribute('href', '/reservas/reservation-1')
+		expect(screen.getByRole('link', { name: 'Ver detalle de la reserva del lote 8 en Las Acacias' })).toHaveAttribute('href', '/reservas/reservation-2')
 		expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
 		await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 		expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'reservation-1' }))
@@ -85,6 +87,7 @@ describe('reservation components', () => {
 		cleanup()
 		render(<MemoryRouter><ReservationsList reservations={[reservation({ puedeCancelar: false })]} onCancel={onCancel} /></MemoryRouter>)
 		expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
+		expect(screen.getByRole('link', { name: 'Ver detalle de la reserva del lote 7 en Las Acacias' })).toHaveAttribute('href', '/reservas/reservation-1')
 		expect(screen.getByRole('link', { name: 'Ver loteo Las Acacias' })).toHaveAttribute('href', '/lotes/loteo-1')
 	})
 
