@@ -50,6 +50,9 @@ func TestUserRepository(t *testing.T) {
 		if created.PerfilCompleto {
 			t.Error("Create() should not mark the profile as complete")
 		}
+		if created.InmobiliariaID != nil {
+			t.Errorf("Create() inmobiliaria id = %q, want none", *created.InmobiliariaID)
+		}
 		if created.CreatedAt.IsZero() {
 			t.Error("Create() should set created_at")
 		}
@@ -123,6 +126,47 @@ func TestUserRepository(t *testing.T) {
 		_, err := repository.UpdateProfile(context.Background(), newUUID(t), "Ana", "Gómez")
 		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
 			t.Fatalf("UpdateProfile() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		}
+	})
+
+	t.Run("create links an inmobiliaria user to its agency", func(t *testing.T) {
+		agencyID := seedInmobiliaria(t, pool)
+		authProviderID := newUUID(t)
+
+		created, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: authProviderID,
+			Email:          newEmail(t),
+			Rol:            domain.RolInmobiliaria,
+			InmobiliariaID: &agencyID,
+		})
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+		if created.InmobiliariaID == nil || *created.InmobiliariaID != agencyID {
+			t.Errorf("Create() inmobiliaria id = %v, want %q", created.InmobiliariaID, agencyID)
+		}
+
+		found, err := repository.FindByID(context.Background(), created.ID)
+		if err != nil {
+			t.Fatalf("FindByID() error = %v", err)
+		}
+		if found.InmobiliariaID == nil || *found.InmobiliariaID != agencyID {
+			t.Errorf("FindByID() inmobiliaria id = %v, want %q", found.InmobiliariaID, agencyID)
+		}
+	})
+
+	t.Run("create rejects an unknown agency", func(t *testing.T) {
+		unknown := newUUID(t)
+
+		_, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: newUUID(t),
+			Email:          newEmail(t),
+			Rol:            domain.RolInmobiliaria,
+			InmobiliariaID: &unknown,
+		})
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("Create() error = %v, want %v", err, domain.ErrAgencyNotFound)
 		}
 	})
 
@@ -385,4 +429,21 @@ func newUUID(t *testing.T) string {
 func newEmail(t *testing.T) string {
 	t.Helper()
 	return fmt.Sprintf("%s@example.com", newUUID(t))
+}
+
+func seedInmobiliaria(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+
+	var id string
+	err := pool.QueryRow(context.Background(), `
+		INSERT INTO inmobiliarias (razon_social, usuario_modificacion)
+		VALUES ($1, $2::uuid)
+		RETURNING id::text
+	`, "Lotes del Sur "+newUUID(t), seedUsuario(t, pool)).Scan(&id)
+	if err != nil {
+		t.Fatalf("seed inmobiliaria: %v", err)
+	}
+	t.Cleanup(func() { deleteInmobiliaria(t, pool, id) })
+
+	return id
 }

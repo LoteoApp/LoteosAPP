@@ -70,7 +70,8 @@ Endpoints operativos del backend:
 
 - `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
   usuario nuevo en Supabase Auth y en Postgres, devuelve una contraseña
-  temporal de un solo uso.
+  temporal de un solo uso. Para rol `inmobiliaria` recibe además
+  `inmobiliariaId` (una agencia activa); los otros roles no lo aceptan.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una

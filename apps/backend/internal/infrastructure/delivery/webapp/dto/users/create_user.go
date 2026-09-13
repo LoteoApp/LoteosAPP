@@ -7,6 +7,9 @@ type CreateUserRequest struct {
 	Apellido string `json:"apellido"`
 	Email    string `json:"email"`
 	Rol      string `json:"rol"`
+	// InmobiliariaID is required when Rol is inmobiliaria and must be
+	// omitted otherwise.
+	InmobiliariaID string `json:"inmobiliariaId,omitempty"`
 }
 
 type CreateUserResponse struct {

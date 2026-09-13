@@ -29,6 +29,7 @@ describe('listUsers', () => {
             nombre: 'Ana',
             apellido: 'Pérez',
             rol: 'administrativo',
+            inmobiliariaId: null,
             perfilCompleto: true,
             fechaBaja: null,
             createdAt: '2026-01-01T00:00:00Z',
@@ -152,6 +153,7 @@ describe('createUser', () => {
         nombre: 'Ana',
         apellido: 'Pérez',
         rol: 'administrativo',
+        inmobiliariaId: null,
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
@@ -180,6 +182,57 @@ describe('createUser', () => {
     })
   })
 
+  it('sends the agency of an inmobiliaria user and reads it back', async () => {
+    const fetchMock = stubFetch(
+      jsonResponse(201, {
+        id: 'usuario-2',
+        email: 'luis@example.com',
+        nombre: 'Luis',
+        apellido: 'Paz',
+        rol: 'inmobiliaria',
+        inmobiliariaId: 'inm-1',
+        perfilCompleto: true,
+        fechaBaja: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        temporaryPassword: 'temp-pass-456',
+      })
+    )
+
+    const created = await createUser('token-123', {
+      nombre: 'Luis',
+      apellido: 'Paz',
+      email: 'luis@example.com',
+      rol: 'inmobiliaria',
+      inmobiliariaId: 'inm-1',
+    })
+
+    expect(created.usuario.inmobiliariaId).toBe('inm-1')
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({ rol: 'inmobiliaria', inmobiliariaId: 'inm-1' })
+  })
+
+  it('rejects a user whose inmobiliariaId is neither null nor a string', async () => {
+    stubFetch(
+      jsonResponse(201, {
+        id: 'usuario-2',
+        email: 'luis@example.com',
+        nombre: 'Luis',
+        apellido: 'Paz',
+        rol: 'inmobiliaria',
+        inmobiliariaId: 42,
+        perfilCompleto: true,
+        fechaBaja: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        temporaryPassword: 'temp-pass-456',
+      })
+    )
+
+    await expect(
+      createUser('token-123', { nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria', inmobiliariaId: 'inm-1' })
+    ).rejects.toThrow('No se pudo completar la operación, intentá nuevamente.')
+  })
+
   it('rejects a created user with no temporary password', async () => {
     stubFetch(
       jsonResponse(201, {
@@ -188,6 +241,7 @@ describe('createUser', () => {
         nombre: 'Ana',
         apellido: 'Pérez',
         rol: 'administrativo',
+        inmobiliariaId: null,
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
@@ -227,6 +281,7 @@ describe('updateUser', () => {
         nombre: 'Ana María',
         apellido: 'Pérez',
         rol: 'administrativo',
+        inmobiliariaId: null,
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
@@ -277,6 +332,7 @@ describe('reactivateUser', () => {
         nombre: 'Ana',
         apellido: 'Pérez',
         rol: 'administrativo',
+        inmobiliariaId: null,
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',

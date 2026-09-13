@@ -18,6 +18,7 @@ function isUsuarioResponse(value: unknown): value is Usuario {
     typeof candidate.apellido === 'string' &&
     typeof candidate.rol === 'string' &&
     (GESTIONABLE_ROLES as readonly string[]).includes(candidate.rol) &&
+    (candidate.inmobiliariaId === null || typeof candidate.inmobiliariaId === 'string') &&
     typeof candidate.perfilCompleto === 'boolean' &&
     (candidate.fechaBaja === null || typeof candidate.fechaBaja === 'string') &&
     typeof candidate.createdAt === 'string'

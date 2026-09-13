@@ -5,6 +5,7 @@ import { ROLE_LABELS, isActivo, type Usuario } from '../types'
 
 type UserCardProps = {
   usuario: Usuario
+  agencyName: string | null
   isSubmitting: boolean
   isConfirmingBaja: boolean
   onEdit: () => void
@@ -16,6 +17,7 @@ type UserCardProps = {
 
 export default function UserCard({
   usuario,
+  agencyName,
   isSubmitting,
   isConfirmingBaja,
   onEdit,
@@ -35,8 +37,9 @@ export default function UserCard({
               {usuario.nombre} {usuario.apellido}
             </p>
             <p className="text-sm text-muted-foreground">{usuario.email}</p>
-            <div className="mt-1 flex gap-1.5">
+            <div className="mt-1 flex flex-wrap gap-1.5">
               <Badge variant="outline">{ROLE_LABELS[usuario.rol]}</Badge>
+              {agencyName && <Badge variant="outline">{agencyName}</Badge>}
               <Badge variant={activo ? 'default' : 'secondary'}>
                 {activo ? 'Activo' : 'Dado de baja'}
               </Badge>

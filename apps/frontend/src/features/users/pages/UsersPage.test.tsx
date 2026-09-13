@@ -10,12 +10,16 @@ type StoredUsuario = {
   nombre: string
   apellido: string
   rol: string
+  inmobiliariaId: string | null
   perfilCompleto: boolean
   fechaBaja: string | null
   createdAt: string
 }
 
 let stored: StoredUsuario[] = []
+let storedAgencies: { id: string; razonSocial: string }[] = []
+let agenciesFailure: { status: number; message: string } | null = null
+let lastCreateBody: Record<string, unknown> | null = null
 let failure: { status: number; message: string; code?: string } | null = null
 let nextId = 0
 let getGate: Promise<void> | null = null
@@ -28,6 +32,7 @@ function usuario(overrides: Partial<StoredUsuario>): StoredUsuario {
     nombre: 'Ana',
     apellido: 'Pérez',
     rol: 'administrativo',
+    inmobiliariaId: null,
     perfilCompleto: true,
     fechaBaja: null,
     createdAt: '2026-01-01T00:00:00Z',
@@ -53,6 +58,13 @@ function installFetch() {
         throw rejectWith
       }
 
+      if (method === 'GET' && url.includes('/api/v1/inmobiliarias')) {
+        if (agenciesFailure) {
+          return jsonResponse(agenciesFailure.status, { code: 'error', message: agenciesFailure.message })
+        }
+        return jsonResponse(200, { inmobiliarias: storedAgencies })
+      }
+
       if (failure) {
         return jsonResponse(failure.status, { code: failure.code ?? 'error', message: failure.message })
       }
@@ -75,12 +87,13 @@ function installFetch() {
       if (method === 'POST') {
         const values = JSON.parse(String(init?.body)) as Omit<
           StoredUsuario,
-          'id' | 'perfilCompleto' | 'fechaBaja' | 'createdAt'
-        >
+          'id' | 'inmobiliariaId' | 'perfilCompleto' | 'fechaBaja' | 'createdAt'
+        > & { inmobiliariaId?: string }
+        lastCreateBody = values
         if (stored.some((candidate) => candidate.email === values.email)) {
           return jsonResponse(409, { code: 'email_in_use', message: 'El email ya está en uso' })
         }
-        const created = usuario(values)
+        const created = usuario({ ...values, inmobiliariaId: values.inmobiliariaId ?? null })
         stored = [...stored, created]
         return jsonResponse(201, { ...created, temporaryPassword: 'temp-pass-123' })
       }
@@ -129,6 +142,9 @@ async function fillUserForm(
 
 beforeEach(() => {
   stored = []
+  storedAgencies = []
+  agenciesFailure = null
+  lastCreateBody = null
   failure = null
   nextId = 0
   getGate = null
@@ -626,5 +642,104 @@ describe('UsersPage', () => {
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Buscar')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument()
+  })
+
+  describe('inmobiliaria users', () => {
+    const lotesDelSur = { id: 'inm-1', razonSocial: 'Lotes del Sur' }
+    const altamira = { id: 'inm-2', razonSocial: 'Altamira Propiedades' }
+
+    it('only asks for the agency when the inmobiliaria role is chosen', async () => {
+      const user = userEvent.setup()
+      storedAgencies = [lotesDelSur, altamira]
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      expect(screen.queryByRole('combobox', { name: 'Inmobiliaria' })).not.toBeInTheDocument()
+
+      await selectOption(user, 'Rol', 'Inmobiliaria')
+      expect(screen.getByRole('combobox', { name: 'Inmobiliaria' })).toBeInTheDocument()
+
+      await selectOption(user, 'Rol', 'Escribano')
+      expect(screen.queryByRole('combobox', { name: 'Inmobiliaria' })).not.toBeInTheDocument()
+    })
+
+    it('requires an agency before creating an inmobiliaria user', async () => {
+      const user = userEvent.setup()
+      storedAgencies = [lotesDelSur]
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      await fillUserForm(user, { nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria' })
+      await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Elegí la inmobiliaria del usuario.')
+      expect(lastCreateBody).toBeNull()
+    })
+
+    it('links the new inmobiliaria user to the chosen agency', async () => {
+      const user = userEvent.setup()
+      storedAgencies = [lotesDelSur, altamira]
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      await fillUserForm(user, { nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria' })
+      await selectOption(user, 'Inmobiliaria', 'Altamira Propiedades')
+      await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+      const card = (await screen.findByText('Luis Paz')).closest('li') as HTMLElement
+      expect(within(card).getByText('Inmobiliaria')).toBeInTheDocument()
+      expect(within(card).getByText('Altamira Propiedades')).toBeInTheDocument()
+      expect(lastCreateBody).toMatchObject({ rol: 'inmobiliaria', inmobiliariaId: 'inm-2' })
+    })
+
+    it('does not send an agency for the other roles', async () => {
+      const user = userEvent.setup()
+      storedAgencies = [lotesDelSur]
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      await fillUserForm(user, { nombre: 'Ana', apellido: 'Pérez', email: 'ana@example.com', rol: 'escribano' })
+      await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+      await screen.findByText('Ana Pérez')
+      expect(lastCreateBody).not.toHaveProperty('inmobiliariaId')
+    })
+
+    it('shows the agency of an inmobiliaria user already stored', async () => {
+      storedAgencies = [lotesDelSur]
+      stored = [usuario({ nombre: 'Luis', apellido: 'Paz', rol: 'inmobiliaria', inmobiliariaId: 'inm-1' })]
+      renderUsersPage()
+
+      const card = (await screen.findByText('Luis Paz')).closest('li') as HTMLElement
+      expect(await within(card).findByText('Lotes del Sur')).toBeInTheDocument()
+    })
+
+    it('explains that an agency must exist before an inmobiliaria user can be created', async () => {
+      const user = userEvent.setup()
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      await selectOption(user, 'Rol', 'Inmobiliaria')
+
+      expect(screen.getByRole('combobox', { name: 'Inmobiliaria' })).toBeDisabled()
+      expect(screen.getByText(/No hay inmobiliarias activas/)).toBeInTheDocument()
+    })
+
+    it('shows the backend error when the agencies cannot be loaded', async () => {
+      const user = userEvent.setup()
+      agenciesFailure = { status: 503, message: 'Servicio no disponible' }
+      renderUsersPage()
+      await screen.findByText('No hay usuarios cargados todavía.')
+
+      await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+      await selectOption(user, 'Rol', 'Inmobiliaria')
+
+      expect(await screen.findByText('Servicio no disponible')).toBeInTheDocument()
+    })
   })
 })

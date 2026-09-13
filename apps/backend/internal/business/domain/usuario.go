@@ -24,7 +24,9 @@ var (
 	// ErrActorNoAprovisionado (no row at all) and from ErrUsuarioDadoDeBaja
 	// (a write targeting an inactive user) — this one blocks every request
 	// from an inactive caller, checked once per request in middleware.
-	ErrCuentaInactiva = &Error{Kind: KindForbidden, Code: "account_inactive", Message: "Tu cuenta fue dada de baja"}
+	ErrCuentaInactiva        = &Error{Kind: KindForbidden, Code: "account_inactive", Message: "Tu cuenta fue dada de baja"}
+	ErrInmobiliariaRequerida = &Error{Kind: KindInvalid, Code: "agency_required", Message: "Elegí la inmobiliaria del usuario"}
+	ErrInmobiliariaNoAplica  = &Error{Kind: KindInvalid, Code: "agency_not_applicable", Message: "Solo un usuario con rol inmobiliaria pertenece a una inmobiliaria"}
 )
 
 type Usuario struct {
@@ -34,6 +36,7 @@ type Usuario struct {
 	Nombre         string     `json:"nombre"`
 	Apellido       string     `json:"apellido"`
 	Rol            Rol        `json:"rol"`
+	InmobiliariaID *string    `json:"inmobiliariaId"`
 	PerfilCompleto bool       `json:"perfilCompleto"`
 	FechaBaja      *time.Time `json:"fechaBaja"`
 	CreatedAt      time.Time  `json:"createdAt"`

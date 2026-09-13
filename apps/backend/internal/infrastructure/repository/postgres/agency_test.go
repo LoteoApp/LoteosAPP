@@ -296,6 +296,47 @@ func TestInmobiliariaRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("find by id returns an active agency", func(t *testing.T) {
+		actor := seedUsuario(t, pool)
+		razonSocial := "Lotes del Sur " + newUUID(t)
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: razonSocial, ModifiedBy: actor,
+		})
+		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		found, err := repository.FindByID(context.Background(), created.ID)
+		if err != nil {
+			t.Fatalf("FindByID() error = %v", err)
+		}
+		if found.ID != created.ID || found.BusinessName != razonSocial {
+			t.Errorf("FindByID() = %#v", found)
+		}
+
+		if err := repository.SoftDelete(context.Background(), created.ID, actor); err != nil {
+			t.Fatalf("SoftDelete() error = %v", err)
+		}
+		if _, err := repository.FindByID(context.Background(), created.ID); !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("FindByID() after baja error = %v, want %v", err, domain.ErrAgencyNotFound)
+		}
+	})
+
+	t.Run("find by id not found", func(t *testing.T) {
+		for name, id := range map[string]string{
+			"unknown uuid": newUUID(t),
+			"not a uuid":   "nope",
+		} {
+			t.Run(name, func(t *testing.T) {
+				_, err := repository.FindByID(context.Background(), id)
+				if !errors.Is(err, domain.ErrAgencyNotFound) {
+					t.Fatalf("FindByID() error = %v, want %v", err, domain.ErrAgencyNotFound)
+				}
+			})
+		}
+	})
+
 	t.Run("update not found", func(t *testing.T) {
 		_, err := repository.Update(context.Background(), domain.AgencyUpdate{
 			ID: newUUID(t), BusinessName: inmobiliariaStrPtr("Lotes del Sur"), ModifiedBy: seedUsuario(t, pool),

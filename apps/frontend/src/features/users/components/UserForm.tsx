@@ -4,10 +4,12 @@ import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
 import { GESTIONABLE_ROLES, ROLE_LABELS } from '../types'
-import type { GestionableRol, UsuarioFormValues, UsuarioUpdateValues } from '../types'
+import type { AgencyOption, GestionableRol, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
 type CreateUserFormProps = {
   mode: 'create'
+  agencies: AgencyOption[]
+  agenciesError?: string | null
   submitLabel: string
   isSubmitting?: boolean
   onSubmit: (values: UsuarioFormValues) => void
@@ -35,6 +37,7 @@ export default function UserForm(props: UserFormProps) {
   const [apellido, setApellido] = useState(props.mode === 'edit' ? props.initialValue.apellido : '')
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState<GestionableRol>(GESTIONABLE_ROLES[0])
+  const [inmobiliariaId, setInmobiliariaId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +56,9 @@ export default function UserForm(props: UserFormProps) {
         apellido: trimmedApellido,
         email: email.trim(),
         rol,
+      }
+      if (rol === 'inmobiliaria' && inmobiliariaId) {
+        values.inmobiliariaId = inmobiliariaId
       }
       const validationError = props.onValidate(values)
       if (validationError) {
@@ -124,6 +130,42 @@ export default function UserForm(props: UserFormProps) {
                 </SelectContent>
               </Select>
             </div>
+            {rol === 'inmobiliaria' && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label htmlFor="inmobiliaria">Inmobiliaria</Label>
+                <Select
+                  name="inmobiliariaId"
+                  value={inmobiliariaId}
+                  onValueChange={(value) => setInmobiliariaId(value)}
+                  disabled={props.agencies.length === 0}
+                >
+                  <SelectTrigger id="inmobiliaria">
+                    <SelectValue placeholder="Elegí una inmobiliaria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectList>
+                      {props.agencies.map((agency) => (
+                        <SelectItem key={agency.id} value={agency.id}>
+                          {agency.razonSocial}
+                        </SelectItem>
+                      ))}
+                    </SelectList>
+                  </SelectContent>
+                </Select>
+                {props.agenciesError ? (
+                  <p className="text-sm text-destructive">{props.agenciesError}</p>
+                ) : props.agencies.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay inmobiliarias activas. Cargá una desde el módulo Inmobiliarias antes de crear
+                    este usuario.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    El usuario va a operar en nombre de esta inmobiliaria.
+                  </p>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex flex-col justify-end gap-1.5 sm:col-span-2">

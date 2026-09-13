@@ -102,8 +102,11 @@ simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
 inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
-vendedor. Asignar un usuario a su agencia (`usuarios.inmobiliaria_id`) queda
-para una futura iteración.
+vendedor. La asignación (`usuarios.inmobiliaria_id`) se hace en el
+[alta del usuario](#abm-de-administrativo-escribano-inmobiliaria-y-agrimensor):
+al elegir el rol inmobiliaria el formulario pide la agencia, entre las
+activas del catálogo, y el API la exige para ese rol y la rechaza para
+cualquier otro.
 
 ## Usuarios y roles
 
@@ -126,7 +129,9 @@ El administrador da de alta, edita (nombre y apellido), da de baja y
 reactiva usuarios con rol administrativo, escribano, inmobiliaria o
 agrimensor desde el módulo **Usuarios**. El email identifica la cuenta en
 el proveedor de identidad y no se edita desde acá; el rol se fija en el
-alta y no cambia después. La baja es lógica (`usuarios.fecha_baja`): el
+alta y no cambia después. Un usuario con rol inmobiliaria se crea ya
+vinculado a su agencia (`inmobiliariaId`, obligatorio solo para ese rol):
+la agencia tiene que estar activa, y no se reasigna desde este ABM. La baja es lógica (`usuarios.fecha_baja`): el
 usuario deja de poder operar pero su fila se conserva para no romper las FK
 de auditoría (`usuario_modificacion`, `usuario_loteos`, reservas, ventas).
 Reactivar limpia `fecha_baja` y deja al usuario operar de nuevo; no

@@ -79,7 +79,8 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 
 	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
 	userRepo := postgres.NewUserRepository(pool)
-	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient))
+	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
+	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, inmobiliariaRepo, adminClient))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
 	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
@@ -92,7 +93,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	deleteClientHandler := handler.NewDeleteClientHandler(clients.NewDeleteClient(clienteRepo, userRepo))
 	listClientsHandler := handler.NewListClientsHandler(clients.NewListClients(clienteRepo))
 
-	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
 	createAgencyHandler := handler.NewCreateAgencyHandler(agencies.NewCreateAgency(inmobiliariaRepo, userRepo))
 	updateAgencyHandler := handler.NewUpdateAgencyHandler(agencies.NewUpdateAgency(inmobiliariaRepo, userRepo))
 	deleteAgencyHandler := handler.NewDeleteAgencyHandler(agencies.NewDeleteAgency(inmobiliariaRepo, userRepo))

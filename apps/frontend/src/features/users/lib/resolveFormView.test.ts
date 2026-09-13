@@ -8,6 +8,7 @@ const usuario: Usuario = {
   nombre: 'Ana',
   apellido: 'Pérez',
   rol: 'administrativo',
+  inmobiliariaId: null,
   perfilCompleto: true,
   fechaBaja: null,
   createdAt: '2026-01-01T00:00:00Z',

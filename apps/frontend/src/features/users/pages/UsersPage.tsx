@@ -6,6 +6,7 @@ import CreatedCredentialsAlert from '../components/CreatedCredentialsAlert'
 import UserCard from '../components/UserCard'
 import UserForm from '../components/UserForm'
 import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
+import { useAgencyOptions } from '../hooks/use-agency-options'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { normalizeText } from '../../../shared/lib/normalizeText'
@@ -37,6 +38,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
   const token = accessToken ?? ''
   const { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate } =
     useUsers(token)
+  const { agencies, error: agenciesError } = useAgencyOptions(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [search, setSearch] = useState('')
   const [rolFilter, setRolFilter] = useState<RolFilter>('todos')
@@ -48,6 +50,13 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
   } | null>(null)
 
   const formView = resolveFormView(formState, usuarios)
+
+  function agencyNameOf(usuario: Usuario): string | null {
+    if (usuario.inmobiliariaId === null) {
+      return null
+    }
+    return agencies.find((agency) => agency.id === usuario.inmobiliariaId)?.razonSocial ?? null
+  }
 
   const normalizedSearch = normalizeText(search.trim())
   const filteredUsuarios = usuarios.filter(
@@ -63,6 +72,9 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
     }
     if (usuarios.some((usuario) => usuario.email === values.email)) {
       return 'Ya existe un usuario con ese correo electrónico.'
+    }
+    if (values.rol === 'inmobiliaria' && !values.inmobiliariaId) {
+      return 'Elegí la inmobiliaria del usuario.'
     }
     return null
   }
@@ -140,6 +152,8 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
               <UserForm
                 key="create"
                 mode="create"
+                agencies={agencies}
+                agenciesError={agenciesError}
                 submitLabel="Crear usuario"
                 isSubmitting={isSubmitting}
                 onSubmit={handleCreate}
@@ -197,6 +211,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
                 <UserCard
                   key={usuario.id}
                   usuario={usuario}
+                  agencyName={agencyNameOf(usuario)}
                   isSubmitting={isSubmitting}
                   isConfirmingBaja={confirmingBajaId === usuario.id}
                   onEdit={() => {

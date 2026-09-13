@@ -125,6 +125,34 @@ func (repository *AgencyRepository) List(ctx context.Context, search string) ([]
 	return found, nil
 }
 
+// FindByID returns the active agency with that id. A malformed id is
+// reported the same way as an unknown one, so a caller can't tell the two
+// apart any more than it could through List.
+func (repository *AgencyRepository) FindByID(ctx context.Context, id string) (domain.Agency, error) {
+	var agency domain.Agency
+
+	err := repository.pool.QueryRow(ctx, `
+		SELECT id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion
+		FROM inmobiliarias
+		WHERE id = $1::uuid AND fecha_baja IS NULL
+	`, id).Scan(
+		&agency.ID, &agency.BusinessName, &agency.CUIT,
+		&agency.Phone, &agency.Email, &agency.CreatedAt, &agency.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Agency{}, domain.ErrAgencyNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Agency{}, domain.ErrAgencyNotFound
+		}
+		return domain.Agency{}, err
+	}
+
+	return agency, nil
+}
+
 // mapAgencyWriteError translates a PostgreSQL unique-violation on the
 // inmobiliarias table into the right domain error. Only pgErr.ConstraintName
 // == cuitUniqueConstraint means "CUIT ya está en uso"; any other unique

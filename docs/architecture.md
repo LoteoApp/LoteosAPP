@@ -364,9 +364,12 @@ Decisiones de este recorte:
   necesite hoy.
 - **La asociación con loteos (`inmobiliaria_loteos`) queda afuera**, junto con
   conectar el selector de agencias del alta de loteo
-  (`features/lots/api/list-agencies.ts`, todavía un catálogo mock) y la
+  (`features/lots/api/list-agencies.ts`, todavía un catálogo mock). La
   asignación de usuarios con rol inmobiliaria a su agencia
-  (`usuarios.inmobiliaria_id`).
+  (`usuarios.inmobiliaria_id`) sí está resuelta, desde el alta de usuario:
+  `POST /api/v1/usuarios` recibe `inmobiliariaId`, obligatorio para ese rol
+  y rechazado para los demás, y lo valida contra las agencias activas antes
+  de tocar Supabase.
 - **Los identificadores de este módulo están en inglés** (`domain.Agency`,
   `BusinessName`, `AgencyRepository`, `AgencyListItem`), como pide
   `AGENTS.md`. Lo que sigue en español es lo que no es un identificador: las
