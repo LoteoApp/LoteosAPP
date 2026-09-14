@@ -57,6 +57,33 @@ func TestReservationAuthorizationRules(t *testing.T) {
 	}
 }
 
+func TestCanCancelReservationForAgency(t *testing.T) {
+	agencyOne := "agency-1"
+	agencyTwo := "agency-2"
+	cases := []struct {
+		name              string
+		role              domain.Rol
+		actorAgency       *string
+		reservationAgency *string
+		want              bool
+	}{
+		{name: "administrator can cancel", role: domain.RolAdministrador, want: true},
+		{name: "administrative can cancel", role: domain.RolAdministrativo, want: true},
+		{name: "agency can cancel its reservation", role: domain.RolInmobiliaria, actorAgency: &agencyOne, reservationAgency: &agencyOne, want: true},
+		{name: "seller cannot cancel after moving agencies", role: domain.RolInmobiliaria, actorAgency: &agencyOne, reservationAgency: &agencyTwo},
+		{name: "agency cannot cancel another agency reservation", role: domain.RolInmobiliaria, actorAgency: &agencyOne, reservationAgency: &agencyTwo},
+		{name: "agency without recorded reservation agency cannot cancel", role: domain.RolInmobiliaria, actorAgency: &agencyOne},
+		{name: "unrelated role cannot cancel", role: domain.RolAgrimensor, actorAgency: &agencyOne, reservationAgency: &agencyOne},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if got := domain.CanCancelReservationForAgency(test.role, test.actorAgency, test.reservationAgency); got != test.want {
+				t.Errorf("CanCancelReservationForAgency() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestValidateReservationReason(t *testing.T) {
 	if !errors.Is(domain.ValidateReservationReason("  "), domain.ErrReservationReasonRequired) {
 		t.Error("blank reason should be rejected")

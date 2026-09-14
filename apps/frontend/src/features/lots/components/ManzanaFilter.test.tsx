@@ -40,7 +40,11 @@ describe('ManzanaFilter', () => {
 
   it('does not render when there is a single manzana', () => {
     const { container } = render(
-      <ManzanaFilter manzanas={[manzana('mz-1', '1')]} value={ALL_MANZANAS} onChange={vi.fn()} />,
+      <ManzanaFilter
+        manzanas={[manzana('mz-1', '1')]}
+        value={ALL_MANZANAS}
+        onChange={vi.fn()}
+      />,
     )
 
     expect(container).toBeEmptyDOMElement()

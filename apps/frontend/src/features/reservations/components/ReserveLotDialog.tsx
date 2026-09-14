@@ -1,6 +1,7 @@
 import { CalendarPlus, X } from 'lucide-react'
 import { useId, useState } from 'react'
-import { Button } from '../../../shared/ui/button'
+import { Link } from 'react-router'
+import { Button, buttonVariants } from '../../../shared/ui/button'
 import {
   Dialog,
   DialogClose,
@@ -22,7 +23,8 @@ type ReserveLotDialogProps = {
   clients?: ReservationClient[]
   isLoadingClients?: boolean
   clientsError?: string | null
-  onCreated: () => void
+	onCreated: () => void
+	navigationOnly?: boolean
 }
 
 function lotLabel(lote: ReservationLot): string {
@@ -47,11 +49,44 @@ export default function ReserveLotDialog({
   accessToken,
   loteoId,
   lote,
+  navigationOnly = false,
+  onCreated,
+  ...dialogProps
+}: ReserveLotDialogProps) {
+  const disabledReason = reservationDisabledReason(lote)
+  if (navigationOnly) {
+    if (disabledReason) {
+      return (
+        <span title={disabledReason} className="inline-flex">
+          <Button type="button" disabled>
+            <CalendarPlus aria-hidden />
+            Reservar lote
+          </Button>
+        </span>
+      )
+    }
+    return (
+      <Link
+        className={buttonVariants()}
+        to={`/reservas/nueva/${encodeURIComponent(loteoId)}/${encodeURIComponent(lote.id)}`}
+      >
+        <CalendarPlus aria-hidden />
+        Reservar lote
+      </Link>
+    )
+  }
+  return <ReservationDialog accessToken={accessToken} loteoId={loteoId} lote={lote} onCreated={onCreated} {...dialogProps} />
+}
+
+function ReservationDialog({
+  accessToken,
+  loteoId,
+  lote,
   clients = [],
   isLoadingClients = false,
-  clientsError = null,
-  onCreated,
-}: ReserveLotDialogProps) {
+	clientsError = null,
+	onCreated,
+}: Omit<ReserveLotDialogProps, 'navigationOnly'>) {
   const [open, setOpen] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey)
   const [draft, setDraft] = useState<ReservationDraft>({ clienteId: '', vendedorId: '' })
@@ -89,12 +124,12 @@ export default function ReserveLotDialog({
   }
 
   const loadError = clientsError || sellersError
-  const trigger = (
-    <Button type="button" disabled={disabledReason !== null}>
+	const trigger = (
+		<Button type="button" disabled={disabledReason !== null}>
       <CalendarPlus aria-hidden />
       Reservar lote
     </Button>
-  )
+	)
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

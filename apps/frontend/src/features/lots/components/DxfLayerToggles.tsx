@@ -15,6 +15,7 @@ export default function DxfLayerToggles({
     <ToggleGroup
       multiple
       variant="outline"
+      size="sm"
       className="w-full md:w-fit"
       value={[...visibleLayers]}
       onValueChange={(next) => {
@@ -27,7 +28,7 @@ export default function DxfLayerToggles({
           key={layer}
           value={layer}
           aria-label={DXF_LAYER_LABELS[layer]}
-          className="min-h-11 min-w-11 flex-1 touch-manipulation md:min-h-8 md:flex-none"
+          className="min-h-11 min-w-11 flex-1 touch-manipulation text-xs md:min-h-8 md:flex-none"
         >
           {DXF_LAYER_LABELS[layer]}
         </ToggleGroupItem>

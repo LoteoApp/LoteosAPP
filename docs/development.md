@@ -86,12 +86,21 @@ Endpoints operativos del backend:
 - `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas` (requiere cuenta
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): crea una
   reserva de 360 horas. Recibe `clienteId` y, para los roles administrativos,
-  `vendedorId`; exige el header `Idempotency-Key`.
+  `vendedorId`; exige el header `Idempotency-Key`. La agencia del actor o del
+  vendedor seleccionado se persiste como atribución histórica.
 - `GET /api/v1/reservas` y `GET /api/v1/reservas/{id}`: listan o consultan
-  reservas dentro del alcance del actor. El listado admite `estado`,
+  reservas dentro del alcance del actor: administrativos ven todas y los
+  usuarios de inmobiliaria las asociadas a su agencia persistida. Incluyen
+  `puedeCancelar`, calculado en el servidor. El listado admite `estado`,
   `loteoId`, `q`, `pagina` y `porPagina`.
 - `POST /api/v1/reservas/{id}/cancelar`: cancela una reserva activa con el
-  body `{ "razon": "..." }`, si el actor tiene el alcance vigente.
+  body `{ "razon": "..." }`, si el actor es administrativo o pertenece a la
+  inmobiliaria persistida en la reserva.
+- `GET /api/v1/reservas/{id}/comprobante`: descarga el comprobante PDF para
+  una reserva dentro del alcance del actor. El documento incluye fecha de
+  emisión y un croquis de referencia sin escala con el lote reservado marcado;
+  aclara que no implica venta y que vence/cancela automáticamente a los 15 días
+  si no se concreta.
 - `GET /api/v1/loteos/{loteoId}/vendedores`: devuelve el catálogo mínimo de
   vendedores elegibles para ese loteo, sin otorgar acceso adicional al ABM de
   usuarios.
@@ -310,6 +319,11 @@ sin Docker: el backend con el comando de arriba y el frontend con
 `pnpm --filter @loteos/frontend dev`. El frontend no necesita Doppler porque
 lee `apps/frontend/.env` (Vite solo expone variables con prefijo `VITE_`, y en
 Doppler los secrets están sin ese prefijo).
+
+El flujo completo de reserva se abre en `/reservas/nueva/:loteoId/:loteId`;
+al guardarse ofrece la descarga del comprobante PDF y también queda disponible
+desde el detalle de la reserva (`/reservas/:id`). El detalle y la pantalla de
+alta muestran el plano completo del loteo con el lote correspondiente marcado.
 
 Fuera de Compose nadie aplica las migraciones: no hay un servicio `migrate`
 que corra antes del backend, así que las pendientes se aplican a mano. El

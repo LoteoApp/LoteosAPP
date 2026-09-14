@@ -1,0 +1,32 @@
+Verified output from review probes, September 7, 2026.
+Only isolated synthetic data was written.
+
+ISOLATED MIGRATIONS UP OK review_reservations_1788781168
+FIXTURE 5000 active reservations, 5010 lots
+CREATE run=1 ms=3161.26 state=activa error=<nil>
+CREATE run=2 ms=1826.54 state=activa error=<nil>
+CREATE run=3 ms=1829.47 state=activa error=<nil>
+LIST q="" ms=359.50 rows=25 total=5003 error=<nil>
+LIST q="Review" ms=165.93 rows=0 total=0 error=ERROR: invalid escape string (SQLSTATE 22025)
+LIST q="%" ms=498.09 rows=0 total=0 error=ERROR: invalid escape string (SQLSTATE 22025)
+EMPTY PAGE total=0 pages=0 error=<nil>
+AGENCY LIST rows=25 total=5000 error=<nil>
+EXPIRE processed=1 failures=0 error=<nil>
+CANCEL ACROSS EXPIRY requested_before_due=true completed_after_due=true state=cancelada error=<nil>
+
+AGENCY REVOKED WHILE CREATE WAITED state=activa error=<nil>
+DIFFERENT LOT SAME DEVELOPMENT lock_error=ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)
+MISSING NUMBER AND PRICE state=activa error=<nil>
+
+WORKER BLOCKED CANDIDATE run=1 candidates=1 processed=0 skipped=1 failures=0 error=<nil>
+WORKER BLOCKED CANDIDATE run=2 candidates=1 processed=0 skipped=1 failures=0 error=<nil>
+
+LIST PLAN variant=admin execution_ms=49.794 planning_ms=9.213
+LIST PLAN variant=agency execution_ms=59.944 planning_ms=2.62
+LIST PLAN variant=development execution_ms=23.519 planning_ms=1.899
+search-original ERROR: invalid escape string (SQLSTATE 22025)
+LIST PLAN variant=search-diagnostic-fixed execution_ms=30.477 planning_ms=3.386
+
+CHECK test error=<nil>
+CHECK test:coverage error=exit status 1
+CLEANUP schema=review_reservations_1788781168 error=<nil>

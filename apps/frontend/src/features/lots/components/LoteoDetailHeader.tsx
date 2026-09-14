@@ -1,7 +1,6 @@
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin, Pencil } from 'lucide-react'
 import { Link } from 'react-router'
-import { cn } from '../../../shared/lib/utils'
-import { formatDate } from '../../../shared/lib/formatDate'
+import { Button } from '../../../shared/ui/button'
 import type { LoteoDetail } from '../types'
 import LoteoStatusBadge from './LoteoStatusBadge'
 
@@ -10,16 +9,19 @@ type LoteoDetailHeaderProps = {
   hasPlan: boolean
 }
 
+function plural(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
 export default function LoteoDetailHeader({ loteo, hasPlan }: LoteoDetailHeaderProps) {
   const stats = [
-    { key: 'Lotes', value: loteo.lotes.length },
-    { key: 'Manzanas', value: loteo.manzanas.length },
-    { key: 'Calles', value: loteo.calles.length },
+    plural(loteo.lotes.length, 'lote', 'lotes'),
+    plural(loteo.manzanas.length, 'manzana', 'manzanas'),
+    plural(loteo.calles.length, 'calle', 'calles'),
   ]
-  const createdAt = formatDate(loteo.fechaCreacion)
 
   return (
-    <header className="flex flex-col gap-3">
+    <header className="flex flex-col gap-2">
       <Link
         to="/lotes"
         className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -31,45 +33,30 @@ export default function LoteoDetailHeader({ loteo, hasPlan }: LoteoDetailHeaderP
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold md:text-2xl">{loteo.nombre}</h1>
-          {loteo.ubicacion && (
-            <p className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin aria-hidden className="size-3.5 shrink-0" />
-              <span>{loteo.ubicacion}</span>
-            </p>
-          )}
+          <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+            {loteo.ubicacion && (
+              <>
+                <MapPin aria-hidden className="size-3.5 shrink-0" />
+                <span>{loteo.ubicacion}</span>
+                <span aria-hidden>·</span>
+              </>
+            )}
+            <span>{stats.join(' · ')}</span>
+          </p>
         </div>
-        <LoteoStatusBadge hasPlan={hasPlan} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <LoteoStatusBadge hasPlan={hasPlan} />
+          <Button type="button" variant="outline" size="sm" disabled title="Próximamente">
+            <Pencil aria-hidden />
+            Editar loteo
+          </Button>
+        </div>
       </div>
 
       {loteo.descripcion && (
         <p className="text-sm text-muted-foreground">{loteo.descripcion}</p>
       )}
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        {stats.map((stat, index) => (
-          <div
-            key={stat.key}
-            className={cn('flex flex-col', index > 0 && 'border-l border-border pl-5')}
-          >
-            <span className="text-lg font-semibold leading-none tabular-nums">
-              {stat.value}
-            </span>
-            <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-              {stat.key}
-            </span>
-          </div>
-        ))}
-        {createdAt && (
-          <div className="flex flex-col border-l border-border pl-5">
-            <span className="text-lg font-semibold leading-none tabular-nums">
-              {createdAt}
-            </span>
-            <span className="mt-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-              Alta
-            </span>
-          </div>
-        )}
-      </div>
     </header>
   )
 }

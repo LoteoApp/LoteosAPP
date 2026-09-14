@@ -39,7 +39,7 @@ func (useCase *listEligibleSellersUseCase) Execute(ctx context.Context, input Li
 	if loteoID == "" {
 		return nil, domain.ErrLoteoNotFound
 	}
-	sellers, err := useCase.repository.ListEligibleSellers(ctx, loteoID, input.Actor.AuthProviderID, scope)
+	sellers, err := useCase.repository.ListEligibleSellers(ctx, loteoID, scope)
 	if err != nil {
 		return nil, fromRepository(err)
 	}

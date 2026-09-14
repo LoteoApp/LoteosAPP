@@ -32,6 +32,25 @@ export async function apiFetch<T = unknown>(
   path: string,
   { method = 'GET', body, token, signal, headers: extraHeaders }: ApiFetchOptions = {},
 ): Promise<T> {
+  const response = await apiResponse(path, { method, body, token, signal, headers: extraHeaders })
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  return (text ? JSON.parse(text) : undefined) as T
+}
+
+export async function apiFetchBlob(path: string, options: ApiFetchOptions = {}): Promise<Blob> {
+  const response = await apiResponse(path, options)
+  return response.blob()
+}
+
+async function apiResponse(
+  path: string,
+  { method = 'GET', body, token, signal, headers: extraHeaders }: ApiFetchOptions,
+): Promise<Response> {
   const headers: Record<string, string> = { ...extraHeaders }
   if (token) {
     headers.Authorization = `Bearer ${token}`
@@ -66,18 +85,13 @@ export async function apiFetch<T = unknown>(
     // is worth showing — sign out and send the browser to /login instead of
     // letting the caller render the error inline.
     if (response.status === 401 || error.code === 'account_inactive') {
-      return blockAndRedirectToLogin<T>()
+      return blockAndRedirectToLogin<Response>()
     }
 
     throw error
   }
 
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  const text = await response.text()
-  return (text ? JSON.parse(text) : undefined) as T
+  return response
 }
 
 // Never resolves: the page is about to unload, so no caller should ever get

@@ -289,8 +289,8 @@ func TestCancelAndSellerUseCasesValidateInputsAndMapFailures(t *testing.T) {
 		if !repository.SellersScope.ForSale {
 			t.Fatalf("seller scope = %#v, want the agency peers included", repository.SellersScope)
 		}
-		if repository.SellersActor != actor.AuthProviderID {
-			t.Fatalf("seller actor = %q, want %q", repository.SellersActor, actor.AuthProviderID)
+		if repository.SellersScope.ActorAuthProviderID == nil || *repository.SellersScope.ActorAuthProviderID != actor.AuthProviderID {
+			t.Fatalf("seller scope actor = %v, want %q", repository.SellersScope.ActorAuthProviderID, actor.AuthProviderID)
 		}
 	})
 }
