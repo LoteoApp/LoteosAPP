@@ -91,18 +91,22 @@ export default function ReservationDetailsPage({ accessToken = '', renderPlan }:
       <Link to="/reservas" className="w-fit text-sm text-muted-foreground hover:text-foreground">Volver a reservas</Link>
       {queryEnabled && isLoading && <ReservationDetailsPageSkeleton />}
       {queryEnabled && error && <Alert variant="destructive"><AlertTitle>No se pudo cargar la reserva</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-      {queryEnabled && !isLoading && !error && reservation && <>
-        {renderPlan?.(reservation)}
-        <ReservationDetails reservation={reservation} />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" className="w-fit" onClick={handleDownloadReceipt} disabled={isDownloadingReceipt}>
-            {isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante'}
-          </Button>
-          {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>}
-          {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
+      {queryEnabled && !isLoading && !error && reservation && (
+        <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
+          <div className="min-w-0 lg:col-span-5">{renderPlan?.(reservation)}</div>
+          <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
+            <ReservationDetails reservation={reservation} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" className="w-fit" onClick={handleDownloadReceipt} disabled={isDownloadingReceipt}>
+                {isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante'}
+              </Button>
+              {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>}
+              {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
+            </div>
+            {receiptError && <Alert variant="destructive"><AlertTitle>No se pudo descargar el comprobante</AlertTitle><AlertDescription>{receiptError}</AlertDescription></Alert>}
+          </div>
         </div>
-        {receiptError && <Alert variant="destructive"><AlertTitle>No se pudo descargar el comprobante</AlertTitle><AlertDescription>{receiptError}</AlertDescription></Alert>}
-      </>}
+      )}
       {queryEnabled && !isLoading && !error && !reservation && <Button render={<Link to="/reservas" />}>Volver a reservas</Button>}
     </section>
   )

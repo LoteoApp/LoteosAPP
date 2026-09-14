@@ -7,40 +7,47 @@ export default function ReservationDetailsPageSkeleton() {
   return (
     <div role="status" aria-label={LOADING_MESSAGE} aria-live="polite">
       <span className="sr-only">{LOADING_MESSAGE}</span>
-      <div aria-hidden="true" className="grid min-w-0 animate-pulse gap-4 motion-reduce:animate-none">
-        <ReservationDetailsPlanSkeleton presentational />
-        <Card>
-          <CardHeader className="grid gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="h-5 w-40 rounded-md bg-muted" />
-              <div className="h-5 w-20 rounded-full bg-muted" />
-            </div>
-            <div className="h-4 w-24 rounded-full bg-muted" />
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <InfoPlaceholder valueClassName="w-56" />
-            <InfoPlaceholder valueClassName="w-40" />
-            <InfoPlaceholder valueClassName="w-44" />
-            <InfoPlaceholder valueClassName="w-36" />
-            <InfoPlaceholder valueClassName="w-48" />
-            <InfoPlaceholder valueClassName="w-48" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div className="h-5 w-28 rounded-md bg-muted" />
-          </CardHeader>
-          <CardContent>
-            <ol className="grid gap-3">
-              <HistoryEntryPlaceholder />
-              <HistoryEntryPlaceholder />
-              <HistoryEntryPlaceholder />
-            </ol>
-          </CardContent>
-        </Card>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="h-9 w-full rounded-md bg-muted sm:w-52" />
-          <div className="h-9 w-full rounded-md bg-muted sm:w-28" />
+      <div
+        aria-hidden="true"
+        className="grid min-w-0 animate-pulse gap-4 motion-reduce:animate-none lg:grid-cols-12 lg:items-start"
+      >
+        <div className="min-w-0 lg:col-span-5">
+          <ReservationDetailsPlanSkeleton presentational />
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
+          <Card>
+            <CardHeader className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="h-5 w-40 rounded-md bg-muted" />
+                <div className="h-5 w-20 rounded-full bg-muted" />
+              </div>
+              <div className="h-4 w-24 rounded-full bg-muted" />
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              <InfoPlaceholder valueClassName="w-56" />
+              <InfoPlaceholder valueClassName="w-40" />
+              <InfoPlaceholder valueClassName="w-44" />
+              <InfoPlaceholder valueClassName="w-36" />
+              <InfoPlaceholder valueClassName="w-48" />
+              <InfoPlaceholder valueClassName="w-48" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="h-5 w-28 rounded-md bg-muted" />
+            </CardHeader>
+            <CardContent>
+              <ol className="grid gap-3">
+                <HistoryEntryPlaceholder />
+                <HistoryEntryPlaceholder />
+                <HistoryEntryPlaceholder />
+              </ol>
+            </CardContent>
+          </Card>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="h-9 w-full rounded-md bg-muted sm:w-52" />
+            <div className="h-9 w-full rounded-md bg-muted sm:w-28" />
+          </div>
         </div>
       </div>
     </div>

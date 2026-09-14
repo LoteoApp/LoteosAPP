@@ -35,7 +35,7 @@ export default function ReservationLoteoPlan({
 
   return (
     <LoteoPlanPanel
-      className={variant === 'reference' ? 'h-[28rem] min-w-0' : 'min-w-0'}
+      className={variant === 'reference' ? 'h-72 min-w-0 sm:h-[28rem]' : 'min-w-0'}
       polygons={plan}
       visibleLayers={layers.visibleLayers}
       onVisibleLayersChange={layers.onVisibleLayersChange}
