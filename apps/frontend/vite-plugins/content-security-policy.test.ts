@@ -42,6 +42,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(prod).not.toContain('unsafe-inline')
   })
 
+  it('allows blob: images, for the object URLs ArchivosSection renders', () => {
+    const csp = buildContentSecurityPolicy({
+      apiUrl: 'http://localhost:8080',
+      supabaseUrl: 'https://example.supabase.co',
+      isDev: false,
+    })
+
+    expect(csp).toContain("img-src 'self' data: blob:")
+  })
+
   it('never allows unsafe-eval or inline scripts, in dev or prod', () => {
     for (const isDev of [true, false]) {
       const csp = buildContentSecurityPolicy({
