@@ -15,6 +15,8 @@ export type Usuario = {
   nombre: string
   apellido: string
   rol: GestionableRol
+  // Only set for rol inmobiliaria: the agency this user operates on behalf of.
+  inmobiliariaId?: string
   perfilCompleto: boolean
   fechaBaja: string | null
   createdAt: string
@@ -29,6 +31,8 @@ export type UsuarioFormValues = {
   apellido: string
   email: string
   rol: GestionableRol
+  // Required by the backend when rol is inmobiliaria, omitted otherwise.
+  inmobiliariaId?: string
 }
 
 export type UsuarioUpdateValues = {

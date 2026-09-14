@@ -72,4 +72,38 @@ type LoteoRepository interface {
 	// in object storage under file.StorageKey. It returns
 	// domain.ErrLoteoNotFound when loteoID names no loteo.
 	RecordDxfFile(ctx context.Context, actorAuthProviderID, loteoID string, file domain.NewLoteoDxfFile) (domain.LoteoDxfFile, error)
+
+	// RecordLoteoFile records a foto/plano attached to the loteo itself.
+	// Unlike RecordDxfFile it never supersedes an existing row: a loteo may
+	// carry several active fotos/planos at once. The bytes must already be in
+	// object storage under file.StorageKey. It returns domain.ErrLoteoNotFound
+	// when loteoID names no active loteo, and domain.ErrTooManyFiles once the
+	// loteo is already at domain.MaxFilesPerEntity — enforced atomically
+	// against concurrent calls for the same loteoID.
+	RecordLoteoFile(ctx context.Context, actorAuthProviderID, loteoID string, file domain.NewFile) (domain.File, error)
+
+	// RecordLoteFile records a foto/plano attached to one lote of loteoID.
+	// loteoID scopes the lookup the same way UpdateLote does: a lote that
+	// doesn't belong to loteoID returns domain.ErrLoteNotFound. It enforces
+	// domain.MaxFilesPerEntity atomically the same way RecordLoteoFile does.
+	RecordLoteFile(ctx context.Context, actorAuthProviderID, loteoID, loteID string, file domain.NewFile) (domain.File, error)
+
+	// ListLoteoFiles returns the active fotos/planos attached to the loteo
+	// itself, newest first.
+	ListLoteoFiles(ctx context.Context, loteoID string) ([]domain.File, error)
+
+	// ListLoteFiles returns the active fotos/planos attached to one lote,
+	// newest first.
+	ListLoteFiles(ctx context.Context, loteoID, loteID string) ([]domain.File, error)
+
+	// GetFile returns one active foto/plano attached either to loteoID
+	// itself or to one of its lotes. It returns domain.ErrFileNotFound when
+	// archivoID names nothing reachable through loteoID (including a DXF or
+	// a documento_legal, which this never reaches), so a caller can't tell
+	// whether the id belongs to another loteo or doesn't exist at all.
+	GetFile(ctx context.Context, loteoID, archivoID string) (domain.File, error)
+
+	// DeleteFile soft-deletes one active foto/plano reachable through
+	// loteoID, the same way GetFile resolves it.
+	DeleteFile(ctx context.Context, actorAuthProviderID, loteoID, archivoID string) error
 }

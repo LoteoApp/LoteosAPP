@@ -17,24 +17,26 @@ import (
 )
 
 type createUserStub struct {
-	usuario       domain.Usuario
-	tempPassword  string
-	err           error
-	called        bool
-	gotActorRoles []string
-	gotNombre     string
-	gotApellido   string
-	gotEmail      string
-	gotRol        string
+	usuario         domain.Usuario
+	tempPassword    string
+	err             error
+	called          bool
+	gotActorRoles   []string
+	gotNombre       string
+	gotApellido     string
+	gotEmail        string
+	gotRol          string
+	gotInmobiliaria string
 }
 
-func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nombre, apellido, email, rol string) (domain.Usuario, string, error) {
+func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nombre, apellido, email, rol, inmobiliariaID string) (domain.Usuario, string, error) {
 	stub.called = true
 	stub.gotActorRoles = actorRoles
 	stub.gotNombre = nombre
 	stub.gotApellido = apellido
 	stub.gotEmail = email
 	stub.gotRol = rol
+	stub.gotInmobiliaria = inmobiliariaID
 	return stub.usuario, stub.tempPassword, stub.err
 }
 
@@ -90,6 +92,29 @@ func TestCreateUserRoute(t *testing.T) {
 		}
 	})
 
+	t.Run("passes the agency id through for rol inmobiliaria", func(t *testing.T) {
+		t.Parallel()
+
+		createUser := &createUserStub{
+			usuario:      domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolInmobiliaria},
+			tempPassword: "temp-pass-123",
+		}
+		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
+
+		recorder := performCreateUserRequest(t, createUser, verifier, "valid-token",
+			map[string]string{
+				"nombre": "Ana", "apellido": "Gómez", "email": "ana@example.com",
+				"rol": domain.RolInmobiliaria, "inmobiliariaId": "agency-1",
+			})
+
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
+		}
+		if createUser.gotInmobiliaria != "agency-1" {
+			t.Errorf("use case called with inmobiliariaId=%q, want %q", createUser.gotInmobiliaria, "agency-1")
+		}
+	})
+
 	t.Run("rejects requests without a token", func(t *testing.T) {
 		t.Parallel()
 
@@ -133,6 +158,8 @@ func TestCreateUserRoute(t *testing.T) {
 			{name: "not authorized", err: domain.ErrNoAutorizado, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
 			{name: "invalid email", err: domain.ErrEmailInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_email"},
 			{name: "invalid rol", err: domain.ErrRolInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_rol"},
+			{name: "agency required", err: domain.ErrAgenciaRequerida, wantStatus: http.StatusBadRequest, wantCode: "agency_required"},
+			{name: "agency not found", err: domain.ErrAgencyNotFound, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
 			{name: "email in use", err: domain.ErrEmailEnUso, wantStatus: http.StatusConflict, wantCode: "email_in_use"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}

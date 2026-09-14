@@ -69,7 +69,7 @@ describe('reservation components', () => {
 		await user.type(screen.getByRole('searchbox', { name: 'Buscar' }), ' Pérez')
 		expect(onSearchChange).toHaveBeenCalled()
 		await user.click(screen.getByRole('combobox', { name: 'Estado' }))
-		await user.click(screen.getByRole('option', { name: 'Canceladas' }))
+		await user.click(await screen.findByRole('option', { name: 'Canceladas' }))
 		expect(onStateChange).toHaveBeenCalledWith('cancelada')
 	})
 

@@ -92,6 +92,33 @@ func (repository *AgencyRepository) SoftDelete(ctx context.Context, id, usuarioM
 	return nil
 }
 
+// FindByID returns an active agency by id. An id that isn't a well-formed
+// UUID is reported the same as one that doesn't match any row.
+func (repository *AgencyRepository) FindByID(ctx context.Context, id string) (domain.Agency, error) {
+	var agency domain.Agency
+
+	err := repository.pool.QueryRow(ctx, `
+		SELECT id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion
+		FROM inmobiliarias
+		WHERE id = $1::uuid AND fecha_baja IS NULL
+	`, id).Scan(
+		&agency.ID, &agency.BusinessName, &agency.CUIT,
+		&agency.Phone, &agency.Email, &agency.CreatedAt, &agency.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Agency{}, domain.ErrAgencyNotFound
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
+			return domain.Agency{}, domain.ErrAgencyNotFound
+		}
+		return domain.Agency{}, err
+	}
+
+	return agency, nil
+}
+
 func (repository *AgencyRepository) List(ctx context.Context, search string) ([]domain.Agency, error) {
 	rows, err := repository.pool.Query(ctx, `
 		SELECT id::text, razon_social, cuit, telefono, email, fecha_creacion, fecha_modificacion

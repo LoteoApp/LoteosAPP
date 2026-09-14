@@ -1,8 +1,13 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UsersPage from './UsersPage'
 import { ROLE_LABELS, type GestionableRol } from '../types'
+
+type StoredAgency = { id: string; razonSocial: string }
+
+let storedAgencies: StoredAgency[] = []
 
 type StoredUsuario = {
   id: string
@@ -10,6 +15,7 @@ type StoredUsuario = {
   nombre: string
   apellido: string
   rol: string
+  inmobiliariaId?: string
   perfilCompleto: boolean
   fechaBaja: string | null
   createdAt: string
@@ -48,6 +54,10 @@ function installFetch() {
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
+
+      if (method === 'GET' && url.includes('/inmobiliarias')) {
+        return jsonResponse(200, { inmobiliarias: storedAgencies })
+      }
 
       if (rejectWith) {
         throw rejectWith
@@ -105,7 +115,11 @@ function installFetch() {
 }
 
 function renderUsersPage() {
-  return render(<UsersPage accessToken="token-123" />)
+  return render(
+    <MemoryRouter>
+      <UsersPage accessToken="token-123" />
+    </MemoryRouter>
+  )
 }
 
 async function selectOption(user: ReturnType<typeof userEvent.setup>, triggerLabel: string, optionName: string) {
@@ -129,6 +143,7 @@ async function fillUserForm(
 
 beforeEach(() => {
   stored = []
+  storedAgencies = []
   failure = null
   nextId = 0
   getGate = null
@@ -262,6 +277,70 @@ describe('UsersPage', () => {
     const card = (await screen.findByText('Ana Pérez')).closest('li') as HTMLElement
     expect(within(card).getByText('Escribano')).toBeInTheDocument()
     expect(screen.getByText('temp-pass-123')).toBeInTheDocument()
+  })
+
+  it('shows the agency selector only while rol is inmobiliaria', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [{ id: 'agency-1', razonSocial: 'Lotes del Sur' }]
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
+
+    await selectOption(user, 'Rol', 'Inmobiliaria')
+    expect(await screen.findByLabelText('Inmobiliaria')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Nueva inmobiliaria' })).toHaveAttribute(
+      'href',
+      '/inmobiliarias'
+    )
+
+    await selectOption(user, 'Rol', 'Escribano')
+    expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
+  })
+
+  it('creates a user with rol inmobiliaria after selecting its agency', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [
+      { id: 'agency-1', razonSocial: 'Lotes del Sur' },
+      { id: 'agency-2', razonSocial: 'Altamira Propiedades' },
+    ]
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, {
+      nombre: 'Luis',
+      apellido: 'Paz',
+      email: 'luis@example.com',
+      rol: 'inmobiliaria',
+    })
+    await selectOption(user, 'Inmobiliaria', 'Altamira Propiedades')
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    const card = (await screen.findByText('Luis Paz')).closest('li') as HTMLElement
+    expect(within(card).getByText('Inmobiliaria')).toBeInTheDocument()
+  })
+
+  it('requires selecting an agency before creating a user with rol inmobiliaria', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [{ id: 'agency-1', razonSocial: 'Lotes del Sur' }]
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, {
+      nombre: 'Luis',
+      apellido: 'Paz',
+      email: 'luis@example.com',
+      rol: 'inmobiliaria',
+    })
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    expect(
+      await screen.findByText('Seleccioná la inmobiliaria a la que pertenece el usuario.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Luis Paz')).not.toBeInTheDocument()
   })
 
   it('requires nombre, apellido and email', async () => {

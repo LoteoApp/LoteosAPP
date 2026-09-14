@@ -13,7 +13,7 @@ import (
 
 const uniqueViolationCode = "23505"
 
-const usuarioColumns = `id::text, auth_provider_id::text, email, nombre, apellido, rol, perfil_completo, fecha_baja, created_at, inmobiliaria_id::text`
+const usuarioColumns = `id::text, auth_provider_id::text, email, nombre, apellido, rol, inmobiliaria_id::text, perfil_completo, fecha_baja, created_at`
 
 type UserRepository struct {
 	pool *pgxpool.Pool
@@ -27,10 +27,10 @@ func (repository *UserRepository) Create(ctx context.Context, usuario domain.Usu
 	var created domain.Usuario
 
 	err := repository.pool.QueryRow(ctx, `
-		INSERT INTO usuarios (auth_provider_id, email, nombre, apellido, rol, perfil_completo)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6)
+		INSERT INTO usuarios (auth_provider_id, email, nombre, apellido, rol, inmobiliaria_id, perfil_completo)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid, $7)
 		RETURNING `+usuarioColumns, usuario.AuthProviderID, usuario.Email, usuario.Nombre,
-		usuario.Apellido, usuario.Rol, usuario.PerfilCompleto).Scan(scanTargets(&created)...)
+		usuario.Apellido, usuario.Rol, usuario.AgencyID, usuario.PerfilCompleto).Scan(scanTargets(&created)...)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
@@ -243,7 +243,7 @@ func (repository *UserRepository) reconcileMissingUpdate(ctx context.Context, id
 func scanTargets(usuario *domain.Usuario) []any {
 	return []any{
 		&usuario.ID, &usuario.AuthProviderID, &usuario.Email, &usuario.Nombre,
-		&usuario.Apellido, &usuario.Rol, &usuario.PerfilCompleto, &usuario.FechaBaja,
-		&usuario.CreatedAt, &usuario.InmobiliariaID,
+		&usuario.Apellido, &usuario.Rol, &usuario.AgencyID, &usuario.PerfilCompleto, &usuario.FechaBaja,
+		&usuario.CreatedAt,
 	}
 }

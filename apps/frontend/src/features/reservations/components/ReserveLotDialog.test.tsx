@@ -72,9 +72,9 @@ describe('ReserveLotDialog', () => {
 		expect(screen.getByText('ID: lot-12345678')).toBeInTheDocument()
 
 		await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
-		await user.click(screen.getByRole('option', { name: /Pérez, Ana/ }))
+		await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
 		await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
-		await user.click(screen.getByRole('option', { name: /Gómez, Beto/ }))
+		await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
 		await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
 
 		expect(create).toHaveBeenCalledWith({ loteoId: 'loteo-1', loteId: lot.id, clienteId: 'client-1', vendedorId: 'seller-1' }, expect.any(String))
@@ -123,9 +123,9 @@ describe('ReserveLotDialog', () => {
 		render(<ReserveLotDialog accessToken="token" loteoId="loteo-1" lote={lot} clients={[client]} onCreated={onCreated} />)
 		await user.click(screen.getByRole('button', { name: 'Reservar lote' }))
 		await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
-		await user.click(screen.getByRole('option', { name: /Pérez, Ana/ }))
+		await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
 		await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
-		await user.click(screen.getByRole('option', { name: /Gómez, Beto/ }))
+		await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
 		await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
 
 		expect(create).toHaveBeenCalled()
@@ -142,9 +142,9 @@ describe('ReserveLotDialog', () => {
 		async function submit() {
 			await user.click(screen.getByRole('button', { name: 'Reservar lote' }))
 			await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
-			await user.click(screen.getByRole('option', { name: /Pérez, Ana/ }))
+			await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
 			await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
-			await user.click(screen.getByRole('option', { name: /Gómez, Beto/ }))
+			await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
 			await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
 		}
 

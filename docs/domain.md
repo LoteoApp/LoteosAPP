@@ -101,9 +101,11 @@ loteo–inmobiliaria, el control permanece visible pero deshabilitado para no
 simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
-inmobiliaria de una reserva. `reservas.inmobiliaria_id` conserva la agencia
-interviniente para mantener el alcance histórico aunque el usuario cambie de
-agencia. La venta mantiene su regla actual de derivar la agencia del vendedor.
+inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
+vendedor. La agencia se elige al dar de alta el usuario
+(`usuarios.inmobiliaria_id`): es obligatoria para rol inmobiliaria y no se
+guarda para ningún otro rol; el alta rechaza una agencia inexistente o dada
+de baja. No se reasigna después del alta.
 
 ## Usuarios y roles
 
@@ -114,7 +116,7 @@ quien asigna loteos y permisos.
 |---|---|---|
 | **Administrador** | Control total: crea usuarios, asigna permisos y loteos, gestiona ventas, cobranzas, edición/eliminación de lotes | — |
 | **Administrativo** | Visualizar información, editar ciertos datos (configurable, ver [Roles y permisos](#gestión-de-roles-y-permisos)), cargar ventas | Crear usuarios, asignar permisos, vender por sí mismo sin definición del admin, editar/eliminar lotes |
-| **Agrimensor** | Cargar DXF, fotos, planos e información de manzanas/lotes/calles en loteos asignados; editar loteos/manzanas/lotes/calles | Operar loteos no asignados |
+| **Agrimensor** | Cargar DXF; cargar fotos y planos del loteo o de un lote (no de una manzana); editar información de manzanas/lotes/calles en loteos asignados | Operar loteos no asignados |
 | **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas, lotes o calles |
 | **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 
