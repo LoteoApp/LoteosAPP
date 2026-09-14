@@ -12,10 +12,10 @@ import (
 // CreateUser gives a new user access to the system. Only callers with the
 // administrador role may do this. The role must be one of
 // gestionableRoles — this ABM doesn't create other administrador accounts.
-// agenciaID is required when rol is inmobiliaria (the agency the user
+// agencyID is required when rol is inmobiliaria (the agency the user
 // operates on behalf of) and ignored for every other role.
 type CreateUser interface {
-	Execute(ctx context.Context, actorRoles []string, nombre, apellido, email, rol, agenciaID string) (domain.Usuario, string, error)
+	Execute(ctx context.Context, actorRoles []string, nombre, apellido, email, rol, agencyID string) (domain.Usuario, string, error)
 }
 
 type createUserUseCase struct {
@@ -34,7 +34,7 @@ func NewCreateUser(repository gateway.UserRepository, identity gateway.IdentityP
 func (useCase *createUserUseCase) Execute(
 	ctx context.Context,
 	actorRoles []string,
-	nombre, apellido, email, rol, agenciaID string,
+	nombre, apellido, email, rol, agencyID string,
 ) (domain.Usuario, string, error) {
 	if !domain.HasRole(actorRoles, domain.RolAdministrador) {
 		return domain.Usuario{}, "", domain.ErrNoAutorizado
@@ -57,16 +57,16 @@ func (useCase *createUserUseCase) Execute(
 
 	// Only rol inmobiliaria carries an agency: any id sent for another role
 	// is ignored rather than persisted or validated.
-	var agencyID *string
+	var agencyIDPtr *string
 	if domain.Rol(rol) == domain.RolInmobiliaria {
-		agenciaID = strings.TrimSpace(agenciaID)
-		if agenciaID == "" {
+		agencyID = strings.TrimSpace(agencyID)
+		if agencyID == "" {
 			return domain.Usuario{}, "", domain.ErrAgenciaRequerida
 		}
-		if _, err := useCase.agencies.FindByID(ctx, agenciaID); err != nil {
+		if _, err := useCase.agencies.FindByID(ctx, agencyID); err != nil {
 			return domain.Usuario{}, "", fromRepository(err)
 		}
-		agencyID = &agenciaID
+		agencyIDPtr = &agencyID
 	}
 
 	authProviderID, temporaryPassword, err := useCase.identity.CreateUser(ctx, email, rol)
@@ -80,7 +80,7 @@ func (useCase *createUserUseCase) Execute(
 		Nombre:         nombre,
 		Apellido:       apellido,
 		Rol:            domain.Rol(rol),
-		AgencyID:       agencyID,
+		AgencyID:       agencyIDPtr,
 		PerfilCompleto: true,
 	})
 	if err != nil {

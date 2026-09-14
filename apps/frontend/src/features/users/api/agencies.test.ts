@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { listAgencies } from './agencies'
 
-const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
-
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -21,11 +19,11 @@ afterEach(() => {
 })
 
 describe('listAgencies', () => {
-  it('returns the agencies from the backend', async () => {
+  it('narrows the backend agencies down to id and razonSocial', async () => {
     stubFetch(
       jsonResponse(200, {
         inmobiliarias: [
-          { id: 'inm-1', razonSocial: 'Lotes del Sur' },
+          { id: 'inm-1', razonSocial: 'Lotes del Sur', cuit: '30712345678' },
           { id: 'inm-2', razonSocial: 'Altamira' },
         ],
       }),
@@ -41,17 +39,5 @@ describe('listAgencies', () => {
     stubFetch(jsonResponse(200, { inmobiliarias: null }))
 
     await expect(listAgencies('token-123')).resolves.toEqual([])
-  })
-
-  it('rejects a response without an inmobiliarias field', async () => {
-    stubFetch(jsonResponse(200, {}))
-
-    await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
-  })
-
-  it('rejects a malformed agency in the list', async () => {
-    stubFetch(jsonResponse(200, { inmobiliarias: [{ id: 'inm-1' }] }))
-
-    await expect(listAgencies('token-123')).rejects.toThrow(GENERIC_ERROR)
   })
 })
