@@ -102,8 +102,10 @@ simular una asociación que todavía no puede persistirse.
 
 Los usuarios con rol inmobiliaria pertenecen a una agencia; esa es la
 inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
-vendedor. Asignar un usuario a su agencia (`usuarios.inmobiliaria_id`) queda
-para una futura iteración.
+vendedor. La agencia se elige al dar de alta el usuario
+(`usuarios.inmobiliaria_id`): es obligatoria para rol inmobiliaria y no se
+guarda para ningún otro rol; el alta rechaza una agencia inexistente o dada
+de baja. No se reasigna después del alta.
 
 ## Usuarios y roles
 

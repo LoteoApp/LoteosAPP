@@ -26,6 +26,11 @@ type AgencyRepository struct {
 	ListErr    error
 	ListResult []domain.Agency
 	ListSearch string
+
+	FindByIDCalls int
+	FindByIDErr   error
+	FoundByID     domain.Agency
+	FindByIDInput string
 }
 
 func (fake *AgencyRepository) Create(_ context.Context, agency domain.Agency) (domain.Agency, error) {
@@ -72,4 +77,13 @@ func (fake *AgencyRepository) List(_ context.Context, search string) ([]domain.A
 		return nil, fake.ListErr
 	}
 	return fake.ListResult, nil
+}
+
+func (fake *AgencyRepository) FindByID(_ context.Context, id string) (domain.Agency, error) {
+	fake.FindByIDCalls++
+	fake.FindByIDInput = id
+	if fake.FindByIDErr != nil {
+		return domain.Agency{}, fake.FindByIDErr
+	}
+	return fake.FoundByID, nil
 }
