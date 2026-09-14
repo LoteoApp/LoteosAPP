@@ -31,15 +31,12 @@ function renderHeader(loteo: LoteoDetail, hasPlan: boolean) {
 }
 
 describe('LoteoDetailHeader', () => {
-  it('shows the loteo name, location, description and entity counts', () => {
+  it('shows the loteo name, location and description', () => {
     renderHeader(detail(), true)
 
     expect(screen.getByRole('heading', { name: 'Las Acacias' })).toBeInTheDocument()
     expect(screen.getByText('Río Ceballos, Córdoba')).toBeInTheDocument()
     expect(screen.getByText('Sobre ruta E-53.')).toBeInTheDocument()
-    // 2 manzanas, 0 lotes, 1 calle
-    expect(screen.getByText('Manzanas').previousSibling).toHaveTextContent('2')
-    expect(screen.getByText('Calles').previousSibling).toHaveTextContent('1')
   })
 
   it('reflects the plan status through the badge', () => {

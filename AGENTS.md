@@ -1,5 +1,17 @@
 # LoteosAPP
 
+## Flujo multi-agent v2
+
+- Por defecto, el agente actual analiza, implementa y verifica el trabajo directamente, sin delegarlo a subagentes.
+- Usar el flujo secuencial de subagentes únicamente cuando el usuario lo solicite expresamente:
+  1. Delegar el análisis y el plan a `planner_v2`.
+  2. Esperar su resultado y entregárselo a `programmer_v2` para que implemente y verifique el cambio.
+  3. Esperar la implementación y delegar la revisión final a `reviewer_v2`.
+  4. Si la revisión encuentra defectos accionables, reenviar esos hallazgos a `programmer_v2` y repetir la revisión hasta que no queden defectos accionables.
+- Cuando se use el flujo de subagentes, el agente principal coordina, conserva las decisiones del usuario y entrega la respuesta final; no implementa en paralelo con `programmer_v2`.
+- Los tres agentes se ejecutan en orden, no en paralelo, porque cada etapa depende del resultado anterior.
+- No permitir que estos subagentes creen otros subagentes; la orquestación pertenece únicamente al agente principal.
+
 ## Language
 
 - Respond to the user in Spanish.

@@ -1,4 +1,4 @@
-import { ApiError, apiFetch } from '../../../shared/api/client'
+import { ApiError, apiFetch, apiFetchBlob } from '../../../shared/api/client'
 import type { Reservation, ReservationListFilters, ReservationPage, SellerOption } from '../types'
 
 const RESERVATIONS_PATH = '/api/v1/reservas'
@@ -22,6 +22,10 @@ function isActor(value: unknown): value is SellerOption {
   )
 }
 
+function isAgency(value: unknown): value is NonNullable<Reservation['inmobiliaria']> {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.razonSocial === 'string'
+}
+
 function isReservation(value: unknown): value is Reservation {
   if (!isRecord(value) || !isState(value.estado)) return false
   const client = value.cliente
@@ -39,7 +43,9 @@ function isReservation(value: unknown): value is Reservation {
     typeof client.apellido === 'string' &&
     typeof client.dni === 'string' &&
     isActor(value.vendedor) &&
-    isActor(value.usuarioAlta)
+    isActor(value.usuarioAlta) &&
+    (value.inmobiliaria === undefined || isAgency(value.inmobiliaria)) &&
+    (value.puedeCancelar === undefined || typeof value.puedeCancelar === 'boolean')
   )
 }
 
@@ -118,6 +124,10 @@ export async function cancelReservation(token: string, id: string, razon: string
     body: { razon },
   })
   return readBody(body, isReservation)
+}
+
+export async function downloadReservationReceipt(token: string, id: string): Promise<Blob> {
+  return apiFetchBlob(`${RESERVATIONS_PATH}/${encodeURIComponent(id)}/comprobante`, { token })
 }
 
 export function isReservationConflict(error: unknown): boolean {

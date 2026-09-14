@@ -1,12 +1,15 @@
 package handler_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/usecase/reservations"
@@ -50,6 +53,19 @@ type getReservationHandlerStub struct {
 }
 
 func (stub *getReservationHandlerStub) Execute(_ context.Context, actor reservations.Actor, id string) (domain.Reservation, error) {
+	stub.actor = actor
+	stub.id = id
+	return stub.result, stub.err
+}
+
+type getReservationReceiptHandlerStub struct {
+	actor  reservations.Actor
+	id     string
+	result reservations.ReservationReceipt
+	err    error
+}
+
+func (stub *getReservationReceiptHandlerStub) Execute(_ context.Context, actor reservations.Actor, id string) (reservations.ReservationReceipt, error) {
 	stub.actor = actor
 	stub.id = id
 	return stub.result, stub.err
@@ -103,6 +119,54 @@ func TestCreateReservationHandler(t *testing.T) {
 }
 
 func TestReservationHandlersParseRequestsAndPrincipal(t *testing.T) {
+	t.Run("receipt", func(t *testing.T) {
+		stub := &getReservationReceiptHandlerStub{result: reservations.ReservationReceipt{
+			Reservation: domain.Reservation{
+				ID: "reservation-1", LoteoNombre: "Las Acacias", LoteID: "lot-7", LoteNumero: "7",
+				Cliente:          domain.Cliente{Nombre: "Ana", Apellido: "Pérez", DNI: "30111222"},
+				FechaCreacion:    time.Date(2026, time.September, 6, 12, 0, 0, 0, time.UTC),
+				FechaVencimiento: time.Date(2026, time.September, 21, 12, 0, 0, 0, time.UTC),
+			},
+			Loteo: domain.Loteo{Lotes: []domain.Lote{{
+				ID: "lot-7", Number: "7", Polygon: domain.Polygon{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}, {X: 0, Y: 10}},
+			}}},
+			IssuedAt: time.Date(2026, time.September, 11, 15, 30, 0, 0, time.UTC),
+		}}
+		mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/reservas/{id}/comprobante", handler.NewReservationReceiptHandler(stub))
+		recorder := performAuthorizedRequest(t, mux, http.MethodGet, "/api/v1/reservas/reservation-1/comprobante", nil)
+
+		if recorder.Code != http.StatusOK || recorder.Header().Get("Content-Type") != "application/pdf" {
+			t.Fatalf("status = %d, content type = %q", recorder.Code, recorder.Header().Get("Content-Type"))
+		}
+		if !strings.HasPrefix(recorder.Body.String(), "%PDF-") {
+			t.Fatalf("response does not start with a PDF header: %q", recorder.Body.String()[:min(recorder.Body.Len(), 12)])
+		}
+		if stub.id != "reservation-1" || stub.actor.AuthProviderID != reservationHandlerPrincipal.Subject {
+			t.Errorf("receipt input id/actor = %q/%#v", stub.id, stub.actor)
+		}
+		if disposition := recorder.Header().Get("Content-Disposition"); disposition != `attachment; filename="comprobante-reserva-reservation-1.pdf"` {
+			t.Errorf("content disposition = %q", disposition)
+		}
+		for _, text := range []string{"COMPROBANTE DE RESERVA", "FECHA DE EMISIÓN", "11/09/2026 12:30", "Las Acacias", "Croquis de ubicación del lote", "no implica una venta", "cancelada", "inmobiliaria", "15"} {
+			if !bytes.Contains(recorder.Body.Bytes(), receiptUTF16Bytes(text)) {
+				t.Errorf("PDF does not include %q", text)
+			}
+		}
+	})
+
+	t.Run("receipt error", func(t *testing.T) {
+		stub := &getReservationReceiptHandlerStub{err: domain.ErrReservationNotFound}
+		mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/reservas/{id}/comprobante", handler.NewReservationReceiptHandler(stub))
+		recorder := performAuthorizedRequest(t, mux, http.MethodGet, "/api/v1/reservas/missing/comprobante", nil)
+
+		if recorder.Code != http.StatusNotFound || recorder.Header().Get("Content-Type") == "application/pdf" {
+			t.Fatalf("status/content type = %d/%q", recorder.Code, recorder.Header().Get("Content-Type"))
+		}
+		if !strings.Contains(recorder.Body.String(), `"code":"reservation_not_found"`) {
+			t.Errorf("error body = %s", recorder.Body.String())
+		}
+	})
+
 	t.Run("list", func(t *testing.T) {
 		stub := &listReservationsHandlerStub{result: domain.ReservationPage{Page: 2, Limit: 10}}
 		mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/reservas", handler.NewListReservationsHandler(stub))
@@ -148,6 +212,15 @@ func TestReservationHandlersParseRequestsAndPrincipal(t *testing.T) {
 			t.Errorf("status = %d, input = %#v, result = %#v", recorder.Code, stub.input, stub.result)
 		}
 	})
+}
+
+func receiptUTF16Bytes(value string) []byte {
+	units := utf16.Encode([]rune(value))
+	encoded := make([]byte, len(units)*2)
+	for index, unit := range units {
+		binary.BigEndian.PutUint16(encoded[index*2:], unit)
+	}
+	return encoded
 }
 
 func TestCreateReservationHandlerRejectsUnauthenticatedRequest(t *testing.T) {

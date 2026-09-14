@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiFetch, messageFromError } from './client'
+import { ApiError, apiFetch, apiFetchBlob, messageFromError } from './client'
 import { apiUrl } from '../config/env'
 import { supabaseClient } from '../config/supabase-client'
 
@@ -210,6 +210,64 @@ describe('apiFetch', () => {
 
     await expect(apiFetch('/api/v1/usuarios')).rejects.toMatchObject({ code: 'forbidden' })
     expect(signOutMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('apiFetchBlob', () => {
+  it('returns a Blob and sends the bearer token through the shared request path', async () => {
+    const mock = stubFetch(
+      new Response('%PDF-1.4', {
+        status: 200,
+        headers: { 'Content-Type': 'application/pdf' },
+      }),
+    )
+
+    const result = await apiFetchBlob('/api/v1/reservas/1/comprobante', { token: 'tok' })
+
+    expect(result.type).toBe('application/pdf')
+    expect(await result.text()).toBe('%PDF-1.4')
+    const [, init] = mock.mock.calls[0]
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer tok')
+  })
+
+  it('preserves the backend error code, message and status', async () => {
+    stubFetch(
+      new Response(
+        JSON.stringify({ code: 'reservation_not_found', message: 'La reserva solicitada no existe' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+
+    await expect(apiFetchBlob('/api/v1/reservas/missing/comprobante')).rejects.toMatchObject({
+      code: 'reservation_not_found',
+      message: 'La reserva solicitada no existe',
+      status: 404,
+    })
+  })
+
+  it.each([
+    [401, 'unauthorized'],
+    [403, 'account_inactive'],
+  ])('signs out and redirects for session-blocking status %s', async (status, code) => {
+    stubFetch(
+      new Response(JSON.stringify({ code, message: 'La sesión no puede continuar' }), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    signOutMock.mockResolvedValue({ error: null })
+    const location = { href: '' }
+    vi.stubGlobal('location', location)
+
+    let settled = false
+    void apiFetchBlob('/api/v1/reservas/1/comprobante').then(
+      () => (settled = true),
+      () => (settled = true),
+    )
+    await vi.waitFor(() => expect(location.href).toBe('/login'))
+
+    expect(signOutMock).toHaveBeenCalledOnce()
+    expect(settled).toBe(false)
   })
 })
 

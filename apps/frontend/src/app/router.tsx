@@ -10,6 +10,7 @@ import LoteoDetailRoute from './LoteoDetailRoute'
 import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsRoute from './ReservationsRoute'
 import ReservationDetailsRoute from './ReservationDetailsRoute'
+import ReservationCreateRoute from './ReservationCreateRoute'
 import SalesPage from '../features/sales/pages/SalesPage'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersRoute from './UsersRoute'
@@ -56,6 +57,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireRole roles={RESERVATION_ROLES}>
             <ReservationsRoute />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/reservas/nueva/:loteoId/:loteId',
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <ReservationCreateRoute />
           </RequireRole>
         ),
       },

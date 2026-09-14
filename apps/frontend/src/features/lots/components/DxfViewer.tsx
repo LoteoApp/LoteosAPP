@@ -22,29 +22,37 @@ import {
 import { calleCaptionLayout } from '../lib/calleCaptionLayout'
 import { loteCaptionLayout } from '../lib/loteCaptionLayout'
 import { polygonToSvgPath } from '../lib/polygonToSvgPath'
-import type { DxfLayer, DxfPolygon } from '../types'
+import { LOT_STATE_LABELS, LOT_STATE_PAINT } from '../lib/lotStateVisuals'
+import type { DxfLayer, DxfPolygon, LotState } from '../types'
 
 const LAYER_PAINT: Record<DxfLayer, { fill: string; stroke: string }> = {
-  LOTEO: { fill: 'var(--chart-1)', stroke: 'var(--chart-1)' },
-  MANZANA: { fill: 'var(--chart-2)', stroke: 'var(--chart-2)' },
-  LOTES: { fill: 'var(--chart-3)', stroke: 'var(--chart-3)' },
-  CALLE: { fill: 'var(--chart-4)', stroke: 'var(--chart-4)' },
+  LOTEO: { fill: 'none', stroke: 'var(--chart-1)' },
+  MANZANA: { fill: 'var(--plan-block)', stroke: 'var(--plan-block-line)' },
+  LOTES: { fill: 'var(--plan-block)', stroke: 'var(--plan-block-line)' },
+  CALLE: { fill: 'var(--plan-street)', stroke: 'var(--plan-street-line)' },
 }
 
-const RESERVED_LOT_PAINT = {
-  fill: 'var(--lot-reserved)',
-  stroke: 'var(--lot-reserved-foreground)',
+const LAYER_FILL_OPACITY: Record<DxfLayer, number> = {
+  LOTEO: 0,
+  MANZANA: 1,
+  LOTES: 1,
+  CALLE: 1,
+}
+
+const LAYER_STROKE_WIDTH: Record<DxfLayer, number> = {
+  LOTEO: 2.5,
+  MANZANA: 1,
+  LOTES: 1,
+  CALLE: 0.6,
 }
 
 const ZOOM_IN = 1 / 1.2
 const ZOOM_OUT = 1.2
 const DRAG_THRESHOLD_PX = 8
-const SELECTED_FILL_OPACITY = 0.55
-const DEFAULT_FILL_OPACITY = 0.28
-const SELECTED_STROKE_WIDTH = 3
-const DEFAULT_STROKE_WIDTH = 1.5
-const RESERVED_FILL_OPACITY = 0.72
-const RESERVED_STROKE_WIDTH = 2
+const SELECTED_STROKE_WIDTH = 2.5
+const LOT_STATE_FILL_OPACITY = 0.9
+const SELECTED_FILL_OPACITY = 1
+const LOT_STATE_STROKE_WIDTH = 1
 
 type PointerPosition = { x: number; y: number }
 
@@ -116,12 +124,6 @@ export default function DxfViewer({
   }
 
   const hasGeometry = polygons.length > 0
-
-  function paintFor(polygon: DxfPolygon) {
-    return polygon.layer === 'LOTES' && polygon.lotState === 'reservado'
-      ? RESERVED_LOT_PAINT
-      : LAYER_PAINT[polygon.layer]
-  }
 
   useEffect(() => {
     const svg = svgRef.current
@@ -265,11 +267,11 @@ export default function DxfViewer({
   }
 
   return (
-    <div className="flex h-[50dvh] min-h-64 flex-col gap-2 md:h-auto md:min-h-0 md:flex-1">
-      <div className="flex flex-wrap gap-2">
+    <div className="relative flex h-[50dvh] min-h-64 flex-col md:h-auto md:min-h-0 md:flex-1">
+      <div className="absolute bottom-3 right-3 z-10 flex flex-col gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-sm">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="icon"
           className="size-11 md:size-8"
           aria-label="Acercar"
@@ -279,7 +281,7 @@ export default function DxfViewer({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="icon"
           className="size-11 md:size-8"
           aria-label="Alejar"
@@ -289,14 +291,13 @@ export default function DxfViewer({
         </Button>
         <Button
           type="button"
-          variant="outline"
-          size="lg"
-          className="min-h-11 px-3 md:h-8 md:min-h-8 md:px-2.5 md:text-[0.8rem]"
+          variant="ghost"
+          size="icon"
+          className="size-11 md:size-8"
           aria-label="Ajustar al plano"
           onClick={() => setViewBox(fitted)}
         >
           <Maximize2 />
-          Ajustar
         </Button>
       </div>
 
@@ -306,6 +307,11 @@ export default function DxfViewer({
         aria-label="Plano del loteo"
         viewBox={viewBoxToString(viewBox)}
         className="min-h-0 w-full flex-1 touch-none touch-manipulation rounded-xl border border-border bg-card outline-none"
+        style={{
+          backgroundImage:
+            'linear-gradient(var(--muted) 1px, transparent 1px), linear-gradient(90deg, var(--muted) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -313,18 +319,18 @@ export default function DxfViewer({
         onClick={handleBackgroundClick}
       >
         {visiblePolygons.map((polygon) => {
-          const paint = paintFor(polygon)
           const selected = polygon.id === selectedPolygonId
-          const reserved = polygon.layer === 'LOTES' && polygon.lotState === 'reservado'
+          const style = polygonStyle(polygon, selected)
           const label = polygonLabels?.get(polygon.id) ?? DXF_LAYER_LABELS[polygon.layer]
+          const state = lotStateOf(polygon)
           return (
             <g key={polygon.id} className="outline-none">
               <path
                 d={polygonPaths.get(polygon.id) ?? ''}
-                fill={paint.fill}
-                fillOpacity={selected ? SELECTED_FILL_OPACITY : reserved ? RESERVED_FILL_OPACITY : DEFAULT_FILL_OPACITY}
-                stroke={paint.stroke}
-                strokeWidth={selected ? SELECTED_STROKE_WIDTH : reserved ? RESERVED_STROKE_WIDTH : DEFAULT_STROKE_WIDTH}
+                fill={style.fill}
+                fillOpacity={style.fillOpacity}
+                stroke={style.stroke}
+                strokeWidth={style.strokeWidth}
                 vectorEffect="non-scaling-stroke"
                 className={
                   interactive
@@ -335,6 +341,7 @@ export default function DxfViewer({
                 tabIndex={interactive ? 0 : undefined}
                 aria-pressed={interactive ? selected : undefined}
                 aria-label={label}
+                aria-description={state ? LOT_STATE_LABELS[state] : undefined}
                 onClick={(event) => handlePathClick(event, polygon.id)}
                 onKeyDown={(event) => handlePathKeyDown(event, polygon.id)}
               />
@@ -345,6 +352,29 @@ export default function DxfViewer({
       </svg>
     </div>
   )
+}
+
+function lotStateOf(polygon: DxfPolygon): LotState | null {
+  return polygon.layer === 'LOTES' && polygon.lotState ? polygon.lotState : null
+}
+
+function polygonStyle(polygon: DxfPolygon, selected: boolean) {
+  const state = lotStateOf(polygon)
+  if (state) {
+    return {
+      fill: LOT_STATE_PAINT[state].fill,
+      stroke: selected ? 'var(--foreground)' : LOT_STATE_PAINT[state].stroke,
+      fillOpacity: selected ? SELECTED_FILL_OPACITY : LOT_STATE_FILL_OPACITY,
+      strokeWidth: selected ? SELECTED_STROKE_WIDTH : LOT_STATE_STROKE_WIDTH,
+    }
+  }
+
+  return {
+    fill: LAYER_PAINT[polygon.layer].fill,
+    stroke: selected ? 'var(--foreground)' : LAYER_PAINT[polygon.layer].stroke,
+    fillOpacity: LAYER_FILL_OPACITY[polygon.layer],
+    strokeWidth: selected ? SELECTED_STROKE_WIDTH : LAYER_STROKE_WIDTH[polygon.layer],
+  }
 }
 
 const PolygonCaption = memo(function PolygonCaption({ polygon }: { polygon: DxfPolygon }) {

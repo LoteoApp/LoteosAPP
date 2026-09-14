@@ -7,9 +7,12 @@ import type { Reservation } from '../types'
 
 const getReservationMock = vi.fn()
 const cancelMock = vi.fn()
+const downloadReceiptMock = vi.fn()
+let restoreURLMocks: (() => void) | null = null
 
 vi.mock('../api/reservations', () => ({
 	getReservation: (...args: unknown[]) => getReservationMock(...args),
+	downloadReservationReceipt: (...args: unknown[]) => downloadReceiptMock(...args),
 }))
 
 vi.mock('../hooks/use-reservation-mutations', () => ({
@@ -22,7 +25,7 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
 		cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
 		vendedor: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrador' },
 		usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
-		estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [],
+		estado: 'activa', fechaVencimiento: '2026-09-21T12:00:00Z', fechaCreacion: '2026-09-06T12:00:00Z', fechaModificacion: '2026-09-06T12:00:00Z', historial: [], puedeCancelar: true,
 		...overrides,
 	}
 }
@@ -44,9 +47,23 @@ function Navigation() {
 afterEach(() => {
 	getReservationMock.mockReset()
 	cancelMock.mockReset()
+	downloadReceiptMock.mockReset()
+	restoreURLMocks?.()
+	restoreURLMocks = null
 })
 
 describe('ReservationDetailsPage', () => {
+	it('shows an accessible detail placeholder while the reservation is loading', () => {
+		getReservationMock.mockImplementation(() => new Promise(() => undefined))
+
+		renderPage()
+
+		const placeholder = screen.getByRole('status', { name: 'Cargando el detalle de la reserva…' })
+		expect(placeholder).not.toHaveAttribute('aria-busy')
+		expect(placeholder).toHaveAttribute('aria-live', 'polite')
+		expect(screen.getByRole('link', { name: 'Volver a reservas' })).toHaveAttribute('href', '/reservas')
+	})
+
 	it('does not request details before the session token is available', async () => {
 		render(
 			<MemoryRouter initialEntries={['/reservas/reservation-1']}>
@@ -86,6 +103,44 @@ describe('ReservationDetailsPage', () => {
 		expect(await screen.findByText('No se pudo cargar la reserva.')).toBeInTheDocument()
 	})
 
+	it('keeps the reservation when the receipt cannot be downloaded', async () => {
+		getReservationMock.mockResolvedValue(reservation())
+		downloadReceiptMock.mockRejectedValue(new Error('No se pudo descargar el comprobante.'))
+		const user = userEvent.setup()
+		renderPage()
+
+		await screen.findByText('Las Acacias')
+		await user.click(screen.getByRole('button', { name: 'Descargar comprobante' }))
+		expect(await screen.findByText('No se pudo descargar el comprobante.')).toBeInTheDocument()
+		expect(screen.getByText('Ana Pérez · DNI 30111222')).toBeInTheDocument()
+	})
+
+	it('downloads a generated receipt from the reservation detail', async () => {
+		getReservationMock.mockResolvedValue(reservation())
+		downloadReceiptMock.mockResolvedValue(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))
+		const createObjectURL = vi.fn().mockReturnValue('blob:reservation-receipt')
+		const revokeObjectURL = vi.fn()
+		const createDescriptor = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+		const revokeDescriptor = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+		Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+		Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+		restoreURLMocks = () => {
+			if (createDescriptor) Object.defineProperty(URL, 'createObjectURL', createDescriptor)
+			else Reflect.deleteProperty(URL, 'createObjectURL')
+			if (revokeDescriptor) Object.defineProperty(URL, 'revokeObjectURL', revokeDescriptor)
+			else Reflect.deleteProperty(URL, 'revokeObjectURL')
+		}
+		const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+		const user = userEvent.setup()
+		renderPage()
+
+		await screen.findByText('Las Acacias')
+		await user.click(screen.getByRole('button', { name: 'Descargar comprobante' }))
+		await waitFor(() => expect(anchorClick).toHaveBeenCalled())
+		expect(downloadReceiptMock).toHaveBeenCalledWith('token', 'reservation-1')
+		expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+	})
+
 	it('offers a return link when the response is empty and hides cancellation for terminal states', async () => {
 		getReservationMock.mockResolvedValueOnce(null as unknown as Reservation)
 		renderPage()
@@ -95,6 +150,11 @@ describe('ReservationDetailsPage', () => {
 		renderPage()
 		expect(await screen.findByText('Vencida')).toBeInTheDocument()
 		expect(screen.queryByRole('button', { name: 'Cancelar reserva' })).not.toBeInTheDocument()
+
+		getReservationMock.mockResolvedValueOnce(reservation({ loteoNombre: 'Los Cedros', puedeCancelar: false }))
+		renderPage()
+		expect(await screen.findByText('Los Cedros')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
 	})
 
 	it('does not apply a cancellation response after navigating to another reservation', async () => {

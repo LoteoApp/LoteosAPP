@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -133,7 +134,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 		if existingHash != command.IdempotencyPayloadHash {
 			return domain.Reservation{}, domain.ErrReservationIdempotencyConflict
 		}
-		result, readErr := loadReservation(ctx, tx, existingID, false)
+		result, readErr := loadReservationForActor(ctx, tx, existingID, command.ActorAuthProviderID)
 		if readErr != nil {
 			return domain.Reservation{}, readErr
 		}
@@ -175,6 +176,10 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 			return domain.Reservation{}, domain.ErrReservationSellerNotEligible
 		}
 	}
+	reservationAgencyID := actorAgency
+	if reservationAgencyID == nil {
+		reservationAgencyID = sellerAgency
+	}
 
 	if err := lockActiveClient(ctx, tx, command.ClienteID); err != nil {
 		return domain.Reservation{}, err
@@ -215,15 +220,15 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 	var reservationID string
 	err = tx.QueryRow(ctx, `
 		INSERT INTO reservas (
-			lote_id, cliente_id, vendedor_id, usuario_alta,
+			lote_id, cliente_id, vendedor_id, usuario_alta, inmobiliaria_id,
 			fecha_vencimiento, fecha_creacion, fecha_modificacion,
 			idempotency_key, idempotency_payload_hash
 		)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid,
-			$5, $6, $6, $7, $8)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
+			$6, $7, $7, $8, $9)
 		RETURNING id::text
 	`, command.LoteID, command.ClienteID, command.VendedorID, command.ActorID,
-		createdAt.Add(domain.ReservationDuration), createdAt,
+		reservationAgencyID, createdAt.Add(domain.ReservationDuration), createdAt,
 		command.IdempotencyKey, command.IdempotencyPayloadHash).Scan(&reservationID)
 	if err != nil {
 		if isConstraint(err, reservationIdempotencyIndex) {
@@ -247,7 +252,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 		return domain.Reservation{}, err
 	}
 
-	result, err := loadReservation(ctx, tx, reservationID, false)
+	result, err := loadReservationForActor(ctx, tx, reservationID, command.ActorAuthProviderID)
 	if err != nil {
 		return domain.Reservation{}, err
 	}
@@ -277,6 +282,7 @@ func (repository *ReservationRepository) reconcileIdempotentCreate(ctx context.C
 }
 
 func (repository *ReservationRepository) List(ctx context.Context, filter domain.ReservationListFilter, scope gateway.ReservationScope) (domain.ReservationPage, error) {
+	scope = normalizeReservationScope(scope)
 	var err error
 	filter, err = filter.Normalize()
 	if err != nil {
@@ -297,6 +303,8 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 		JOIN clientes c ON c.id = r.cliente_id
 		JOIN usuarios seller ON seller.id = r.vendedor_id
 		JOIN usuarios alta ON alta.id = r.usuario_alta
+		LEFT JOIN inmobiliarias agency ON agency.id = r.inmobiliaria_id
+		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $10::uuid
 		WHERE (cardinality($1::text[]) = 0 OR r.estado_actual = ANY($1::text[]))
 		  AND ($2 = '' OR l.id::text = $2)
 		  AND ($3 = '' OR l.nombre ILIKE $7 ESCAPE '\'
@@ -305,11 +313,11 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 		       OR c.dni ILIKE $7 ESCAPE '\'
 		       OR seller.nombre ILIKE $7 ESCAPE '\' OR seller.apellido ILIKE $7 ESCAPE '\')
 		  AND ($4 = '' OR lo.id::text = $4)
-		  AND `+predicate+`
+		AND `+predicate+`
 		ORDER BY r.fecha_creacion DESC, r.id DESC
 		LIMIT $8 OFFSET $9
 	`, states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
-		scope.ByAgencyAssignment, containsPattern(filter.Search), filter.Limit, offset)
+		scope.ByAgencyAssignment, containsPattern(filter.Search), filter.Limit, offset, scope.ActorAuthProviderID)
 	if err != nil {
 		return domain.ReservationPage{}, err
 	}
@@ -360,6 +368,7 @@ func (repository *ReservationRepository) Get(ctx context.Context, id string, sco
 }
 
 func (repository *ReservationRepository) Cancel(ctx context.Context, command gateway.CancelReservationCommand, scope gateway.ReservationScope) (domain.Reservation, error) {
+	scope = normalizeReservationScope(scope)
 	tx, err := repository.pool.Begin(ctx)
 	if err != nil {
 		return domain.Reservation{}, err
@@ -392,19 +401,17 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 
 	var state domain.ReservationState
 	var due time.Time
-	var sellerID, actorRole string
-	var sellerAgency, actorAgency *string
+	var actorRole string
+	var actorAgency, reservationAgency *string
 	var actorInactive *time.Time
 	err = tx.QueryRow(ctx, `
-		SELECT r.estado_actual, r.fecha_vencimiento, r.vendedor_id::text,
-		       seller.inmobiliaria_id::text, actor.rol,
+		SELECT r.estado_actual, r.fecha_vencimiento, r.inmobiliaria_id::text, actor.rol,
 		       actor.inmobiliaria_id::text, actor.fecha_baja
 		FROM reservas r
-		JOIN usuarios seller ON seller.id = r.vendedor_id
 		JOIN usuarios actor ON actor.id = $2::uuid
 		WHERE r.id = $1::uuid
 		FOR UPDATE
-	`, command.ReservationID, command.ActorID).Scan(&state, &due, &sellerID, &sellerAgency, &actorRole, &actorAgency, &actorInactive)
+	`, command.ReservationID, command.ActorID).Scan(&state, &due, &reservationAgency, &actorRole, &actorAgency, &actorInactive)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Reservation{}, domain.ErrReservationNotFound
 	}
@@ -421,14 +428,7 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 	if !inScope {
 		return domain.Reservation{}, domain.ErrReservationNotFound
 	}
-	assigned := false
-	if domain.Rol(actorRole) == domain.RolInmobiliaria {
-		assigned, err = agencyAssigned(ctx, tx, actorAgency, loteoID)
-		if err != nil {
-			return domain.Reservation{}, err
-		}
-	}
-	if !domain.CanCancelReservation(domain.Rol(actorRole), command.ActorID, sellerID, sameString(actorAgency, sellerAgency), assigned) {
+	if !domain.CanCancelReservationForAgency(domain.Rol(actorRole), actorAgency, reservationAgency) {
 		return domain.Reservation{}, domain.ErrNoAutorizado
 	}
 
@@ -493,6 +493,7 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 }
 
 func (repository *ReservationRepository) ListEligibleSellers(ctx context.Context, loteoID string, scope gateway.ReservationScope) ([]domain.SellerOption, error) {
+	scope = normalizeReservationScope(scope)
 	rows, err := repository.pool.Query(ctx, `
 		SELECT u.id::text, u.nombre, u.apellido, u.email, u.rol
 		FROM usuarios u
@@ -736,23 +737,28 @@ const reservationColumns = `
 	c.id::text, c.nombre, c.apellido, c.dni, c.celular, c.email,
 	seller.id::text, seller.nombre, seller.apellido, seller.email, seller.rol,
 	alta.id::text, alta.nombre, alta.apellido, alta.email, alta.rol,
+	agency.id::text, COALESCE(agency.razon_social, ''),
+	CASE WHEN reservation_actor.rol IN ('administrador', 'administrativo')
+	          OR reservation_actor.id = seller.id
+	          OR (reservation_actor.rol = 'inmobiliaria'
+	              AND r.inmobiliaria_id IS NOT NULL
+	              AND reservation_actor.inmobiliaria_id = r.inmobiliaria_id)
+	     THEN true ELSE false END,
 	r.estado_actual, r.fecha_vencimiento, r.fecha_creacion, r.fecha_modificacion`
 
 const reservationScopePredicate = `($%[1]d::uuid IS NULL OR ($%[2]d AND EXISTS (
 	SELECT 1
 	FROM usuarios actor
-	JOIN inmobiliarias agency ON agency.id = actor.inmobiliaria_id
-	JOIN usuarios seller_scope ON seller_scope.id = r.vendedor_id
-	JOIN inmobiliaria_loteos il ON il.inmobiliaria_id = agency.id AND il.loteo_id = l.id
+	JOIN inmobiliarias agency ON agency.id = r.inmobiliaria_id
 	WHERE actor.auth_provider_id = $%[1]d::uuid
-	  AND actor.fecha_baja IS NULL AND agency.fecha_baja IS NULL
-	  AND seller_scope.inmobiliaria_id = agency.id
-	  AND il.fecha_baja IS NULL
+	  AND actor.fecha_baja IS NULL
+	  AND actor.inmobiliaria_id = r.inmobiliaria_id
 )))`
 
 func reservationInScope(ctx context.Context, queryer interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, id string, scope gateway.ReservationScope) (bool, error) {
+	scope = normalizeReservationScope(scope)
 	predicate := fmt.Sprintf(reservationScopePredicate, 2, 3)
 	var exists bool
 	err := queryer.QueryRow(ctx, `
@@ -776,6 +782,7 @@ type reservationQueryer interface {
 }
 
 func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id string, scope gateway.ReservationScope, withHistory bool) (domain.Reservation, error) {
+	scope = normalizeReservationScope(scope)
 	predicate := fmt.Sprintf(reservationScopePredicate, 2, 3)
 	row := pool.QueryRow(ctx, `SELECT `+reservationColumns+` FROM reservas r
 		JOIN lotes lo ON lo.id = r.lote_id AND lo.fecha_baja IS NULL
@@ -783,8 +790,10 @@ func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id st
 		JOIN clientes c ON c.id = r.cliente_id
 		JOIN usuarios seller ON seller.id = r.vendedor_id
 		JOIN usuarios alta ON alta.id = r.usuario_alta
+		LEFT JOIN inmobiliarias agency ON agency.id = r.inmobiliaria_id
+		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $4::uuid
 		WHERE r.id = $1::uuid AND `+predicate,
-		id, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment)
+		id, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment, scope.ActorAuthProviderID)
 	reservation, err := scanReservation(row)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Reservation{}, domain.ErrReservationNotFound
@@ -803,6 +812,31 @@ func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id st
 
 func loadReservation(ctx context.Context, tx pgx.Tx, id string, withHistory bool) (domain.Reservation, error) {
 	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{}, withHistory)
+}
+
+func loadReservationForActor(ctx context.Context, tx pgx.Tx, id, actorAuthProviderID string) (domain.Reservation, error) {
+	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{ActorAuthProviderID: uuidReference(actorAuthProviderID)}, false)
+}
+
+func normalizeReservationScope(scope gateway.ReservationScope) gateway.ReservationScope {
+	scope.AssigneeAuthProviderID = nonBlankUUIDReference(scope.AssigneeAuthProviderID)
+	scope.ActorAuthProviderID = nonBlankUUIDReference(scope.ActorAuthProviderID)
+	return scope
+}
+
+func uuidReference(value string) *string {
+	return nonBlankUUIDReference(&value)
+}
+
+func nonBlankUUIDReference(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	normalized := strings.TrimSpace(*value)
+	if normalized == "" {
+		return nil
+	}
+	return &normalized
 }
 
 func loadHistory(ctx context.Context, queryer interface {
@@ -847,6 +881,8 @@ func scanReservation(row reservationScanner) (domain.Reservation, error) {
 		client      domain.Cliente
 		seller      domain.ReservationActor
 		alta        domain.ReservationActor
+		agencyID    *string
+		agencyName  string
 	)
 	err := row.Scan(
 		&reservation.ID, &reservation.LoteoID, &reservation.LoteoNombre,
@@ -854,6 +890,7 @@ func scanReservation(row reservationScanner) (domain.Reservation, error) {
 		&client.ID, &client.Nombre, &client.Apellido, &client.DNI, &client.Celular, &client.Email,
 		&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol,
 		&alta.ID, &alta.Nombre, &alta.Apellido, &alta.Email, &alta.Rol,
+		&agencyID, &agencyName, &reservation.PuedeCancelar,
 		&reservation.Estado, &reservation.FechaVencimiento, &reservation.FechaCreacion, &reservation.FechaModificacion,
 	)
 	if err != nil {
@@ -862,6 +899,9 @@ func scanReservation(row reservationScanner) (domain.Reservation, error) {
 	reservation.Cliente = client
 	reservation.Vendedor = seller
 	reservation.UsuarioAlta = alta
+	if agencyID != nil {
+		reservation.Inmobiliaria = &domain.ReservationAgency{ID: *agencyID, BusinessName: agencyName}
+	}
 	return reservation, nil
 }
 
@@ -870,12 +910,15 @@ func scanReservationWithTotal(row reservationScanner) (domain.Reservation, int64
 	var reservation domain.Reservation
 	var client domain.Cliente
 	var seller, alta domain.ReservationActor
+	var agencyID *string
+	var agencyName string
 	err := row.Scan(
 		&reservation.ID, &reservation.LoteoID, &reservation.LoteoNombre,
 		&reservation.LoteID, &reservation.LoteNumero,
 		&client.ID, &client.Nombre, &client.Apellido, &client.DNI, &client.Celular, &client.Email,
 		&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol,
 		&alta.ID, &alta.Nombre, &alta.Apellido, &alta.Email, &alta.Rol,
+		&agencyID, &agencyName, &reservation.PuedeCancelar,
 		&reservation.Estado, &reservation.FechaVencimiento, &reservation.FechaCreacion, &reservation.FechaModificacion,
 		&total,
 	)
@@ -883,6 +926,9 @@ func scanReservationWithTotal(row reservationScanner) (domain.Reservation, int64
 		return domain.Reservation{}, 0, err
 	}
 	reservation.Cliente, reservation.Vendedor, reservation.UsuarioAlta = client, seller, alta
+	if agencyID != nil {
+		reservation.Inmobiliaria = &domain.ReservationAgency{ID: *agencyID, BusinessName: agencyName}
+	}
 	return reservation, total, nil
 }
 

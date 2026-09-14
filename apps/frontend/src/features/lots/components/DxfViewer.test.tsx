@@ -39,16 +39,49 @@ describe('DxfViewer', () => {
     expect(svg.querySelector('[aria-label="Manzana"]')).toBeNull()
   })
 
-  it('uses the reserved lot paint for reserved lot polygons', () => {
-    const reserved = { ...polygons[2], lotState: 'reservado' as const }
-    render(<DxfViewer polygons={[reserved]} visibleLayers={new Set(['LOTES'])} />)
+  it.each([
+    ['disponible', 'available'],
+    ['reservado', 'reserved'],
+    ['vendido', 'sold'],
+    ['finalizado', 'completed'],
+  ] as const)('paints a %s lote with its state color', (state, token) => {
+    const lote = { ...polygons[2], lotState: state }
+    render(<DxfViewer polygons={[lote]} visibleLayers={new Set(['LOTES'])} />)
 
     const lotPath = screen
       .getByRole('img', { name: 'Plano del loteo' })
       .querySelector('[aria-label="Lotes"]')
 
-    expect(lotPath).toHaveAttribute('fill', 'var(--lot-reserved)')
-    expect(lotPath).toHaveAttribute('stroke', 'var(--lot-reserved-foreground)')
+    expect(lotPath).toHaveAttribute('fill', `var(--lot-${token}-plan)`)
+    expect(lotPath).toHaveAttribute('stroke', `var(--lot-${token}-foreground)`)
+  })
+
+  it('keeps the layer color for polygons that are not lotes', () => {
+    render(<DxfViewer polygons={polygons} visibleLayers={new Set(DXF_LAYERS)} />)
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+
+    expect(svg.querySelector('[aria-label="Loteo"]')).toHaveAttribute('stroke', 'var(--chart-1)')
+    expect(svg.querySelector('[aria-label="Manzana"]')).toHaveAttribute('fill', 'var(--plan-block)')
+    expect(svg.querySelector('[aria-label="Lotes"]')).toHaveAttribute('fill', 'var(--plan-block)')
+  })
+
+  it('announces the state of each lote', () => {
+    const lotes: DxfPolygon[] = [
+      { ...polygons[2], id: 'lote-1', lotState: 'vendido' },
+      { ...polygons[2], id: 'lote-2' },
+    ]
+    render(
+      <DxfViewer
+        polygons={lotes}
+        visibleLayers={new Set(['LOTES'])}
+        onSelectPolygon={vi.fn()}
+        polygonLabels={new Map([['lote-1', 'Lote 1'], ['lote-2', 'Lote 2']])}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Lote 1' })).toHaveAccessibleDescription('Vendido')
+    expect(screen.getByRole('button', { name: 'Lote 2' })).not.toHaveAccessibleDescription()
   })
 
   it('draws the lote and manzana numbers at the center of each polygon', () => {

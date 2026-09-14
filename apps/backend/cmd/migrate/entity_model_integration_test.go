@@ -78,6 +78,43 @@ func TestEntityModelStateHistory(t *testing.T) {
 		t.Fatalf("apply remaining migrations: %v", err)
 	}
 
+	t.Run("backfills and protects reservation agency", func(t *testing.T) {
+		var agencyID sql.NullString
+		if err := db.QueryRowContext(ctx, `
+			SELECT inmobiliaria_id::text FROM reservas
+			WHERE id = '00000000-0000-0000-0000-000000000030'
+		`).Scan(&agencyID); err != nil {
+			t.Fatalf("query backfilled reservation agency: %v", err)
+		}
+		if !agencyID.Valid || agencyID.String != "00000000-0000-0000-0000-000000000060" {
+			t.Fatalf("backfilled agency = %#v, want agency 00000000-0000-0000-0000-000000000060", agencyID)
+		}
+
+		var nullable, indexed bool
+		if err := db.QueryRowContext(ctx, `
+			SELECT is_nullable = 'YES'
+			FROM information_schema.columns
+			WHERE table_schema = current_schema() AND table_name = 'reservas'
+			  AND column_name = 'inmobiliaria_id'
+		`).Scan(&nullable); err != nil {
+			t.Fatalf("check nullable agency column: %v", err)
+		}
+		if err := db.QueryRowContext(ctx, `
+			SELECT to_regclass($1) IS NOT NULL
+		`, schemaName+".reservas_inmobiliaria_id_idx").Scan(&indexed); err != nil {
+			t.Fatalf("check reservation agency index: %v", err)
+		}
+		if !nullable || !indexed {
+			t.Fatalf("agency column nullable = %v, index present = %v", nullable, indexed)
+		}
+
+		_, err := db.ExecContext(ctx, `
+			UPDATE reservas SET inmobiliaria_id = NULL
+			WHERE id = '00000000-0000-0000-0000-000000000030'
+		`)
+		assertIntegrityViolation(t, err)
+	})
+
 	t.Run("backfills existing lotes and seeds new ones", func(t *testing.T) {
 		assertLotState(t, ctx, db, "00000000-0000-0000-0000-000000000012", "disponible", 1)
 		assertLotState(t, ctx, db, "00000000-0000-0000-0000-000000000013", "vendido", 1)
@@ -418,9 +455,36 @@ func TestEntityModelStateHistory(t *testing.T) {
 		assertIntegrityViolation(t, err)
 	})
 
+	if _, err := provider.DownTo(ctx, 9); err != nil {
+		t.Fatalf("roll back reservation agency migration: %v", err)
+	}
+	var agencyColumnRemoved, agencyIndexRemoved bool
+	if err := db.QueryRowContext(ctx, `
+		SELECT NOT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema = current_schema() AND table_name = 'reservas'
+			  AND column_name = 'inmobiliaria_id'
+		)
+	`).Scan(&agencyColumnRemoved); err != nil {
+		t.Fatalf("check reservation agency rollback: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `
+		SELECT to_regclass($1) IS NULL
+	`, schemaName+".reservas_inmobiliaria_id_idx").Scan(&agencyIndexRemoved); err != nil {
+		t.Fatalf("check reservation agency index rollback: %v", err)
+	}
+	if !agencyColumnRemoved || !agencyIndexRemoved {
+		t.Fatalf("agency rollback removed column = %v, index = %v", agencyColumnRemoved, agencyIndexRemoved)
+	}
+	_, err = db.ExecContext(ctx, `
+		UPDATE reservas SET fecha_vencimiento = fecha_vencimiento + interval '1 hour'
+		WHERE id = '00000000-0000-0000-0000-000000000030'
+	`)
+	assertIntegrityViolation(t, err)
 	if _, err := provider.DownTo(ctx, 7); err != nil {
 		t.Fatalf("roll back lot state migration: %v", err)
 	}
+
 	var preservedHistory int
 	if err := db.QueryRowContext(ctx, `
 		SELECT count(*) FROM lote_estados
@@ -448,8 +512,13 @@ func seedEntityModelStateFixtures(t *testing.T, ctx context.Context, db *sql.DB)
 	t.Helper()
 
 	_, err := db.ExecContext(ctx, `
+		INSERT INTO inmobiliarias (id, razon_social) VALUES
+			('00000000-0000-0000-0000-000000000060', 'Test Agency');
 		INSERT INTO usuarios (id, auth_provider_id, email, rol) VALUES
-			('00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'admin@example.test', 'administrador');
+			('00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'admin@example.test', 'administrador'),
+			('00000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'agency@example.test', 'inmobiliaria');
+		UPDATE usuarios SET inmobiliaria_id = '00000000-0000-0000-0000-000000000060'
+		WHERE id = '00000000-0000-0000-0000-000000000002';
 		INSERT INTO loteos (id, nombre) VALUES
 			('00000000-0000-0000-0000-000000000010', 'A');
 		INSERT INTO manzanas (id, loteo_id) VALUES
@@ -464,7 +533,7 @@ func seedEntityModelStateFixtures(t *testing.T, ctx context.Context, db *sql.DB)
 				'00000000-0000-0000-0000-000000000030',
 				'00000000-0000-0000-0000-000000000012',
 				'00000000-0000-0000-0000-000000000020',
-				'00000000-0000-0000-0000-000000000001',
+				'00000000-0000-0000-0000-000000000002',
 				'00000000-0000-0000-0000-000000000001',
 				now() + interval '15 days'
 			);
