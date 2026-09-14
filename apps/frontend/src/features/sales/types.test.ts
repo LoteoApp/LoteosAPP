@@ -6,7 +6,9 @@ import {
   clienteOptionLabel,
   defaultSeller,
   isLotState,
+  loteOptionFromDevelopment,
   loteOptionLabel,
+  saleDisabledReason,
   sellerAgencyLabel,
   sellerOptionLabel,
   sellersOfAgency,
@@ -245,5 +247,56 @@ describe('buildSaleReceipt', () => {
       ok: false,
       error: 'El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.',
     })
+  })
+})
+
+describe('loteOptionFromDevelopment', () => {
+  const loteo = {
+    id: 'loteo-1',
+    nombre: 'Las Acacias',
+    ubicacion: 'Córdoba',
+    descripcion: '',
+    manzanas: [{ id: 'block-1', numero: '2', tieneAgua: true, tieneCloaca: false, tieneLuz: true, tieneGas: false }],
+    lotes: [
+      { id: 'lot-1', manzanaId: 'block-1', numero: '7', estado: 'disponible' as const, precio: 120000, moneda: 'USD', superficie: 300, caracteristicas: '' },
+      { id: 'lot-2', manzanaId: 'block-x', numero: '8', estado: 'reservado' as const, precio: null, moneda: 'ARS', superficie: null, caracteristicas: '' },
+    ],
+  }
+
+  it('builds the lote option with the names of its loteo and manzana', () => {
+    expect(loteOptionFromDevelopment(loteo, 'lot-1')).toEqual({
+      id: 'lot-1',
+      numero: '7',
+      manzanaId: 'block-1',
+      manzanaNumero: '2',
+      loteoId: 'loteo-1',
+      loteoNombre: 'Las Acacias',
+      estado: 'disponible',
+      precio: 120000,
+      moneda: 'USD',
+      superficie: 300,
+    })
+  })
+
+  it('leaves the manzana number empty when the manzana is unknown', () => {
+    expect(loteOptionFromDevelopment(loteo, 'lot-2')).toMatchObject({ manzanaNumero: '', precio: null })
+  })
+
+  it('returns null for a lote that is not in the loteo', () => {
+    expect(loteOptionFromDevelopment(loteo, 'lot-999')).toBeNull()
+  })
+})
+
+describe('saleDisabledReason', () => {
+  it('allows a lote with number and price', () => {
+    expect(saleDisabledReason({ numero: '7', precio: 1 })).toBeNull()
+  })
+
+  it('names each missing field', () => {
+    expect(saleDisabledReason({ numero: '', precio: 1 })).toBe('Completá el número del lote para habilitar la venta.')
+    expect(saleDisabledReason({ numero: '7', precio: null })).toBe('Completá el precio del lote para habilitar la venta.')
+    expect(saleDisabledReason({ numero: '  ', precio: null })).toBe(
+      'Completá el número y el precio del lote para habilitar la venta.',
+    )
   })
 })

@@ -11,6 +11,7 @@ import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsRoute from './ReservationsRoute'
 import ReservationDetailsRoute from './ReservationDetailsRoute'
 import ReservationCreateRoute from './ReservationCreateRoute'
+import SaleCreateRoute from './SaleCreateRoute'
 import SalesRoute from './SalesRoute'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersRoute from './UsersRoute'
@@ -79,6 +80,14 @@ export const router = createBrowserRouter([
       {
         path: '/ventas',
         element: <SalesRoute />,
+      },
+      {
+        path: '/ventas/nueva/:loteoId/:loteId',
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <SaleCreateRoute />
+          </RequireRole>
+        ),
       },
       {
         path: '/cobranzas',

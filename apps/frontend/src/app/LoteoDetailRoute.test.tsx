@@ -21,8 +21,9 @@ vi.mock('../features/reservations/components/ReserveLotDialog', () => ({
   ),
 }))
 vi.mock('../features/lots/pages/LoteoDetailPage', () => ({
-  default: ({ renderReservationAction, renderReservationSummary, renderReservations }: {
+  default: ({ renderReservationAction, renderSaleAction, renderReservationSummary, renderReservations }: {
     renderReservationAction?: (lote: LoteoLote, onCreated: () => void) => ReactNode
+    renderSaleAction?: (lote: LoteoLote) => ReactNode
     renderReservationSummary?: (lote: LoteoLote, onCanceled: () => void) => ReactNode
     renderReservations?: (loteo: LoteoDetail, onCanceled: (loteId: string) => void) => ReactNode
   }) => {
@@ -40,6 +41,7 @@ vi.mock('../features/lots/pages/LoteoDetailPage', () => ({
     }
     return <div>
       {renderReservationAction?.(availableLot, vi.fn())}
+      {renderSaleAction?.({ ...availableLot, precio: 120000 })}
       {renderReservationSummary?.(reservedLot, vi.fn())}
       {renderReservations?.(loteo, freeLotMock)}
     </div>
@@ -106,6 +108,14 @@ describe('LoteoDetailRoute', () => {
     expect(screen.getByRole('link', { name: 'Ver reserva' })).toBeInTheDocument()
   })
 
+  it('offers to sell an available lote from the visor', () => {
+    useAuthMock.mockReturnValue({ session: { access_token: 'token' }, user: { app_metadata: { role: 'administrativo' } } })
+
+    renderRoute()
+
+    expect(screen.getByRole('link', { name: 'Pasar a venta' })).toHaveAttribute('href', '/ventas/nueva/loteo-1/lot-available')
+  })
+
   it('creates a reservation from the visor', async () => {
     useAuthMock.mockReturnValue({ session: { access_token: 'token' }, user: { app_metadata: { role: 'administrador' } } })
 
@@ -152,6 +162,7 @@ describe('LoteoDetailRoute', () => {
     expect(screen.queryByText(/Reservado por Ana Pérez/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancelar reserva' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reservar lote' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pasar a venta' })).not.toBeInTheDocument()
     expect(useReservationsMock).not.toHaveBeenCalled()
   })
 

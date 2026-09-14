@@ -210,3 +210,74 @@ export function buildSaleReceipt(draft: SaleDraft, emitidoEl: string): SaleRecei
     },
   }
 }
+
+// What the sale started from the loteo viewer needs of a loteo: enough to
+// describe the lote being sold and to build its LoteOption. `app` maps the
+// loteo detail into this shape; sales never imports the lots feature.
+export type SaleCreateBlock = {
+  id: string
+  numero: string
+  tieneAgua: boolean
+  tieneCloaca: boolean
+  tieneLuz: boolean
+  tieneGas: boolean
+}
+
+export type SaleCreateLot = {
+  id: string
+  manzanaId: string
+  numero: string
+  estado: LotState
+  precio: number | null
+  moneda: string
+  superficie: number | null
+  caracteristicas: string
+}
+
+export type SaleCreateDevelopment = {
+  id: string
+  nombre: string
+  ubicacion: string
+  descripcion: string
+  manzanas: SaleCreateBlock[]
+  lotes: SaleCreateLot[]
+}
+
+export function loteOptionFromDevelopment(
+  loteo: SaleCreateDevelopment,
+  loteId: string,
+): LoteOption | null {
+  const lote = loteo.lotes.find((candidate) => candidate.id === loteId)
+  if (lote === undefined) {
+    return null
+  }
+  const manzana = loteo.manzanas.find((candidate) => candidate.id === lote.manzanaId)
+  return {
+    id: lote.id,
+    numero: lote.numero,
+    manzanaId: lote.manzanaId,
+    manzanaNumero: manzana?.numero ?? '',
+    loteoId: loteo.id,
+    loteoNombre: loteo.nombre,
+    estado: lote.estado,
+    precio: lote.precio,
+    moneda: lote.moneda,
+    superficie: lote.superficie,
+  }
+}
+
+// Why a lote can't be sold yet from the viewer, or null when it can. Mirrors
+// the reserva rule: the receipt needs the number and the price.
+export function saleDisabledReason(lote: { numero: string; precio: number | null }): string | null {
+  const missing: string[] = []
+  if (!lote.numero.trim()) {
+    missing.push('el número')
+  }
+  if (lote.precio === null) {
+    missing.push('el precio')
+  }
+  if (missing.length === 0) {
+    return null
+  }
+  return `Completá ${missing.join(' y ')} del lote para habilitar la venta.`
+}

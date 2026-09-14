@@ -537,10 +537,23 @@ Decisiones de este recorte:
   hasta que haya un lote, y cambiar de lote los limpia. Ese endpoint suma la agencia
   de cada vendedor (`inmobiliariaId`, `inmobiliariaRazonSocial`) justamente
   para que el cliente pueda agruparlos sin una segunda consulta.
-- **Ventas no importa `clients` ni `reservations`.** Como una feature no toca
-  los archivos de otra, `SalesPage` recibe `loadLotes`, `loadClientes`,
-  `createCliente` y `loadSellers` como props, y `app/SalesRoute.tsx` —que es
-  composición, no feature— inyecta las implementaciones de cada una.
+- **La venta arranca desde el visualizador del loteo, como la reserva.** En el
+  panel del lote, «Pasar a venta» (`SellLotLink`) lleva a
+  `/ventas/nueva/{loteoId}/{loteId}`, deshabilitado con el motivo si al lote
+  le falta número o precio, y solo para lotes `disponible`. `SaleCreatePage`
+  es el espejo de `ReservationCreatePage`: plano de referencia y ficha del
+  lote a la izquierda, formulario a la derecha, y el mismo aviso si el lote
+  cambió de estado. El formulario en sí es `SaleForm` (cliente, inmobiliaria,
+  vendedor, condiciones de pago, confirmación y recibo), compartido con
+  `SalesPage`, la pantalla de `/ventas` que en vez de recibir el lote de la
+  ruta lo deja elegir con un buscador (`leading`). Los vendedores los carga
+  `useSaleSellers` por loteo.
+- **Ventas no importa `clients`, `lots` ni `reservations`.** Como una feature
+  no toca los archivos de otra, `SaleForm` recibe `loadClientes`,
+  `createCliente` y `loadSellers` como props y `SaleCreatePage` describe el
+  loteo que necesita como `SaleCreateDevelopment`; `app/SalesRoute.tsx` y
+  `app/SaleCreateRoute.tsx` —composición, no feature— inyectan las
+  implementaciones y mapean el `LoteoDetail` de `lots`.
 - **De las tres modalidades de pago solo está implementada `contado`.** El
   selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`
   y `entrega_financiada` deshabilitadas y rotuladas «(próximamente)»: la

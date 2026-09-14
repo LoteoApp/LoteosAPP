@@ -11,6 +11,7 @@ import CancelReservationDialog from '../features/reservations/components/CancelR
 import ReservationsList from '../features/reservations/components/ReservationsList'
 import ReservationsPagination from '../features/reservations/components/ReservationsPagination'
 import ReserveLotDialog from '../features/reservations/components/ReserveLotDialog'
+import SellLotLink from '../features/sales/components/SellLotLink'
 import { useReservationMutations } from '../features/reservations/hooks/use-reservation-mutations'
 import { useReservations } from '../features/reservations/hooks/use-reservations'
 import type { Reservation } from '../features/reservations/types'
@@ -41,6 +42,10 @@ export default function LoteoDetailRoute() {
           onCreated={onCreated}
         />
       )
+    : undefined
+
+  const renderSaleAction = canReserve
+    ? (lote: LoteoLote) => <SellLotLink loteoId={loteoId} lote={lote} />
     : undefined
 
   const renderReservationSummary = canReserve
@@ -88,6 +93,7 @@ export default function LoteoDetailRoute() {
         accessToken={token || null}
         canEdit={canEdit}
         renderReservationAction={renderReservationAction}
+        renderSaleAction={renderSaleAction}
         renderReservationSummary={renderReservationSummary}
         renderReservations={renderReservations}
       />

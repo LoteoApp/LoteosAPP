@@ -223,6 +223,9 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 Cargada por administrador o administrativo (`usuario_alta`):
 
 - lote vendido, cliente comprador;
+- la venta se inicia desde el visualizador del loteo, con el lote ya
+  elegido —solo un lote `disponible` con número y precio—, igual que la
+  reserva;
 - vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
   agencia se lee de `usuarios.inmobiliaria_id`. Administrador y administrativo
   eligen primero la inmobiliaria —cualquiera activa con al menos un vendedor

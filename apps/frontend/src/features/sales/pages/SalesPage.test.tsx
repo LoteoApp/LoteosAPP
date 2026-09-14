@@ -368,4 +368,26 @@ describe('SalesPage', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
   })
+
+  it('drops the lotes and their failure when the screen is unmounted while loading', async () => {
+    let resolveLotes: (lotes: LoteOption[]) => void = () => {}
+    let rejectLotes: (error: Error) => void = () => {}
+    const loadLotes = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<LoteOption[]>((resolve) => { resolveLotes = resolve }))
+      .mockImplementationOnce(() => new Promise<LoteOption[]>((_, reject) => { rejectLotes = reject }))
+
+    const first = render(<SalesPage loadLotes={loadLotes} loadClientes={vi.fn().mockResolvedValue([])} createCliente={vi.fn()} loadSellers={vi.fn()} />)
+    first.unmount()
+    resolveLotes([lote()])
+    await Promise.resolve()
+
+    const second = render(<SalesPage loadLotes={loadLotes} loadClientes={vi.fn().mockResolvedValue([])} createCliente={vi.fn()} loadSellers={vi.fn()} />)
+    second.unmount()
+    rejectLotes(new Error('boom'))
+    await Promise.resolve()
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Lote')).not.toBeInTheDocument()
+  })
 })
