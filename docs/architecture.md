@@ -469,20 +469,76 @@ Decisiones de este recorte:
   en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
   se ofrece un selector libre.
 - **La pantalla de venta todavía no persiste nada.** `features/sales` resuelve
-  la selección de lote, cliente e inmobiliaria contra endpoints existentes;
+  la selección de lote, cliente y vendedor contra endpoints existentes;
   el alta de la venta y la transición del lote a `vendido` quedan para la
   entrega siguiente. `GET /api/v1/lotes` alimenta el buscador de lotes: es la
   única pieza de backend que agrega, devuelve cada lote con su manzana, su
   loteo y su estado, y acepta `?q=` y `?estado=`. La pantalla pide
-  `estado=disponible` para no ofrecer un lote reservado o vendido, y el scope
+  `estado=disponible` para no ofrecer un lote reservado o vendido —cuando la
+  conversión de reserva entre al circuito habrá que sumar los `reservado` y
+  fijar el vendedor al de la reserva, según la regla de `docs/domain.md`—, y
+  el scope
   por rol es el mismo de `ListLoteos`, así que una inmobiliaria solo alcanza
   los lotes de los loteos de su agencia.
-- **Ventas no importa `clients` ni `agencies`.** Como una feature no toca los
-  archivos de otra, `SalesPage` recibe `loadLotes`, `loadClientes`,
-  `createCliente` y `loadAgencies` como props, y `app/SalesRoute.tsx` inyecta
-  las implementaciones. `loadAgencies` llega sin definir cuando el usuario
-  tiene rol inmobiliaria: la venta es de su propia agencia, así que el
-  selector no se muestra.
+- **Confirmar la venta hoy solo emite el recibo.** `buildSaleReceipt` valida el
+  borrador en el cliente (lote elegido y con precio, cliente elegido, modalidad
+  disponible, vendedor elegido) y devuelve el recibo o el mensaje de lo que
+  falta: mientras algo
+  falte, `Confirmar venta` queda deshabilitado y el mensaje se muestra al lado
+  del botón. Con el borrador completo, `SaleReceiptDialog` muestra el recibo y
+  `window.print()` lo manda a la impresora.
+  Sale rotulado «Comprobante provisorio» porque todavía no hay una venta
+  registrada detrás: cuando exista el alta, el diálogo se abrirá con la venta
+  persistida y el rótulo se cae. El recibo nombra al vendedor y deriva de él
+  la inmobiliaria; para un vendedor interno dice «Venta directa». Al imprimir,
+  el backdrop del diálogo compartido se esconde con `print:hidden` e
+  `index.css` oculta con
+  `display: none` todo hermano de `body` que no contenga `[data-print-area]`
+  — es decir la app entera — y el diálogo pasa a `static`: si en cambio se
+  escondiera el resto con `visibility`, seguiría ocupando lugar y el recibo
+  saldría en la segunda hoja.
+- **La venta guarda un vendedor, no una inmobiliaria.** `ventas.vendedor_id`
+  apunta a `usuarios` y la agencia se lee de `usuarios.inmobiliaria_id`, así
+  que el formulario elige la persona. Para no ofrecer una lista larga, el
+  selector de inmobiliaria filtra: sus opciones salen de agrupar los
+  vendedores elegibles por su agencia, más «Venta directa» para los internos
+  (`administrador`, `administrativo`), que no tienen ninguna. Elegir una
+  agencia deja el desplegable de vendedores con los suyos.
+- **Por defecto vende quien carga la venta.** El catálogo marca con `esActor`
+  la fila del usuario logueado —el cliente no conoce su `usuarios.id`, solo su
+  identidad de Supabase—, y el formulario la preselecciona junto con su
+  inmobiliaria. Para un administrador o administrativo, que no pertenecen a
+  ninguna agencia, eso deja el formulario en «Venta directa» a su nombre sin
+  tocar ningún selector. Los dos selectores siguen habilitados: la preselección
+  es un punto de partida, no un candado. Si el actor no aparece en el catálogo
+  pero hay un único elegible, se preselecciona ese.
+- **El alcance de ese catálogo no es el mismo en reservas que en ventas.** Una
+  reserva la toma siempre el usuario que la carga, así que para un actor con
+  rol inmobiliaria el endpoint devuelve una sola persona: él mismo. Una venta,
+  en cambio, la puede cargar por un colega de su agencia, y por eso ventas
+  pide `?alcance=agencia`: para un actor con rol inmobiliaria el scope pasa de
+  «solo el actor» a «los vendedores de la agencia del actor», sin incluir
+  nunca usuarios internos, porque estos no tienen `inmobiliaria_id`; para un
+  administrador o administrativo lista a los internos más los vendedores de
+  toda inmobiliaria activa que tenga al menos uno, esté o no asignada al
+  loteo por `inmobiliaria_loteos`, porque hoy no hay pantalla para cargar esa
+  asignación y sin este alcance el selector solo ofrecería «Venta directa».
+  El parámetro solo cambia lo que se lista;
+  `CreateReservation` sigue forzando `vendedor_id` al actor cuando tiene rol
+  inmobiliaria, así que no se puede usar para saltear esa regla.
+- **Los vendedores dependen del loteo, no del lote.** La elegibilidad sale de
+  `GET /api/v1/loteos/{loteoId}/vendedores`, el endpoint que agregó reservas.
+  Para una reserva solo devuelve usuarios internos y los de agencias asignadas
+  a ese loteo por `inmobiliaria_loteos`; para una venta (`?alcance=agencia`)
+  la asignación no filtra, pero el loteo sigue siendo el parámetro del
+  endpoint y tiene que existir. Por eso ambos selectores están deshabilitados
+  hasta que haya un lote, y cambiar de lote los limpia. Ese endpoint suma la agencia
+  de cada vendedor (`inmobiliariaId`, `inmobiliariaRazonSocial`) justamente
+  para que el cliente pueda agruparlos sin una segunda consulta.
+- **Ventas no importa `clients` ni `reservations`.** Como una feature no toca
+  los archivos de otra, `SalesPage` recibe `loadLotes`, `loadClientes`,
+  `createCliente` y `loadSellers` como props, y `app/SalesRoute.tsx` —que es
+  composición, no feature— inyecta las implementaciones de cada una.
 - **De las tres modalidades de pago solo está implementada `contado`.** El
   selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`
   y `entrega_financiada` deshabilitadas y rotuladas «(próximamente)»: la

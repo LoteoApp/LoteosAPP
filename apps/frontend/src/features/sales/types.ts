@@ -30,8 +30,8 @@ export function loteOptionLabel(lote: LoteOption): string {
 }
 
 // Sales never imports another feature's files, so it states the shape it needs
-// from a cliente and an inmobiliaria. The objects `app` injects satisfy these
-// structurally.
+// from a cliente, an inmobiliaria and a vendedor. The objects `app` injects
+// satisfy these structurally.
 export type ClienteOption = {
   id: string
   nombre: string
@@ -42,6 +42,81 @@ export type ClienteOption = {
 export type AgencyOption = {
   id: string
   razonSocial: string
+}
+
+// `ventas.vendedor_id` points at a usuario, and the agency is read from that
+// user's profile, so the sale stores the seller and never the agency.
+export type SellerOption = {
+  id: string
+  nombre: string
+  apellido: string
+  rol: string
+  // Marks the logged-in user, whose usuario id the client does not know.
+  esActor?: boolean
+  inmobiliariaId?: string
+  inmobiliariaRazonSocial?: string
+}
+
+// Administradores and administrativos sell without an agency, so they need a
+// group of their own in the selector that narrows the sellers.
+export const DIRECT_SALE: AgencyOption = { id: 'directa', razonSocial: 'Venta directa' }
+
+export function sellerOptionLabel(seller: SellerOption): string {
+  return `${seller.apellido}, ${seller.nombre}`
+}
+
+export function agencyOfSeller(seller: SellerOption): AgencyOption {
+  const id = seller.inmobiliariaId ?? ''
+  if (id === '') {
+    return DIRECT_SALE
+  }
+  return { id, razonSocial: seller.inmobiliariaRazonSocial ?? '' }
+}
+
+export function sellerAgencyLabel(seller: SellerOption): string {
+  return agencyOfSeller(seller).razonSocial
+}
+
+export function agencyOptionsFromSellers(sellers: readonly SellerOption[]): AgencyOption[] {
+  const agencies = new Map<string, AgencyOption>()
+  let hasDirectSale = false
+
+  for (const seller of sellers) {
+    const agency = agencyOfSeller(seller)
+    if (agency.id === DIRECT_SALE.id) {
+      hasDirectSale = true
+      continue
+    }
+    agencies.set(agency.id, agency)
+  }
+
+  const options = [...agencies.values()].sort((left, right) =>
+    left.razonSocial.localeCompare(right.razonSocial, 'es'),
+  )
+
+  return hasDirectSale ? [DIRECT_SALE, ...options] : options
+}
+
+// Whoever registers the sale is the seller unless they say otherwise, so the
+// form opens already resolved for the usual case: an administrativo selling
+// directly. Falling back to a lone eligible seller covers an agency user, who
+// can only sell for their own agency.
+export function defaultSeller(sellers: readonly SellerOption[]): SellerOption | null {
+  const actor = sellers.find((seller) => seller.esActor === true)
+  if (actor !== undefined) {
+    return actor
+  }
+  return sellers.length === 1 ? sellers[0] : null
+}
+
+export function sellersOfAgency(
+  sellers: readonly SellerOption[],
+  agency: AgencyOption | null,
+): SellerOption[] {
+  if (agency === null) {
+    return []
+  }
+  return sellers.filter((seller) => agencyOfSeller(seller).id === agency.id)
 }
 
 export type NewClientValues = {
@@ -73,4 +148,65 @@ const AVAILABLE_PAYMENT_METHODS: readonly PaymentMethod[] = ['contado']
 
 export function isPaymentMethodAvailable(method: PaymentMethod): boolean {
   return AVAILABLE_PAYMENT_METHODS.includes(method)
+}
+
+export type SaleDraft = {
+  lote: LoteOption | null
+  cliente: ClienteOption | null
+  seller: SellerOption | null
+  method: PaymentMethod
+}
+
+export type SaleReceipt = {
+  emitidoEl: string
+  lote: LoteOption
+  cliente: ClienteOption
+  seller: SellerOption
+  method: PaymentMethod
+  monto: number
+  moneda: string
+}
+
+export type SaleReceiptResult =
+  | { ok: true; receipt: SaleReceipt }
+  | { ok: false; error: string }
+
+export function buildSaleReceipt(draft: SaleDraft, emitidoEl: string): SaleReceiptResult {
+  const { lote, cliente, seller, method } = draft
+
+  if (lote === null) {
+    return { ok: false, error: 'Elegí el lote que se vende.' }
+  }
+
+  if (cliente === null) {
+    return { ok: false, error: 'Elegí el cliente comprador.' }
+  }
+
+  if (seller === null) {
+    return { ok: false, error: 'Elegí el vendedor que realizó la venta.' }
+  }
+
+  if (!isPaymentMethodAvailable(method)) {
+    return { ok: false, error: 'Por ahora solo se puede registrar una venta al contado.' }
+  }
+
+  if (lote.precio === null) {
+    return {
+      ok: false,
+      error: 'El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.',
+    }
+  }
+
+  return {
+    ok: true,
+    receipt: {
+      emitidoEl,
+      lote,
+      cliente,
+      seller,
+      method,
+      monto: lote.precio,
+      moneda: lote.moneda,
+    },
+  }
 }

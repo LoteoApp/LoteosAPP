@@ -1,17 +1,14 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useAuth } from '../features/auth/hooks/use-auth'
-import { getUserRole, ROLE } from '../shared/auth/roles'
-import { listAgencies } from '../features/agencies/api/agencies'
 import { createClient, listClients } from '../features/clients/api/clients'
+import { listEligibleSellers } from '../features/reservations/api/reservations'
 import { searchLotes } from '../features/sales/api/search-lotes'
 import SalesPage from '../features/sales/pages/SalesPage'
 import type { NewClientValues } from '../features/sales/types'
 
 export default function SalesRoute() {
-  const { session, user } = useAuth()
+  const { session } = useAuth()
   const token = session?.access_token ?? ''
-  // An inmobiliaria sells for its own agency, so it never picks one.
-  const isAgencyUser = getUserRole(user) === ROLE.inmobiliaria
 
   const loadLotes = useCallback(
     (signal?: AbortSignal) => searchLotes(token, { estado: 'disponible' }, signal),
@@ -28,10 +25,12 @@ export default function SalesRoute() {
     [token],
   )
 
-  const loadAgencies = useMemo(
-    () =>
-      isAgencyUser ? undefined : (signal?: AbortSignal) => listAgencies(token, signal),
-    [isAgencyUser, token],
+  // A venta lists every agency with sellers, assigned to the loteo or not, and
+  // lets an agency user pick a colleague; a reserva does neither.
+  const loadSellers = useCallback(
+    (loteoId: string, signal?: AbortSignal) =>
+      listEligibleSellers(token, loteoId, signal, 'agencia'),
+    [token],
   )
 
   return (
@@ -39,7 +38,7 @@ export default function SalesRoute() {
       loadLotes={loadLotes}
       loadClientes={loadClientes}
       createCliente={createCliente}
-      loadAgencies={loadAgencies}
+      loadSellers={loadSellers}
     />
   )
 }

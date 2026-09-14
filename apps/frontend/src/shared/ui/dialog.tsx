@@ -10,7 +10,7 @@ function DialogContent({ className, ...props }: ComponentProps<typeof DialogPrim
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
-        className="fixed inset-0 z-50 bg-foreground/50 transition-opacity duration-200 data-open:opacity-100 data-closed:opacity-0"
+        className="fixed inset-0 z-50 bg-foreground/50 transition-opacity duration-200 data-open:opacity-100 data-closed:opacity-0 print:hidden"
       />
       <DialogPrimitive.Popup
         className={cn(

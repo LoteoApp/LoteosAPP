@@ -147,6 +147,19 @@ func TestReservationHandlersParseRequestsAndPrincipal(t *testing.T) {
 		if recorder.Code != http.StatusOK || stub.input.LoteoID != "development-1" || len(stub.result) != 1 {
 			t.Errorf("status = %d, input = %#v, result = %#v", recorder.Code, stub.input, stub.result)
 		}
+		if stub.input.ForSale {
+			t.Errorf("input = %#v, want the actor alone without ?alcance", stub.input)
+		}
+	})
+
+	t.Run("eligible sellers of the agency", func(t *testing.T) {
+		stub := &listEligibleSellersHandlerStub{result: []domain.SellerOption{{ID: "seller-1"}}}
+		mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/loteos/{loteoId}/vendedores", handler.NewListEligibleSellersHandler(stub))
+		recorder := performAuthorizedRequest(t, mux, http.MethodGet, "/api/v1/loteos/development-1/vendedores?alcance=agencia", nil)
+
+		if recorder.Code != http.StatusOK || !stub.input.ForSale {
+			t.Errorf("status = %d, input = %#v", recorder.Code, stub.input)
+		}
 	})
 }
 

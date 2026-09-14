@@ -87,6 +87,53 @@ describe('reservation API', () => {
 
 		apiFetchMock.mockResolvedValueOnce({ vendedores: [{ id: 'seller-1' }] })
 		await expect(listEligibleSellers('token', 'loteo/1')).rejects.toThrow('No se pudo completar la operación')
+
+		apiFetchMock.mockResolvedValueOnce({ vendedores: [{ id: 'seller-1' }, { id: 'seller-2' }] })
+		await expect(
+			listEligibleSellers('token', 'loteo/1', undefined, 'agencia'),
+		).rejects.toThrow('No se pudo completar la operación')
+		expect(apiFetchMock.mock.calls.at(-1)?.[0]).toBe(
+			'/api/v1/loteos/loteo%2F1/vendedores?alcance=agencia',
+		)
+	})
+
+	it('keeps a seller with the agency of their profile', async () => {
+		apiFetchMock.mockResolvedValueOnce({
+			vendedores: [
+				{
+					id: 'seller-1',
+					nombre: 'Marta',
+					apellido: 'Suárez',
+					rol: 'inmobiliaria',
+					inmobiliariaId: 'agency-1',
+					inmobiliariaRazonSocial: 'Inmobiliaria Sur',
+				},
+			],
+		})
+
+		await expect(listEligibleSellers('token', 'loteo-1')).resolves.toEqual([
+			{
+				id: 'seller-1',
+				nombre: 'Marta',
+				apellido: 'Suárez',
+				rol: 'inmobiliaria',
+				inmobiliariaId: 'agency-1',
+				inmobiliariaRazonSocial: 'Inmobiliaria Sur',
+			},
+		])
+		expect(apiFetchMock.mock.calls.at(-1)?.[0]).toBe('/api/v1/loteos/loteo-1/vendedores')
+	})
+
+	it('rejects a seller whose agency is not text', async () => {
+		apiFetchMock.mockResolvedValueOnce({
+			vendedores: [
+				{ id: 'seller-1', nombre: 'Ana', apellido: 'Pérez', rol: 'inmobiliaria', inmobiliariaId: 7 },
+			],
+		})
+
+		await expect(listEligibleSellers('token', 'loteo-1')).rejects.toThrow(
+			'No se pudo completar la operación',
+		)
 	})
 
 	it('rejects malformed reservation payloads and identifies conflicts', async () => {

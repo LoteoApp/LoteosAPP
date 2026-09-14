@@ -36,6 +36,7 @@ type ReservationRepository struct {
 	SellersErr    error
 	SellersResult []domain.SellerOption
 	SellersLoteo  string
+	SellersActor  string
 	SellersScope  gateway.ReservationScope
 
 	ExpireCalls  int
@@ -84,9 +85,10 @@ func (fake *ReservationRepository) Cancel(_ context.Context, command gateway.Can
 	return fake.CancelResult, nil
 }
 
-func (fake *ReservationRepository) ListEligibleSellers(_ context.Context, loteoID string, scope gateway.ReservationScope) ([]domain.SellerOption, error) {
+func (fake *ReservationRepository) ListEligibleSellers(_ context.Context, loteoID string, actorAuthProviderID string, scope gateway.ReservationScope) ([]domain.SellerOption, error) {
 	fake.SellersCalls++
 	fake.SellersLoteo = loteoID
+	fake.SellersActor = actorAuthProviderID
 	fake.SellersScope = scope
 	if fake.SellersErr != nil {
 		return nil, fake.SellersErr

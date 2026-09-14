@@ -22,6 +22,7 @@ func (handler *ListEligibleSellersHandler) Handle(w http.ResponseWriter, request
 	sellers, err := handler.listEligibleSellers.Execute(request.Context(), reservations.ListEligibleSellersInput{
 		Actor:   reservations.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
 		LoteoID: request.PathValue("loteoId"),
+		ForSale: request.URL.Query().Get("alcance") == "agencia",
 	})
 	if err != nil {
 		return err

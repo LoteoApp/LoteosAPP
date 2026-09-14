@@ -209,11 +209,27 @@ Cargada por administrador o administrativo (`usuario_alta`):
 
 - lote vendido, cliente comprador;
 - vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
-  agencia se lee de `usuarios.inmobiliaria_id`;
+  agencia se lee de `usuarios.inmobiliaria_id`. Administrador y administrativo
+  eligen primero la inmobiliaria —cualquiera activa con al menos un vendedor
+  cargado, o «Venta directa» para vender como internos— y después uno de sus
+  vendedores; a diferencia de la reserva, la agencia no tiene que estar
+  asignada al loteo. Un usuario con rol inmobiliaria lo elige entre los de
+  su propia agencia, así que puede cargar
+  la venta de un colega. Es la diferencia con la reserva, donde la
+  inmobiliaria siempre queda como vendedor responsable. Por defecto el
+  vendedor es quien carga la venta: un administrador o administrativo, que no
+  pertenece a ninguna agencia, queda como vendedor de una venta directa sin
+  tener que elegir nada;
 - estado vigente en `ventas.estado_actual`; las transiciones se registran
   solo en `venta_estados`. Una venta no cancelada por lote;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
   o entrega + financiación.
+
+Vender un lote `reservado` solo lo puede hacer el vendedor responsable de esa
+reserva (`reservas.vendedor_id`): la reserva le pertenece a quien la tomó, y
+la venta la concreta esa misma persona. El vendedor de la venta no se elige
+entonces, sale de la reserva. Un lote `disponible` no tiene esa restricción y
+lo vende cualquier vendedor elegible.
 
 Al completarse, se genera un recibo PDF con descripción de lo comprado, medio
 de pago y código QR o link de verificación de autenticidad.

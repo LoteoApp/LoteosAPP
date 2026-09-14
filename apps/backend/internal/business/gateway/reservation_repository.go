@@ -10,6 +10,10 @@ import (
 type ReservationScope struct {
 	AssigneeAuthProviderID *string
 	ByAgencyAssignment     bool
+	// Marks a seller listing for a venta instead of a reserva: an agency actor
+	// gets every seller of their agency (not just themselves), and every active
+	// agency with sellers is listed whether or not it is assigned to the loteo.
+	ForSale bool
 }
 
 type CreateReservationCommand struct {
@@ -38,6 +42,6 @@ type ReservationRepository interface {
 	List(ctx context.Context, filter domain.ReservationListFilter, scope ReservationScope) (domain.ReservationPage, error)
 	Get(ctx context.Context, id string, scope ReservationScope) (domain.Reservation, error)
 	Cancel(ctx context.Context, command CancelReservationCommand, scope ReservationScope) (domain.Reservation, error)
-	ListEligibleSellers(ctx context.Context, loteoID string, scope ReservationScope) ([]domain.SellerOption, error)
+	ListEligibleSellers(ctx context.Context, loteoID string, actorAuthProviderID string, scope ReservationScope) ([]domain.SellerOption, error)
 	ExpireDue(ctx context.Context, now time.Time, limit int) (domain.ExpirationReport, error)
 }

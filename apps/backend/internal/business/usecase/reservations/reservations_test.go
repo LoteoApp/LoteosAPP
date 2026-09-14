@@ -275,6 +275,23 @@ func TestCancelAndSellerUseCasesValidateInputsAndMapFailures(t *testing.T) {
 		if repository.SellersLoteo != "loteo-id" || repository.SellersScope.AssigneeAuthProviderID != nil {
 			t.Fatalf("seller request = %#v/%#v", repository.SellersLoteo, repository.SellersScope)
 		}
+		if repository.SellersScope.ForSale {
+			t.Fatalf("seller scope = %#v, want the actor alone by default", repository.SellersScope)
+		}
+		repository.SellersErr = nil
+		if _, err := useCase.Execute(ctx, reservations.ListEligibleSellersInput{
+			Actor:   actor,
+			LoteoID: "loteo-id",
+			ForSale: true,
+		}); err != nil {
+			t.Fatalf("sellers with agency peers error = %v", err)
+		}
+		if !repository.SellersScope.ForSale {
+			t.Fatalf("seller scope = %#v, want the agency peers included", repository.SellersScope)
+		}
+		if repository.SellersActor != actor.AuthProviderID {
+			t.Fatalf("seller actor = %q, want %q", repository.SellersActor, actor.AuthProviderID)
+		}
 	})
 }
 

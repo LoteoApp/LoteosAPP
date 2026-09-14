@@ -55,7 +55,7 @@ export default function AgencyCombobox({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      <FieldDescription>Inmobiliaria que realizó la venta.</FieldDescription>
+      <FieldDescription>Inmobiliaria del vendedor, o venta directa.</FieldDescription>
     </Field>
   )
 }

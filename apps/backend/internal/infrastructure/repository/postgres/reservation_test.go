@@ -101,15 +101,79 @@ func TestReservationRepository(t *testing.T) {
 		t.Fatalf("List() out-of-range = %#v, want totals preserved", outsidePage)
 	}
 
-	sellers, err := repository.ListEligibleSellers(context.Background(), loteoID, gateway.ReservationScope{})
+	agencySellerID, agencySellerAuthID, agencyPeerID, agencyID, agencyName := agencySellerFixture(t, pool, loteoID)
+
+	sellers, err := repository.ListEligibleSellers(context.Background(), loteoID, "", gateway.ReservationScope{})
 	if err != nil {
 		t.Fatalf("ListEligibleSellers() error = %v", err)
 	}
 	if !containsSeller(sellers, actorID) {
 		t.Fatalf("ListEligibleSellers() = %#v, want the fixture administrator", sellers)
 	}
-	if _, err := repository.ListEligibleSellers(context.Background(), "not-a-uuid", gateway.ReservationScope{}); !errors.Is(err, domain.ErrLoteoNotFound) {
+	administrator, found := findSeller(sellers, actorID)
+	if !found || administrator.InmobiliariaID != "" || administrator.InmobiliariaRazonSocial != "" {
+		t.Fatalf("ListEligibleSellers() administrator = %#v, want no agency", administrator)
+	}
+	agencySeller, found := findSeller(sellers, agencySellerID)
+	if !found {
+		t.Fatalf("ListEligibleSellers() = %#v, want the agency seller", sellers)
+	}
+	if agencySeller.InmobiliariaID != agencyID || agencySeller.InmobiliariaRazonSocial != agencyName {
+		t.Fatalf("ListEligibleSellers() agency seller = %#v, want agency %q named %q", agencySeller, agencyID, agencyName)
+	}
+	if _, err := repository.ListEligibleSellers(context.Background(), "not-a-uuid", "", gateway.ReservationScope{}); !errors.Is(err, domain.ErrLoteoNotFound) {
 		t.Fatalf("ListEligibleSellers() invalid loteo error = %v", err)
+	}
+
+	agencyScope := gateway.ReservationScope{
+		AssigneeAuthProviderID: &agencySellerAuthID,
+		ByAgencyAssignment:     true,
+	}
+	alone, err := repository.ListEligibleSellers(context.Background(), loteoID, agencySellerAuthID, agencyScope)
+	if err != nil {
+		t.Fatalf("ListEligibleSellers() agency scope error = %v", err)
+	}
+	if len(alone) != 1 || alone[0].ID != agencySellerID {
+		t.Fatalf("ListEligibleSellers() agency scope = %#v, want the actor alone", alone)
+	}
+	if !alone[0].IsActor {
+		t.Fatalf("ListEligibleSellers() agency scope = %#v, want the actor marked", alone)
+	}
+
+	agencyScope.ForSale = true
+	peers, err := repository.ListEligibleSellers(context.Background(), loteoID, agencySellerAuthID, agencyScope)
+	if err != nil {
+		t.Fatalf("ListEligibleSellers() agency peers error = %v", err)
+	}
+	if !containsSeller(peers, agencySellerID) || !containsSeller(peers, agencyPeerID) {
+		t.Fatalf("ListEligibleSellers() agency peers = %#v, want both sellers of the agency", peers)
+	}
+	if containsSeller(peers, actorID) {
+		t.Fatalf("ListEligibleSellers() agency peers = %#v, want no internal users", peers)
+	}
+	peer, _ := findSeller(peers, agencyPeerID)
+	if peer.IsActor {
+		t.Fatalf("ListEligibleSellers() peer = %#v, want only the caller marked as actor", peer)
+	}
+
+	unassignedSellerID, unassignedAgencyID := unassignedAgencySellerFixture(t, pool)
+	forReservation, err := repository.ListEligibleSellers(context.Background(), loteoID, "", gateway.ReservationScope{})
+	if err != nil {
+		t.Fatalf("ListEligibleSellers() reservation error = %v", err)
+	}
+	if containsSeller(forReservation, unassignedSellerID) {
+		t.Fatalf("ListEligibleSellers() reservation = %#v, want no seller of an agency not assigned to the loteo", forReservation)
+	}
+	forSale, err := repository.ListEligibleSellers(context.Background(), loteoID, "", gateway.ReservationScope{ForSale: true})
+	if err != nil {
+		t.Fatalf("ListEligibleSellers() sale error = %v", err)
+	}
+	unassigned, found := findSeller(forSale, unassignedSellerID)
+	if !found || unassigned.InmobiliariaID != unassignedAgencyID {
+		t.Fatalf("ListEligibleSellers() sale = %#v, want the seller of the agency not assigned to the loteo", forSale)
+	}
+	if !containsSeller(forSale, agencySellerID) || !containsSeller(forSale, actorID) {
+		t.Fatalf("ListEligibleSellers() sale = %#v, want the assigned agency seller and the administrator too", forSale)
 	}
 
 	detailed, err := repository.Get(context.Background(), created.ID, gateway.ReservationScope{})
@@ -219,6 +283,69 @@ func (clock fixedReservationClock) Now() time.Time { return clock.now }
 type mutableReservationClock struct{ now time.Time }
 
 func (clock *mutableReservationClock) Now() time.Time { return clock.now }
+
+func agencySellerFixture(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	loteoID string,
+) (sellerID, sellerAuthProviderID, peerID, agencyID, razonSocial string) {
+	t.Helper()
+
+	razonSocial = "Inmobiliaria Test " + newUUID(t)
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO inmobiliarias (razon_social) VALUES ($1) RETURNING id::text
+	`, razonSocial).Scan(&agencyID); err != nil {
+		t.Fatalf("create seller agency: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM inmobiliarias WHERE id = $1::uuid`, agencyID); err != nil {
+			t.Errorf("cleanup seller agency: %v", err)
+		}
+	})
+
+	sellerAuthProviderID = newUUID(t)
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO usuarios (auth_provider_id, email, rol, nombre, apellido, perfil_completo, inmobiliaria_id)
+		VALUES ($1::uuid, $2, 'inmobiliaria', 'Vendedor', 'Agencia', true, $3::uuid)
+		RETURNING id::text
+	`, sellerAuthProviderID, newEmail(t), agencyID).Scan(&sellerID); err != nil {
+		t.Fatalf("create agency seller: %v", err)
+	}
+	t.Cleanup(func() { deleteUsuario(t, pool, sellerAuthProviderID) })
+
+	peerAuthProviderID := newUUID(t)
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO usuarios (auth_provider_id, email, rol, nombre, apellido, perfil_completo, inmobiliaria_id)
+		VALUES ($1::uuid, $2, 'inmobiliaria', 'Colega', 'Agencia', true, $3::uuid)
+		RETURNING id::text
+	`, peerAuthProviderID, newEmail(t), agencyID).Scan(&peerID); err != nil {
+		t.Fatalf("create agency peer: %v", err)
+	}
+	t.Cleanup(func() { deleteUsuario(t, pool, peerAuthProviderID) })
+
+	var linkID string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO inmobiliaria_loteos (inmobiliaria_id, loteo_id) VALUES ($1::uuid, $2::uuid) RETURNING id::text
+	`, agencyID, loteoID).Scan(&linkID); err != nil {
+		t.Fatalf("assign agency to loteo: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM inmobiliaria_loteos WHERE id = $1::uuid`, linkID); err != nil {
+			t.Errorf("cleanup agency loteo assignment: %v", err)
+		}
+	})
+
+	return sellerID, sellerAuthProviderID, peerID, agencyID, razonSocial
+}
+
+func findSeller(sellers []domain.SellerOption, id string) (domain.SellerOption, bool) {
+	for _, seller := range sellers {
+		if seller.ID == id {
+			return seller, true
+		}
+	}
+	return domain.SellerOption{}, false
+}
 
 func containsSeller(sellers []domain.SellerOption, id string) bool {
 	for _, seller := range sellers {
@@ -819,4 +946,33 @@ func reservationFixture(t *testing.T, pool *pgxpool.Pool) (actorID, clientID, lo
 	t.Cleanup(func() { deleteLoteo(t, pool, loteoID) })
 
 	return actorID, clientID, loteoID, lotID
+}
+
+// unassignedAgencySellerFixture creates an active agency with one seller and
+// no inmobiliaria_loteos row, the case a venta may pick and a reserva may not.
+func unassignedAgencySellerFixture(t *testing.T, pool *pgxpool.Pool) (sellerID, agencyID string) {
+	t.Helper()
+
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO inmobiliarias (razon_social) VALUES ($1) RETURNING id::text
+	`, "Inmobiliaria Sin Loteo "+newUUID(t)).Scan(&agencyID); err != nil {
+		t.Fatalf("create unassigned agency: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM inmobiliarias WHERE id = $1::uuid`, agencyID); err != nil {
+			t.Errorf("cleanup unassigned agency: %v", err)
+		}
+	})
+
+	authProviderID := newUUID(t)
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO usuarios (auth_provider_id, email, rol, nombre, apellido, perfil_completo, inmobiliaria_id)
+		VALUES ($1::uuid, $2, 'inmobiliaria', 'Vendedor', 'Sin Loteo', true, $3::uuid)
+		RETURNING id::text
+	`, authProviderID, newEmail(t), agencyID).Scan(&sellerID); err != nil {
+		t.Fatalf("create unassigned agency seller: %v", err)
+	}
+	t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+
+	return sellerID, agencyID
 }

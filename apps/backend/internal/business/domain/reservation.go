@@ -171,11 +171,15 @@ type ReservationPage struct {
 }
 
 type SellerOption struct {
-	ID       string `json:"id"`
-	Nombre   string `json:"nombre"`
-	Apellido string `json:"apellido"`
-	Email    string `json:"email,omitempty"`
-	Rol      Rol    `json:"rol"`
+	ID                      string `json:"id"`
+	Nombre                  string `json:"nombre"`
+	Apellido                string `json:"apellido"`
+	Email                   string `json:"email,omitempty"`
+	Rol                     Rol    `json:"rol"`
+	InmobiliariaID          string `json:"inmobiliariaId,omitempty"`
+	InmobiliariaRazonSocial string `json:"inmobiliariaRazonSocial,omitempty"`
+	// Lets a caller preselect the seller without knowing their usuario id.
+	IsActor bool `json:"esActor"`
 }
 
 type ExpirationFailure struct {
