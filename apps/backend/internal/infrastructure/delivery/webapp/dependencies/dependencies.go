@@ -42,6 +42,12 @@ type Container struct {
 	ListLoteosHandler          *handler.ListLoteosHandler
 	SearchLotesHandler         *handler.SearchLotesHandler
 	GetLoteoHandler            *handler.GetLoteoHandler
+	StoreLoteoFileHandler      *handler.StoreLoteoFileHandler
+	StoreLoteFileHandler       *handler.StoreLoteFileHandler
+	ListLoteoFilesHandler      *handler.ListLoteoFilesHandler
+	ListLoteFilesHandler       *handler.ListLoteFilesHandler
+	GetFileContentHandler      *handler.GetFileContentHandler
+	DeleteFileHandler          *handler.DeleteFileHandler
 	CreateReservationHandler   *handler.CreateReservationHandler
 	ListReservationsHandler    *handler.ListReservationsHandler
 	GetReservationHandler      *handler.GetReservationHandler
@@ -109,6 +115,13 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
 	searchLotesHandler := handler.NewSearchLotesHandler(loteos.NewSearchLotes(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
+	storeLoteoFileHandler := handler.NewStoreLoteoFileHandler(loteos.NewStoreLoteoFile(loteoRepo, objectStorage))
+	storeLoteFileHandler := handler.NewStoreLoteFileHandler(loteos.NewStoreLoteFile(loteoRepo, objectStorage))
+	listLoteoFilesHandler := handler.NewListLoteoFilesHandler(loteos.NewListLoteoFiles(loteoRepo))
+	listLoteFilesHandler := handler.NewListLoteFilesHandler(loteos.NewListLoteFiles(loteoRepo))
+	getFileContentHandler := handler.NewGetFileContentHandler(loteos.NewGetFileContent(loteoRepo, objectStorage))
+	deleteFileHandler := handler.NewDeleteFileHandler(loteos.NewDeleteFile(loteoRepo))
+
 	transitionLotState := loteos.NewTransitionLotState(lotStateRepo, userRepo)
 	reservationRepo := postgres.NewReservationRepository(pool)
 	createReservationHandler := handler.NewCreateReservationHandler(reservations.NewCreateReservation(reservationRepo, userRepo))
@@ -149,6 +162,12 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		ListLoteosHandler:          listLoteosHandler,
 		SearchLotesHandler:         searchLotesHandler,
 		GetLoteoHandler:            getLoteoHandler,
+		StoreLoteoFileHandler:      storeLoteoFileHandler,
+		StoreLoteFileHandler:       storeLoteFileHandler,
+		ListLoteoFilesHandler:      listLoteoFilesHandler,
+		ListLoteFilesHandler:       listLoteFilesHandler,
+		GetFileContentHandler:      getFileContentHandler,
+		DeleteFileHandler:          deleteFileHandler,
 		CreateReservationHandler:   createReservationHandler,
 		ListReservationsHandler:    listReservationsHandler,
 		GetReservationHandler:      getReservationHandler,

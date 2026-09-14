@@ -96,6 +96,19 @@ Después de agregar tablas conviene revisar los avisos del proyecto
 (**Advisors > Security** en el dashboard de Supabase), que marcan
 exactamente este problema.
 
+## Archivos y almacenamiento de objetos
+
+La tabla `archivos` (migración `00005`) guarda metadata — `categoria`
+(`dxf`, `foto`, `plano`, `documento_legal`), `storage_key`, `mime_type`,
+`hash_sha256`, baja lógica — para todo archivo que sube un usuario: el DXF
+original de un loteo, sus fotos y planos, y los de sus lotes. `storage_key`
+apunta a un objeto en un bucket de Cloudflare R2; los bytes en sí nunca
+llegan a PostgreSQL. El constraint `archivos_loteo_xor_lote_chk` exige que
+cada fila cuelgue de `loteo_id` o de `lote_id`, nunca de ambos ni de
+ninguno. Ver [Fotos y planos de loteo y lote](architecture.md#fotos-y-planos-de-loteo-y-lote)
+en `architecture.md` para el flujo completo (autorización, cupo por
+entidad, validación del tipo real del contenido, cómo se sirve de vuelta).
+
 ## Validar el entorno
 
 Para confirmar que el backend pudo conectarse a la base durante el
