@@ -14,9 +14,9 @@ func TestCreateUserRejectsNonAdministrador(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{"administrativo"}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
+	_, _, err := createUser.Execute(context.Background(), []string{"administrativo"}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
 	if !errors.Is(err, domain.ErrNoAutorizado) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
@@ -48,10 +48,10 @@ func TestCreateUserRejectsIncompleteProfile(t *testing.T) {
 
 			repository := &gatewayfake.UserRepository{}
 			identity := &gatewayfake.IdentityProvider{}
-			createUser := NewCreateUser(repository, identity)
+			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
 			_, _, err := createUser.Execute(context.Background(),
-				[]string{domain.RolAdministrador}, test.nombre, test.apellido, "ana@example.com", domain.RolAdministrativo)
+				[]string{domain.RolAdministrador}, test.nombre, test.apellido, "ana@example.com", domain.RolAdministrativo, "")
 
 			if !errors.Is(err, domain.ErrPerfilInvalido) {
 				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrPerfilInvalido)
@@ -68,9 +68,9 @@ func TestCreateUserRejectsInvalidRol(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", "superadmin")
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", "superadmin", "")
 
 	if !errors.Is(err, domain.ErrRolInvalido) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrRolInvalido)
@@ -91,9 +91,9 @@ func TestCreateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 
 			repository := &gatewayfake.UserRepository{}
 			identity := &gatewayfake.IdentityProvider{}
-			createUser := NewCreateUser(repository, identity)
+			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-			_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", rol)
+			_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", rol, "")
 
 			if !errors.Is(err, domain.ErrRolInvalido) {
 				t.Fatalf("Execute() error = %v, want %v", err, domain.ErrRolInvalido)
@@ -110,9 +110,9 @@ func TestCreateUserRejectsInvalidEmail(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "not-an-email", domain.RolAdministrativo)
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "not-an-email", domain.RolAdministrativo, "")
 
 	if !errors.Is(err, domain.ErrEmailInvalido) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmailInvalido)
@@ -127,10 +127,10 @@ func TestCreateUserHappyPath(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
 	usuario, tempPassword, err := createUser.Execute(context.Background(),
-		[]string{domain.RolAdministrador}, "  Ana  ", "  Gómez  ", "  ana@example.com  ", domain.RolAdministrativo)
+		[]string{domain.RolAdministrador}, "  Ana  ", "  Gómez  ", "  ana@example.com  ", domain.RolAdministrativo, "")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -165,9 +165,9 @@ func TestCreateUserPropagatesIdentityProviderError(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{CreateErr: domain.ErrEmailEnUso}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
 	if !errors.Is(err, domain.ErrEmailEnUso) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrEmailEnUso)
@@ -183,9 +183,9 @@ func TestCreateUserCompensatesWhenPersistenceFails(t *testing.T) {
 	persistErr := errors.New("insert failed")
 	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
 	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
 	assertDatabaseUnavailable(t, err, persistErr)
 	if identity.DeleteCalls != 1 {
@@ -202,9 +202,95 @@ func TestCreateUserReturnsOriginalErrorWhenCompensationAlsoFails(t *testing.T) {
 	persistErr := errors.New("insert failed")
 	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
 	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", DeleteErr: errors.New("delete failed")}
-	createUser := NewCreateUser(repository, identity)
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
 
-	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo)
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
 	assertDatabaseUnavailable(t, err, persistErr)
+}
+
+func TestCreateUserRequiresAgencyForRolInmobiliaria(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{}
+	agencies := &gatewayfake.AgencyRepository{}
+	createUser := NewCreateUser(repository, identity, agencies)
+
+	_, _, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "  ")
+
+	if !errors.Is(err, domain.ErrAgenciaRequerida) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrAgenciaRequerida)
+	}
+	if identity.CreateCalls != 0 {
+		t.Error("Execute() should not call identity provider when the agency is missing")
+	}
+	if agencies.FindByIDCalls != 0 {
+		t.Error("Execute() should not look up an agency when none was sent")
+	}
+}
+
+func TestCreateUserPropagatesAgencyNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{}
+	agencies := &gatewayfake.AgencyRepository{FindByIDErr: domain.ErrAgencyNotFound}
+	createUser := NewCreateUser(repository, identity, agencies)
+
+	_, _, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "agency-1")
+
+	if !errors.Is(err, domain.ErrAgencyNotFound) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrAgencyNotFound)
+	}
+	if agencies.FindByIDInput != "agency-1" {
+		t.Errorf("Execute() looked up agency %q, want %q", agencies.FindByIDInput, "agency-1")
+	}
+	if identity.CreateCalls != 0 {
+		t.Error("Execute() should not call identity provider when the agency doesn't exist")
+	}
+}
+
+func TestCreateUserSetsAgencyForRolInmobiliaria(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	agencies := &gatewayfake.AgencyRepository{FoundByID: domain.Agency{ID: "agency-1"}}
+	createUser := NewCreateUser(repository, identity, agencies)
+
+	usuario, _, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "agency-1")
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if usuario.AgencyID == nil || *usuario.AgencyID != "agency-1" {
+		t.Errorf("Execute() agency id = %v, want %q", usuario.AgencyID, "agency-1")
+	}
+	if agencies.FindByIDCalls != 1 {
+		t.Errorf("Execute() agencies.FindByID calls = %d, want 1", agencies.FindByIDCalls)
+	}
+}
+
+func TestCreateUserIgnoresAgencyForOtherRoles(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	agencies := &gatewayfake.AgencyRepository{}
+	createUser := NewCreateUser(repository, identity, agencies)
+
+	usuario, _, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "agency-1")
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if usuario.AgencyID != nil {
+		t.Errorf("Execute() agency id = %v, want nil for a non-inmobiliaria role", usuario.AgencyID)
+	}
+	if agencies.FindByIDCalls != 0 {
+		t.Error("Execute() should not look up an agency for a role that doesn't have one")
+	}
 }

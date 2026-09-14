@@ -61,6 +61,9 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
     if (!values.nombre || !values.apellido || !values.email) {
       return 'Completá nombre, apellido y correo electrónico.'
     }
+    if (values.rol === 'inmobiliaria' && !values.inmobiliariaId) {
+      return 'Seleccioná la inmobiliaria a la que pertenece el usuario.'
+    }
     if (usuarios.some((usuario) => usuario.email === values.email)) {
       return 'Ya existe un usuario con ese correo electrónico.'
     }
@@ -140,6 +143,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
               <UserForm
                 key="create"
                 mode="create"
+                accessToken={token}
                 submitLabel="Crear usuario"
                 isSubmitting={isSubmitting}
                 onSubmit={handleCreate}

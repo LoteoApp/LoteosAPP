@@ -207,6 +207,57 @@ func TestInmobiliariaRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("find by id returns an active agency", func(t *testing.T) {
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: seedUsuario(t, pool),
+		})
+		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		found, err := repository.FindByID(context.Background(), created.ID)
+		if err != nil {
+			t.Fatalf("FindByID() error = %v", err)
+		}
+		if found.ID != created.ID || found.BusinessName != created.BusinessName {
+			t.Errorf("FindByID() = %#v", found)
+		}
+	})
+
+	t.Run("find by id not found", func(t *testing.T) {
+		for name, id := range map[string]string{
+			"unknown uuid": newUUID(t),
+			"not a uuid":   "nope",
+		} {
+			t.Run(name, func(t *testing.T) {
+				_, err := repository.FindByID(context.Background(), id)
+				if !errors.Is(err, domain.ErrAgencyNotFound) {
+					t.Fatalf("FindByID() error = %v, want %v", err, domain.ErrAgencyNotFound)
+				}
+			})
+		}
+	})
+
+	t.Run("find by id does not return an agency given de baja", func(t *testing.T) {
+		actor := seedUsuario(t, pool)
+		created, err := repository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: actor,
+		})
+		t.Cleanup(func() { deleteInmobiliaria(t, pool, created.ID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+		if err := repository.SoftDelete(context.Background(), created.ID, actor); err != nil {
+			t.Fatalf("SoftDelete() error = %v", err)
+		}
+
+		_, err = repository.FindByID(context.Background(), created.ID)
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("FindByID() error = %v, want %v", err, domain.ErrAgencyNotFound)
+		}
+	})
+
 	t.Run("update replaces the fields that are present", func(t *testing.T) {
 		actor := seedUsuario(t, pool)
 		created, err := repository.Create(context.Background(), domain.Agency{

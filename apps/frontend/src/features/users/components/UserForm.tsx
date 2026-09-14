@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
+import { useAgencyOptions } from '../hooks/use-agency-options'
 import { GESTIONABLE_ROLES, ROLE_LABELS } from '../types'
 import type { GestionableRol, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
 type CreateUserFormProps = {
   mode: 'create'
+  accessToken: string
   submitLabel: string
   isSubmitting?: boolean
   onSubmit: (values: UsuarioFormValues) => void
@@ -35,7 +38,21 @@ export default function UserForm(props: UserFormProps) {
   const [apellido, setApellido] = useState(props.mode === 'edit' ? props.initialValue.apellido : '')
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState<GestionableRol>(GESTIONABLE_ROLES[0])
+  const [inmobiliariaId, setInmobiliariaId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const isInmobiliaria = rol === 'inmobiliaria'
+  const {
+    agencies,
+    isLoading: isLoadingAgencies,
+    error: agenciesError,
+  } = useAgencyOptions(props.mode === 'create' ? props.accessToken : '', props.mode === 'create' && isInmobiliaria)
+
+  function handleRolChange(value: GestionableRol) {
+    setRol(value)
+    // The agency field only applies to rol inmobiliaria: drop any previous
+    // selection so a leftover value never survives a role change unseen.
+    setInmobiliariaId('')
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -53,6 +70,7 @@ export default function UserForm(props: UserFormProps) {
         apellido: trimmedApellido,
         email: email.trim(),
         rol,
+        inmobiliariaId: isInmobiliaria ? inmobiliariaId : undefined,
       }
       const validationError = props.onValidate(values)
       if (validationError) {
@@ -108,7 +126,7 @@ export default function UserForm(props: UserFormProps) {
               <Select
                 name="rol"
                 value={rol}
-                onValueChange={(value) => setRol(value as GestionableRol)}
+                onValueChange={(value) => handleRolChange(value as GestionableRol)}
               >
                 <SelectTrigger id="rol">
                   <SelectValue />
@@ -124,6 +142,50 @@ export default function UserForm(props: UserFormProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            {isInmobiliaria && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="inmobiliaria">Inmobiliaria</Label>
+                  <Button type="button" variant="ghost" size="sm" render={<Link to="/inmobiliarias" />}>
+                    Nueva inmobiliaria
+                  </Button>
+                </div>
+                <Select
+                  name="inmobiliaria"
+                  value={inmobiliariaId || 'inmobiliaria-empty'}
+                  onValueChange={(value) => setInmobiliariaId(!value || value === 'inmobiliaria-empty' ? '' : value)}
+                  disabled={isLoadingAgencies}
+                >
+                  <SelectTrigger id="inmobiliaria">
+                    <SelectValue>
+                      {inmobiliariaId
+                        ? agencies.find((agency) => agency.id === inmobiliariaId)?.razonSocial
+                        : isLoadingAgencies
+                          ? 'Cargando inmobiliarias…'
+                          : 'Seleccioná una inmobiliaria'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectList>
+                      <SelectItem value="inmobiliaria-empty">
+                        {agencies.length > 0 ? 'Seleccioná una inmobiliaria' : 'No hay inmobiliarias cargadas'}
+                      </SelectItem>
+                      {agencies.map((agency) => (
+                        <SelectItem key={agency.id} value={agency.id}>
+                          {agency.razonSocial}
+                        </SelectItem>
+                      ))}
+                    </SelectList>
+                  </SelectContent>
+                </Select>
+                {agenciesError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {agenciesError}
+                  </p>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex flex-col justify-end gap-1.5 sm:col-span-2">
