@@ -665,7 +665,7 @@ caso de uso compensa borrando el objeto que ya había subido a R2. Decisiones:
   `application/pdf`. Como el `Content-Type` de un part multipart lo declara el
   cliente y no prueba nada sobre los bytes que siguen, `usecase/loteos`
   también compara los primeros bytes del archivo contra la firma esperada
-  (`domain.ArchivoContentMatchesMimeType`) antes de hashear y subir.
+  (`domain.FileContentMatchesMimeType`) antes de hashear y subir.
 - **`categoria` es un detalle interno, no una elección de quien sube el
   archivo.** El frontend la infiere del tipo del archivo (imagen → `foto`,
   cualquier otra cosa → `plano`, ver `categoryFor` en
