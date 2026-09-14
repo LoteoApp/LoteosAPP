@@ -126,6 +126,48 @@ func TestUserRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("create sets the agency for rol inmobiliaria", func(t *testing.T) {
+		agencyRepository := postgres.NewAgencyRepository(pool)
+		agency, err := agencyRepository.Create(context.Background(), domain.Agency{
+			BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: seedUsuario(t, pool),
+		})
+		t.Cleanup(func() { deleteInmobiliaria(t, pool, agency.ID) })
+		if err != nil {
+			t.Fatalf("agencyRepository.Create() error = %v", err)
+		}
+
+		authProviderID := newUUID(t)
+		created, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: authProviderID,
+			Email:          newEmail(t),
+			Rol:            domain.RolInmobiliaria,
+			AgencyID:       &agency.ID,
+		})
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+		if created.AgencyID == nil || *created.AgencyID != agency.ID {
+			t.Errorf("Create() agency id = %v, want %q", created.AgencyID, agency.ID)
+		}
+
+		found, err := repository.FindByID(context.Background(), created.ID)
+		if err != nil {
+			t.Fatalf("FindByID() error = %v", err)
+		}
+		if found.AgencyID == nil || *found.AgencyID != agency.ID {
+			t.Errorf("FindByID() agency id = %v, want %q", found.AgencyID, agency.ID)
+		}
+	})
+
+	t.Run("create leaves the agency unset for other roles", func(t *testing.T) {
+		created := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
+
+		if created.AgencyID != nil {
+			t.Errorf("Create() agency id = %v, want nil", created.AgencyID)
+		}
+	})
+
 	t.Run("find by id", func(t *testing.T) {
 		created := createUsuarioConRol(t, pool, repository, domain.RolEscribano, "Ana", "Gómez")
 

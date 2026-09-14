@@ -30,7 +30,7 @@ func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 	}
 
 	usuario, temporaryPassword, err := handler.createUser.Execute(
-		request.Context(), principal.Roles, body.Nombre, body.Apellido, body.Email, body.Rol,
+		request.Context(), principal.Roles, body.Nombre, body.Apellido, body.Email, body.Rol, body.InmobiliariaID,
 	)
 	if err != nil {
 		return err
