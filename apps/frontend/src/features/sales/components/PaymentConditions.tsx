@@ -1,4 +1,5 @@
 import { Field, FieldDescription, FieldLabel } from '../../../shared/ui/field'
+import { Input } from '../../../shared/ui/input'
 import {
   Select,
   SelectContent,
@@ -11,19 +12,33 @@ import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
-  isPaymentMethodAvailable,
+  PAYMENT_PERIODS,
+  PAYMENT_PERIOD_LABELS,
+  buildPaymentSchedule,
+  isFinancedMethod,
   saleDisabledReason,
+  parsePaymentPlan,
   type LotOption,
   type PaymentMethod,
+  type PaymentPeriod,
+  type PaymentPlanValues,
 } from '../types'
 
 type PaymentConditionsProps = {
   method: PaymentMethod
-  // The amount of a contado sale is the price of the lote, so it is shown,
-  // never typed.
+  plan: PaymentPlanValues
+  // The amount of a sale is the price of the lote, so it is shown, never
+  // typed; a financed plan splits it.
   lot: LotOption | null
   onMethodChange: (method: PaymentMethod) => void
+  onPlanChange: (plan: PaymentPlanValues) => void
   disabled?: boolean
+}
+
+const METHOD_DESCRIPTIONS: Record<PaymentMethod, string> = {
+  contado: 'El monto es el precio del lote seleccionado.',
+  financiado: 'El precio del lote se divide en cuotas, con el interés que indiques.',
+  entrega_financiada: 'Una entrega inicial y el resto del precio en cuotas.',
 }
 
 function AmountValue({ lot }: { lot: LotOption | null }) {
@@ -46,12 +61,69 @@ function AmountValue({ lot }: { lot: LotOption | null }) {
   )
 }
 
+function PlanPreview({
+  method,
+  plan,
+  lot,
+}: {
+  method: PaymentMethod
+  plan: PaymentPlanValues
+  lot: LotOption
+}) {
+  if (lot.price === null || saleDisabledReason(lot) !== null) {
+    return null
+  }
+  const parsed = parsePaymentPlan(method, plan, lot.price)
+  if (!parsed.ok || parsed.plan === undefined) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Completá el plan para ver el detalle de las cuotas.
+      </p>
+    )
+  }
+  const schedule = buildPaymentSchedule(lot.price, parsed.plan)
+  const lastAmount = schedule.cuotas[schedule.cuotas.length - 1]
+  const cuotaLabel =
+    lastAmount === schedule.montoCuota
+      ? `${schedule.cuotas.length} × ${formatCurrency(schedule.montoCuota, lot.currency)}`
+      : `${schedule.cuotas.length - 1} × ${formatCurrency(schedule.montoCuota, lot.currency)} + 1 × ${formatCurrency(lastAmount, lot.currency)}`
+
+  return (
+    <dl
+      aria-label="Detalle del plan"
+      className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm sm:grid-cols-2"
+    >
+      {method === 'entrega_financiada' && (
+        <PreviewItem term="Entrega" value={formatCurrency(parsed.plan.montoEntrega, lot.currency)} />
+      )}
+      <PreviewItem term="Monto financiado" value={formatCurrency(schedule.montoFinanciado, lot.currency)} />
+      <PreviewItem term="Cuotas" value={cuotaLabel} />
+      <PreviewItem term="Total financiado" value={formatCurrency(schedule.montoTotal, lot.currency)} />
+    </dl>
+  )
+}
+
+function PreviewItem({ term, value }: { term: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs font-medium text-muted-foreground">{term}</dt>
+      <dd className="font-medium tabular-nums text-foreground">{value}</dd>
+    </div>
+  )
+}
+
 export default function PaymentConditions({
   method,
+  plan,
   lot,
   onMethodChange,
+  onPlanChange,
   disabled = false,
 }: PaymentConditionsProps) {
+  const financed = isFinancedMethod(method)
+  const update = <Key extends keyof PaymentPlanValues>(key: Key, value: PaymentPlanValues[Key]) =>
+    onPlanChange({ ...plan, [key]: value })
+
   return (
     <div className="flex flex-col gap-6">
       <Field>
@@ -67,34 +139,104 @@ export default function PaymentConditions({
           </SelectTrigger>
           <SelectContent>
             <SelectList>
-              {PAYMENT_METHODS.map((candidate) => {
-                const available = isPaymentMethodAvailable(candidate)
-                return (
-                  <SelectItem
-                    key={candidate}
-                    value={candidate}
-                    disabled={!available}
-                    className="min-h-11 md:min-h-8"
-                  >
-                    {available
-                      ? PAYMENT_METHOD_LABELS[candidate]
-                      : `${PAYMENT_METHOD_LABELS[candidate]} (próximamente)`}
-                  </SelectItem>
-                )
-              })}
+              {PAYMENT_METHODS.map((candidate) => (
+                <SelectItem key={candidate} value={candidate} className="min-h-11 md:min-h-8">
+                  {PAYMENT_METHOD_LABELS[candidate]}
+                </SelectItem>
+              ))}
             </SelectList>
           </SelectContent>
         </Select>
-        <FieldDescription>
-          Por ahora solo se puede registrar una venta al contado.
-        </FieldDescription>
+        <FieldDescription>{METHOD_DESCRIPTIONS[method]}</FieldDescription>
       </Field>
 
-      {method === 'contado' && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm leading-none font-medium">Monto</span>
-          <AmountValue lot={lot} />
-          <FieldDescription>Es el precio del lote seleccionado.</FieldDescription>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm leading-none font-medium">
+          {financed ? 'Precio del lote' : 'Monto'}
+        </span>
+        <AmountValue lot={lot} />
+      </div>
+
+      {financed && (
+        <div className="flex flex-col gap-4">
+          {method === 'entrega_financiada' && (
+            <Field>
+              <FieldLabel htmlFor="venta-entrega">Monto de entrega</FieldLabel>
+              <Input
+                id="venta-entrega"
+                name="montoEntrega"
+                inputMode="decimal"
+                autoComplete="off"
+                value={plan.montoEntrega}
+                onChange={(event) => update('montoEntrega', event.target.value)}
+                disabled={disabled}
+                className="min-h-11 md:min-h-9"
+              />
+              <FieldDescription>
+                {lot === null ? 'En la moneda del lote.' : `En ${lot.currency || 'la moneda del lote'}.`}
+              </FieldDescription>
+            </Field>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="venta-cuotas">Cantidad de cuotas</FieldLabel>
+              <Input
+                id="venta-cuotas"
+                name="cantidadCuotas"
+                inputMode="numeric"
+                autoComplete="off"
+                value={plan.cantidadCuotas}
+                onChange={(event) => update('cantidadCuotas', event.target.value)}
+                disabled={disabled}
+                className="min-h-11 md:min-h-9"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venta-tasa">Tasa de interés (%)</FieldLabel>
+              <Input
+                id="venta-tasa"
+                name="tasaInteres"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="0"
+                value={plan.tasaInteres}
+                onChange={(event) => update('tasaInteres', event.target.value)}
+                disabled={disabled}
+                className="min-h-11 md:min-h-9"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venta-periodicidad">Periodicidad</FieldLabel>
+              <Select
+                name="periodicidad"
+                value={plan.periodicidad}
+                onValueChange={(next) => update('periodicidad', next as PaymentPeriod)}
+                disabled={disabled}
+              >
+                <SelectTrigger id="venta-periodicidad" className="min-h-11 md:min-h-9">
+                  <SelectValue>
+                    {(current: PaymentPeriod) => PAYMENT_PERIOD_LABELS[current]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectList>
+                    {PAYMENT_PERIODS.map((candidate) => (
+                      <SelectItem key={candidate} value={candidate} className="min-h-11 md:min-h-8">
+                        {PAYMENT_PERIOD_LABELS[candidate]}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <FieldDescription>
+            La tasa se aplica una sola vez sobre el monto financiado. La primera cuota vence un
+            período después de la venta.
+          </FieldDescription>
+
+          {lot !== null && <PlanPreview method={method} plan={plan} lot={lot} />}
         </div>
       )}
     </div>

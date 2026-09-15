@@ -1,6 +1,14 @@
 import { apiFetch } from '../../../shared/api/client'
-import { isSaleState, PAYMENT_METHODS } from '../types'
-import type { CreateSaleValues, Sale, SaleActor, SaleListFilters, SalePage } from '../types'
+import { isInstallmentState, isPaymentMethod, isPaymentPeriod, isSaleState } from '../types'
+import type {
+  CreateSaleValues,
+  Installment,
+  PaymentPlan,
+  Sale,
+  SaleActor,
+  SaleListFilters,
+  SalePage,
+} from '../types'
 
 const SALES_PATH = '/api/v1/ventas'
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
@@ -16,6 +24,34 @@ function isActor(value: unknown): value is SaleActor {
     typeof value.nombre === 'string' &&
     typeof value.apellido === 'string' &&
     typeof value.rol === 'string'
+  )
+}
+
+function isInstallment(value: unknown): value is Installment {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.numero === 'number' &&
+    typeof value.monto === 'number' &&
+    isInstallmentState(value.estado) &&
+    typeof value.fechaVencimiento === 'string' &&
+    (value.fechaPago === undefined || typeof value.fechaPago === 'string')
+  )
+}
+
+function isPaymentPlan(value: unknown): value is PaymentPlan {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.montoEntrega === 'number' &&
+    typeof value.cantidadCuotas === 'number' &&
+    typeof value.tasaInteres === 'number' &&
+    isPaymentPeriod(value.periodicidad) &&
+    typeof value.moneda === 'string' &&
+    typeof value.montoFinanciado === 'number' &&
+    typeof value.montoCuota === 'number' &&
+    typeof value.montoTotal === 'number' &&
+    (value.cuotas === undefined || (Array.isArray(value.cuotas) && value.cuotas.every(isInstallment)))
   )
 }
 
@@ -41,10 +77,10 @@ function isSale(value: unknown): value is Sale {
       (isRecord(value.inmobiliaria) &&
         typeof value.inmobiliaria.id === 'string' &&
         typeof value.inmobiliaria.razonSocial === 'string')) &&
-    typeof value.modalidadPago === 'string' &&
-    (PAYMENT_METHODS as readonly string[]).includes(value.modalidadPago) &&
+    isPaymentMethod(value.modalidadPago) &&
     typeof value.monto === 'number' &&
     typeof value.moneda === 'string' &&
+    (value.planPago === undefined || isPaymentPlan(value.planPago)) &&
     typeof value.fechaCreacion === 'string' &&
     typeof value.fechaModificacion === 'string'
   )
@@ -99,7 +135,12 @@ export async function createSale(
     {
       method: 'POST',
       token,
-      body: { clienteId: values.clienteId, vendedorId: values.vendedorId, modalidadPago: values.modalidadPago },
+      body: {
+        clienteId: values.clienteId,
+        vendedorId: values.vendedorId,
+        modalidadPago: values.modalidadPago,
+        ...(values.planPago === undefined ? {} : { planPago: values.planPago }),
+      },
       headers: { 'Idempotency-Key': idempotencyKey },
     },
   )

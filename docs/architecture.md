@@ -479,8 +479,7 @@ Decisiones de este recorte:
   serializan y la segunda lo encuentra vendido (`sale_lot_unavailable`); el
   índice único `ventas_lote_id_activa_idx` es la red de seguridad. El monto
   y la moneda se copian del precio del lote en ese momento: un lote sin
-  número, precio o moneda es `sale_lot_incomplete`. Solo `contado` está
-  disponible (`payment_method_unavailable` para las otras dos modalidades).
+  número, precio o moneda es `sale_lot_incomplete`.
   `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}` listan y consultan con el
   alcance de reservas: internos ven todo; un usuario de inmobiliaria solo las
   ventas cuyo vendedor es de su agencia, porque `ventas` no guarda agencia y
@@ -590,13 +589,39 @@ Decisiones de este recorte:
   Los identificadores internos de `features/sales` van en inglés
   (`LotOption`, `ClientOption`, `SaleReceipt.issuedAt`, `development`); el español queda
   solo en los nombres de propiedad que son contrato JSON de la API.
-- **De las tres modalidades de pago solo está implementada `contado`.** El
-  selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`
-  y `entrega_financiada` deshabilitadas y rotuladas «(próximamente)»: la
-  feature que las agregue solo tiene que sumarlas a
-  `AVAILABLE_PAYMENT_METHODS` y agregar sus campos. En contado el monto no se
-  escribe — es el precio del lote elegido, mostrado en su moneda. Un lote sin
-  precio cargado avisa en lugar de dejar seguir.
+- **El plan de pago se calcula en dominio y se persiste con la venta.**
+  `domain.ValidatePaymentPlan` aplica las reglas que no dependen del precio
+  (plan obligatorio en `financiado`/`entrega_financiada` y prohibido en
+  `contado`, cuotas 1..360, tasa 0..1000, periodicidad válida, entrega solo
+  en `entrega_financiada`); el caso de uso la corre antes de tocar la base y
+  `SaleRepository.Create` la repite y agrega la única regla que necesita el
+  lote: la entrega tiene que ser menor al precio
+  (`invalid_sale_down_payment`). `domain.BuildPaymentSchedule` es una
+  función pura que devuelve el cronograma (monto financiado, total, cuota
+  regular y cada cuota con su vencimiento); la fórmula y los vencimientos
+  están en `docs/domain.md`. El repositorio inserta `planes_pago` y las
+  `cuotas` (con `CopyFrom`) en la misma transacción que `ventas` y el cambio
+  de estado del lote, así una venta financiada nunca queda sin plan. El
+  plan forma parte del payload que firma la clave de idempotencia, así un
+  reintento con otro plan es un conflicto y no devuelve la venta anterior.
+  `Sale.PlanPago` publica el resumen (`montoFinanciado`, `montoCuota`,
+  `montoTotal` leídos de las cuotas persistidas, no recalculados) en el
+  listado y además las `cuotas` en el detalle.
+- **El formulario replica la fórmula para previsualizar.**
+  `buildPaymentSchedule` en `sales/types.ts` es la misma función que
+  `domain.BuildPaymentSchedule` (ambas lo dicen en un comentario y sus tests
+  cubren los mismos casos de redondeo), así la vista previa de
+  `PaymentConditions` —entrega, monto financiado, cuotas y total— coincide
+  con lo que el backend persiste. `parsePaymentPlan` valida los campos
+  tipeados con los mismos límites del backend y `buildSaleReceipt` bloquea
+  «Confirmar venta» con el motivo mientras el plan esté incompleto. El
+  selector lista las tres modalidades de `ventas.modalidad_pago`; en contado
+  el monto no se escribe — es el precio del lote elegido, mostrado en su
+  moneda — y en las financiadas ese precio es la base del plan. Un lote sin
+  precio cargado avisa en lugar de dejar seguir (`saleDisabledReason`, la
+  misma regla que usa el enlace «Vender» del visor). El recibo imprime el
+  plan y el detalle (`SaleDetails`) lista las cuotas con número,
+  vencimiento, monto y estado.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive

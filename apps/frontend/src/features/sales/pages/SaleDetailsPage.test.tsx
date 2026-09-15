@@ -75,6 +75,77 @@ describe('SaleDetailsPage', () => {
     print.mockRestore()
   })
 
+  it('shows the plan and the cuotas of a financed sale', async () => {
+    const user = userEvent.setup()
+    getSaleMock.mockResolvedValue({
+      ...sale,
+      modalidadPago: 'entrega_financiada',
+      planPago: {
+        id: 'plan-1',
+        montoEntrega: 20000,
+        cantidadCuotas: 2,
+        tasaInteres: 10,
+        periodicidad: 'bimestral',
+        moneda: 'USD',
+        montoFinanciado: 100000,
+        montoCuota: 55000,
+        montoTotal: 110000,
+        cuotas: [
+          { id: 'c-1', numero: 1, monto: 55000, estado: 'pagada', fechaVencimiento: '2026-11-14T15:00:00Z', fechaPago: '2026-11-10T12:00:00Z' },
+          { id: 'c-2', numero: 2, monto: 55000, estado: 'pendiente', fechaVencimiento: '2027-01-14T15:00:00Z' },
+        ],
+      },
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Entrega + financiación')).toBeInTheDocument()
+    expect(screen.getByText('Plan de pago')).toBeInTheDocument()
+    expect(screen.getByText('2 cuotas · bimestral')).toBeInTheDocument()
+    expect(screen.getByText('Entrega').nextSibling).toHaveTextContent('US$ 20.000,00')
+    expect(screen.getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 100.000,00')
+    expect(screen.getByText('Tasa de interés').nextSibling).toHaveTextContent('10 %')
+    expect(screen.getByText('Monto por cuota').nextSibling).toHaveTextContent('US$ 55.000,00')
+    expect(screen.getByText('Total financiado').nextSibling).toHaveTextContent('US$ 110.000,00')
+
+    const table = screen.getByRole('table', { name: 'Cuotas' })
+    const rows = within(table).getAllByRole('row')
+    expect(rows).toHaveLength(3)
+    expect(rows[1]).toHaveTextContent('1')
+    expect(rows[1]).toHaveTextContent('14/11/2026')
+    expect(rows[1]).toHaveTextContent('US$ 55.000,00')
+    expect(rows[1]).toHaveTextContent('Pagada')
+    expect(rows[2]).toHaveTextContent('14/01/2027')
+    expect(rows[2]).toHaveTextContent('Pendiente')
+
+    await user.click(screen.getByRole('button', { name: 'Imprimir recibo' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('2 × US$ 55.000,00 · bimestral')
+  })
+
+  it('describes a financed plan without entrega or cuotas', async () => {
+    getSaleMock.mockResolvedValue({
+      ...sale,
+      modalidadPago: 'financiado',
+      planPago: {
+        id: 'plan-1',
+        montoEntrega: 0,
+        cantidadCuotas: 1,
+        tasaInteres: 0,
+        periodicidad: 'mensual',
+        moneda: 'USD',
+        montoFinanciado: 120000,
+        montoCuota: 120000,
+        montoTotal: 120000,
+      },
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('1 cuota · mensual')).toBeInTheDocument()
+    expect(screen.queryByText('Entrega')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Cuotas' })).not.toBeInTheDocument()
+  })
+
   it('describes a venta directa of a lote without numbers or surface', async () => {
     getSaleMock.mockResolvedValue({ ...sale, inmobiliaria: undefined, loteNumero: '', manzanaNumero: '', loteSuperficie: null, estado: 'cancelada' })
 

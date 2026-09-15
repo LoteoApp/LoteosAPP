@@ -20,6 +20,15 @@ type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now() }
 
+// PaymentPlanInput is the plan as the request describes it. TasaInteres is a
+// percentage; MontoEntrega only applies to entrega_financiada.
+type PaymentPlanInput struct {
+	CantidadCuotas int
+	TasaInteres    float64
+	Periodicidad   string
+	MontoEntrega   float64
+}
+
 type CreateSaleInput struct {
 	Actor          Actor
 	DevelopmentID  string
@@ -28,14 +37,19 @@ type CreateSaleInput struct {
 	SellerID       string
 	PaymentMethod  string
 	IdempotencyKey string
+	// PaymentPlan is required for financiado and entrega_financiada and must
+	// be absent for contado.
+	PaymentPlan *PaymentPlanInput
 }
 
-// CreateSale registers a venta al contado for an available lote and moves
-// the lote to vendido. Unlike a reserva, an agency user may register the
-// sale for a colleague of their agency, so the seller is never forced to
-// the actor; the repository checks the seller belongs to the actor's agency
-// and that the agency is assigned to the loteo. A retry with the same
-// Idempotency-Key and payload returns the venta already registered.
+// CreateSale registers a venta for an available lote and moves the lote to
+// vendido. A financed sale also gets its plan de pago and cuotas, computed
+// over the lote price in the same transaction. Unlike a reserva, an agency
+// user may register the sale for a colleague of their agency, so the seller
+// is never forced to the actor; the repository checks the seller belongs to
+// the actor's agency and that the agency is assigned to the loteo. A retry
+// with the same Idempotency-Key and payload returns the venta already
+// registered.
 type CreateSale interface {
 	Execute(ctx context.Context, input CreateSaleInput) (domain.Sale, error)
 }
@@ -82,8 +96,17 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	if !method.IsValid() {
 		return domain.Sale{}, domain.ErrSaleInvalidPaymentMethod
 	}
-	if !method.IsAvailable() {
-		return domain.Sale{}, domain.ErrSalePaymentMethodUnavailable
+	var plan *domain.PaymentPlanInput
+	if input.PaymentPlan != nil {
+		plan = &domain.PaymentPlanInput{
+			CantidadCuotas: input.PaymentPlan.CantidadCuotas,
+			TasaInteres:    input.PaymentPlan.TasaInteres,
+			Periodicidad:   domain.PaymentPeriod(strings.TrimSpace(input.PaymentPlan.Periodicidad)),
+			MontoEntrega:   input.PaymentPlan.MontoEntrega,
+		}
+	}
+	if err := domain.ValidatePaymentPlan(method, plan); err != nil {
+		return domain.Sale{}, err
 	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
@@ -102,7 +125,8 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 		ActorID:                actor.ID,
 		PaymentMethod:          method,
 		IdempotencyKey:         key,
-		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method),
+		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method, plan),
+		PaymentPlan:            plan,
 		CreatedAt:              useCase.clock.Now().UTC(),
 	})
 	if err != nil {
@@ -111,10 +135,13 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	return sale, nil
 }
 
-func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod) string {
+func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod, plan *domain.PaymentPlanInput) string {
 	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s%d:%s",
 		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
 		len(sellerID), sellerID, len(method), method)
+	if plan != nil {
+		payload += fmt.Sprintf("|%d:%g:%s:%g", plan.CantidadCuotas, plan.TasaInteres, plan.Periodicidad, plan.MontoEntrega)
+	}
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
 }

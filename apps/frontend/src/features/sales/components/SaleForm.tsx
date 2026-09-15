@@ -9,6 +9,7 @@ import PaymentConditions from './PaymentConditions'
 import SellerCombobox from './SellerCombobox'
 import {
   DIRECT_SALE,
+  EMPTY_PAYMENT_PLAN,
   agencyOfSeller,
   agencyOptionsFromSellers,
   buildSaleReceipt,
@@ -21,6 +22,7 @@ import type {
   CreateSaleValues,
   LotOption,
   PaymentMethod,
+  PaymentPlanValues,
   SellerOption,
 } from '../types'
 
@@ -58,6 +60,7 @@ export default function SaleForm({
   disabled = false,
 }: SaleFormProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanValues>(EMPTY_PAYMENT_PLAN)
   const [client, setClient] = useState<ClientOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
@@ -109,7 +112,7 @@ export default function SaleForm({
   )
 
   const draft = buildSaleReceipt(
-    { lot, client, seller, method: paymentMethod },
+    { lot, client, seller, method: paymentMethod, plan: paymentPlan },
     new Date().toISOString(),
   )
   const pendingReason = draft.ok ? null : draft.error
@@ -125,6 +128,7 @@ export default function SaleForm({
       clienteId: client.id,
       vendedorId: seller.id,
       modalidadPago: paymentMethod,
+      ...(draft.plan === undefined ? {} : { planPago: draft.plan }),
     })
   }
 
@@ -178,8 +182,10 @@ export default function SaleForm({
           )}
           <PaymentConditions
             method={paymentMethod}
+            plan={paymentPlan}
             lot={lot}
             onMethodChange={setPaymentMethod}
+            onPlanChange={setPaymentPlan}
             disabled={isBusy}
           />
         </CardContent>
