@@ -212,6 +212,30 @@ describe('SaleCreatePage', () => {
     expect(screen.getByLabelText('Cliente')).toHaveValue('Gómez, Bruno · DNI 28999888')
   })
 
+  it('fixes the seller to the internal user on a venta directa and frees it for an agency', async () => {
+    const user = userEvent.setup()
+    const actor: SellerOption = { ...directSeller, esActor: true }
+    renderPage({ loadSellers: vi.fn().mockResolvedValue([agencySeller, actor]) })
+
+    await waitFor(() => expect(screen.getByLabelText('Inmobiliaria')).toHaveValue('Venta directa'))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Luna, Sofía')
+    expect(screen.getByLabelText('Vendedor')).toBeDisabled()
+    expect(screen.getByText(/Vendés a tu nombre/)).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Inmobiliaria'))
+    await user.click(await screen.findByRole('option', { name: 'Inmobiliaria Sur' }))
+    expect(screen.getByLabelText('Vendedor')).toBeEnabled()
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('')
+    await user.click(screen.getByLabelText('Vendedor'))
+    await user.click(await screen.findByRole('option', { name: 'Suárez, Marta' }))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Suárez, Marta')
+
+    await user.click(screen.getByLabelText('Inmobiliaria'))
+    await user.click(await screen.findByRole('option', { name: 'Venta directa' }))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Luna, Sofía')
+    expect(screen.getByLabelText('Vendedor')).toBeDisabled()
+  })
+
   it('shows the loading state before the loteo arrives', () => {
     renderPage({ loteo: null, loteoStatus: 'loading' })
 

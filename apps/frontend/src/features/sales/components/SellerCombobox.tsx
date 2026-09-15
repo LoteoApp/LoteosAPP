@@ -15,6 +15,7 @@ type SellerComboboxProps = {
   onChange: (seller: SellerOption | null) => void
   isLoading?: boolean
   disabled?: boolean
+  description?: string
 }
 
 export default function SellerCombobox({
@@ -23,6 +24,7 @@ export default function SellerCombobox({
   onChange,
   isLoading = false,
   disabled = false,
+  description = 'Usuario responsable de la venta.',
 }: SellerComboboxProps) {
   const isDisabled = disabled || isLoading
 
@@ -57,7 +59,7 @@ export default function SellerCombobox({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      <FieldDescription>Usuario responsable de la venta.</FieldDescription>
+      <FieldDescription>{description}</FieldDescription>
     </Field>
   )
 }

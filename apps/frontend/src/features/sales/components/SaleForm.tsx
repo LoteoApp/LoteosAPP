@@ -8,6 +8,7 @@ import ClientCombobox from './ClientCombobox'
 import PaymentConditions from './PaymentConditions'
 import SellerCombobox from './SellerCombobox'
 import {
+  DIRECT_SALE,
   agencyOfSeller,
   agencyOptionsFromSellers,
   buildSaleReceipt,
@@ -93,6 +94,15 @@ export default function SaleForm({
   }
 
   const agencies = useMemo(() => agencyOptionsFromSellers(sellersState.sellers), [sellersState.sellers])
+  // An internal user selling directly sells at their own name: the seller is
+  // theirs to keep, not to choose. Picking an agency reopens the choice.
+  const actorSeller = useMemo(
+    () => sellersState.sellers.find((candidate) => candidate.esActor === true) ?? null,
+    [sellersState.sellers],
+  )
+  const directSaleSeller =
+    actorSeller !== null && agencyOfSeller(actorSeller).id === DIRECT_SALE.id ? actorSeller : null
+  const sellerIsFixedToActor = directSaleSeller !== null && agency?.id === DIRECT_SALE.id
   const agencySellers = useMemo(
     () => sellersOfAgency(sellersState.sellers, agency),
     [sellersState.sellers, agency],
@@ -144,7 +154,7 @@ export default function SaleForm({
             value={agency}
             onChange={(next) => {
               setAgency(next)
-              setSeller(null)
+              setSeller(next?.id === DIRECT_SALE.id ? directSaleSeller : null)
             }}
             isLoading={sellersState.isLoading}
             disabled={isBusy || lot === null}
@@ -154,7 +164,12 @@ export default function SaleForm({
             value={seller}
             onChange={setSeller}
             isLoading={sellersState.isLoading}
-            disabled={isBusy || agency === null}
+            disabled={isBusy || agency === null || sellerIsFixedToActor}
+            description={
+              sellerIsFixedToActor
+                ? 'Vendés a tu nombre. Elegí una inmobiliaria para registrar la venta de uno de sus vendedores.'
+                : undefined
+            }
           />
           {sellersState.error !== null && (
             <p role="alert" className="text-sm text-destructive">

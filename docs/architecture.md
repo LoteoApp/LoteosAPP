@@ -533,9 +533,10 @@ Decisiones de este recorte:
   la fila del usuario logueado —el cliente no conoce su `usuarios.id`, solo su
   identidad de Supabase—, y el formulario la preselecciona junto con su
   inmobiliaria. Para un administrador o administrativo, que no pertenecen a
-  ninguna agencia, eso deja el formulario en «Venta directa» a su nombre sin
-  tocar ningún selector. Los dos selectores siguen habilitados: la preselección
-  es un punto de partida, no un candado. Si el actor no aparece en el catálogo
+  ninguna agencia, eso deja el formulario en «Venta directa» a su nombre: con
+  «Venta directa» el vendedor es siempre quien carga y el selector queda
+  deshabilitado; elegir una inmobiliaria lo habilita para escoger entre sus
+  vendedores, y volver a «Venta directa» lo fija de nuevo. Si el actor no aparece en el catálogo
   pero hay un único elegible, se preselecciona ese.
 - **El alcance de ese catálogo no es el mismo en reservas que en ventas.** Una
   reserva la toma siempre el usuario que la carga, así que para un actor con
