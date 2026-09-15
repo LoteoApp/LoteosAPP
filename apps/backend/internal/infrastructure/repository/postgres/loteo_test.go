@@ -1705,6 +1705,7 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 
 	statements := []string{
 		`DELETE FROM usuario_loteos WHERE loteo_id = $1::uuid`,
+		`DELETE FROM inmobiliaria_loteos WHERE loteo_id = $1::uuid`,
 		`DELETE FROM archivos WHERE loteo_id = $1::uuid`,
 		`DELETE FROM archivos WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)`,
 		`DELETE FROM reserva_estados WHERE reserva_id IN (
