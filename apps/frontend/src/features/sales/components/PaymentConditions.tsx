@@ -31,7 +31,7 @@ function AmountValue({ lot }: { lot: LotOption | null }) {
     return <p className="text-sm text-muted-foreground">Elegí un lote para ver el monto.</p>
   }
   const disabledReason = saleDisabledReason(lot)
-  if (disabledReason !== null || lot.precio === null) {
+  if (disabledReason !== null || lot.price === null) {
     return (
       <p role="alert" className="text-sm text-destructive">
         {disabledReason}
@@ -41,7 +41,7 @@ function AmountValue({ lot }: { lot: LotOption | null }) {
 
   return (
     <p className="text-lg font-semibold tabular-nums text-foreground">
-      {formatCurrency(lot.precio, lot.moneda)}
+      {formatCurrency(lot.price, lot.currency)}
     </p>
   )
 }

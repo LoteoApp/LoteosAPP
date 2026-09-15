@@ -70,7 +70,7 @@ export default function SaleForm({
     }
   }
 
-  const developmentId = lot === null ? '' : lot.loteoId
+  const developmentId = lot === null ? '' : lot.developmentId
   const sellersState = useSaleSellers(developmentId, loadSellers)
 
   // A different loteo invalidates both selectors before the new list arrives.
@@ -120,7 +120,7 @@ export default function SaleForm({
       return
     }
     await onSubmit({
-      loteoId: lot.loteoId,
+      loteoId: lot.developmentId,
       loteId: lot.id,
       clienteId: client.id,
       vendedorId: seller.id,

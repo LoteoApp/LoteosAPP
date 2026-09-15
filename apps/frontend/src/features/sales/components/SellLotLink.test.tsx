@@ -3,17 +3,17 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import SellLotLink from './SellLotLink'
 
-function renderLink(lot: { id: string; numero: string; precio: number | null; moneda: string }) {
+function renderLink(lot: { id: string; number: string; price: number | null; currency: string }) {
   render(
     <MemoryRouter>
-      <SellLotLink loteoId="loteo 1" lot={lot} />
+      <SellLotLink developmentId="loteo 1" lot={lot} />
     </MemoryRouter>,
   )
 }
 
 describe('SellLotLink', () => {
   it('links to the sale page of the lote', () => {
-    renderLink({ id: 'lot-1', numero: '7', precio: 120000, moneda: 'USD' })
+    renderLink({ id: 'lot-1', number: '7', price: 120000, currency: 'USD' })
 
     expect(screen.getByRole('link', { name: 'Pasar a venta' })).toHaveAttribute(
       'href',
@@ -22,7 +22,7 @@ describe('SellLotLink', () => {
   })
 
   it('stays disabled and explains what the lote is missing', () => {
-    renderLink({ id: 'lot-1', numero: ' ', precio: null, moneda: '' })
+    renderLink({ id: 'lot-1', number: ' ', price: null, currency: '' })
 
     const button = screen.getByRole('button', { name: 'Pasar a venta' })
     expect(button).toBeDisabled()

@@ -22,10 +22,10 @@ func (SystemClock) Now() time.Time { return time.Now() }
 
 type CreateSaleInput struct {
 	Actor          Actor
-	LoteoID        string
-	LoteID         string
-	ClienteID      string
-	VendedorID     string
+	DevelopmentID  string
+	LotID          string
+	ClientID       string
+	SellerID       string
 	PaymentMethod  string
 	IdempotencyKey string
 }
@@ -60,16 +60,16 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	}
 	key, err := domain.NormalizeIdempotencyKey(input.IdempotencyKey)
 	if err != nil {
-		return domain.Sale{}, err
+		return domain.Sale{}, domain.ErrSaleIdempotencyRequired
 	}
-	loteoID := strings.TrimSpace(input.LoteoID)
-	loteID := strings.TrimSpace(input.LoteID)
-	clienteID := strings.TrimSpace(input.ClienteID)
-	sellerID := strings.TrimSpace(input.VendedorID)
-	if loteoID == "" || loteID == "" {
+	developmentID := strings.TrimSpace(input.DevelopmentID)
+	lotID := strings.TrimSpace(input.LotID)
+	clientID := strings.TrimSpace(input.ClientID)
+	sellerID := strings.TrimSpace(input.SellerID)
+	if developmentID == "" || lotID == "" {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
-	if clienteID == "" {
+	if clientID == "" {
 		return domain.Sale{}, domain.ErrSaleInvalidClient
 	}
 	if sellerID == "" {
@@ -95,14 +95,14 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	}
 
 	sale, err := useCase.repository.Create(ctx, gateway.CreateSaleCommand{
-		LoteoID:                loteoID,
-		LoteID:                 loteID,
-		ClienteID:              clienteID,
-		VendedorID:             sellerID,
+		DevelopmentID:          developmentID,
+		LotID:                  lotID,
+		ClientID:               clientID,
+		SellerID:               sellerID,
 		ActorID:                actor.ID,
 		PaymentMethod:          method,
 		IdempotencyKey:         key,
-		IdempotencyPayloadHash: salePayloadHash(loteoID, loteID, clienteID, sellerID, method),
+		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method),
 		CreatedAt:              useCase.clock.Now().UTC(),
 	})
 	if err != nil {
@@ -111,9 +111,9 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	return sale, nil
 }
 
-func salePayloadHash(loteoID, loteID, clienteID, sellerID string, method domain.PaymentMethod) string {
+func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod) string {
 	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s%d:%s",
-		len(loteoID), loteoID, len(loteID), loteID, len(clienteID), clienteID,
+		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
 		len(sellerID), sellerID, len(method), method)
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])

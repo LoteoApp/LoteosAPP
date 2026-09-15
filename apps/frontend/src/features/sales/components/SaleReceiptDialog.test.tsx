@@ -9,15 +9,15 @@ function receipt(overrides: Partial<SaleReceipt> = {}): SaleReceipt {
     issuedAt: '2026-09-07T10:00:00.000Z',
     lot: {
       id: 'lt-1',
-      numero: '7',
-      manzanaId: 'mz-1',
-      manzanaNumero: '1',
-      loteoId: 'loteo-1',
-      loteoNombre: 'Norte',
-      estado: 'disponible',
-      precio: 150000,
-      moneda: 'USD',
-      superficie: 300,
+      number: '7',
+      blockId: 'mz-1',
+      blockNumber: '1',
+      developmentId: 'loteo-1',
+      developmentName: 'Norte',
+      state: 'disponible',
+      price: 150000,
+      currency: 'USD',
+      area: 300,
     },
     client: { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
     seller: {
@@ -71,7 +71,7 @@ describe('SaleReceiptDialog', () => {
     render(
       <SaleReceiptDialog
         open
-        receipt={{ ...withoutArea, lot: { ...withoutArea.lot, superficie: null } }}
+        receipt={{ ...withoutArea, lot: { ...withoutArea.lot, area: null } }}
         onClose={vi.fn()}
       />,
     )

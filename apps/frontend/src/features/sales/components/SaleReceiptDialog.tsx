@@ -114,11 +114,11 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
           </div>
 
           <dl className="grid grid-cols-1 gap-x-6 gap-y-5 px-4 py-5 sm:grid-cols-2 sm:px-6">
-            <Field term="Lote" className={lot.superficie === null ? 'sm:col-span-2' : undefined}>
+            <Field term="Lote" className={lot.area === null ? 'sm:col-span-2' : undefined}>
               {lotOptionLabel(lot)}
             </Field>
-            {lot.superficie !== null && (
-              <Field term="Superficie">{formatArea(lot.superficie)}</Field>
+            {lot.area !== null && (
+              <Field term="Superficie">{formatArea(lot.area)}</Field>
             )}
             <Field term="Comprador">
               {client.apellido}, {client.nombre}

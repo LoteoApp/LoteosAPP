@@ -40,6 +40,8 @@ var (
 	ErrSalePaymentMethodUnavailable = &Error{Kind: KindInvalid, Code: "payment_method_unavailable", Message: "Por ahora solo se puede registrar una venta al contado"}
 	ErrSaleInvalidState             = &Error{Kind: KindInvalid, Code: "invalid_sale_state", Message: "El estado de la venta no es válido"}
 	ErrSaleInvalidPage              = &Error{Kind: KindInvalid, Code: "invalid_sale_page", Message: "La paginación solicitada no es válida"}
+	ErrSaleIdempotencyRequired      = &Error{Kind: KindInvalid, Code: "idempotency_key_required", Message: "La solicitud necesita una clave de idempotencia"}
+	ErrSaleIdempotencyConflict      = &Error{Kind: KindConflict, Code: "idempotency_key_conflict", Message: "La clave de idempotencia ya fue utilizada con otros datos"}
 )
 
 func (state SaleState) IsValid() bool {
@@ -107,17 +109,17 @@ type Sale struct {
 }
 
 type SaleListFilter struct {
-	States  []SaleState
-	LoteoID string
-	LoteID  string
-	Search  string
-	Page    int
-	Limit   int
+	States        []SaleState
+	DevelopmentID string
+	LotID         string
+	Search        string
+	Page          int
+	Limit         int
 }
 
 func (filter SaleListFilter) Normalize() (SaleListFilter, error) {
-	filter.LoteoID = strings.TrimSpace(filter.LoteoID)
-	filter.LoteID = strings.TrimSpace(filter.LoteID)
+	filter.DevelopmentID = strings.TrimSpace(filter.DevelopmentID)
+	filter.LotID = strings.TrimSpace(filter.LotID)
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Page == 0 {
 		filter.Page = DefaultSalePage

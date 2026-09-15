@@ -7,15 +7,15 @@ import type { LotOption } from '../types'
 function lot(overrides: Partial<LotOption> = {}): LotOption {
   return {
     id: 'lt-1',
-    numero: '7',
-    manzanaId: 'mz-1',
-    manzanaNumero: '1',
-    loteoId: 'loteo-1',
-    loteoNombre: 'Norte',
-    estado: 'disponible',
-    precio: 150000,
-    moneda: 'USD',
-    superficie: 300,
+    number: '7',
+    blockId: 'mz-1',
+    blockNumber: '1',
+    developmentId: 'loteo-1',
+    developmentName: 'Norte',
+    state: 'disponible',
+    price: 150000,
+    currency: 'USD',
+    area: 300,
     ...overrides,
   }
 }
@@ -65,7 +65,7 @@ describe('PaymentConditions', () => {
 
   it('warns when the lote has no price loaded', () => {
     render(
-      <PaymentConditions method="contado" lot={lot({ precio: null })} onMethodChange={vi.fn()} />,
+      <PaymentConditions method="contado" lot={lot({ price: null })} onMethodChange={vi.fn()} />,
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
@@ -73,7 +73,7 @@ describe('PaymentConditions', () => {
 
   it('warns instead of showing an amount when the price is zero', () => {
     render(
-      <PaymentConditions method="contado" lot={lot({ precio: 0 })} onMethodChange={vi.fn()} />,
+      <PaymentConditions method="contado" lot={lot({ price: 0 })} onMethodChange={vi.fn()} />,
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
@@ -84,7 +84,7 @@ describe('PaymentConditions', () => {
     render(
       <PaymentConditions
         method="contado"
-        lot={lot({ precio: 2500, moneda: 'ARS' })}
+        lot={lot({ price: 2500, currency: 'ARS' })}
         onMethodChange={vi.fn()}
       />,
     )

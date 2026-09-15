@@ -29,10 +29,10 @@ func adminActor() sales.Actor {
 func validInput() sales.CreateSaleInput {
 	return sales.CreateSaleInput{
 		Actor:          adminActor(),
-		LoteoID:        " loteo-id ",
-		LoteID:         " lote-id ",
-		ClienteID:      " cliente-id ",
-		VendedorID:     " seller-id ",
+		DevelopmentID:  " loteo-id ",
+		LotID:          " lote-id ",
+		ClientID:       " cliente-id ",
+		SellerID:       " seller-id ",
 		IdempotencyKey: " sale-key ",
 	}
 }
@@ -56,7 +56,7 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 		t.Errorf("Execute() = %#v, want the repository result", sale)
 	}
 	command := repository.CreateCommand
-	if command.LoteoID != "loteo-id" || command.LoteID != "lote-id" || command.ClienteID != "cliente-id" || command.VendedorID != "seller-id" {
+	if command.DevelopmentID != "loteo-id" || command.LotID != "lote-id" || command.ClientID != "cliente-id" || command.SellerID != "seller-id" {
 		t.Errorf("normalized command = %#v", command)
 	}
 	if command.ActorID != "actor-id" || command.PaymentMethod != domain.PaymentMethodCash {
@@ -85,7 +85,7 @@ func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 	first := repository.CreateCommand.IdempotencyPayloadHash
 
 	other := validInput()
-	other.ClienteID = "another-client"
+	other.ClientID = "another-client"
 	if _, err := useCase.Execute(context.Background(), other); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -103,11 +103,11 @@ func TestCreateSaleLetsAnAgencyUserPickAColleague(t *testing.T) {
 
 	input := validInput()
 	input.Actor = sales.Actor{AuthProviderID: "agency-subject", Roles: []string{domain.RolInmobiliaria}}
-	input.VendedorID = "colleague"
+	input.SellerID = "colleague"
 	if _, err := useCase.Execute(context.Background(), input); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if repository.CreateCommand.VendedorID != "colleague" || repository.CreateCommand.ActorID != "agency-user" {
+	if repository.CreateCommand.SellerID != "colleague" || repository.CreateCommand.ActorID != "agency-user" {
 		t.Errorf("seller command = %#v", repository.CreateCommand)
 	}
 }
@@ -127,25 +127,25 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 			input := validInput()
 			input.IdempotencyKey = "  "
 			return input
-		}, domain.ErrReservationIdempotencyRequired},
+		}, domain.ErrSaleIdempotencyRequired},
 		{"idempotency key too long", func() sales.CreateSaleInput {
 			input := validInput()
 			input.IdempotencyKey = strings.Repeat("k", domain.MaxIdempotencyKeySize+1)
 			return input
-		}, domain.ErrReservationIdempotencyRequired},
+		}, domain.ErrSaleIdempotencyRequired},
 		{"missing lote", func() sales.CreateSaleInput {
 			input := validInput()
-			input.LoteID = " "
+			input.LotID = " "
 			return input
 		}, domain.ErrLoteNotFound},
 		{"missing client", func() sales.CreateSaleInput {
 			input := validInput()
-			input.ClienteID = ""
+			input.ClientID = ""
 			return input
 		}, domain.ErrSaleInvalidClient},
 		{"missing seller", func() sales.CreateSaleInput {
 			input := validInput()
-			input.VendedorID = ""
+			input.SellerID = ""
 			return input
 		}, domain.ErrSaleSellerRequired},
 		{"invalid payment method", func() sales.CreateSaleInput {

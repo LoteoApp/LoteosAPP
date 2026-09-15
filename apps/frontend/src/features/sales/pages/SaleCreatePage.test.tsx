@@ -53,8 +53,8 @@ const sale: Sale = {
 
 function baseProps(): SaleCreatePageProps {
   return {
-    loteoId: development.id,
-    loteId: 'lot-1',
+    developmentId: development.id,
+    lotId: 'lot-1',
     development,
     developmentStatus: 'loaded',
     clients: [client],
@@ -256,7 +256,7 @@ describe('SaleCreatePage', () => {
   })
 
   it('blocks the sale of a lote that is no longer available', async () => {
-    const props = renderPage({ loteId: 'lot-2' })
+    const props = renderPage({ lotId: 'lot-2' })
 
     expect(screen.getByText('Lote no disponible')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()
@@ -265,7 +265,7 @@ describe('SaleCreatePage', () => {
   })
 
   it('warns when the lote does not belong to the loteo', () => {
-    renderPage({ loteId: 'lot-999' })
+    renderPage({ lotId: 'lot-999' })
 
     expect(screen.getByText('El lote seleccionado no existe.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()

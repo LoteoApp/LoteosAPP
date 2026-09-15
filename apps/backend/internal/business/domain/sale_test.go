@@ -33,14 +33,14 @@ func TestSaleStateAndPaymentMethodValidity(t *testing.T) {
 }
 
 func TestSaleListFilterNormalize(t *testing.T) {
-	normalized, err := domain.SaleListFilter{LoteoID: " loteo ", Search: " ana "}.Normalize()
+	normalized, err := domain.SaleListFilter{DevelopmentID: " loteo ", Search: " ana "}.Normalize()
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}
 	if normalized.Page != domain.DefaultSalePage || normalized.Limit != domain.DefaultSaleLimit {
 		t.Fatalf("Normalize() defaults = %d/%d", normalized.Page, normalized.Limit)
 	}
-	if normalized.LoteoID != "loteo" || normalized.Search != "ana" {
+	if normalized.DevelopmentID != "loteo" || normalized.Search != "ana" {
 		t.Fatalf("Normalize() should trim, got %#v", normalized)
 	}
 

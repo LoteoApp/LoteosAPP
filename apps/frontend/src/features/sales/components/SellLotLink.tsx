@@ -4,13 +4,13 @@ import { Button, buttonVariants } from '../../../shared/ui/button'
 import { saleDisabledReason, type SaleableLot } from '../types'
 
 type SellLotLinkProps = {
-  loteoId: string
+  developmentId: string
   lot: SaleableLot & { id: string }
 }
 
 // The viewer's entry point to a sale: a link to the sale page for this lote,
 // or a disabled button explaining what the lote is missing.
-export default function SellLotLink({ loteoId, lot }: SellLotLinkProps) {
+export default function SellLotLink({ developmentId, lot }: SellLotLinkProps) {
   const disabledReason = saleDisabledReason(lot)
   if (disabledReason) {
     return (
@@ -25,7 +25,7 @@ export default function SellLotLink({ loteoId, lot }: SellLotLinkProps) {
   return (
     <Link
       className={buttonVariants({ variant: 'outline' })}
-      to={`/ventas/nueva/${encodeURIComponent(loteoId)}/${encodeURIComponent(lot.id)}`}
+      to={`/ventas/nueva/${encodeURIComponent(developmentId)}/${encodeURIComponent(lot.id)}`}
     >
       <BadgeDollarSign aria-hidden />
       Pasar a venta

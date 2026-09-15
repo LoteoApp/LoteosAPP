@@ -58,13 +58,13 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	}
 	defer rollbackTransaction(tx)
 
-	var loteoID string
+	var developmentID string
 	err = tx.QueryRow(ctx, `
 		SELECT id::text
 		FROM loteos
 		WHERE id = $1::uuid AND fecha_baja IS NULL
 		FOR SHARE
-	`, command.LoteoID).Scan(&loteoID)
+	`, command.DevelopmentID).Scan(&developmentID)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
@@ -80,7 +80,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		FROM lotes
 		WHERE id = $1::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
 		FOR UPDATE
-	`, command.LoteID, command.LoteoID).Scan(&lotState, &lotNumber, &lotPrice, &currency)
+	`, command.LotID, command.DevelopmentID).Scan(&lotState, &lotNumber, &lotPrice, &currency)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
@@ -96,7 +96,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		return domain.Sale{}, domain.ErrNoAutorizado
 	}
 	if actorRole == domain.RolInmobiliaria {
-		assigned, assignmentErr := agencyAssigned(ctx, tx, actorAgency, loteoID)
+		assigned, assignmentErr := agencyAssigned(ctx, tx, actorAgency, developmentID)
 		if assignmentErr != nil {
 			return domain.Sale{}, assignmentErr
 		}
@@ -114,7 +114,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	`, command.ActorID, command.IdempotencyKey).Scan(&existingID, &existingHash)
 	if err == nil {
 		if existingHash != command.IdempotencyPayloadHash {
-			return domain.Sale{}, domain.ErrReservationIdempotencyConflict
+			return domain.Sale{}, domain.ErrSaleIdempotencyConflict
 		}
 		existing, readErr := loadSale(ctx, tx, existingID, gateway.SaleScope{}, true)
 		if readErr != nil {
@@ -129,7 +129,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		return domain.Sale{}, err
 	}
 
-	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.VendedorID)
+	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.SellerID)
 	if err != nil {
 		if errors.Is(err, domain.ErrReservationSellerNotEligible) {
 			return domain.Sale{}, domain.ErrSaleSellerNotEligible
@@ -154,7 +154,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		}
 	}
 
-	if err := lockActiveClient(ctx, tx, command.ClienteID); err != nil {
+	if err := lockActiveClient(ctx, tx, command.ClientID); err != nil {
 		if errors.Is(err, domain.ErrReservationInvalidClient) {
 			return domain.Sale{}, domain.ErrSaleInvalidClient
 		}
@@ -176,8 +176,8 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		)
 		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid, $8, $8, $9, $10)
 		RETURNING id::text
-	`, command.LoteID, command.ClienteID, command.PaymentMethod, *lotPrice, currency,
-		command.VendedorID, command.ActorID, command.CreatedAt,
+	`, command.LotID, command.ClientID, command.PaymentMethod, *lotPrice, currency,
+		command.SellerID, command.ActorID, command.CreatedAt,
 		command.IdempotencyKey, command.IdempotencyPayloadHash).Scan(&saleID)
 	if err != nil {
 		if isConstraint(err, saleIdempotencyIndex) {
@@ -190,8 +190,8 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	}
 
 	if _, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
-		DevelopmentID: loteoID,
-		LotID:         command.LoteID,
+		DevelopmentID: developmentID,
+		LotID:         command.LotID,
 		ExpectedState: domain.LotStateAvailable,
 		NextState:     domain.LotStateSold,
 		Origin:        domain.LotStateOriginSale,
@@ -228,7 +228,7 @@ func (repository *SaleRepository) reconcileIdempotentCreate(ctx context.Context,
 		return domain.Sale{}, err
 	}
 	if hash != command.IdempotencyPayloadHash {
-		return domain.Sale{}, domain.ErrReservationIdempotencyConflict
+		return domain.Sale{}, domain.ErrSaleIdempotencyConflict
 	}
 	return repository.Get(ctx, id, gateway.SaleScope{})
 }
@@ -261,7 +261,7 @@ func (repository *SaleRepository) List(ctx context.Context, filter domain.SaleLi
 		`+saleFromClause+where+`
 		ORDER BY v.fecha_creacion DESC, v.id DESC
 		LIMIT $8 OFFSET $9
-	`, states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
+	`, states, filter.DevelopmentID, filter.Search, filter.LotID, scope.AssigneeAuthProviderID,
 		scope.ByAgency, containsPattern(filter.Search), filter.Limit, offset)
 	if err != nil {
 		return domain.SalePage{}, err
@@ -283,7 +283,7 @@ func (repository *SaleRepository) List(ctx context.Context, filter domain.SaleLi
 	}
 	if !hasTotal {
 		if err := repository.pool.QueryRow(ctx, `SELECT count(*) `+saleFromClause+where,
-			states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
+			states, filter.DevelopmentID, filter.Search, filter.LotID, scope.AssigneeAuthProviderID,
 			scope.ByAgency, containsPattern(filter.Search)).Scan(&page.Total); err != nil {
 			return domain.SalePage{}, err
 		}

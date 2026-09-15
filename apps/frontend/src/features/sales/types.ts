@@ -1,20 +1,21 @@
-// Property names of the option and wire types below are the JSON contract of
-// the API, so they keep the Spanish it publishes; the symbols are in English.
+// Types that mirror an API body (`Sale`, `SaleCreateDevelopment`, the
+// option types `app` fills with API objects) keep the Spanish property names
+// of the JSON contract; everything the feature builds for itself is in English.
 export const LOT_STATES = ['disponible', 'reservado', 'vendido', 'finalizado'] as const
 
 export type LotState = (typeof LOT_STATES)[number]
 
 export type LotOption = {
   id: string
-  numero: string
-  manzanaId: string
-  manzanaNumero: string
-  loteoId: string
-  loteoNombre: string
-  estado: LotState
-  precio: number | null
-  moneda: string
-  superficie: number | null
+  number: string
+  blockId: string
+  blockNumber: string
+  developmentId: string
+  developmentName: string
+  state: LotState
+  price: number | null
+  currency: string
+  area: number | null
 }
 
 export function isLotState(value: unknown): value is LotState {
@@ -24,9 +25,9 @@ export function isLotState(value: unknown): value is LotState {
 // A lote is identified by its loteo, manzana and number together: the number
 // alone repeats across manzanas and loteos.
 export function lotOptionLabel(lot: LotOption): string {
-  const block = lot.manzanaNumero || '—'
-  const number = lot.numero || '—'
-  return `${lot.loteoNombre} · Mz ${block} · Lote ${number}`
+  const block = lot.blockNumber || '—'
+  const number = lot.number || '—'
+  return `${lot.developmentName} · Mz ${block} · Lote ${number}`
 }
 
 // Sales never imports another feature's files, so it states the shape it needs
@@ -142,7 +143,7 @@ export function isPaymentMethodAvailable(method: PaymentMethod): boolean {
   return AVAILABLE_PAYMENT_METHODS.includes(method)
 }
 
-export type SaleableLot = { numero: string; precio: number | null; moneda: string }
+export type SaleableLot = { number: string; price: number | null; currency: string }
 
 // Why a lote can't be sold yet, or null when it can. The backend rejects a
 // sale of a lote without number, without a price above zero or without a
@@ -150,12 +151,12 @@ export type SaleableLot = { numero: string; precio: number | null; moneda: strin
 // same rule and never offer a sale that can't persist.
 export function saleDisabledReason(lot: SaleableLot): string | null {
   const missing: string[] = []
-  if (!lot.numero.trim()) {
+  if (!lot.number.trim()) {
     missing.push('el número')
   }
-  if (lot.precio === null || lot.precio <= 0) {
+  if (lot.price === null || lot.price <= 0) {
     missing.push('el precio')
-  } else if (!lot.moneda.trim()) {
+  } else if (!lot.currency.trim()) {
     missing.push('la moneda')
   }
   if (missing.length === 0) {
@@ -217,8 +218,8 @@ export function buildSaleReceipt(draft: SaleDraft, issuedAt: string): SaleReceip
       client,
       seller,
       method,
-      amount: lot.precio ?? 0,
-      currency: lot.moneda,
+      amount: lot.price ?? 0,
+      currency: lot.currency,
     },
   }
 }
@@ -266,15 +267,15 @@ export function lotOptionFromDevelopment(
   const block = development.manzanas.find((candidate) => candidate.id === lot.manzanaId)
   return {
     id: lot.id,
-    numero: lot.numero,
-    manzanaId: lot.manzanaId,
-    manzanaNumero: block?.numero ?? '',
-    loteoId: development.id,
-    loteoNombre: development.nombre,
-    estado: lot.estado,
-    precio: lot.precio,
-    moneda: lot.moneda,
-    superficie: lot.superficie,
+    number: lot.numero,
+    blockId: lot.manzanaId,
+    blockNumber: block?.numero ?? '',
+    developmentId: development.id,
+    developmentName: development.nombre,
+    state: lot.estado,
+    price: lot.precio,
+    currency: lot.moneda,
+    area: lot.superficie,
   }
 }
 
@@ -359,15 +360,15 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
     issuedAt: sale.fechaCreacion,
     lot: {
       id: sale.loteId,
-      numero: sale.loteNumero,
-      manzanaId: '',
-      manzanaNumero: sale.manzanaNumero,
-      loteoId: sale.loteoId,
-      loteoNombre: sale.loteoNombre,
-      estado: 'vendido',
-      precio: sale.monto,
-      moneda: sale.moneda,
-      superficie: sale.loteSuperficie,
+      number: sale.loteNumero,
+      blockId: '',
+      blockNumber: sale.manzanaNumero,
+      developmentId: sale.loteoId,
+      developmentName: sale.loteoNombre,
+      state: 'vendido',
+      price: sale.monto,
+      currency: sale.moneda,
+      area: sale.loteSuperficie,
     },
     client: sale.cliente,
     seller: {

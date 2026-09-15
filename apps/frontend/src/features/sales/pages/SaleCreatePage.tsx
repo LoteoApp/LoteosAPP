@@ -21,8 +21,8 @@ import type {
 } from '../types'
 
 export type SaleCreatePageProps = {
-  loteoId: string
-  loteId: string
+  developmentId: string
+  lotId: string
   development: SaleCreateDevelopment | null
   developmentStatus: 'loading' | 'loaded' | 'not-found' | 'error'
   developmentError?: string
@@ -38,8 +38,8 @@ export type SaleCreatePageProps = {
 }
 
 export default function SaleCreatePage({
-  loteoId,
-  loteId,
+  developmentId,
+  lotId,
   development,
   developmentStatus,
   developmentError,
@@ -81,7 +81,7 @@ export default function SaleCreatePage({
   if (developmentStatus === 'loading') {
     return (
       <section className="flex min-h-0 flex-1 flex-col gap-4">
-        <BackLink loteoId={loteoId} />
+        <BackLink developmentId={developmentId} />
         <SaleCreateHeader />
         <SaleCreatePageSkeleton />
       </section>
@@ -96,7 +96,7 @@ export default function SaleCreatePage({
         : 'No se pudo cargar el loteo.'
     return (
       <section className="flex flex-col gap-4">
-        <BackLink loteoId={loteoId} />
+        <BackLink developmentId={developmentId} />
         <Alert variant="destructive">
           <AlertTitle>No se puede iniciar la venta</AlertTitle>
           <AlertDescription>{message}</AlertDescription>
@@ -105,14 +105,14 @@ export default function SaleCreatePage({
     )
   }
 
-  const selectedLot = development.lotes.find((lot) => lot.id === loteId) ?? null
+  const selectedLot = development.lotes.find((lot) => lot.id === lotId) ?? null
   const selectedBlock = development.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
   const isUnavailable = selectedLot === null || selectedLot.estado !== 'disponible'
-  const lot = isUnavailable ? null : lotOptionFromDevelopment(development, loteId)
+  const lot = isUnavailable ? null : lotOptionFromDevelopment(development, lotId)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <BackLink loteoId={development.id} />
+      <BackLink developmentId={development.id} />
       <SaleCreateHeader />
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
@@ -218,10 +218,10 @@ export default function SaleCreatePage({
   )
 }
 
-function BackLink({ loteoId }: { loteoId: string }) {
+function BackLink({ developmentId }: { developmentId: string }) {
   return (
     <Link
-      to={`/lotes/${loteoId}`}
+      to={`/lotes/${developmentId}`}
       className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft aria-hidden className="size-4" />

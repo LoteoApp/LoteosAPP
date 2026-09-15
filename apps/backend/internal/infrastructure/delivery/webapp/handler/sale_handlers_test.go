@@ -62,7 +62,7 @@ func TestCreateSaleHandler(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
 	}
-	if stub.input.LoteoID != "development-1" || stub.input.LoteID != "lot-1" || stub.input.ClienteID != "client-1" || stub.input.VendedorID != "seller-1" || stub.input.PaymentMethod != "contado" || stub.input.IdempotencyKey != "sale-key-1" {
+	if stub.input.DevelopmentID != "development-1" || stub.input.LotID != "lot-1" || stub.input.ClientID != "client-1" || stub.input.SellerID != "seller-1" || stub.input.PaymentMethod != "contado" || stub.input.IdempotencyKey != "sale-key-1" {
 		t.Errorf("input = %#v", stub.input)
 	}
 	if stub.input.Actor.AuthProviderID != reservationHandlerPrincipal.Subject || len(stub.input.Actor.Roles) != 1 {
@@ -92,7 +92,7 @@ func TestCreateSaleHandlerRejectsInvalidBodyAndMapsErrors(t *testing.T) {
 		if recorder.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 		}
-		if stub.input.LoteoID != "" {
+		if stub.input.DevelopmentID != "" {
 			t.Error("use case should not be called with an invalid body")
 		}
 	})
@@ -106,8 +106,8 @@ func TestCreateSaleHandlerRejectsInvalidBodyAndMapsErrors(t *testing.T) {
 		{name: "lot unavailable", err: domain.ErrSaleLotUnavailable, wantStatus: http.StatusConflict, wantCode: "sale_lot_unavailable"},
 		{name: "seller not eligible", err: domain.ErrSaleSellerNotEligible, wantStatus: http.StatusForbidden, wantCode: "sale_seller_not_eligible"},
 		{name: "agency not assigned", err: domain.ErrSaleAgencyNotAssigned, wantStatus: http.StatusForbidden, wantCode: "sale_agency_not_assigned"},
-		{name: "idempotency key missing", err: domain.ErrReservationIdempotencyRequired, wantStatus: http.StatusBadRequest, wantCode: "idempotency_key_required"},
-		{name: "idempotency key reused", err: domain.ErrReservationIdempotencyConflict, wantStatus: http.StatusConflict, wantCode: "idempotency_key_conflict"},
+		{name: "idempotency key missing", err: domain.ErrSaleIdempotencyRequired, wantStatus: http.StatusBadRequest, wantCode: "idempotency_key_required"},
+		{name: "idempotency key reused", err: domain.ErrSaleIdempotencyConflict, wantStatus: http.StatusConflict, wantCode: "idempotency_key_conflict"},
 		{name: "payment method unavailable", err: domain.ErrSalePaymentMethodUnavailable, wantStatus: http.StatusBadRequest, wantCode: "payment_method_unavailable"},
 		{name: "unexpected", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 	}
@@ -144,7 +144,7 @@ func TestSaleHandlersParseRequestsAndPrincipal(t *testing.T) {
 		if len(filter.States) != 2 || filter.States[0] != domain.SaleStateActive || filter.States[1] != domain.SaleStateCancelled {
 			t.Errorf("states = %#v", filter.States)
 		}
-		if filter.LoteoID != "development-1" || filter.LoteID != "lot-1" || filter.Search != "Ana" || filter.Page != 2 || filter.Limit != 10 {
+		if filter.DevelopmentID != "development-1" || filter.LotID != "lot-1" || filter.Search != "Ana" || filter.Page != 2 || filter.Limit != 10 {
 			t.Errorf("filter = %#v", filter)
 		}
 		if stub.input.Actor.AuthProviderID != reservationHandlerPrincipal.Subject {

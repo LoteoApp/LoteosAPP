@@ -45,7 +45,12 @@ export default function LoteoDetailRoute() {
     : undefined
 
   const renderSaleAction = canReserve
-    ? (lote: LoteoLote) => <SellLotLink loteoId={loteoId} lot={lote} />
+    ? (lote: LoteoLote) => (
+        <SellLotLink
+          developmentId={loteoId}
+          lot={{ id: lote.id, number: lote.numero, price: lote.precio, currency: lote.moneda }}
+        />
+      )
     : undefined
 
   const renderReservationSummary = canReserve

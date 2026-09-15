@@ -13,9 +13,9 @@ import ReservationLoteoPlan from './ReservationLoteoPlan'
 
 export default function SaleCreateRoute() {
   const { session } = useAuth()
-  const { loteoId = '', loteId = '' } = useParams()
+  const { loteoId: developmentId = '', loteId: lotId = '' } = useParams()
   const token = session?.access_token ?? ''
-  const developmentState = useLoteo(loteoId, token)
+  const developmentState = useLoteo(developmentId, token)
   const clientsState = useClients(token, { enabled: token !== '' })
   const [createdClient, setCreatedClient] = useState<Cliente | null>(null)
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false)
@@ -36,8 +36,8 @@ export default function SaleCreateRoute() {
   // A venta lists every agency with sellers, assigned to the loteo or not, and
   // lets an agency user pick a colleague; a reserva does neither.
   const loadSellers = useCallback(
-    (developmentId: string, signal?: AbortSignal) =>
-      listEligibleSellers(token, developmentId, signal, 'agencia'),
+    (targetDevelopmentId: string, signal?: AbortSignal) =>
+      listEligibleSellers(token, targetDevelopmentId, signal, 'agencia'),
     [token],
   )
 
@@ -48,8 +48,8 @@ export default function SaleCreateRoute() {
 
   return (
     <SaleCreatePage
-      loteoId={loteoId}
-      loteId={loteId}
+      developmentId={developmentId}
+      lotId={lotId}
       development={development}
       developmentStatus={developmentState.status}
       developmentError={developmentState.status === 'error' ? developmentState.message : undefined}
@@ -70,7 +70,7 @@ export default function SaleCreateRoute() {
       )}
       loadSellers={loadSellers}
       createSale={registerSale}
-      renderPlan={sourceDevelopment && <ReservationLoteoPlan loteo={sourceDevelopment} selectedLoteId={loteId} variant="reference" />}
+      renderPlan={sourceDevelopment && <ReservationLoteoPlan loteo={sourceDevelopment} selectedLoteId={lotId} variant="reference" />}
     />
   )
 }
