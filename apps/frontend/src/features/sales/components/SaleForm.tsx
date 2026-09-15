@@ -10,6 +10,7 @@ import NewClientDialog from './NewClientDialog'
 import PaymentConditions from './PaymentConditions'
 import SellerCombobox from './SellerCombobox'
 import {
+  EMPTY_PAYMENT_PLAN,
   agencyOfSeller,
   agencyOptionsFromSellers,
   buildSaleReceipt,
@@ -23,6 +24,7 @@ import type {
   LoteOption,
   NewClientValues,
   PaymentMethod,
+  PaymentPlanValues,
   SellerOption,
 } from '../types'
 
@@ -54,6 +56,7 @@ export default function SaleForm({
   const [clientesError, setClientesError] = useState<string | null>(null)
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanValues>(EMPTY_PAYMENT_PLAN)
   const [cliente, setCliente] = useState<ClienteOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
@@ -139,7 +142,7 @@ export default function SaleForm({
   )
 
   const draft = buildSaleReceipt(
-    { lote, cliente, seller, method: paymentMethod },
+    { lote, cliente, seller, method: paymentMethod, plan: paymentPlan },
     new Date().toISOString(),
   )
   const pendingReason = draft.ok ? null : draft.error
@@ -155,6 +158,7 @@ export default function SaleForm({
       clienteId: cliente.id,
       vendedorId: seller.id,
       modalidadPago: paymentMethod,
+      ...(draft.plan === undefined ? {} : { planPago: draft.plan }),
     })
   }
 
@@ -206,8 +210,10 @@ export default function SaleForm({
           )}
           <PaymentConditions
             method={paymentMethod}
+            plan={paymentPlan}
             lote={lote}
             onMethodChange={setPaymentMethod}
+            onPlanChange={setPaymentPlan}
             disabled={isBusy}
           />
         </CardContent>

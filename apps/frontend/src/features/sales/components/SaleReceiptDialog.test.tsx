@@ -52,6 +52,65 @@ describe('SaleReceiptDialog', () => {
     expect(dialog).toHaveTextContent('07/09/2026')
   })
 
+  it('prints the plan of a financed sale', () => {
+    render(
+      <SaleReceiptDialog
+        open
+        receipt={receipt({
+          method: 'entrega_financiada',
+          plan: {
+            montoEntrega: 50000,
+            cantidadCuotas: 10,
+            tasaInteres: 12.5,
+            periodicidad: 'mensual',
+            montoFinanciado: 100000,
+            montoCuota: 11250,
+            montoTotal: 112500,
+          },
+        })}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent('Entrega + financiación')
+    const plan = screen.getByLabelText('Plan de pago')
+    expect(plan).toHaveTextContent('Entrega')
+    expect(plan).toHaveTextContent('US$ 50.000,00')
+    expect(plan).toHaveTextContent('Monto financiado')
+    expect(plan).toHaveTextContent('US$ 100.000,00')
+    expect(plan).toHaveTextContent('10 × US$ 11.250,00 · mensual')
+    expect(plan).toHaveTextContent('12,5 %')
+    expect(plan).toHaveTextContent('US$ 112.500,00')
+  })
+
+  it('omits the entrega row of a plan without one and the plan of a contado sale', () => {
+    const { rerender } = render(
+      <SaleReceiptDialog
+        open
+        receipt={receipt({
+          method: 'financiado',
+          plan: {
+            montoEntrega: 0,
+            cantidadCuotas: 3,
+            tasaInteres: 0,
+            periodicidad: 'trimestral',
+            montoFinanciado: 150000,
+            montoCuota: 50000,
+            montoTotal: 150000,
+          },
+        })}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Plan de pago')).not.toHaveTextContent('Entrega')
+    expect(screen.getByLabelText('Plan de pago')).toHaveTextContent('3 × US$ 50.000,00 · trimestral')
+
+    rerender(<SaleReceiptDialog open receipt={receipt()} onClose={vi.fn()} />)
+    expect(screen.queryByLabelText('Plan de pago')).not.toBeInTheDocument()
+  })
+
   it('reads a sale without inmobiliaria as a direct sale', () => {
     render(
       <SaleReceiptDialog

@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import PaymentConditions from './PaymentConditions'
-import type { LoteOption } from '../types'
+import { EMPTY_PAYMENT_PLAN, type LoteOption, type PaymentMethod, type PaymentPlanValues } from '../types'
 
 function lote(overrides: Partial<LoteOption> = {}): LoteOption {
   return {
@@ -20,36 +20,56 @@ function lote(overrides: Partial<LoteOption> = {}): LoteOption {
   }
 }
 
+function renderConditions({
+  method = 'contado',
+  plan = EMPTY_PAYMENT_PLAN,
+  lote: current = lote(),
+  onMethodChange = vi.fn(),
+  onPlanChange = vi.fn(),
+  disabled = false,
+}: {
+  method?: PaymentMethod
+  plan?: PaymentPlanValues
+  lote?: LoteOption | null
+  onMethodChange?: (method: PaymentMethod) => void
+  onPlanChange?: (plan: PaymentPlanValues) => void
+  disabled?: boolean
+} = {}) {
+  return render(
+    <PaymentConditions
+      method={method}
+      plan={plan}
+      lote={current}
+      onMethodChange={onMethodChange}
+      onPlanChange={onPlanChange}
+      disabled={disabled}
+    />,
+  )
+}
+
 describe('PaymentConditions', () => {
   it('starts on contado', () => {
-    render(<PaymentConditions method="contado" lote={lote()} onMethodChange={vi.fn()} />)
+    renderConditions()
 
     expect(screen.getByLabelText('Condiciones de pago')).toHaveTextContent('Contado')
   })
 
-  it('lists the three modalidades, with the pending ones unavailable', async () => {
+  it('lists the three modalidades and lets the user pick a financed one', async () => {
     const user = userEvent.setup()
     const onMethodChange = vi.fn()
-    render(<PaymentConditions method="contado" lote={lote()} onMethodChange={onMethodChange} />)
+    renderConditions({ onMethodChange })
 
     await user.click(screen.getByLabelText('Condiciones de pago'))
 
-    expect(await screen.findByRole('option', { name: 'Contado' })).not.toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
+    expect(await screen.findByRole('option', { name: 'Contado' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Entrega + financiación' })).toBeInTheDocument()
 
-    const financiado = screen.getByRole('option', { name: 'Financiado (próximamente)' })
-    const entrega = screen.getByRole('option', { name: 'Entrega + financiación (próximamente)' })
-    expect(financiado).toHaveAttribute('aria-disabled', 'true')
-    expect(entrega).toHaveAttribute('aria-disabled', 'true')
-
-    await user.click(financiado)
-    expect(onMethodChange).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('option', { name: 'Financiado' }))
+    expect(onMethodChange).toHaveBeenCalledWith('financiado')
   })
 
   it('shows the price of the lote as the amount, without letting it be edited', () => {
-    render(<PaymentConditions method="contado" lote={lote()} onMethodChange={vi.fn()} />)
+    renderConditions()
 
     expect(screen.getByText('Monto')).toBeInTheDocument()
     expect(screen.getByText(/150\.000/)).toBeInTheDocument()
@@ -58,34 +78,91 @@ describe('PaymentConditions', () => {
   })
 
   it('asks for a lote before showing an amount', () => {
-    render(<PaymentConditions method="contado" lote={null} onMethodChange={vi.fn()} />)
+    renderConditions({ lote: null })
 
     expect(screen.getByText('Elegí un lote para ver el monto.')).toBeInTheDocument()
   })
 
   it('warns when the lote has no price loaded', () => {
-    render(
-      <PaymentConditions method="contado" lote={lote({ precio: null })} onMethodChange={vi.fn()} />,
-    )
+    renderConditions({ lote: lote({ precio: null }) })
 
     expect(screen.getByRole('alert')).toHaveTextContent('El lote no tiene precio cargado')
   })
 
   it('shows the amount in the currency of the lote', () => {
-    render(
-      <PaymentConditions
-        method="contado"
-        lote={lote({ precio: 2500, moneda: 'ARS' })}
-        onMethodChange={vi.fn()}
-      />,
-    )
+    renderConditions({ lote: lote({ precio: 2500, moneda: 'ARS' }) })
 
     expect(screen.getByText(/\$\s?2\.500/)).toBeInTheDocument()
   })
 
-  it('hides the amount on a modalidad that is not contado', () => {
-    render(<PaymentConditions method="financiado" lote={lote()} onMethodChange={vi.fn()} />)
+  it('asks for the cuotas, the rate and the periodicidad of a financed sale', async () => {
+    const user = userEvent.setup()
+    const onPlanChange = vi.fn()
+    renderConditions({ method: 'financiado', onPlanChange })
 
-    expect(screen.queryByText('Monto')).not.toBeInTheDocument()
+    expect(screen.getByText('Precio del lote')).toBeInTheDocument()
+    expect(screen.getByLabelText('Periodicidad')).toHaveTextContent('Mensual')
+    expect(screen.queryByLabelText('Monto de entrega')).not.toBeInTheDocument()
+    expect(screen.getByText('Completá el plan para ver el detalle de las cuotas.')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Cantidad de cuotas'), '1')
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, cantidadCuotas: '1' })
+
+    await user.type(screen.getByLabelText('Tasa de interés (%)'), '5')
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, tasaInteres: '5' })
+
+    await user.click(screen.getByLabelText('Periodicidad'))
+    await user.click(await screen.findByRole('option', { name: 'Trimestral' }))
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, periodicidad: 'trimestral' })
+  })
+
+  it('previews the cuotas of a financed plan with the interest applied', () => {
+    renderConditions({
+      method: 'financiado',
+      plan: { cantidadCuotas: '12', tasaInteres: '10', periodicidad: 'mensual', montoEntrega: '' },
+    })
+
+    const preview = screen.getByLabelText('Detalle del plan')
+    expect(within(preview).getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 150.000,00')
+    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent('12 × US$ 13.750,00')
+    expect(within(preview).getByText('Total financiado').nextSibling).toHaveTextContent('US$ 165.000,00')
+    expect(within(preview).queryByText('Entrega')).not.toBeInTheDocument()
+  })
+
+  it('asks for the entrega and takes it off the financed amount', async () => {
+    const user = userEvent.setup()
+    const onPlanChange = vi.fn()
+    const plan: PaymentPlanValues = { cantidadCuotas: '7', tasaInteres: '', periodicidad: 'mensual', montoEntrega: '50000' }
+    renderConditions({ method: 'entrega_financiada', plan, onPlanChange })
+
+    const preview = screen.getByLabelText('Detalle del plan')
+    expect(within(preview).getByText('Entrega').nextSibling).toHaveTextContent('US$ 50.000,00')
+    expect(within(preview).getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 100.000,00')
+    // 100000 / 7 = 14285.71 x 6 + 14285.74
+    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent(
+      '6 × US$ 14.285,71 + 1 × US$ 14.285,74',
+    )
+
+    await user.type(screen.getByLabelText('Monto de entrega'), '1')
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...plan, montoEntrega: '500001' })
+  })
+
+  it('keeps the preview quiet while the plan is invalid', () => {
+    renderConditions({
+      method: 'entrega_financiada',
+      plan: { cantidadCuotas: '12', tasaInteres: '', periodicidad: 'mensual', montoEntrega: '150000' },
+    })
+
+    expect(screen.queryByLabelText('Detalle del plan')).not.toBeInTheDocument()
+    expect(screen.getByText('Completá el plan para ver el detalle de las cuotas.')).toBeInTheDocument()
+  })
+
+  it('disables the plan fields with the rest of the form', () => {
+    renderConditions({ method: 'entrega_financiada', disabled: true })
+
+    expect(screen.getByLabelText('Cantidad de cuotas')).toBeDisabled()
+    expect(screen.getByLabelText('Tasa de interés (%)')).toBeDisabled()
+    expect(screen.getByLabelText('Monto de entrega')).toBeDisabled()
+    expect(screen.getByLabelText('Periodicidad')).toBeDisabled()
   })
 })
