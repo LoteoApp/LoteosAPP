@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
-import { messageFromError } from '../../../shared/api/client'
 import { useSaleSellers } from '../hooks/use-sale-sellers'
 import AgencyCombobox from './AgencyCombobox'
 import ClientCombobox from './ClientCombobox'
-import NewClientDialog from './NewClientDialog'
 import PaymentConditions from './PaymentConditions'
 import SellerCombobox from './SellerCombobox'
 import {
@@ -18,10 +16,9 @@ import {
 } from '../types'
 import type {
   AgencyOption,
-  ClienteOption,
+  ClientOption,
   CreateSaleValues,
-  LoteOption,
-  NewClientValues,
+  LotOption,
   PaymentMethod,
   SellerOption,
 } from '../types'
@@ -29,9 +26,15 @@ import type {
 export type SaleFormProps = {
   // The lote being sold. Who may sell it depends on its loteo, so the
   // sellers are (re)loaded whenever it changes.
-  lote: LoteOption | null
-  loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
-  createCliente: (values: NewClientValues) => Promise<ClienteOption>
+  lot: LotOption | null
+  clients: readonly ClientOption[]
+  clientsLoading?: boolean
+  clientsError?: string | null
+  // A cliente registered from the dialog `app` renders through
+  // renderClientDialog; the form selects it as soon as it arrives.
+  createdClient?: ClientOption | null
+  onRegisterClient?: () => void
+  renderClientDialog?: ReactNode
   loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
   onSubmit: (values: CreateSaleValues) => Promise<boolean>
   isSubmitting?: boolean
@@ -40,58 +43,33 @@ export type SaleFormProps = {
 }
 
 export default function SaleForm({
-  lote,
-  loadClientes,
-  createCliente,
+  lot,
+  clients,
+  clientsLoading = false,
+  clientsError = null,
+  createdClient = null,
+  onRegisterClient,
+  renderClientDialog,
   loadSellers,
   onSubmit,
   isSubmitting = false,
   error = null,
   disabled = false,
 }: SaleFormProps) {
-  const [clientes, setClientes] = useState<ClienteOption[]>([])
-  const [isLoadingClientes, setIsLoadingClientes] = useState(true)
-  const [clientesError, setClientesError] = useState<string | null>(null)
-
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
-  const [cliente, setCliente] = useState<ClienteOption | null>(null)
+  const [client, setClient] = useState<ClientOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isCreatingCliente, setIsCreatingCliente] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load() {
-      setIsLoadingClientes(true)
-      try {
-        const loaded = await loadClientes(controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        setClientes(loaded)
-        setClientesError(null)
-      } catch (loadError) {
-        if (controller.signal.aborted) {
-          return
-        }
-        setClientesError(messageFromError(loadError))
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingClientes(false)
-        }
-      }
+  const [seenCreatedClient, setSeenCreatedClient] = useState(createdClient)
+  if (seenCreatedClient !== createdClient) {
+    setSeenCreatedClient(createdClient)
+    if (createdClient !== null) {
+      setClient(createdClient)
     }
+  }
 
-    void load()
-
-    return () => controller.abort()
-  }, [loadClientes])
-
-  const loteoId = lote === null ? '' : lote.loteoId
+  const loteoId = lot === null ? '' : lot.loteoId
   const sellersState = useSaleSellers(loteoId, loadSellers)
 
   // A different loteo invalidates both selectors before the new list arrives.
@@ -114,24 +92,6 @@ export default function SaleForm({
     }
   }
 
-  const handleCreateCliente = useCallback(
-    async (values: NewClientValues) => {
-      setIsCreatingCliente(true)
-      setCreateError(null)
-      try {
-        const created = await createCliente(values)
-        setClientes((current) => [created, ...current])
-        setCliente(created)
-        setIsDialogOpen(false)
-      } catch (creationError) {
-        setCreateError(messageFromError(creationError))
-      } finally {
-        setIsCreatingCliente(false)
-      }
-    },
-    [createCliente],
-  )
-
   const agencies = useMemo(() => agencyOptionsFromSellers(sellersState.sellers), [sellersState.sellers])
   const agencySellers = useMemo(
     () => sellersOfAgency(sellersState.sellers, agency),
@@ -139,20 +99,20 @@ export default function SaleForm({
   )
 
   const draft = buildSaleReceipt(
-    { lote, cliente, seller, method: paymentMethod },
+    { lot, client, seller, method: paymentMethod },
     new Date().toISOString(),
   )
   const pendingReason = draft.ok ? null : draft.error
   const isBusy = disabled || isSubmitting
 
   async function handleConfirm() {
-    if (lote === null || cliente === null || seller === null || !draft.ok) {
+    if (lot === null || client === null || seller === null || !draft.ok) {
       return
     }
     await onSubmit({
-      loteoId: lote.loteoId,
-      loteId: lote.id,
-      clienteId: cliente.id,
+      loteoId: lot.loteoId,
+      loteId: lot.id,
+      clienteId: client.id,
       vendedorId: seller.id,
       modalidadPago: paymentMethod,
     })
@@ -160,9 +120,9 @@ export default function SaleForm({
 
   return (
     <>
-      {clientesError !== null && (
+      {clientsError !== null && (
         <p role="alert" className="text-sm text-destructive">
-          {clientesError}
+          {clientsError}
         </p>
       )}
 
@@ -172,14 +132,11 @@ export default function SaleForm({
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <ClientCombobox
-            clientes={clientes}
-            value={cliente}
-            onChange={setCliente}
-            onRegisterClient={() => {
-              setCreateError(null)
-              setIsDialogOpen(true)
-            }}
-            isLoading={isLoadingClientes}
+            clients={clients}
+            value={client}
+            onChange={setClient}
+            onRegisterClient={() => onRegisterClient?.()}
+            isLoading={clientsLoading}
             disabled={isBusy}
           />
           <AgencyCombobox
@@ -190,7 +147,7 @@ export default function SaleForm({
               setSeller(null)
             }}
             isLoading={sellersState.isLoading}
-            disabled={isBusy || lote === null}
+            disabled={isBusy || lot === null}
           />
           <SellerCombobox
             sellers={agencySellers}
@@ -206,7 +163,7 @@ export default function SaleForm({
           )}
           <PaymentConditions
             method={paymentMethod}
-            lote={lote}
+            lot={lot}
             onMethodChange={setPaymentMethod}
             disabled={isBusy}
           />
@@ -233,13 +190,7 @@ export default function SaleForm({
         </Button>
       </div>
 
-      <NewClientDialog
-        open={isDialogOpen}
-        isSubmitting={isCreatingCliente}
-        error={createError}
-        onSubmit={handleCreateCliente}
-        onClose={() => setIsDialogOpen(false)}
-      />
+      {renderClientDialog}
     </>
   )
 }

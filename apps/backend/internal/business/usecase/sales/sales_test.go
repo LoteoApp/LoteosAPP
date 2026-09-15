@@ -2,7 +2,10 @@ package sales_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,12 +28,18 @@ func adminActor() sales.Actor {
 
 func validInput() sales.CreateSaleInput {
 	return sales.CreateSaleInput{
-		Actor:      adminActor(),
-		LoteoID:    " loteo-id ",
-		LoteID:     " lote-id ",
-		ClienteID:  " cliente-id ",
-		VendedorID: " seller-id ",
+		Actor:          adminActor(),
+		LoteoID:        " loteo-id ",
+		LoteID:         " lote-id ",
+		ClienteID:      " cliente-id ",
+		VendedorID:     " seller-id ",
+		IdempotencyKey: " sale-key ",
 	}
+}
+
+func sha256Hex(payload string) string {
+	sum := sha256.Sum256([]byte(payload))
+	return hex.EncodeToString(sum[:])
 }
 
 func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
@@ -55,6 +64,33 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 	}
 	if !command.CreatedAt.Equal(created.UTC()) {
 		t.Errorf("created at = %s, want %s", command.CreatedAt, created.UTC())
+	}
+	if command.IdempotencyKey != "sale-key" {
+		t.Errorf("idempotency key = %q, want the trimmed header", command.IdempotencyKey)
+	}
+	wantHash := sha256Hex("8:loteo-id7:lote-id10:cliente-id9:seller-id7:contado")
+	if command.IdempotencyPayloadHash != wantHash {
+		t.Errorf("payload hash = %q, want %q", command.IdempotencyPayloadHash, wantHash)
+	}
+}
+
+func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.SaleRepository{}
+	useCase := sales.NewCreateSale(repository, users)
+
+	if _, err := useCase.Execute(context.Background(), validInput()); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	first := repository.CreateCommand.IdempotencyPayloadHash
+
+	other := validInput()
+	other.ClienteID = "another-client"
+	if _, err := useCase.Execute(context.Background(), other); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash == first {
+		t.Error("a different cliente must produce a different payload hash")
 	}
 }
 
@@ -87,6 +123,16 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 			input.Actor.Roles = []string{domain.RolEscribano}
 			return input
 		}, domain.ErrNoAutorizado},
+		{"missing idempotency key", func() sales.CreateSaleInput {
+			input := validInput()
+			input.IdempotencyKey = "  "
+			return input
+		}, domain.ErrReservationIdempotencyRequired},
+		{"idempotency key too long", func() sales.CreateSaleInput {
+			input := validInput()
+			input.IdempotencyKey = strings.Repeat("k", domain.MaxIdempotencyKeySize+1)
+			return input
+		}, domain.ErrReservationIdempotencyRequired},
 		{"missing lote", func() sales.CreateSaleInput {
 			input := validInput()
 			input.LoteID = " "

@@ -55,13 +55,14 @@ func TestCreateSaleHandler(t *testing.T) {
 	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/loteos/{loteoId}/lotes/{loteId}/ventas", handler.NewCreateSaleHandler(stub))
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/development-1/lotes/lot-1/ventas", strings.NewReader(`{"clienteId":"client-1","vendedorId":"seller-1","modalidadPago":"contado"}`))
 	request.Header.Set("Authorization", "Bearer token")
+	request.Header.Set("Idempotency-Key", "sale-key-1")
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
 	}
-	if stub.input.LoteoID != "development-1" || stub.input.LoteID != "lot-1" || stub.input.ClienteID != "client-1" || stub.input.VendedorID != "seller-1" || stub.input.PaymentMethod != "contado" {
+	if stub.input.LoteoID != "development-1" || stub.input.LoteID != "lot-1" || stub.input.ClienteID != "client-1" || stub.input.VendedorID != "seller-1" || stub.input.PaymentMethod != "contado" || stub.input.IdempotencyKey != "sale-key-1" {
 		t.Errorf("input = %#v", stub.input)
 	}
 	if stub.input.Actor.AuthProviderID != reservationHandlerPrincipal.Subject || len(stub.input.Actor.Roles) != 1 {
@@ -104,6 +105,9 @@ func TestCreateSaleHandlerRejectsInvalidBodyAndMapsErrors(t *testing.T) {
 	}{
 		{name: "lot unavailable", err: domain.ErrSaleLotUnavailable, wantStatus: http.StatusConflict, wantCode: "sale_lot_unavailable"},
 		{name: "seller not eligible", err: domain.ErrSaleSellerNotEligible, wantStatus: http.StatusForbidden, wantCode: "sale_seller_not_eligible"},
+		{name: "agency not assigned", err: domain.ErrSaleAgencyNotAssigned, wantStatus: http.StatusForbidden, wantCode: "sale_agency_not_assigned"},
+		{name: "idempotency key missing", err: domain.ErrReservationIdempotencyRequired, wantStatus: http.StatusBadRequest, wantCode: "idempotency_key_required"},
+		{name: "idempotency key reused", err: domain.ErrReservationIdempotencyConflict, wantStatus: http.StatusConflict, wantCode: "idempotency_key_conflict"},
 		{name: "payment method unavailable", err: domain.ErrSalePaymentMethodUnavailable, wantStatus: http.StatusBadRequest, wantCode: "payment_method_unavailable"},
 		{name: "unexpected", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 	}

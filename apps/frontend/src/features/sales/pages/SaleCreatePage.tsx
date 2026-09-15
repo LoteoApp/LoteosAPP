@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Link } from 'react-router'
 import { messageFromError } from '../../../shared/api/client'
+import { newIdempotencyKey } from '../../../shared/lib/idempotencyKey'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
@@ -10,11 +11,10 @@ import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import SaleForm from '../components/SaleForm'
 import SaleCreatePageSkeleton from '../components/SaleCreatePageSkeleton'
 import SaleReceiptDialog from '../components/SaleReceiptDialog'
-import { loteOptionFromDevelopment, saleReceiptFromSale } from '../types'
+import { lotOptionFromDevelopment, saleReceiptFromSale } from '../types'
 import type {
-  ClienteOption,
+  ClientOption,
   CreateSaleValues,
-  NewClientValues,
   Sale,
   SaleCreateDevelopment,
   SellerOption,
@@ -26,10 +26,14 @@ export type SaleCreatePageProps = {
   loteo: SaleCreateDevelopment | null
   loteoStatus: 'loading' | 'loaded' | 'not-found' | 'error'
   loteoError?: string
-  loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
-  createCliente: (values: NewClientValues) => Promise<ClienteOption>
+  clients: readonly ClientOption[]
+  clientsLoading?: boolean
+  clientsError?: string | null
+  createdClient?: ClientOption | null
+  onRegisterClient?: () => void
+  renderClientDialog?: ReactNode
   loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
-  createSale: (values: CreateSaleValues) => Promise<Sale>
+  createSale: (values: CreateSaleValues, idempotencyKey: string) => Promise<Sale>
   renderPlan?: ReactNode
 }
 
@@ -39,8 +43,12 @@ export default function SaleCreatePage({
   loteo,
   loteoStatus,
   loteoError,
-  loadClientes,
-  createCliente,
+  clients,
+  clientsLoading = false,
+  clientsError = null,
+  createdClient = null,
+  onRegisterClient,
+  renderClientDialog,
   loadSellers,
   createSale,
   renderPlan,
@@ -49,12 +57,16 @@ export default function SaleCreatePage({
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // One key per attempted sale: a retry after a failure reuses it so the
+  // backend can hand back the venta if the first request did land.
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey)
 
   async function handleSubmit(values: CreateSaleValues): Promise<boolean> {
     setIsSubmitting(true)
     setSubmitError(null)
     try {
-      const sale = await createSale(values)
+      const sale = await createSale(values, idempotencyKey)
+      setIdempotencyKey(newIdempotencyKey())
       setCreatedSale(sale)
       setIsReceiptOpen(true)
       return true
@@ -96,7 +108,7 @@ export default function SaleCreatePage({
   const selectedLot = loteo.lotes.find((lot) => lot.id === loteId) ?? null
   const selectedBlock = loteo.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
   const isUnavailable = selectedLot === null || selectedLot.estado !== 'disponible'
-  const lote = isUnavailable ? null : loteOptionFromDevelopment(loteo, loteId)
+  const lot = isUnavailable ? null : lotOptionFromDevelopment(loteo, loteId)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
@@ -181,9 +193,13 @@ export default function SaleCreatePage({
             </Card>
           ) : (
             <SaleForm
-              lote={lote}
-              loadClientes={loadClientes}
-              createCliente={createCliente}
+              lot={lot}
+              clients={clients}
+              clientsLoading={clientsLoading}
+              clientsError={clientsError}
+              createdClient={createdClient}
+              onRegisterClient={onRegisterClient}
+              renderClientDialog={renderClientDialog}
               loadSellers={loadSellers}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}

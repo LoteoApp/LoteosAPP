@@ -4,7 +4,7 @@ import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
-import { newIdempotencyKey } from '../lib/idempotencyKey'
+import { newIdempotencyKey } from '../../../shared/lib/idempotencyKey'
 import type { ReservationClient, ReservationDraft, ReservationLot, ReservationLoteoOption, SellerOption } from '../types'
 
 type Props = {

@@ -2,6 +2,8 @@ package postgres_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"testing"
@@ -33,13 +35,15 @@ func TestSaleRepository(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	repository := postgres.NewSaleRepository(pool)
 	command := gateway.CreateSaleCommand{
-		LoteoID:       loteoID,
-		LoteID:        lotID,
-		ClienteID:     clientID,
-		VendedorID:    actorID,
-		ActorID:       actorID,
-		PaymentMethod: domain.PaymentMethodCash,
-		CreatedAt:     now,
+		LoteoID:                loteoID,
+		LoteID:                 lotID,
+		ClienteID:              clientID,
+		VendedorID:             actorID,
+		ActorID:                actorID,
+		PaymentMethod:          domain.PaymentMethodCash,
+		IdempotencyKey:         newUUID(t),
+		IdempotencyPayloadHash: saleHash(t),
+		CreatedAt:              now,
 	}
 
 	created, err := repository.Create(context.Background(), command)
@@ -73,7 +77,25 @@ func TestSaleRepository(t *testing.T) {
 		t.Fatalf("lot state after sale = %q, want vendido", lotState)
 	}
 
-	if _, err := repository.Create(context.Background(), command); !errors.Is(err, domain.ErrSaleLotUnavailable) {
+	// A retry with the same key and payload is the lost response of the
+	// first request, so it gets the same venta back.
+	retried, err := repository.Create(context.Background(), command)
+	if err != nil {
+		t.Fatalf("retried Create() error = %v", err)
+	}
+	if retried.ID != created.ID || len(retried.Historial) != 1 {
+		t.Errorf("retried Create() = %#v, want the original sale %q", retried, created.ID)
+	}
+
+	reused := command
+	reused.IdempotencyPayloadHash = saleHash(t)
+	if _, err := repository.Create(context.Background(), reused); !errors.Is(err, domain.ErrReservationIdempotencyConflict) {
+		t.Fatalf("Create() reusing the key with other data error = %v, want %v", err, domain.ErrReservationIdempotencyConflict)
+	}
+
+	fresh := command
+	fresh.IdempotencyKey = newUUID(t)
+	if _, err := repository.Create(context.Background(), fresh); !errors.Is(err, domain.ErrSaleLotUnavailable) {
 		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrSaleLotUnavailable)
 	}
 
@@ -157,11 +179,23 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
+	// An agency actor sells only on a loteo their agency is assigned to; the
+	// administrator is free to pick an unassigned agency's seller.
+	_, err = repository.Create(context.Background(), gateway.CreateSaleCommand{
+		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: otherSellerID,
+		ActorID: otherSellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+	})
+	if !errors.Is(err, domain.ErrSaleAgencyNotAssigned) {
+		t.Fatalf("Create() by an unassigned agency error = %v, want %v", err, domain.ErrSaleAgencyNotAssigned)
+	}
+
 	// An agency actor can register the sale for a colleague, but not for a
 	// seller of another agency.
 	_, err = repository.Create(context.Background(), gateway.CreateSaleCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: otherSellerID,
 		ActorID: sellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	})
 	if !errors.Is(err, domain.ErrSaleSellerNotEligible) {
 		t.Fatalf("Create() for another agency error = %v, want %v", err, domain.ErrSaleSellerNotEligible)
@@ -170,6 +204,7 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	created, err := repository.Create(context.Background(), gateway.CreateSaleCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: peerID,
 		ActorID: sellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	})
 	if err != nil {
 		t.Fatalf("Create() for a colleague error = %v", err)
@@ -199,7 +234,40 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	if _, err := repository.Get(context.Background(), created.ID, gateway.SaleScope{}); err != nil {
 		t.Fatalf("Get() as administrator error = %v", err)
 	}
-	_ = actorID
+
+	_, otherLotID := secondLotFixture(t, pool, loteoID)
+	byAdmin, err := repository.Create(context.Background(), gateway.CreateSaleCommand{
+		LoteoID: loteoID, LoteID: otherLotID, ClienteID: clientID, VendedorID: otherSellerID,
+		ActorID: actorID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+	})
+	if err != nil {
+		t.Fatalf("Create() by the administrator with an unassigned agency seller error = %v", err)
+	}
+	if byAdmin.Vendedor.ID != otherSellerID {
+		t.Errorf("administrator sale seller = %#v, want %q", byAdmin.Vendedor, otherSellerID)
+	}
+}
+
+func secondLotFixture(t *testing.T, pool *pgxpool.Pool, loteoID string) (manzanaID, lotID string) {
+	t.Helper()
+	if err := pool.QueryRow(context.Background(), `
+		SELECT id::text FROM manzanas WHERE loteo_id = $1::uuid LIMIT 1
+	`, loteoID).Scan(&manzanaID); err != nil {
+		t.Fatalf("find fixture manzana: %v", err)
+	}
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO lotes (manzana_id, loteo_id, numero, precio, moneda) VALUES ($1::uuid, $2::uuid, '2', 90000, 'USD') RETURNING id::text
+	`, manzanaID, loteoID).Scan(&lotID); err != nil {
+		t.Fatalf("create second lot: %v", err)
+	}
+	return manzanaID, lotID
+}
+
+func saleHash(t *testing.T) string {
+	t.Helper()
+	sum := sha256.Sum256([]byte(newUUID(t)))
+	return hex.EncodeToString(sum[:])
 }
 
 func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
@@ -220,6 +288,7 @@ func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
 	valid := gateway.CreateSaleCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID,
 		ActorID: actorID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	}
 
 	for name, test := range map[string]struct {

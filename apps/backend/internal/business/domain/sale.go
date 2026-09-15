@@ -32,6 +32,7 @@ var (
 	ErrSaleInvalidClient            = &Error{Kind: KindInvalid, Code: "invalid_sale_client", Message: "El cliente seleccionado no es válido"}
 	ErrSaleSellerRequired           = &Error{Kind: KindInvalid, Code: "sale_seller_required", Message: "Tenés que seleccionar un vendedor"}
 	ErrSaleSellerNotEligible        = &Error{Kind: KindForbidden, Code: "sale_seller_not_eligible", Message: "El vendedor no está habilitado para vender"}
+	ErrSaleAgencyNotAssigned        = &Error{Kind: KindForbidden, Code: "sale_agency_not_assigned", Message: "Tu inmobiliaria no está asignada a este loteo"}
 	ErrSaleLotUnavailable           = &Error{Kind: KindConflict, Code: "sale_lot_unavailable", Message: "El lote no está disponible para vender"}
 	ErrSaleLotIncomplete            = &Error{Kind: KindConflict, Code: "sale_lot_incomplete", Message: "El lote necesita número y precio para vender"}
 	ErrSaleActiveConflict           = &Error{Kind: KindConflict, Code: "sale_already_active", Message: "El lote ya tiene una venta registrada"}
@@ -66,6 +67,9 @@ func (method PaymentMethod) IsAvailable() bool {
 	return method == PaymentMethodCash
 }
 
+// IsSaleRole reports who may register a venta: internal users for any loteo,
+// and agency users only for a loteo their agency is assigned to, which the
+// repository checks since the domain doesn't know the assignments.
 func IsSaleRole(role Rol) bool {
 	return IsReservationRole(role)
 }

@@ -21,6 +21,7 @@ type CreateClientDialogProps = {
   onOpenChange: (open: boolean) => void
   onCreated: (client: Cliente) => void
   trigger?: ReactElement
+  description?: string
 }
 
 export default function CreateClientDialog({
@@ -30,6 +31,7 @@ export default function CreateClientDialog({
   onOpenChange,
   onCreated,
   trigger,
+  description = 'Registrá los datos para asociarlo a la reserva.',
 }: CreateClientDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,7 +74,7 @@ export default function CreateClientDialog({
         <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div className="grid gap-1">
             <DialogTitle>Nuevo cliente</DialogTitle>
-            <DialogDescription>Registrá los datos para asociarlo a la reserva.</DialogDescription>
+            <DialogDescription>{description}</DialogDescription>
           </div>
           <DialogClose
             render={

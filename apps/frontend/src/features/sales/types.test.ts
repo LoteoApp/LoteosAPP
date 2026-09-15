@@ -3,18 +3,18 @@ import {
   DIRECT_SALE,
   agencyOptionsFromSellers,
   buildSaleReceipt,
-  clienteOptionLabel,
+  clientOptionLabel,
   defaultSeller,
   isLotState,
-  loteOptionFromDevelopment,
-  loteOptionLabel,
+  lotOptionFromDevelopment,
+  lotOptionLabel,
   saleDisabledReason,
-  saleLoteLabel,
+  saleLotLabel,
   saleReceiptFromSale,
   sellerAgencyLabel,
   sellerOptionLabel,
   sellersOfAgency,
-  type LoteOption,
+  type LotOption,
   type SellerOption,
 } from './types'
 
@@ -52,7 +52,7 @@ const directSeller: SellerOption = {
   rol: 'administrativo',
 }
 
-function lote(overrides: Partial<LoteOption> = {}): LoteOption {
+function lote(overrides: Partial<LotOption> = {}): LotOption {
   return {
     id: 'lt-1',
     numero: '7',
@@ -84,20 +84,20 @@ describe('isLotState', () => {
   })
 })
 
-describe('loteOptionLabel', () => {
+describe('lotOptionLabel', () => {
   it('names a lote by its loteo, manzana and number', () => {
-    expect(loteOptionLabel(lote())).toBe('Norte · Mz 1 · Lote 7')
+    expect(lotOptionLabel(lote())).toBe('Norte · Mz 1 · Lote 7')
   })
 
   it('falls back to a dash where the manzana or the lote has no number', () => {
-    expect(loteOptionLabel(lote({ numero: '', manzanaNumero: '' }))).toBe('Norte · Mz — · Lote —')
+    expect(lotOptionLabel(lote({ numero: '', manzanaNumero: '' }))).toBe('Norte · Mz — · Lote —')
   })
 })
 
-describe('clienteOptionLabel', () => {
+describe('clientOptionLabel', () => {
   it('names a cliente by apellido, nombre and DNI', () => {
     expect(
-      clienteOptionLabel({ id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }),
+      clientOptionLabel({ id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }),
     ).toBe('Pérez, Ana · DNI 30111222')
   })
 })
@@ -181,7 +181,7 @@ describe('sellersOfAgency', () => {
 })
 
 describe('buildSaleReceipt', () => {
-  const cliente = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
+  const client = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
   const seller: SellerOption = {
     id: 'us-1',
     nombre: 'Marta',
@@ -193,27 +193,27 @@ describe('buildSaleReceipt', () => {
 
   it('builds the receipt of a contado sale with the price of the lote', () => {
     const result = buildSaleReceipt(
-      { lote: lote(), cliente, seller, method: 'contado' },
+      { lot: lote(), client, seller, method: 'contado' },
       '2026-09-07T10:00:00.000Z',
     )
 
     expect(result).toEqual({
       ok: true,
       receipt: {
-        emitidoEl: '2026-09-07T10:00:00.000Z',
-        lote: lote(),
-        cliente,
+        issuedAt: '2026-09-07T10:00:00.000Z',
+        lot: lote(),
+        client,
         seller,
         method: 'contado',
-        monto: 150000,
-        moneda: 'USD',
+        amount: 150000,
+        currency: 'USD',
       },
     })
   })
 
   it('accepts a sale by a seller without inmobiliaria', () => {
     const result = buildSaleReceipt(
-      { lote: lote(), cliente, seller: directSeller, method: 'contado' },
+      { lot: lote(), client, seller: directSeller, method: 'contado' },
       '2026-09-07T10:00:00.000Z',
     )
 
@@ -222,19 +222,19 @@ describe('buildSaleReceipt', () => {
 
   it('asks for the lote, the cliente, the vendedor, an available modalidad and a price', () => {
     expect(
-      buildSaleReceipt({ lote: null, cliente, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: null, client, seller, method: 'contado' }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el lote que se vende.' })
 
     expect(
-      buildSaleReceipt({ lote: lote(), cliente: null, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lote(), client: null, seller, method: 'contado' }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el cliente comprador.' })
 
     expect(
-      buildSaleReceipt({ lote: lote(), cliente, seller: null, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lote(), client, seller: null, method: 'contado' }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el vendedor que realizó la venta.' })
 
     expect(
-      buildSaleReceipt({ lote: lote(), cliente, seller, method: 'financiado' }, 'now'),
+      buildSaleReceipt({ lot: lote(), client, seller, method: 'financiado' }, 'now'),
     ).toEqual({
       ok: false,
       error: 'Por ahora solo se puede registrar una venta al contado.',
@@ -242,17 +242,27 @@ describe('buildSaleReceipt', () => {
 
     expect(
       buildSaleReceipt(
-        { lote: lote({ precio: null }), cliente, seller, method: 'contado' },
+        { lot: lote({ precio: null }), client, seller, method: 'contado' },
         'now',
       ),
     ).toEqual({
       ok: false,
-      error: 'El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.',
+      error: 'Completá el precio del lote para habilitar la venta.',
     })
+  })
+
+  it('refuses a lote the backend would reject: price zero or no currency', () => {
+    expect(
+      buildSaleReceipt({ lot: lote({ precio: 0 }), client, seller, method: 'contado' }, 'now'),
+    ).toEqual({ ok: false, error: 'Completá el precio del lote para habilitar la venta.' })
+
+    expect(
+      buildSaleReceipt({ lot: lote({ moneda: '' }), client, seller, method: 'contado' }, 'now'),
+    ).toEqual({ ok: false, error: 'Completá la moneda del lote para habilitar la venta.' })
   })
 })
 
-describe('loteOptionFromDevelopment', () => {
+describe('lotOptionFromDevelopment', () => {
   const loteo = {
     id: 'loteo-1',
     nombre: 'Las Acacias',
@@ -266,7 +276,7 @@ describe('loteOptionFromDevelopment', () => {
   }
 
   it('builds the lote option with the names of its loteo and manzana', () => {
-    expect(loteOptionFromDevelopment(loteo, 'lot-1')).toEqual({
+    expect(lotOptionFromDevelopment(loteo, 'lot-1')).toEqual({
       id: 'lot-1',
       numero: '7',
       manzanaId: 'block-1',
@@ -281,25 +291,30 @@ describe('loteOptionFromDevelopment', () => {
   })
 
   it('leaves the manzana number empty when the manzana is unknown', () => {
-    expect(loteOptionFromDevelopment(loteo, 'lot-2')).toMatchObject({ manzanaNumero: '', precio: null })
+    expect(lotOptionFromDevelopment(loteo, 'lot-2')).toMatchObject({ manzanaNumero: '', precio: null })
   })
 
   it('returns null for a lote that is not in the loteo', () => {
-    expect(loteOptionFromDevelopment(loteo, 'lot-999')).toBeNull()
+    expect(lotOptionFromDevelopment(loteo, 'lot-999')).toBeNull()
   })
 })
 
 describe('saleDisabledReason', () => {
-  it('allows a lote with number and price', () => {
-    expect(saleDisabledReason({ numero: '7', precio: 1 })).toBeNull()
+  it('allows a lote with number, a price above zero and a currency', () => {
+    expect(saleDisabledReason({ numero: '7', precio: 1, moneda: 'USD' })).toBeNull()
   })
 
   it('names each missing field', () => {
-    expect(saleDisabledReason({ numero: '', precio: 1 })).toBe('Completá el número del lote para habilitar la venta.')
-    expect(saleDisabledReason({ numero: '7', precio: null })).toBe('Completá el precio del lote para habilitar la venta.')
-    expect(saleDisabledReason({ numero: '  ', precio: null })).toBe(
+    expect(saleDisabledReason({ numero: '', precio: 1, moneda: 'USD' })).toBe('Completá el número del lote para habilitar la venta.')
+    expect(saleDisabledReason({ numero: '7', precio: null, moneda: 'USD' })).toBe('Completá el precio del lote para habilitar la venta.')
+    expect(saleDisabledReason({ numero: '  ', precio: null, moneda: '' })).toBe(
       'Completá el número y el precio del lote para habilitar la venta.',
     )
+  })
+
+  it('treats a price of zero like a missing price and asks for the currency of a priced lote', () => {
+    expect(saleDisabledReason({ numero: '7', precio: 0, moneda: 'USD' })).toBe('Completá el precio del lote para habilitar la venta.')
+    expect(saleDisabledReason({ numero: '7', precio: 100, moneda: ' ' })).toBe('Completá la moneda del lote para habilitar la venta.')
   })
 })
 
@@ -327,13 +342,13 @@ describe('saleReceiptFromSale', () => {
   it('turns the persisted sale into the receipt the dialog prints', () => {
     const receipt = saleReceiptFromSale(sale)
 
-    expect(receipt.emitidoEl).toBe('2026-09-14T15:00:00Z')
-    expect(receipt.monto).toBe(120000)
-    expect(receipt.moneda).toBe('USD')
+    expect(receipt.issuedAt).toBe('2026-09-14T15:00:00Z')
+    expect(receipt.amount).toBe(120000)
+    expect(receipt.currency).toBe('USD')
     expect(receipt.method).toBe('contado')
-    expect(loteOptionLabel(receipt.lote)).toBe('Las Acacias · Mz 2 · Lote 7')
-    expect(receipt.lote.superficie).toBe(300)
-    expect(receipt.cliente).toEqual(sale.cliente)
+    expect(lotOptionLabel(receipt.lot)).toBe('Las Acacias · Mz 2 · Lote 7')
+    expect(receipt.lot.superficie).toBe(300)
+    expect(receipt.client).toEqual(sale.cliente)
     expect(sellerOptionLabel(receipt.seller)).toBe('Suárez, Marta')
     expect(sellerAgencyLabel(receipt.seller)).toBe('Inmobiliaria Sur')
   })
@@ -345,7 +360,7 @@ describe('saleReceiptFromSale', () => {
   })
 
   it('labels the lote of a sale', () => {
-    expect(saleLoteLabel(sale)).toBe('Las Acacias · Mz 2 · Lote 7')
-    expect(saleLoteLabel({ loteoNombre: 'Norte', manzanaNumero: '', loteNumero: '' })).toBe('Norte · Mz — · Lote —')
+    expect(saleLotLabel(sale)).toBe('Las Acacias · Mz 2 · Lote 7')
+    expect(saleLotLabel({ loteoNombre: 'Norte', manzanaNumero: '', loteNumero: '' })).toBe('Norte · Mz — · Lote —')
   })
 })

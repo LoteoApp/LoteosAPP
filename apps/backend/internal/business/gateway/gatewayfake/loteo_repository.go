@@ -88,12 +88,6 @@ type LoteoRepository struct {
 	ListSearch string
 	ListScope  gateway.LoteoScope
 
-	SearchLotesCalls  int
-	SearchLotesErr    error
-	SearchLotesResult []domain.LoteSummary
-	SearchLotesFilter gateway.LoteFilter
-	SearchLotesScope  gateway.LoteoScope
-
 	GetCalls   int
 	GetErr     error
 	GetResult  domain.Loteo
@@ -255,21 +249,6 @@ func (fake *LoteoRepository) RecordDxfFile(
 	}
 
 	return fake.RecordedDxfFileResult, nil
-}
-
-func (fake *LoteoRepository) SearchLotes(
-	_ context.Context,
-	filter gateway.LoteFilter,
-	scope gateway.LoteoScope,
-) ([]domain.LoteSummary, error) {
-	fake.SearchLotesCalls++
-	fake.SearchLotesFilter = filter
-	fake.SearchLotesScope = scope
-	if fake.SearchLotesErr != nil {
-		return nil, fake.SearchLotesErr
-	}
-
-	return fake.SearchLotesResult, nil
 }
 
 func (fake *LoteoRepository) RecordLoteoFile(

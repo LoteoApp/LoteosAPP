@@ -1272,116 +1272,6 @@ func TestLoteoRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("searches lotes carrying their manzana, loteo and state", func(t *testing.T) {
-		loteo := createNamedLoteo(t, pool, repository, actor, "Loteo Search "+newUUID(t), testPlan())
-		number := "S" + newUUID(t)[:8]
-		price := 150000.0
-		area := 300.5
-
-		if _, err := repository.UpdateLote(context.Background(), actor, loteo.ID, loteo.Lotes[0].ID,
-			domain.LoteData{Number: number, Price: &price, Currency: "USD", Area: &area},
-		); err != nil {
-			t.Fatalf("UpdateLote() error = %v", err)
-		}
-
-		lotes, err := repository.SearchLotes(
-			context.Background(), gateway.LoteFilter{Search: number}, unrestrictedScope,
-		)
-		if err != nil {
-			t.Fatalf("SearchLotes() error = %v", err)
-		}
-		if len(lotes) != 1 {
-			t.Fatalf("SearchLotes(%q) = %d lotes, want 1", number, len(lotes))
-		}
-
-		got := lotes[0]
-		if got.ID != loteo.Lotes[0].ID || got.Number != number {
-			t.Errorf("SearchLotes() = %#v", got)
-		}
-		if got.LoteoID != loteo.ID || got.LoteoName != loteo.Name {
-			t.Errorf("loteo context = %q/%q, want %q/%q", got.LoteoID, got.LoteoName, loteo.ID, loteo.Name)
-		}
-		if got.ManzanaID != loteo.Manzanas[1].ID {
-			t.Errorf("manzanaId = %q, want the lote's own manzana %q", got.ManzanaID, loteo.Manzanas[1].ID)
-		}
-		if got.State != domain.LotStateAvailable {
-			t.Errorf("estado = %q, want a new lote to be %q", got.State, domain.LotStateAvailable)
-		}
-		if got.Price == nil || *got.Price != price {
-			t.Errorf("precio = %v, want %v", got.Price, price)
-		}
-		if got.Area == nil || *got.Area != area {
-			t.Errorf("superficie = %v, want %v", got.Area, area)
-		}
-		if got.Currency != "USD" {
-			t.Errorf("moneda = %q, want %q", got.Currency, "USD")
-		}
-	})
-
-	t.Run("searching lotes finds them by their loteo name", func(t *testing.T) {
-		token := newUUID(t)
-		loteo := createNamedLoteo(t, pool, repository, actor, "Loteo "+token, testPlan())
-
-		lotes, err := repository.SearchLotes(
-			context.Background(), gateway.LoteFilter{Search: token}, unrestrictedScope,
-		)
-		if err != nil {
-			t.Fatalf("SearchLotes() error = %v", err)
-		}
-		if len(lotes) != len(loteo.Lotes) {
-			t.Fatalf("SearchLotes(%q) = %d lotes, want the %d of that loteo", token, len(lotes), len(loteo.Lotes))
-		}
-	})
-
-	t.Run("searching lotes keeps only the requested state", func(t *testing.T) {
-		token := newUUID(t)
-		loteo := createNamedLoteo(t, pool, repository, actor, "Loteo "+token, testPlan())
-		taken := loteo.Lotes[0].ID
-
-		command := stateTransition(loteo.ID, taken, domain.LotStateAvailable, domain.LotStateReserved)
-		reservationID := createLotReservation(t, pool, actor, stateClientID, taken)
-		command.ReservationID = &reservationID
-		if _, err := stateRepository.Transition(context.Background(), command); err != nil {
-			t.Fatalf("Transition() error = %v", err)
-		}
-
-		available, err := repository.SearchLotes(context.Background(),
-			gateway.LoteFilter{Search: token, State: domain.LotStateAvailable}, unrestrictedScope,
-		)
-		if err != nil {
-			t.Fatalf("SearchLotes() error = %v", err)
-		}
-		if containsLote(available, taken) {
-			t.Error("SearchLotes(disponible) should not offer a lote that was already reserved")
-		}
-		if len(available) != len(loteo.Lotes)-1 {
-			t.Errorf("SearchLotes(disponible) = %d lotes, want %d", len(available), len(loteo.Lotes)-1)
-		}
-	})
-
-	t.Run("searching lotes scopes an inmobiliaria to its agency loteos", func(t *testing.T) {
-		viewer := createUsuario(t, pool)
-		assigned := createLoteoWithPlan(t, pool, repository, actor)
-		hidden := createLoteoWithPlan(t, pool, repository, actor)
-		inmobiliaria := createInmobiliaria(t, pool)
-		linkUsuarioToInmobiliaria(t, pool, viewer, inmobiliaria)
-		assignInmobiliariaToLoteo(t, pool, inmobiliaria, assigned.ID)
-
-		lotes, err := repository.SearchLotes(
-			context.Background(), gateway.LoteFilter{}, agencyScope(viewer),
-		)
-		if err != nil {
-			t.Fatalf("SearchLotes() error = %v", err)
-		}
-
-		if !containsLote(lotes, assigned.Lotes[0].ID) {
-			t.Error("SearchLotes() should include a lote of a loteo assigned to the caller's inmobiliaria")
-		}
-		if containsLote(lotes, hidden.Lotes[0].ID) {
-			t.Error("SearchLotes() should not include a lote of an unassigned loteo")
-		}
-	})
-
 	t.Run("gets a loteo with its geometry", func(t *testing.T) {
 		loteo := createLoteoWithPlan(t, pool, repository, actor)
 
@@ -1628,16 +1518,6 @@ func containsLoteo(summaries []domain.LoteoSummary, id string) bool {
 	return false
 }
 
-func containsLote(lotes []domain.LoteSummary, id string) bool {
-	for _, lote := range lotes {
-		if lote.ID == id {
-			return true
-		}
-	}
-
-	return false
-}
-
 func stateTransition(developmentID, lotID string, current, next domain.LotState) domain.LotStateTransition {
 	referenceID := "00000000-0000-0000-0000-000000000001"
 	return domain.LotStateTransition{
@@ -1842,7 +1722,6 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 		`DELETE FROM manzana_calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM manzanas WHERE loteo_id = $1::uuid`,
-		`DELETE FROM inmobiliaria_loteos WHERE loteo_id = $1::uuid`,
 		`UPDATE loteos SET dxf_entidad_id = NULL WHERE id = $1::uuid`,
 		`DELETE FROM dxf_entidades WHERE loteo_id = $1::uuid`,
 		`DELETE FROM loteos WHERE id = $1::uuid`,

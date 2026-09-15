@@ -456,19 +456,3 @@ type LoteoDxfFile struct {
 	Sha256       string
 	CreatedAt    time.Time
 }
-
-// LoteSummary is one lote carrying the manzana and loteo context needed to
-// tell it apart from every other lote in a search result. It has no geometry:
-// picking a lote from a list never needs the plan.
-type LoteSummary struct {
-	ID            string   `json:"id"`
-	Number        string   `json:"numero"`
-	ManzanaID     string   `json:"manzanaId"`
-	ManzanaNumber string   `json:"manzanaNumero"`
-	LoteoID       string   `json:"loteoId"`
-	LoteoName     string   `json:"loteoNombre"`
-	State         LotState `json:"estado"`
-	Price         *float64 `json:"precio"`
-	Currency      string   `json:"moneda"`
-	Area          *float64 `json:"superficie"`
-}

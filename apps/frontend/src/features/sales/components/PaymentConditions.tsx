@@ -12,7 +12,8 @@ import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
   isPaymentMethodAvailable,
-  type LoteOption,
+  saleDisabledReason,
+  type LotOption,
   type PaymentMethod,
 } from '../types'
 
@@ -20,33 +21,34 @@ type PaymentConditionsProps = {
   method: PaymentMethod
   // The amount of a contado sale is the price of the lote, so it is shown,
   // never typed.
-  lote: LoteOption | null
+  lot: LotOption | null
   onMethodChange: (method: PaymentMethod) => void
   disabled?: boolean
 }
 
-function AmountValue({ lote }: { lote: LoteOption | null }) {
-  if (lote === null) {
+function AmountValue({ lot }: { lot: LotOption | null }) {
+  if (lot === null) {
     return <p className="text-sm text-muted-foreground">Elegí un lote para ver el monto.</p>
   }
-  if (lote.precio === null) {
+  const disabledReason = saleDisabledReason(lot)
+  if (disabledReason !== null || lot.precio === null) {
     return (
       <p role="alert" className="text-sm text-destructive">
-        El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.
+        {disabledReason}
       </p>
     )
   }
 
   return (
     <p className="text-lg font-semibold tabular-nums text-foreground">
-      {formatCurrency(lote.precio, lote.moneda)}
+      {formatCurrency(lot.precio, lot.moneda)}
     </p>
   )
 }
 
 export default function PaymentConditions({
   method,
-  lote,
+  lot,
   onMethodChange,
   disabled = false,
 }: PaymentConditionsProps) {
@@ -91,7 +93,7 @@ export default function PaymentConditions({
       {method === 'contado' && (
         <div className="flex flex-col gap-1.5">
           <span className="text-sm leading-none font-medium">Monto</span>
-          <AmountValue lote={lote} />
+          <AmountValue lot={lot} />
           <FieldDescription>Es el precio del lote seleccionado.</FieldDescription>
         </div>
       )}

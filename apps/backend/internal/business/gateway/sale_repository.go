@@ -16,13 +16,15 @@ type SaleScope struct {
 }
 
 type CreateSaleCommand struct {
-	LoteoID       string
-	LoteID        string
-	ClienteID     string
-	VendedorID    string
-	ActorID       string
-	PaymentMethod domain.PaymentMethod
-	CreatedAt     time.Time
+	LoteoID                string
+	LoteID                 string
+	ClienteID              string
+	VendedorID             string
+	ActorID                string
+	PaymentMethod          domain.PaymentMethod
+	IdempotencyKey         string
+	IdempotencyPayloadHash string
+	CreatedAt              time.Time
 }
 
 type SaleRepository interface {

@@ -20,14 +20,6 @@ type LoteoScope struct {
 	ByAgencyAssignment     bool
 }
 
-// LoteFilter narrows a lote search. An empty Search matches every lote, and
-// an empty State matches a lote in any state, so a zero LoteFilter lists them
-// all.
-type LoteFilter struct {
-	Search string
-	State  domain.LotState
-}
-
 type LoteoRepository interface {
 	// Create persists the loteo and its whole plan atomically: either every
 	// polygon, manzana, lote and calle lands, or none does. The returned
@@ -41,11 +33,6 @@ type LoteoRepository interface {
 	// case-insensitively. scope limits the result to the loteos the caller
 	// may see (see LoteoScope).
 	List(ctx context.Context, search string, scope LoteoScope) ([]domain.LoteoSummary, error)
-
-	// SearchLotes returns the active lotes as summaries, ordered by loteo,
-	// manzana and lote number. filter narrows the result (see LoteFilter) and
-	// scope limits it to the loteos the caller may see (see LoteoScope).
-	SearchLotes(ctx context.Context, filter LoteFilter, scope LoteoScope) ([]domain.LoteSummary, error)
 
 	// Get returns one loteo with its manzanas, lotes, calles and the geometry
 	// of each (a nil polygon where an entity has no DXF ring yet). scope

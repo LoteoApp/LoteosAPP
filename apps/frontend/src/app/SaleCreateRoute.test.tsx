@@ -79,14 +79,14 @@ describe('SaleCreateRoute', () => {
 
     await waitFor(() => expect(createSaleMock).toHaveBeenCalledWith('token', {
       loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado',
-    }))
+    }, expect.any(String)))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Las Acacias · Mz 2 · Lote 7')
     expect(dialog).toHaveTextContent('Gómez, Beto')
     print.mockRestore()
   })
 
-  it('registers a new client through the clients API and selects it', async () => {
+  it('registers a new client through the shared clients dialog and selects it', async () => {
     useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
     listClientsMock.mockResolvedValue([])
     listEligibleSellersMock.mockResolvedValue([seller])
@@ -97,13 +97,41 @@ describe('SaleCreateRoute', () => {
 
     await user.click(screen.getByRole('button', { name: 'Registrar cliente' }))
     const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Registrá los datos para asociarlo a la venta.')
     await user.type(within(dialog).getByLabelText('Nombre'), client.nombre)
     await user.type(within(dialog).getByLabelText('Apellido'), client.apellido)
     await user.type(within(dialog).getByLabelText('DNI'), client.dni)
-    await user.click(within(dialog).getByRole('button', { name: 'Guardar cliente' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Crear cliente' }))
 
     await waitFor(() => expect(createClientMock).toHaveBeenCalledWith('token', expect.objectContaining({ dni: client.dni })))
-    await waitFor(() => expect(screen.getByLabelText('Cliente')).toHaveValue('Pérez, Ana · DNI 30111222'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Cliente')).toHaveValue('Pérez, Ana · DNI 30111222')
+
+    // Reopening after a creation starts from a blank form.
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }))
+    const reopened = await screen.findByRole('dialog')
+    expect(within(reopened).getByLabelText('Nombre')).toHaveValue('')
+    expect(within(reopened).getByLabelText('DNI')).toHaveValue('')
+  })
+
+  it('discards what was typed when the client dialog is closed without saving', async () => {
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+    listClientsMock.mockResolvedValue([])
+    listEligibleSellersMock.mockResolvedValue([seller])
+    const user = userEvent.setup()
+
+    renderRoute()
+
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Nombre'), 'Borrador')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }))
+    const reopened = await screen.findByRole('dialog')
+    expect(within(reopened).getByLabelText('Nombre')).toHaveValue('')
+    expect(createClientMock).not.toHaveBeenCalled()
   })
 
   it('shows the loteo loading state', () => {

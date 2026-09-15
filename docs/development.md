@@ -108,8 +108,11 @@ Endpoints operativos del backend:
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): registra
   una venta al contado de un lote `disponible` y lo pasa a `vendido`. Recibe
   `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (solo `contado`
-  por ahora). El monto y la moneda salen del precio del lote. Un usuario de
-  inmobiliaria solo puede elegir vendedores de su propia agencia.
+  por ahora); exige el header `Idempotency-Key`. El monto y la moneda salen
+  del precio del lote. Un usuario de inmobiliaria solo puede vender en un
+  loteo al que su agencia está asignada (`sale_agency_not_assigned`) y solo
+  puede elegir vendedores de su propia agencia; administrador y
+  administrativo eligen cualquier agencia activa con vendedores.
 - `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}`: listan o consultan ventas
   dentro del alcance del actor: administrativos ven todas y los usuarios de
   inmobiliaria las vendidas por su agencia. El listado admite `estado`,
