@@ -2,6 +2,9 @@ package sales
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"strings"
 	"time"
 
@@ -27,12 +30,13 @@ type PaymentPlanInput struct {
 }
 
 type CreateSaleInput struct {
-	Actor         Actor
-	LoteoID       string
-	LoteID        string
-	ClienteID     string
-	VendedorID    string
-	PaymentMethod string
+	Actor          Actor
+	DevelopmentID  string
+	LotID          string
+	ClientID       string
+	SellerID       string
+	PaymentMethod  string
+	IdempotencyKey string
 	// PaymentPlan is required for financiado and entrega_financiada and must
 	// be absent for contado.
 	PaymentPlan *PaymentPlanInput
@@ -43,7 +47,9 @@ type CreateSaleInput struct {
 // over the lote price in the same transaction. Unlike a reserva, an agency
 // user may register the sale for a colleague of their agency, so the seller
 // is never forced to the actor; the repository checks the seller belongs to
-// the actor's agency.
+// the actor's agency and that the agency is assigned to the loteo. A retry
+// with the same Idempotency-Key and payload returns the venta already
+// registered.
 type CreateSale interface {
 	Execute(ctx context.Context, input CreateSaleInput) (domain.Sale, error)
 }
@@ -66,14 +72,18 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	if !hasSaleRole(input.Actor.Roles) {
 		return domain.Sale{}, domain.ErrNoAutorizado
 	}
-	loteoID := strings.TrimSpace(input.LoteoID)
-	loteID := strings.TrimSpace(input.LoteID)
-	clienteID := strings.TrimSpace(input.ClienteID)
-	sellerID := strings.TrimSpace(input.VendedorID)
-	if loteoID == "" || loteID == "" {
+	key, err := domain.NormalizeIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		return domain.Sale{}, domain.ErrSaleIdempotencyRequired
+	}
+	developmentID := strings.TrimSpace(input.DevelopmentID)
+	lotID := strings.TrimSpace(input.LotID)
+	clientID := strings.TrimSpace(input.ClientID)
+	sellerID := strings.TrimSpace(input.SellerID)
+	if developmentID == "" || lotID == "" {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
-	if clienteID == "" {
+	if clientID == "" {
 		return domain.Sale{}, domain.ErrSaleInvalidClient
 	}
 	if sellerID == "" {
@@ -108,17 +118,30 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	}
 
 	sale, err := useCase.repository.Create(ctx, gateway.CreateSaleCommand{
-		LoteoID:       loteoID,
-		LoteID:        loteID,
-		ClienteID:     clienteID,
-		VendedorID:    sellerID,
-		ActorID:       actor.ID,
-		PaymentMethod: method,
-		PaymentPlan:   plan,
-		CreatedAt:     useCase.clock.Now().UTC(),
+		DevelopmentID:          developmentID,
+		LotID:                  lotID,
+		ClientID:               clientID,
+		SellerID:               sellerID,
+		ActorID:                actor.ID,
+		PaymentMethod:          method,
+		IdempotencyKey:         key,
+		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method, plan),
+		PaymentPlan:            plan,
+		CreatedAt:              useCase.clock.Now().UTC(),
 	})
 	if err != nil {
 		return domain.Sale{}, fromRepository(err)
 	}
 	return sale, nil
+}
+
+func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod, plan *domain.PaymentPlanInput) string {
+	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s%d:%s",
+		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
+		len(sellerID), sellerID, len(method), method)
+	if plan != nil {
+		payload += fmt.Sprintf("|%d:%g:%s:%g", plan.CantidadCuotas, plan.TasaInteres, plan.Periodicidad, plan.MontoEntrega)
+	}
+	sum := sha256.Sum256([]byte(payload))
+	return hex.EncodeToString(sum[:])
 }

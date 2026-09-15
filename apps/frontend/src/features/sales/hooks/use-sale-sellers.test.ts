@@ -19,15 +19,15 @@ describe('useSaleSellers', () => {
   it('loads the sellers of the loteo and reloads when it changes', async () => {
     const loadSellers = vi.fn().mockResolvedValue([seller])
 
-    const { result, rerender } = renderHook(({ loteoId }) => useSaleSellers(loteoId, loadSellers), {
-      initialProps: { loteoId: 'loteo-1' },
+    const { result, rerender } = renderHook(({ developmentId }) => useSaleSellers(developmentId, loadSellers), {
+      initialProps: { developmentId: 'loteo-1' },
     })
 
     expect(result.current.isLoading).toBe(true)
     await waitFor(() => expect(result.current.sellers).toEqual([seller]))
     expect(result.current.isLoading).toBe(false)
 
-    rerender({ loteoId: 'loteo-2' })
+    rerender({ developmentId: 'loteo-2' })
 
     expect(result.current.sellers).toEqual([])
     expect(result.current.isLoading).toBe(true)

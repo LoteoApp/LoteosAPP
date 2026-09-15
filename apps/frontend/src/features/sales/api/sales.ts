@@ -125,7 +125,11 @@ export async function getSale(token: string, id: string, signal?: AbortSignal): 
   return readBody(body, isSale)
 }
 
-export async function createSale(token: string, values: CreateSaleValues): Promise<Sale> {
+export async function createSale(
+  token: string,
+  values: CreateSaleValues,
+  idempotencyKey: string,
+): Promise<Sale> {
   const body = await apiFetch<unknown>(
     `/api/v1/loteos/${encodeURIComponent(values.loteoId)}/lotes/${encodeURIComponent(values.loteId)}/ventas`,
     {
@@ -137,6 +141,7 @@ export async function createSale(token: string, values: CreateSaleValues): Promi
         modalidadPago: values.modalidadPago,
         ...(values.planPago === undefined ? {} : { planPago: values.planPago }),
       },
+      headers: { 'Idempotency-Key': idempotencyKey },
     },
   )
   return readBody(body, isSale)

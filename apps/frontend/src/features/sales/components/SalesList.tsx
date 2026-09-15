@@ -22,7 +22,7 @@ export default function SalesList({ sales }: { sales: Sale[] }) {
     <ul className="grid gap-3">
       {sales.map((sale) => {
         const seller = sellerOf(sale)
-        const loteLabel = sale.loteNumero ? `Lote ${sale.loteNumero}` : 'Lote sin número'
+        const lotLabel = sale.loteNumero ? `Lote ${sale.loteNumero}` : 'Lote sin número'
         return (
           <li key={sale.id}>
             <Card>
@@ -43,7 +43,7 @@ export default function SalesList({ sales }: { sales: Sale[] }) {
                   </div>
                   <p className="text-sm">
                     {sale.manzanaNumero ? `Mz ${sale.manzanaNumero} · ` : ''}
-                    {loteLabel} · {sale.cliente.apellido}, {sale.cliente.nombre}
+                    {lotLabel} · {sale.cliente.apellido}, {sale.cliente.nombre}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(sale.monto, sale.moneda)} · {sellerOptionLabel(seller)} ({sellerAgencyLabel(seller)})

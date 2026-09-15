@@ -108,15 +108,19 @@ Endpoints operativos del backend:
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): registra
   una venta de un lote `disponible` y lo pasa a `vendido`. Recibe
   `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (`contado` por
-  defecto, `financiado` o `entrega_financiada`). Las dos modalidades
-  financiadas exigen `planPago` con `cantidadCuotas` (1..360), `tasaInteres`
-  (porcentaje, 0..1000, opcional), `periodicidad` (`mensual`, `bimestral`,
-  `trimestral`, `semestral`) y, solo en `entrega_financiada`, `montoEntrega`
-  (mayor a 0 y menor al precio del lote); `contado` no admite `planPago`.
-  Los vencimientos se derivan de la fecha de la venta. El monto y la moneda
-  salen del precio del lote. La respuesta incluye `planPago` con el resumen
-  (`montoFinanciado`, `montoCuota`, `montoTotal`) y las `cuotas`. Un usuario
-  de inmobiliaria solo puede elegir vendedores de su propia agencia.
+  defecto, `financiado` o `entrega_financiada`); exige el header
+  `Idempotency-Key`. Las dos modalidades financiadas exigen `planPago` con
+  `cantidadCuotas` (1..360), `tasaInteres` (porcentaje, 0..1000, opcional),
+  `periodicidad` (`mensual`, `bimestral`, `trimestral`, `semestral`) y, solo
+  en `entrega_financiada`, `montoEntrega` (mayor a 0 y menor al precio del
+  lote); `contado` no admite `planPago`. Los vencimientos se derivan de la
+  fecha de la venta. El monto y la moneda salen del precio del lote. La
+  respuesta incluye `planPago` con el resumen (`montoFinanciado`,
+  `montoCuota`, `montoTotal`) y las `cuotas`. Un usuario de inmobiliaria
+  solo puede vender en un loteo al que su agencia está asignada
+  (`sale_agency_not_assigned`) y solo puede elegir vendedores de su propia
+  agencia; administrador y administrativo eligen cualquier agencia activa
+  con vendedores.
 - `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}`: listan o consultan ventas
   dentro del alcance del actor: administrativos ven todas y los usuarios de
   inmobiliaria las vendidas por su agencia. El listado admite `estado`,

@@ -14,7 +14,7 @@ import type { ReservationClient, ReservationDraft, ReservationLot } from '../typ
 import ReservationForm from './ReservationForm'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
-import { newIdempotencyKey } from '../lib/idempotencyKey'
+import { newIdempotencyKey } from '../../../shared/lib/idempotencyKey'
 
 type ReserveLotDialogProps = {
   accessToken: string

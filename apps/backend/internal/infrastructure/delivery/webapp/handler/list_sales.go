@@ -39,9 +39,9 @@ func (handler *ListSalesHandler) Handle(w http.ResponseWriter, request *http.Req
 func saleFilter(request *http.Request) (domain.SaleListFilter, error) {
 	query := request.URL.Query()
 	filter := domain.SaleListFilter{
-		LoteoID: query.Get("loteoId"),
-		LoteID:  query.Get("loteId"),
-		Search:  query.Get("q"),
+		DevelopmentID: query.Get("loteoId"),
+		LotID:         query.Get("loteId"),
+		Search:        query.Get("q"),
 	}
 	for _, rawState := range query["estado"] {
 		for _, state := range strings.Split(rawState, ",") {

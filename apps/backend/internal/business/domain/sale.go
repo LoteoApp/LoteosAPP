@@ -32,12 +32,15 @@ var (
 	ErrSaleInvalidClient        = &Error{Kind: KindInvalid, Code: "invalid_sale_client", Message: "El cliente seleccionado no es válido"}
 	ErrSaleSellerRequired       = &Error{Kind: KindInvalid, Code: "sale_seller_required", Message: "Tenés que seleccionar un vendedor"}
 	ErrSaleSellerNotEligible    = &Error{Kind: KindForbidden, Code: "sale_seller_not_eligible", Message: "El vendedor no está habilitado para vender"}
+	ErrSaleAgencyNotAssigned    = &Error{Kind: KindForbidden, Code: "sale_agency_not_assigned", Message: "Tu inmobiliaria no está asignada a este loteo"}
 	ErrSaleLotUnavailable       = &Error{Kind: KindConflict, Code: "sale_lot_unavailable", Message: "El lote no está disponible para vender"}
 	ErrSaleLotIncomplete        = &Error{Kind: KindConflict, Code: "sale_lot_incomplete", Message: "El lote necesita número y precio para vender"}
 	ErrSaleActiveConflict       = &Error{Kind: KindConflict, Code: "sale_already_active", Message: "El lote ya tiene una venta registrada"}
 	ErrSaleInvalidPaymentMethod = &Error{Kind: KindInvalid, Code: "invalid_payment_method", Message: "La modalidad de pago no es válida"}
 	ErrSaleInvalidState         = &Error{Kind: KindInvalid, Code: "invalid_sale_state", Message: "El estado de la venta no es válido"}
 	ErrSaleInvalidPage          = &Error{Kind: KindInvalid, Code: "invalid_sale_page", Message: "La paginación solicitada no es válida"}
+	ErrSaleIdempotencyRequired  = &Error{Kind: KindInvalid, Code: "idempotency_key_required", Message: "La solicitud necesita una clave de idempotencia"}
+	ErrSaleIdempotencyConflict  = &Error{Kind: KindConflict, Code: "idempotency_key_conflict", Message: "La clave de idempotencia ya fue utilizada con otros datos"}
 )
 
 func (state SaleState) IsValid() bool {
@@ -58,6 +61,9 @@ func (method PaymentMethod) IsValid() bool {
 	}
 }
 
+// IsSaleRole reports who may register a venta: internal users for any loteo,
+// and agency users only for a loteo their agency is assigned to, which the
+// repository checks since the domain doesn't know the assignments.
 func IsSaleRole(role Rol) bool {
 	return IsReservationRole(role)
 }
@@ -96,17 +102,17 @@ type Sale struct {
 }
 
 type SaleListFilter struct {
-	States  []SaleState
-	LoteoID string
-	LoteID  string
-	Search  string
-	Page    int
-	Limit   int
+	States        []SaleState
+	DevelopmentID string
+	LotID         string
+	Search        string
+	Page          int
+	Limit         int
 }
 
 func (filter SaleListFilter) Normalize() (SaleListFilter, error) {
-	filter.LoteoID = strings.TrimSpace(filter.LoteoID)
-	filter.LoteID = strings.TrimSpace(filter.LoteID)
+	filter.DevelopmentID = strings.TrimSpace(filter.DevelopmentID)
+	filter.LotID = strings.TrimSpace(filter.LotID)
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Page == 0 {
 		filter.Page = DefaultSalePage

@@ -16,8 +16,9 @@ import {
   PAYMENT_PERIOD_LABELS,
   buildPaymentSchedule,
   isFinancedMethod,
+  saleDisabledReason,
   parsePaymentPlan,
-  type LoteOption,
+  type LotOption,
   type PaymentMethod,
   type PaymentPeriod,
   type PaymentPlanValues,
@@ -28,7 +29,7 @@ type PaymentConditionsProps = {
   plan: PaymentPlanValues
   // The amount of a sale is the price of the lote, so it is shown, never
   // typed; a financed plan splits it.
-  lote: LoteOption | null
+  lot: LotOption | null
   onMethodChange: (method: PaymentMethod) => void
   onPlanChange: (plan: PaymentPlanValues) => void
   disabled?: boolean
@@ -40,21 +41,22 @@ const METHOD_DESCRIPTIONS: Record<PaymentMethod, string> = {
   entrega_financiada: 'Una entrega inicial y el resto del precio en cuotas.',
 }
 
-function AmountValue({ lote }: { lote: LoteOption | null }) {
-  if (lote === null) {
+function AmountValue({ lot }: { lot: LotOption | null }) {
+  if (lot === null) {
     return <p className="text-sm text-muted-foreground">Elegí un lote para ver el monto.</p>
   }
-  if (lote.precio === null) {
+  const disabledReason = saleDisabledReason(lot)
+  if (disabledReason !== null || lot.price === null) {
     return (
       <p role="alert" className="text-sm text-destructive">
-        El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.
+        {disabledReason}
       </p>
     )
   }
 
   return (
     <p className="text-lg font-semibold tabular-nums text-foreground">
-      {formatCurrency(lote.precio, lote.moneda)}
+      {formatCurrency(lot.price, lot.currency)}
     </p>
   )
 }
@@ -62,16 +64,16 @@ function AmountValue({ lote }: { lote: LoteOption | null }) {
 function PlanPreview({
   method,
   plan,
-  lote,
+  lot,
 }: {
   method: PaymentMethod
   plan: PaymentPlanValues
-  lote: LoteOption
+  lot: LotOption
 }) {
-  if (lote.precio === null) {
+  if (lot.price === null || saleDisabledReason(lot) !== null) {
     return null
   }
-  const parsed = parsePaymentPlan(method, plan, lote.precio)
+  const parsed = parsePaymentPlan(method, plan, lot.price)
   if (!parsed.ok || parsed.plan === undefined) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -79,12 +81,12 @@ function PlanPreview({
       </p>
     )
   }
-  const schedule = buildPaymentSchedule(lote.precio, parsed.plan)
+  const schedule = buildPaymentSchedule(lot.price, parsed.plan)
   const lastAmount = schedule.cuotas[schedule.cuotas.length - 1]
   const cuotaLabel =
     lastAmount === schedule.montoCuota
-      ? `${schedule.cuotas.length} × ${formatCurrency(schedule.montoCuota, lote.moneda)}`
-      : `${schedule.cuotas.length - 1} × ${formatCurrency(schedule.montoCuota, lote.moneda)} + 1 × ${formatCurrency(lastAmount, lote.moneda)}`
+      ? `${schedule.cuotas.length} × ${formatCurrency(schedule.montoCuota, lot.currency)}`
+      : `${schedule.cuotas.length - 1} × ${formatCurrency(schedule.montoCuota, lot.currency)} + 1 × ${formatCurrency(lastAmount, lot.currency)}`
 
   return (
     <dl
@@ -92,11 +94,11 @@ function PlanPreview({
       className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm sm:grid-cols-2"
     >
       {method === 'entrega_financiada' && (
-        <PreviewItem term="Entrega" value={formatCurrency(parsed.plan.montoEntrega, lote.moneda)} />
+        <PreviewItem term="Entrega" value={formatCurrency(parsed.plan.montoEntrega, lot.currency)} />
       )}
-      <PreviewItem term="Monto financiado" value={formatCurrency(schedule.montoFinanciado, lote.moneda)} />
+      <PreviewItem term="Monto financiado" value={formatCurrency(schedule.montoFinanciado, lot.currency)} />
       <PreviewItem term="Cuotas" value={cuotaLabel} />
-      <PreviewItem term="Total financiado" value={formatCurrency(schedule.montoTotal, lote.moneda)} />
+      <PreviewItem term="Total financiado" value={formatCurrency(schedule.montoTotal, lot.currency)} />
     </dl>
   )
 }
@@ -113,7 +115,7 @@ function PreviewItem({ term, value }: { term: string; value: string }) {
 export default function PaymentConditions({
   method,
   plan,
-  lote,
+  lot,
   onMethodChange,
   onPlanChange,
   disabled = false,
@@ -152,7 +154,7 @@ export default function PaymentConditions({
         <span className="text-sm leading-none font-medium">
           {financed ? 'Precio del lote' : 'Monto'}
         </span>
-        <AmountValue lote={lote} />
+        <AmountValue lot={lot} />
       </div>
 
       {financed && (
@@ -171,7 +173,7 @@ export default function PaymentConditions({
                 className="min-h-11 md:min-h-9"
               />
               <FieldDescription>
-                {lote === null ? 'En la moneda del lote.' : `En ${lote.moneda || 'la moneda del lote'}.`}
+                {lot === null ? 'En la moneda del lote.' : `En ${lot.currency || 'la moneda del lote'}.`}
               </FieldDescription>
             </Field>
           )}
@@ -234,7 +236,7 @@ export default function PaymentConditions({
             período después de la venta.
           </FieldDescription>
 
-          {lote !== null && <PlanPreview method={method} plan={plan} lote={lote} />}
+          {lot !== null && <PlanPreview method={method} plan={plan} lot={lot} />}
         </div>
       )}
     </div>

@@ -123,12 +123,13 @@ describe('createSale', () => {
       clienteId: 'client-1',
       vendedorId: 'seller-1',
       modalidadPago: 'contado',
-    })
+    }, 'sale-key-1')
 
     expect(created.id).toBe('sale-1')
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toContain('/api/v1/loteos/loteo%201/lotes/lot-1/ventas')
     expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('sale-key-1')
     expect(JSON.parse(String(init.body))).toEqual({ clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado' })
   })
 
@@ -161,11 +162,12 @@ describe('createSale', () => {
       vendedorId: 'seller-1',
       modalidadPago: 'entrega_financiada',
       planPago: { cantidadCuotas: 2, tasaInteres: 10, periodicidad: 'mensual', montoEntrega: 20000 },
-    })
+    }, 'sale-key-3')
 
     expect(created.planPago?.cuotas).toHaveLength(2)
     expect(created.planPago?.montoCuota).toBe(55000)
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('sale-key-3')
     expect(JSON.parse(String(init.body))).toEqual({
       clienteId: 'client-1',
       vendedorId: 'seller-1',
@@ -196,7 +198,7 @@ describe('createSale', () => {
     stubFetch(jsonResponse(409, { code: 'sale_lot_unavailable', message: 'El lote no está disponible para vender' }))
 
     await expect(
-      createSale('token-123', { loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado' }),
+      createSale('token-123', { loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado' }, 'sale-key-2'),
     ).rejects.toThrow('El lote no está disponible para vender')
   })
 })

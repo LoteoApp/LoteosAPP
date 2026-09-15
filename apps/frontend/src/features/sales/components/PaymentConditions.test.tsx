@@ -2,20 +2,20 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import PaymentConditions from './PaymentConditions'
-import { EMPTY_PAYMENT_PLAN, type LoteOption, type PaymentMethod, type PaymentPlanValues } from '../types'
+import { EMPTY_PAYMENT_PLAN, type LotOption, type PaymentMethod, type PaymentPlanValues } from '../types'
 
-function lote(overrides: Partial<LoteOption> = {}): LoteOption {
+function lot(overrides: Partial<LotOption> = {}): LotOption {
   return {
     id: 'lt-1',
-    numero: '7',
-    manzanaId: 'mz-1',
-    manzanaNumero: '1',
-    loteoId: 'loteo-1',
-    loteoNombre: 'Norte',
-    estado: 'disponible',
-    precio: 150000,
-    moneda: 'USD',
-    superficie: 300,
+    number: '7',
+    blockId: 'mz-1',
+    blockNumber: '1',
+    developmentId: 'loteo-1',
+    developmentName: 'Norte',
+    state: 'disponible',
+    price: 150000,
+    currency: 'USD',
+    area: 300,
     ...overrides,
   }
 }
@@ -23,14 +23,14 @@ function lote(overrides: Partial<LoteOption> = {}): LoteOption {
 function renderConditions({
   method = 'contado',
   plan = EMPTY_PAYMENT_PLAN,
-  lote: current = lote(),
+  lot: current = lot(),
   onMethodChange = vi.fn(),
   onPlanChange = vi.fn(),
   disabled = false,
 }: {
   method?: PaymentMethod
   plan?: PaymentPlanValues
-  lote?: LoteOption | null
+  lot?: LotOption | null
   onMethodChange?: (method: PaymentMethod) => void
   onPlanChange?: (plan: PaymentPlanValues) => void
   disabled?: boolean
@@ -39,7 +39,7 @@ function renderConditions({
     <PaymentConditions
       method={method}
       plan={plan}
-      lote={current}
+      lot={current}
       onMethodChange={onMethodChange}
       onPlanChange={onPlanChange}
       disabled={disabled}
@@ -78,19 +78,26 @@ describe('PaymentConditions', () => {
   })
 
   it('asks for a lote before showing an amount', () => {
-    renderConditions({ lote: null })
+    renderConditions({ lot: null })
 
     expect(screen.getByText('Elegí un lote para ver el monto.')).toBeInTheDocument()
   })
 
   it('warns when the lote has no price loaded', () => {
-    renderConditions({ lote: lote({ precio: null }) })
+    renderConditions({ lot: lot({ price: null }) })
 
-    expect(screen.getByRole('alert')).toHaveTextContent('El lote no tiene precio cargado')
+    expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
+  })
+
+  it('warns instead of showing an amount when the price is zero', () => {
+    renderConditions({ lot: lot({ price: 0 }) })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
+    expect(screen.queryByText(/US\$\s*0/)).not.toBeInTheDocument()
   })
 
   it('shows the amount in the currency of the lote', () => {
-    renderConditions({ lote: lote({ precio: 2500, moneda: 'ARS' }) })
+    renderConditions({ lot: lot({ price: 2500, currency: 'ARS' }) })
 
     expect(screen.getByText(/\$\s?2\.500/)).toBeInTheDocument()
   })

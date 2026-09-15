@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { messageFromError } from '../../../shared/api/client'
 import { listSales } from '../api/sales'
 import type { SaleListFilters, SalePage } from '../types'
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
-}
 
 export type UseSales = {
   page: SalePage
@@ -53,7 +50,7 @@ export function useSales(token: string, filters: SaleListFilters): UseSales {
       .catch((loadError: unknown) => {
         if (!controller.signal.aborted) {
           setPage(emptyPage)
-          setError(messageOf(loadError))
+          setError(messageFromError(loadError))
         }
       })
       .finally(() => {

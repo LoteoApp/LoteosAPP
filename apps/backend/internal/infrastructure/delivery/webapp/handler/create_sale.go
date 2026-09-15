@@ -33,13 +33,14 @@ func (handler *CreateSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 		}
 	}
 	sale, err := handler.createSale.Execute(request.Context(), sales.CreateSaleInput{
-		Actor:         sales.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
-		LoteoID:       request.PathValue("loteoId"),
-		LoteID:        request.PathValue("loteId"),
-		ClienteID:     body.ClienteID,
-		VendedorID:    body.VendedorID,
-		PaymentMethod: body.ModalidadPago,
-		PaymentPlan:   plan,
+		Actor:          sales.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
+		DevelopmentID:  request.PathValue("loteoId"),
+		LotID:          request.PathValue("loteId"),
+		ClientID:       body.ClienteID,
+		SellerID:       body.VendedorID,
+		PaymentMethod:  body.ModalidadPago,
+		IdempotencyKey: request.Header.Get("Idempotency-Key"),
+		PaymentPlan:    plan,
 	})
 	if err != nil {
 		return err

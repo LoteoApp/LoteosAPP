@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
-import { messageFromError } from '../../../shared/api/client'
 import { useSaleSellers } from '../hooks/use-sale-sellers'
 import AgencyCombobox from './AgencyCombobox'
 import ClientCombobox from './ClientCombobox'
-import NewClientDialog from './NewClientDialog'
 import PaymentConditions from './PaymentConditions'
 import SellerCombobox from './SellerCombobox'
 import {
+  DIRECT_SALE,
   EMPTY_PAYMENT_PLAN,
   agencyOfSeller,
   agencyOptionsFromSellers,
@@ -19,10 +18,9 @@ import {
 } from '../types'
 import type {
   AgencyOption,
-  ClienteOption,
+  ClientOption,
   CreateSaleValues,
-  LoteOption,
-  NewClientValues,
+  LotOption,
   PaymentMethod,
   PaymentPlanValues,
   SellerOption,
@@ -31,10 +29,16 @@ import type {
 export type SaleFormProps = {
   // The lote being sold. Who may sell it depends on its loteo, so the
   // sellers are (re)loaded whenever it changes.
-  lote: LoteOption | null
-  loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
-  createCliente: (values: NewClientValues) => Promise<ClienteOption>
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
+  lot: LotOption | null
+  clients: readonly ClientOption[]
+  clientsLoading?: boolean
+  clientsError?: string | null
+  // A cliente registered from the dialog `app` renders through
+  // renderClientDialog; the form selects it as soon as it arrives.
+  createdClient?: ClientOption | null
+  onRegisterClient?: () => void
+  renderClientDialog?: ReactNode
+  loadSellers: (developmentId: string, signal?: AbortSignal) => Promise<SellerOption[]>
   onSubmit: (values: CreateSaleValues) => Promise<boolean>
   isSubmitting?: boolean
   error?: string | null
@@ -42,65 +46,40 @@ export type SaleFormProps = {
 }
 
 export default function SaleForm({
-  lote,
-  loadClientes,
-  createCliente,
+  lot,
+  clients,
+  clientsLoading = false,
+  clientsError = null,
+  createdClient = null,
+  onRegisterClient,
+  renderClientDialog,
   loadSellers,
   onSubmit,
   isSubmitting = false,
   error = null,
   disabled = false,
 }: SaleFormProps) {
-  const [clientes, setClientes] = useState<ClienteOption[]>([])
-  const [isLoadingClientes, setIsLoadingClientes] = useState(true)
-  const [clientesError, setClientesError] = useState<string | null>(null)
-
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlanValues>(EMPTY_PAYMENT_PLAN)
-  const [cliente, setCliente] = useState<ClienteOption | null>(null)
+  const [client, setClient] = useState<ClientOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isCreatingCliente, setIsCreatingCliente] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load() {
-      setIsLoadingClientes(true)
-      try {
-        const loaded = await loadClientes(controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        setClientes(loaded)
-        setClientesError(null)
-      } catch (loadError) {
-        if (controller.signal.aborted) {
-          return
-        }
-        setClientesError(messageFromError(loadError))
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingClientes(false)
-        }
-      }
+  const [seenCreatedClient, setSeenCreatedClient] = useState(createdClient)
+  if (seenCreatedClient !== createdClient) {
+    setSeenCreatedClient(createdClient)
+    if (createdClient !== null) {
+      setClient(createdClient)
     }
+  }
 
-    void load()
-
-    return () => controller.abort()
-  }, [loadClientes])
-
-  const loteoId = lote === null ? '' : lote.loteoId
-  const sellersState = useSaleSellers(loteoId, loadSellers)
+  const developmentId = lot === null ? '' : lot.developmentId
+  const sellersState = useSaleSellers(developmentId, loadSellers)
 
   // A different loteo invalidates both selectors before the new list arrives.
-  const [sellersLoteoId, setSellersLoteoId] = useState(loteoId)
-  if (sellersLoteoId !== loteoId) {
-    setSellersLoteoId(loteoId)
+  const [sellersDevelopmentId, setSellersDevelopmentId] = useState(developmentId)
+  if (sellersDevelopmentId !== developmentId) {
+    setSellersDevelopmentId(developmentId)
     setAgency(null)
     setSeller(null)
   }
@@ -117,45 +96,36 @@ export default function SaleForm({
     }
   }
 
-  const handleCreateCliente = useCallback(
-    async (values: NewClientValues) => {
-      setIsCreatingCliente(true)
-      setCreateError(null)
-      try {
-        const created = await createCliente(values)
-        setClientes((current) => [created, ...current])
-        setCliente(created)
-        setIsDialogOpen(false)
-      } catch (creationError) {
-        setCreateError(messageFromError(creationError))
-      } finally {
-        setIsCreatingCliente(false)
-      }
-    },
-    [createCliente],
-  )
-
   const agencies = useMemo(() => agencyOptionsFromSellers(sellersState.sellers), [sellersState.sellers])
+  // An internal user selling directly sells at their own name: the seller is
+  // theirs to keep, not to choose. Picking an agency reopens the choice.
+  const actorSeller = useMemo(
+    () => sellersState.sellers.find((candidate) => candidate.esActor === true) ?? null,
+    [sellersState.sellers],
+  )
+  const directSaleSeller =
+    actorSeller !== null && agencyOfSeller(actorSeller).id === DIRECT_SALE.id ? actorSeller : null
+  const sellerIsFixedToActor = directSaleSeller !== null && agency?.id === DIRECT_SALE.id
   const agencySellers = useMemo(
     () => sellersOfAgency(sellersState.sellers, agency),
     [sellersState.sellers, agency],
   )
 
   const draft = buildSaleReceipt(
-    { lote, cliente, seller, method: paymentMethod, plan: paymentPlan },
+    { lot, client, seller, method: paymentMethod, plan: paymentPlan },
     new Date().toISOString(),
   )
   const pendingReason = draft.ok ? null : draft.error
   const isBusy = disabled || isSubmitting
 
   async function handleConfirm() {
-    if (lote === null || cliente === null || seller === null || !draft.ok) {
+    if (lot === null || client === null || seller === null || !draft.ok) {
       return
     }
     await onSubmit({
-      loteoId: lote.loteoId,
-      loteId: lote.id,
-      clienteId: cliente.id,
+      loteoId: lot.developmentId,
+      loteId: lot.id,
+      clienteId: client.id,
       vendedorId: seller.id,
       modalidadPago: paymentMethod,
       ...(draft.plan === undefined ? {} : { planPago: draft.plan }),
@@ -164,9 +134,9 @@ export default function SaleForm({
 
   return (
     <>
-      {clientesError !== null && (
+      {clientsError !== null && (
         <p role="alert" className="text-sm text-destructive">
-          {clientesError}
+          {clientsError}
         </p>
       )}
 
@@ -176,14 +146,11 @@ export default function SaleForm({
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <ClientCombobox
-            clientes={clientes}
-            value={cliente}
-            onChange={setCliente}
-            onRegisterClient={() => {
-              setCreateError(null)
-              setIsDialogOpen(true)
-            }}
-            isLoading={isLoadingClientes}
+            clients={clients}
+            value={client}
+            onChange={setClient}
+            onRegisterClient={() => onRegisterClient?.()}
+            isLoading={clientsLoading}
             disabled={isBusy}
           />
           <AgencyCombobox
@@ -191,17 +158,22 @@ export default function SaleForm({
             value={agency}
             onChange={(next) => {
               setAgency(next)
-              setSeller(null)
+              setSeller(next?.id === DIRECT_SALE.id ? directSaleSeller : null)
             }}
             isLoading={sellersState.isLoading}
-            disabled={isBusy || lote === null}
+            disabled={isBusy || lot === null}
           />
           <SellerCombobox
             sellers={agencySellers}
             value={seller}
             onChange={setSeller}
             isLoading={sellersState.isLoading}
-            disabled={isBusy || agency === null}
+            disabled={isBusy || agency === null || sellerIsFixedToActor}
+            description={
+              sellerIsFixedToActor
+                ? 'Vendés a tu nombre. Elegí una inmobiliaria para registrar la venta de uno de sus vendedores.'
+                : undefined
+            }
           />
           {sellersState.error !== null && (
             <p role="alert" className="text-sm text-destructive">
@@ -211,7 +183,7 @@ export default function SaleForm({
           <PaymentConditions
             method={paymentMethod}
             plan={paymentPlan}
-            lote={lote}
+            lot={lot}
             onMethodChange={setPaymentMethod}
             onPlanChange={setPaymentPlan}
             disabled={isBusy}
@@ -239,13 +211,7 @@ export default function SaleForm({
         </Button>
       </div>
 
-      <NewClientDialog
-        open={isDialogOpen}
-        isSubmitting={isCreatingCliente}
-        error={createError}
-        onSubmit={handleCreateCliente}
-        onClose={() => setIsDialogOpen(false)}
-      />
+      {renderClientDialog}
     </>
   )
 }

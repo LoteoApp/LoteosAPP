@@ -16,7 +16,7 @@ import { formatPercent } from '../../../shared/lib/formatPercent'
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_PERIOD_LABELS,
-  loteOptionLabel,
+  lotOptionLabel,
   sellerAgencyLabel,
   sellerOptionLabel,
   type SaleReceipt,
@@ -48,22 +48,22 @@ function Field({
   )
 }
 
-function PlanSummary({ plan, moneda }: { plan: SaleReceiptPlan; moneda: string }) {
+function PlanSummary({ plan, currency }: { plan: SaleReceiptPlan; currency: string }) {
   return (
     <dl
       aria-label="Plan de pago"
       className="grid grid-cols-1 gap-x-6 gap-y-5 border-t border-border px-4 py-5 sm:grid-cols-2 sm:px-6 print:border-black"
     >
       {plan.montoEntrega > 0 && (
-        <Field term="Entrega">{formatCurrency(plan.montoEntrega, moneda)}</Field>
+        <Field term="Entrega">{formatCurrency(plan.montoEntrega, currency)}</Field>
       )}
-      <Field term="Monto financiado">{formatCurrency(plan.montoFinanciado, moneda)}</Field>
+      <Field term="Monto financiado">{formatCurrency(plan.montoFinanciado, currency)}</Field>
       <Field term="Cuotas">
-        {plan.cantidadCuotas} × {formatCurrency(plan.montoCuota, moneda)} ·{' '}
+        {plan.cantidadCuotas} × {formatCurrency(plan.montoCuota, currency)} ·{' '}
         {PAYMENT_PERIOD_LABELS[plan.periodicidad].toLowerCase()}
       </Field>
       <Field term="Tasa de interés">{formatPercent(plan.tasaInteres)}</Field>
-      <Field term="Total financiado">{formatCurrency(plan.montoTotal, moneda)}</Field>
+      <Field term="Total financiado">{formatCurrency(plan.montoTotal, currency)}</Field>
     </dl>
   )
 }
@@ -82,7 +82,7 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
     return null
   }
 
-  const { lote, cliente, seller, method, monto, moneda, emitidoEl, plan } = receipt
+  const { lot, client, seller, method, amount, currency, issuedAt, plan } = receipt
 
   return (
     <Dialog
@@ -117,7 +117,7 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
                 Emitido el
               </p>
               <p className="text-sm font-medium text-foreground print:text-black">
-                {formatDate(emitidoEl)}
+                {formatDate(issuedAt)}
               </p>
             </div>
           </header>
@@ -128,7 +128,7 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
                 Total de la operación
               </p>
               <p className="text-3xl font-semibold tracking-tight text-foreground tabular-nums print:text-black">
-                {formatCurrency(monto, moneda)}
+                {formatCurrency(amount, currency)}
               </p>
             </div>
             <Badge className="h-6 self-start px-3 sm:self-auto print:border-black print:bg-white print:text-black">
@@ -137,21 +137,21 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
           </div>
 
           <dl className="grid grid-cols-1 gap-x-6 gap-y-5 px-4 py-5 sm:grid-cols-2 sm:px-6">
-            <Field term="Lote" className={lote.superficie === null ? 'sm:col-span-2' : undefined}>
-              {loteOptionLabel(lote)}
+            <Field term="Lote" className={lot.area === null ? 'sm:col-span-2' : undefined}>
+              {lotOptionLabel(lot)}
             </Field>
-            {lote.superficie !== null && (
-              <Field term="Superficie">{formatArea(lote.superficie)}</Field>
+            {lot.area !== null && (
+              <Field term="Superficie">{formatArea(lot.area)}</Field>
             )}
             <Field term="Comprador">
-              {cliente.apellido}, {cliente.nombre}
+              {client.apellido}, {client.nombre}
             </Field>
-            <Field term="DNI">{cliente.dni}</Field>
+            <Field term="DNI">{client.dni}</Field>
             <Field term="Vendedor">{sellerOptionLabel(seller)}</Field>
             <Field term="Inmobiliaria">{sellerAgencyLabel(seller)}</Field>
           </dl>
 
-          {plan !== undefined && <PlanSummary plan={plan} moneda={moneda} />}
+          {plan !== undefined && <PlanSummary plan={plan} currency={currency} />}
 
           <footer className="flex flex-col gap-5 border-t border-border bg-muted/40 px-4 py-5 sm:px-6 print:border-black">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-10">

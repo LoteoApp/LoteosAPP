@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../../../shared/api/client'
 import { listSales } from '../api/sales'
 import { useSales } from './use-sales'
 import type { SalePage } from '../types'
@@ -54,13 +55,22 @@ describe('useSales', () => {
   })
 
   it('exposes the load failure and an empty page', async () => {
-    listSalesMock.mockRejectedValue(new Error('Servicio no disponible'))
+    listSalesMock.mockRejectedValue(new ApiError('Servicio no disponible', 'unavailable', 503))
 
     const { result } = renderHook(() => useSales('token', {}))
 
     await waitFor(() => expect(result.current.error).toBe('Servicio no disponible'))
     expect(result.current.page).toEqual(page)
     expect(result.current.isLoading).toBe(false)
+  })
+
+  it('hides an unexpected failure behind the generic message', async () => {
+    listSalesMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const { result } = renderHook(() => useSales('token', {}))
+
+    await waitFor(() => expect(result.current.error).toMatch(/error inesperado/i))
+    expect(result.current.page).toEqual(page)
   })
 
   it('stays idle without a token', () => {

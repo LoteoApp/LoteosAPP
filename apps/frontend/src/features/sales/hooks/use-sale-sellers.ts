@@ -11,29 +11,29 @@ export type UseSaleSellers = {
 // Who can sell depends on the loteo, so the list is reloaded whenever the
 // loteo changes and cleared while the new one is on its way.
 export function useSaleSellers(
-  loteoId: string,
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>,
+  developmentId: string,
+  loadSellers: (developmentId: string, signal?: AbortSignal) => Promise<SellerOption[]>,
 ): UseSaleSellers {
   const [sellers, setSellers] = useState<SellerOption[]>([])
-  const [isLoading, setIsLoading] = useState(loteoId !== '')
+  const [isLoading, setIsLoading] = useState(developmentId !== '')
   const [error, setError] = useState<string | null>(null)
-  const [loadedLoteoId, setLoadedLoteoId] = useState(loteoId)
+  const [loadedDevelopmentId, setLoadedDevelopmentId] = useState(developmentId)
 
-  if (loadedLoteoId !== loteoId) {
-    setLoadedLoteoId(loteoId)
+  if (loadedDevelopmentId !== developmentId) {
+    setLoadedDevelopmentId(developmentId)
     setSellers([])
-    setIsLoading(loteoId !== '')
+    setIsLoading(developmentId !== '')
     setError(null)
   }
 
   useEffect(() => {
-    if (loteoId === '') {
+    if (developmentId === '') {
       return
     }
 
     const controller = new AbortController()
 
-    loadSellers(loteoId, controller.signal)
+    loadSellers(developmentId, controller.signal)
       .then((loaded) => {
         if (!controller.signal.aborted) {
           setSellers(loaded)
@@ -51,7 +51,7 @@ export function useSaleSellers(
       })
 
     return () => controller.abort()
-  }, [loteoId, loadSellers])
+  }, [developmentId, loadSellers])
 
   return { sellers, isLoading, error }
 }

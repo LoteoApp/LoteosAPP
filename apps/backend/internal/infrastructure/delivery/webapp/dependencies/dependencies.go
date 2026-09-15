@@ -41,7 +41,6 @@ type Container struct {
 	UpdateManzanaHandler       *handler.UpdateManzanaHandler
 	UpdateCalleHandler         *handler.UpdateCalleHandler
 	ListLoteosHandler          *handler.ListLoteosHandler
-	SearchLotesHandler         *handler.SearchLotesHandler
 	GetLoteoHandler            *handler.GetLoteoHandler
 	StoreLoteoFileHandler      *handler.StoreLoteoFileHandler
 	StoreLoteFileHandler       *handler.StoreLoteFileHandler
@@ -118,7 +117,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	updateManzanaHandler := handler.NewUpdateManzanaHandler(loteos.NewUpdateManzana(loteoRepo))
 	updateCalleHandler := handler.NewUpdateCalleHandler(loteos.NewUpdateCalle(loteoRepo))
 	listLoteosHandler := handler.NewListLoteosHandler(loteos.NewListLoteos(loteoRepo))
-	searchLotesHandler := handler.NewSearchLotesHandler(loteos.NewSearchLotes(loteoRepo))
 	getLoteoHandler := handler.NewGetLoteoHandler(loteos.NewGetLoteo(loteoRepo))
 	storeLoteoFileHandler := handler.NewStoreLoteoFileHandler(loteos.NewStoreLoteoFile(loteoRepo, objectStorage))
 	storeLoteFileHandler := handler.NewStoreLoteFileHandler(loteos.NewStoreLoteFile(loteoRepo, objectStorage))
@@ -172,7 +170,6 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		UpdateManzanaHandler:       updateManzanaHandler,
 		UpdateCalleHandler:         updateCalleHandler,
 		ListLoteosHandler:          listLoteosHandler,
-		SearchLotesHandler:         searchLotesHandler,
 		GetLoteoHandler:            getLoteoHandler,
 		StoreLoteoFileHandler:      storeLoteoFileHandler,
 		StoreLoteFileHandler:       storeLoteFileHandler,

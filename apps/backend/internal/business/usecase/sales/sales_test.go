@@ -2,7 +2,10 @@ package sales_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,12 +28,18 @@ func adminActor() sales.Actor {
 
 func validInput() sales.CreateSaleInput {
 	return sales.CreateSaleInput{
-		Actor:      adminActor(),
-		LoteoID:    " loteo-id ",
-		LoteID:     " lote-id ",
-		ClienteID:  " cliente-id ",
-		VendedorID: " seller-id ",
+		Actor:          adminActor(),
+		DevelopmentID:  " loteo-id ",
+		LotID:          " lote-id ",
+		ClientID:       " cliente-id ",
+		SellerID:       " seller-id ",
+		IdempotencyKey: " sale-key ",
 	}
+}
+
+func sha256Hex(payload string) string {
+	sum := sha256.Sum256([]byte(payload))
+	return hex.EncodeToString(sum[:])
 }
 
 func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
@@ -47,7 +56,7 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 		t.Errorf("Execute() = %#v, want the repository result", sale)
 	}
 	command := repository.CreateCommand
-	if command.LoteoID != "loteo-id" || command.LoteID != "lote-id" || command.ClienteID != "cliente-id" || command.VendedorID != "seller-id" {
+	if command.DevelopmentID != "loteo-id" || command.LotID != "lote-id" || command.ClientID != "cliente-id" || command.SellerID != "seller-id" {
 		t.Errorf("normalized command = %#v", command)
 	}
 	if command.ActorID != "actor-id" || command.PaymentMethod != domain.PaymentMethodCash {
@@ -55,6 +64,56 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 	}
 	if !command.CreatedAt.Equal(created.UTC()) {
 		t.Errorf("created at = %s, want %s", command.CreatedAt, created.UTC())
+	}
+	if command.IdempotencyKey != "sale-key" {
+		t.Errorf("idempotency key = %q, want the trimmed header", command.IdempotencyKey)
+	}
+	wantHash := sha256Hex("8:loteo-id7:lote-id10:cliente-id9:seller-id7:contado")
+	if command.IdempotencyPayloadHash != wantHash {
+		t.Errorf("payload hash = %q, want %q", command.IdempotencyPayloadHash, wantHash)
+	}
+}
+
+func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.SaleRepository{}
+	useCase := sales.NewCreateSale(repository, users)
+
+	if _, err := useCase.Execute(context.Background(), validInput()); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	first := repository.CreateCommand.IdempotencyPayloadHash
+
+	other := validInput()
+	other.ClientID = "another-client"
+	if _, err := useCase.Execute(context.Background(), other); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash == first {
+		t.Error("a different cliente must produce a different payload hash")
+	}
+
+	financed := validInput()
+	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
+	financed.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, TasaInteres: 10, Periodicidad: "mensual"}
+	if _, err := useCase.Execute(context.Background(), financed); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	financedHash := repository.CreateCommand.IdempotencyPayloadHash
+	if financedHash == first {
+		t.Error("a financed sale must produce a different payload hash than contado")
+	}
+	if financedHash != sha256Hex("8:loteo-id7:lote-id10:cliente-id9:seller-id10:financiado|12:10:mensual:0") {
+		t.Errorf("financed payload hash = %q", financedHash)
+	}
+
+	otherPlan := financed
+	otherPlan.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 24, TasaInteres: 10, Periodicidad: "mensual"}
+	if _, err := useCase.Execute(context.Background(), otherPlan); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash == financedHash {
+		t.Error("a different plan must produce a different payload hash")
 	}
 }
 
@@ -96,11 +155,11 @@ func TestCreateSaleLetsAnAgencyUserPickAColleague(t *testing.T) {
 
 	input := validInput()
 	input.Actor = sales.Actor{AuthProviderID: "agency-subject", Roles: []string{domain.RolInmobiliaria}}
-	input.VendedorID = "colleague"
+	input.SellerID = "colleague"
 	if _, err := useCase.Execute(context.Background(), input); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if repository.CreateCommand.VendedorID != "colleague" || repository.CreateCommand.ActorID != "agency-user" {
+	if repository.CreateCommand.SellerID != "colleague" || repository.CreateCommand.ActorID != "agency-user" {
 		t.Errorf("seller command = %#v", repository.CreateCommand)
 	}
 }
@@ -116,19 +175,29 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 			input.Actor.Roles = []string{domain.RolEscribano}
 			return input
 		}, domain.ErrNoAutorizado},
+		{"missing idempotency key", func() sales.CreateSaleInput {
+			input := validInput()
+			input.IdempotencyKey = "  "
+			return input
+		}, domain.ErrSaleIdempotencyRequired},
+		{"idempotency key too long", func() sales.CreateSaleInput {
+			input := validInput()
+			input.IdempotencyKey = strings.Repeat("k", domain.MaxIdempotencyKeySize+1)
+			return input
+		}, domain.ErrSaleIdempotencyRequired},
 		{"missing lote", func() sales.CreateSaleInput {
 			input := validInput()
-			input.LoteID = " "
+			input.LotID = " "
 			return input
 		}, domain.ErrLoteNotFound},
 		{"missing client", func() sales.CreateSaleInput {
 			input := validInput()
-			input.ClienteID = ""
+			input.ClientID = ""
 			return input
 		}, domain.ErrSaleInvalidClient},
 		{"missing seller", func() sales.CreateSaleInput {
 			input := validInput()
-			input.VendedorID = ""
+			input.SellerID = ""
 			return input
 		}, domain.ErrSaleSellerRequired},
 		{"invalid payment method", func() sales.CreateSaleInput {

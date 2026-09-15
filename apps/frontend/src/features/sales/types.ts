@@ -1,20 +1,21 @@
-// The property names are the wire contract of /api/v1/lotes, so they keep the
-// Spanish the API publishes even though the symbols are in English.
+// Types that mirror an API body (`Sale`, `SaleCreateDevelopment`, the
+// option types `app` fills with API objects) keep the Spanish property names
+// of the JSON contract; everything the feature builds for itself is in English.
 export const LOT_STATES = ['disponible', 'reservado', 'vendido', 'finalizado'] as const
 
 export type LotState = (typeof LOT_STATES)[number]
 
-export type LoteOption = {
+export type LotOption = {
   id: string
-  numero: string
-  manzanaId: string
-  manzanaNumero: string
-  loteoId: string
-  loteoNombre: string
-  estado: LotState
-  precio: number | null
-  moneda: string
-  superficie: number | null
+  number: string
+  blockId: string
+  blockNumber: string
+  developmentId: string
+  developmentName: string
+  state: LotState
+  price: number | null
+  currency: string
+  area: number | null
 }
 
 export function isLotState(value: unknown): value is LotState {
@@ -23,16 +24,16 @@ export function isLotState(value: unknown): value is LotState {
 
 // A lote is identified by its loteo, manzana and number together: the number
 // alone repeats across manzanas and loteos.
-export function loteOptionLabel(lote: LoteOption): string {
-  const manzana = lote.manzanaNumero || '—'
-  const numero = lote.numero || '—'
-  return `${lote.loteoNombre} · Mz ${manzana} · Lote ${numero}`
+export function lotOptionLabel(lot: LotOption): string {
+  const block = lot.blockNumber || '—'
+  const number = lot.number || '—'
+  return `${lot.developmentName} · Mz ${block} · Lote ${number}`
 }
 
 // Sales never imports another feature's files, so it states the shape it needs
 // from a cliente, an inmobiliaria and a vendedor. The objects `app` injects
 // satisfy these structurally.
-export type ClienteOption = {
+export type ClientOption = {
   id: string
   nombre: string
   apellido: string
@@ -119,16 +120,8 @@ export function sellersOfAgency(
   return sellers.filter((seller) => agencyOfSeller(seller).id === agency.id)
 }
 
-export type NewClientValues = {
-  nombre: string
-  apellido: string
-  dni: string
-  celular: string
-  email: string
-}
-
-export function clienteOptionLabel(cliente: ClienteOption): string {
-  return `${cliente.apellido}, ${cliente.nombre} · DNI ${cliente.dni}`
+export function clientOptionLabel(client: ClientOption): string {
+  return `${client.apellido}, ${client.nombre} · DNI ${client.dni}`
 }
 
 // The three modalidades of the ventas.modalidad_pago contract.
@@ -303,9 +296,31 @@ export function parsePaymentPlan(
   return { ok: true, plan }
 }
 
+export type SaleableLot = { number: string; price: number | null; currency: string }
+
+// Why a lote can't be sold yet, or null when it can. The backend rejects a
+// sale of a lote without number, without a price above zero or without a
+// currency (`sale_lot_incomplete`), so the viewer link and the form apply the
+// same rule and never offer a sale that can't persist.
+export function saleDisabledReason(lot: SaleableLot): string | null {
+  const missing: string[] = []
+  if (!lot.number.trim()) {
+    missing.push('el número')
+  }
+  if (lot.price === null || lot.price <= 0) {
+    missing.push('el precio')
+  } else if (!lot.currency.trim()) {
+    missing.push('la moneda')
+  }
+  if (missing.length === 0) {
+    return null
+  }
+  return `Completá ${missing.join(' y ')} del lote para habilitar la venta.`
+}
+
 export type SaleDraft = {
-  lote: LoteOption | null
-  cliente: ClienteOption | null
+  lot: LotOption | null
+  client: ClientOption | null
   seller: SellerOption | null
   method: PaymentMethod
   plan: PaymentPlanValues
@@ -324,13 +339,13 @@ export type SaleReceiptPlan = {
 }
 
 export type SaleReceipt = {
-  emitidoEl: string
-  lote: LoteOption
-  cliente: ClienteOption
+  issuedAt: string
+  lot: LotOption
+  client: ClientOption
   seller: SellerOption
   method: PaymentMethod
-  monto: number
-  moneda: string
+  amount: number
+  currency: string
   plan?: SaleReceiptPlan
 }
 
@@ -338,14 +353,14 @@ export type SaleReceiptResult =
   | { ok: true; receipt: SaleReceipt; plan: PaymentPlanInput | undefined }
   | { ok: false; error: string }
 
-export function buildSaleReceipt(draft: SaleDraft, emitidoEl: string): SaleReceiptResult {
-  const { lote, cliente, seller, method } = draft
+export function buildSaleReceipt(draft: SaleDraft, issuedAt: string): SaleReceiptResult {
+  const { lot, client, seller, method } = draft
 
-  if (lote === null) {
+  if (lot === null) {
     return { ok: false, error: 'Elegí el lote que se vende.' }
   }
 
-  if (cliente === null) {
+  if (client === null) {
     return { ok: false, error: 'Elegí el cliente comprador.' }
   }
 
@@ -353,29 +368,28 @@ export function buildSaleReceipt(draft: SaleDraft, emitidoEl: string): SaleRecei
     return { ok: false, error: 'Elegí el vendedor que realizó la venta.' }
   }
 
-  if (lote.precio === null) {
-    return {
-      ok: false,
-      error: 'El lote no tiene precio cargado. Cargalo en el detalle del loteo antes de vender.',
-    }
+  const disabledReason = saleDisabledReason(lot)
+  if (disabledReason !== null) {
+    return { ok: false, error: disabledReason }
   }
+  const price = lot.price ?? 0
 
-  const parsed = parsePaymentPlan(method, draft.plan, lote.precio)
+  const parsed = parsePaymentPlan(method, draft.plan, price)
   if (!parsed.ok) {
     return parsed
   }
 
   const receipt: SaleReceipt = {
-    emitidoEl,
-    lote,
-    cliente,
+    issuedAt,
+    lot,
+    client,
     seller,
     method,
-    monto: lote.precio,
-    moneda: lote.moneda,
+    amount: price,
+    currency: lot.currency,
   }
   if (parsed.plan !== undefined) {
-    const schedule = buildPaymentSchedule(lote.precio, parsed.plan)
+    const schedule = buildPaymentSchedule(price, parsed.plan)
     receipt.plan = {
       montoEntrega: parsed.plan.montoEntrega,
       cantidadCuotas: parsed.plan.cantidadCuotas,
@@ -391,7 +405,7 @@ export function buildSaleReceipt(draft: SaleDraft, emitidoEl: string): SaleRecei
 }
 
 // What the sale started from the loteo viewer needs of a loteo: enough to
-// describe the lote being sold and to build its LoteOption. `app` maps the
+// describe the lote being sold and to build its LotOption. `app` maps the
 // loteo detail into this shape; sales never imports the lots feature.
 export type SaleCreateBlock = {
   id: string
@@ -422,43 +436,27 @@ export type SaleCreateDevelopment = {
   lotes: SaleCreateLot[]
 }
 
-export function loteOptionFromDevelopment(
-  loteo: SaleCreateDevelopment,
-  loteId: string,
-): LoteOption | null {
-  const lote = loteo.lotes.find((candidate) => candidate.id === loteId)
-  if (lote === undefined) {
+export function lotOptionFromDevelopment(
+  development: SaleCreateDevelopment,
+  lotId: string,
+): LotOption | null {
+  const lot = development.lotes.find((candidate) => candidate.id === lotId)
+  if (lot === undefined) {
     return null
   }
-  const manzana = loteo.manzanas.find((candidate) => candidate.id === lote.manzanaId)
+  const block = development.manzanas.find((candidate) => candidate.id === lot.manzanaId)
   return {
-    id: lote.id,
-    numero: lote.numero,
-    manzanaId: lote.manzanaId,
-    manzanaNumero: manzana?.numero ?? '',
-    loteoId: loteo.id,
-    loteoNombre: loteo.nombre,
-    estado: lote.estado,
-    precio: lote.precio,
-    moneda: lote.moneda,
-    superficie: lote.superficie,
+    id: lot.id,
+    number: lot.numero,
+    blockId: lot.manzanaId,
+    blockNumber: block?.numero ?? '',
+    developmentId: development.id,
+    developmentName: development.nombre,
+    state: lot.estado,
+    price: lot.precio,
+    currency: lot.moneda,
+    area: lot.superficie,
   }
-}
-
-// Why a lote can't be sold yet from the viewer, or null when it can. Mirrors
-// the reserva rule: the receipt needs the number and the price.
-export function saleDisabledReason(lote: { numero: string; precio: number | null }): string | null {
-  const missing: string[] = []
-  if (!lote.numero.trim()) {
-    missing.push('el número')
-  }
-  if (lote.precio === null) {
-    missing.push('el precio')
-  }
-  if (missing.length === 0) {
-    return null
-  }
-  return `Completá ${missing.join(' y ')} del lote para habilitar la venta.`
 }
 
 // A venta as GET /api/v1/ventas publishes it. The agency comes from the
@@ -530,7 +528,7 @@ export type Sale = {
   loteNumero: string
   manzanaNumero: string
   loteSuperficie: number | null
-  cliente: ClienteOption
+  cliente: ClientOption
   vendedor: SaleActor
   usuarioAlta: SaleActor
   inmobiliaria?: AgencyOption
@@ -569,10 +567,10 @@ export type CreateSaleValues = {
   planPago?: PaymentPlanInput
 }
 
-export function saleLoteLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 'loteNumero'>): string {
-  const manzana = sale.manzanaNumero || '—'
-  const numero = sale.loteNumero || '—'
-  return `${sale.loteoNombre} · Mz ${manzana} · Lote ${numero}`
+export function saleLotLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 'loteNumero'>): string {
+  const block = sale.manzanaNumero || '—'
+  const number = sale.loteNumero || '—'
+  return `${sale.loteoNombre} · Mz ${block} · Lote ${number}`
 }
 
 // The receipt of a persisted sale: what the dialog prints once the backend
@@ -592,20 +590,20 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
             montoCuota: plan.montoCuota,
             montoTotal: plan.montoTotal,
           },
-    emitidoEl: sale.fechaCreacion,
-    lote: {
+    issuedAt: sale.fechaCreacion,
+    lot: {
       id: sale.loteId,
-      numero: sale.loteNumero,
-      manzanaId: '',
-      manzanaNumero: sale.manzanaNumero,
-      loteoId: sale.loteoId,
-      loteoNombre: sale.loteoNombre,
-      estado: 'vendido',
-      precio: sale.monto,
-      moneda: sale.moneda,
-      superficie: sale.loteSuperficie,
+      number: sale.loteNumero,
+      blockId: '',
+      blockNumber: sale.manzanaNumero,
+      developmentId: sale.loteoId,
+      developmentName: sale.loteoNombre,
+      state: 'vendido',
+      price: sale.monto,
+      currency: sale.moneda,
+      area: sale.loteSuperficie,
     },
-    cliente: sale.cliente,
+    client: sale.cliente,
     seller: {
       id: sale.vendedor.id,
       nombre: sale.vendedor.nombre,
@@ -615,7 +613,7 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
       inmobiliariaRazonSocial: sale.inmobiliaria?.razonSocial,
     },
     method: sale.modalidadPago,
-    monto: sale.monto,
-    moneda: sale.moneda,
+    amount: sale.monto,
+    currency: sale.moneda,
   }
 }

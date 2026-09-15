@@ -4,9 +4,9 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../shared/api/client'
 import SaleCreatePage, { type SaleCreatePageProps } from './SaleCreatePage'
-import type { ClienteOption, Sale, SaleCreateDevelopment, SellerOption } from '../types'
+import type { ClientOption, Sale, SaleCreateDevelopment, SellerOption } from '../types'
 
-const loteo: SaleCreateDevelopment = {
+const development: SaleCreateDevelopment = {
   id: 'loteo-1',
   nombre: 'Las Acacias',
   ubicacion: 'Córdoba',
@@ -18,7 +18,7 @@ const loteo: SaleCreateDevelopment = {
   ],
 }
 
-const cliente: ClienteOption = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
+const client: ClientOption = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
 
 const agencySeller: SellerOption = {
   id: 'us-1',
@@ -39,7 +39,7 @@ const sale: Sale = {
   loteNumero: '7',
   manzanaNumero: '2',
   loteSuperficie: 300,
-  cliente,
+  cliente: client,
   vendedor: { id: 'us-1', nombre: 'Marta', apellido: 'Suárez', rol: 'inmobiliaria' },
   usuarioAlta: { id: 'us-9', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
   inmobiliaria: { id: 'ag-1', razonSocial: 'Inmobiliaria Sur' },
@@ -51,19 +51,21 @@ const sale: Sale = {
   fechaModificacion: '2026-09-14T15:00:00Z',
 }
 
-function renderPage(overrides: Partial<SaleCreatePageProps> = {}) {
-  const props: SaleCreatePageProps = {
-    loteoId: loteo.id,
-    loteId: 'lot-1',
-    loteo,
-    loteoStatus: 'loaded',
-    loadClientes: vi.fn().mockResolvedValue([cliente]),
-    createCliente: vi.fn(),
+function baseProps(): SaleCreatePageProps {
+  return {
+    developmentId: development.id,
+    lotId: 'lot-1',
+    development,
+    developmentStatus: 'loaded',
+    clients: [client],
     loadSellers: vi.fn().mockResolvedValue([agencySeller, directSeller]),
     createSale: vi.fn().mockResolvedValue(sale),
     renderPlan: <p>Plano del loteo</p>,
-    ...overrides,
   }
+}
+
+function renderPage(overrides: Partial<SaleCreatePageProps> = {}) {
+  const props: SaleCreatePageProps = { ...baseProps(), ...overrides }
   render(
     <MemoryRouter>
       <SaleCreatePage {...props} />
@@ -107,13 +109,16 @@ describe('SaleCreatePage', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
 
     await waitFor(() =>
-      expect(props.createSale).toHaveBeenCalledWith({
-        loteoId: 'loteo-1',
-        loteId: 'lot-1',
-        clienteId: 'cl-1',
-        vendedorId: 'us-1',
-        modalidadPago: 'contado',
-      }),
+      expect(props.createSale).toHaveBeenCalledWith(
+        {
+          loteoId: 'loteo-1',
+          loteId: 'lot-1',
+          clienteId: 'cl-1',
+          vendedorId: 'us-1',
+          modalidadPago: 'contado',
+        },
+        expect.any(String),
+      ),
     )
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Recibo de venta')
@@ -181,14 +186,17 @@ describe('SaleCreatePage', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
 
     await waitFor(() =>
-      expect(props.createSale).toHaveBeenCalledWith({
-        loteoId: 'loteo-1',
-        loteId: 'lot-1',
-        clienteId: 'cl-1',
-        vendedorId: 'us-1',
-        modalidadPago: 'entrega_financiada',
-        planPago: { cantidadCuotas: 10, tasaInteres: 5, periodicidad: 'mensual', montoEntrega: 20000 },
-      }),
+      expect(props.createSale).toHaveBeenCalledWith(
+        {
+          loteoId: 'loteo-1',
+          loteId: 'lot-1',
+          clienteId: 'cl-1',
+          vendedorId: 'us-1',
+          modalidadPago: 'entrega_financiada',
+          planPago: { cantidadCuotas: 10, tasaInteres: 5, periodicidad: 'mensual', montoEntrega: 20000 },
+        },
+        expect.any(String),
+      ),
     )
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Entrega + financiación')
@@ -209,37 +217,114 @@ describe('SaleCreatePage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('retries a failed sale with the same idempotency key and rotates it after success', async () => {
+    const user = userEvent.setup()
+    const createSale = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('Servicio no disponible', 'database_unavailable', 503))
+      .mockResolvedValue(sale)
+    renderPage({ createSale })
+
+    await fillSale(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
+    await screen.findByText('Servicio no disponible')
+    await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
+    await screen.findByRole('dialog')
+
+    expect(createSale).toHaveBeenCalledTimes(2)
+    const [, firstKey] = createSale.mock.calls[0] as [unknown, string]
+    const [, secondKey] = createSale.mock.calls[1] as [unknown, string]
+    expect(firstKey).not.toBe('')
+    expect(secondKey).toBe(firstKey)
+  })
+
+  it('selects the cliente registered from the dialog app renders', async () => {
+    const user = userEvent.setup()
+    const onRegisterClient = vi.fn()
+    const created: ClientOption = { id: 'cl-2', nombre: 'Bruno', apellido: 'Gómez', dni: '28999888' }
+    const { rerender } = render(
+      <MemoryRouter>
+        <SaleCreatePage
+          {...baseProps()}
+          onRegisterClient={onRegisterClient}
+          renderClientDialog={<p>Diálogo de cliente</p>}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Diálogo de cliente')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }))
+    expect(onRegisterClient).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <MemoryRouter>
+        <SaleCreatePage
+          {...baseProps()}
+          clients={[created, client]}
+          createdClient={created}
+          onRegisterClient={onRegisterClient}
+          renderClientDialog={<p>Diálogo de cliente</p>}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByLabelText('Cliente')).toHaveValue('Gómez, Bruno · DNI 28999888')
+  })
+
+  it('fixes the seller to the internal user on a venta directa and frees it for an agency', async () => {
+    const user = userEvent.setup()
+    const actor: SellerOption = { ...directSeller, esActor: true }
+    renderPage({ loadSellers: vi.fn().mockResolvedValue([agencySeller, actor]) })
+
+    await waitFor(() => expect(screen.getByLabelText('Inmobiliaria')).toHaveValue('Venta directa'))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Luna, Sofía')
+    expect(screen.getByLabelText('Vendedor')).toBeDisabled()
+    expect(screen.getByText(/Vendés a tu nombre/)).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Inmobiliaria'))
+    await user.click(await screen.findByRole('option', { name: 'Inmobiliaria Sur' }))
+    expect(screen.getByLabelText('Vendedor')).toBeEnabled()
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('')
+    await user.click(screen.getByLabelText('Vendedor'))
+    await user.click(await screen.findByRole('option', { name: 'Suárez, Marta' }))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Suárez, Marta')
+
+    await user.click(screen.getByLabelText('Inmobiliaria'))
+    await user.click(await screen.findByRole('option', { name: 'Venta directa' }))
+    expect(screen.getByLabelText('Vendedor')).toHaveValue('Luna, Sofía')
+    expect(screen.getByLabelText('Vendedor')).toBeDisabled()
+  })
+
   it('shows the loading state before the loteo arrives', () => {
-    renderPage({ loteo: null, loteoStatus: 'loading' })
+    renderPage({ development: null, developmentStatus: 'loading' })
 
     expect(screen.getByRole('status', { name: 'Cargando los datos para registrar la venta…' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Cliente')).not.toBeInTheDocument()
   })
 
   it('explains when the loteo cannot be loaded', () => {
-    renderPage({ loteo: null, loteoStatus: 'not-found' })
+    renderPage({ development: null, developmentStatus: 'not-found' })
     expect(screen.getByText('No se puede iniciar la venta')).toBeInTheDocument()
     expect(screen.getByText('No encontramos este loteo.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver al loteo' })).toHaveAttribute('href', '/lotes/loteo-1')
   })
 
   it('shows the backend error when the loteo fails to load', () => {
-    renderPage({ loteo: null, loteoStatus: 'error', loteoError: 'Servicio no disponible' })
+    renderPage({ development: null, developmentStatus: 'error', developmentError: 'Servicio no disponible' })
     expect(screen.getByText('Servicio no disponible')).toBeInTheDocument()
   })
 
   it('blocks the sale of a lote that is no longer available', async () => {
-    const props = renderPage({ loteId: 'lot-2' })
+    const props = renderPage({ lotId: 'lot-2' })
 
     expect(screen.getByText('Lote no disponible')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()
     expect(screen.getByLabelText('Cliente')).toBeDisabled()
-    await waitFor(() => expect(props.loadClientes).toHaveBeenCalled())
     expect(props.loadSellers).not.toHaveBeenCalled()
   })
 
   it('warns when the lote does not belong to the loteo', () => {
-    renderPage({ loteId: 'lot-999' })
+    renderPage({ lotId: 'lot-999' })
 
     expect(screen.getByText('El lote seleccionado no existe.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()

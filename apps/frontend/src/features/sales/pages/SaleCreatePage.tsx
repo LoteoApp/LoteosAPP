@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Link } from 'react-router'
 import { messageFromError } from '../../../shared/api/client'
+import { newIdempotencyKey } from '../../../shared/lib/idempotencyKey'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
@@ -10,37 +11,44 @@ import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import SaleForm from '../components/SaleForm'
 import SaleCreatePageSkeleton from '../components/SaleCreatePageSkeleton'
 import SaleReceiptDialog from '../components/SaleReceiptDialog'
-import { loteOptionFromDevelopment, saleReceiptFromSale } from '../types'
+import { lotOptionFromDevelopment, saleReceiptFromSale } from '../types'
 import type {
-  ClienteOption,
+  ClientOption,
   CreateSaleValues,
-  NewClientValues,
   Sale,
   SaleCreateDevelopment,
   SellerOption,
 } from '../types'
 
 export type SaleCreatePageProps = {
-  loteoId: string
-  loteId: string
-  loteo: SaleCreateDevelopment | null
-  loteoStatus: 'loading' | 'loaded' | 'not-found' | 'error'
-  loteoError?: string
-  loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
-  createCliente: (values: NewClientValues) => Promise<ClienteOption>
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
-  createSale: (values: CreateSaleValues) => Promise<Sale>
+  developmentId: string
+  lotId: string
+  development: SaleCreateDevelopment | null
+  developmentStatus: 'loading' | 'loaded' | 'not-found' | 'error'
+  developmentError?: string
+  clients: readonly ClientOption[]
+  clientsLoading?: boolean
+  clientsError?: string | null
+  createdClient?: ClientOption | null
+  onRegisterClient?: () => void
+  renderClientDialog?: ReactNode
+  loadSellers: (developmentId: string, signal?: AbortSignal) => Promise<SellerOption[]>
+  createSale: (values: CreateSaleValues, idempotencyKey: string) => Promise<Sale>
   renderPlan?: ReactNode
 }
 
 export default function SaleCreatePage({
-  loteoId,
-  loteId,
-  loteo,
-  loteoStatus,
-  loteoError,
-  loadClientes,
-  createCliente,
+  developmentId,
+  lotId,
+  development,
+  developmentStatus,
+  developmentError,
+  clients,
+  clientsLoading = false,
+  clientsError = null,
+  createdClient = null,
+  onRegisterClient,
+  renderClientDialog,
   loadSellers,
   createSale,
   renderPlan,
@@ -49,12 +57,16 @@ export default function SaleCreatePage({
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // One key per attempted sale: a retry after a failure reuses it so the
+  // backend can hand back the venta if the first request did land.
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey)
 
   async function handleSubmit(values: CreateSaleValues): Promise<boolean> {
     setIsSubmitting(true)
     setSubmitError(null)
     try {
-      const sale = await createSale(values)
+      const sale = await createSale(values, idempotencyKey)
+      setIdempotencyKey(newIdempotencyKey())
       setCreatedSale(sale)
       setIsReceiptOpen(true)
       return true
@@ -66,25 +78,25 @@ export default function SaleCreatePage({
     }
   }
 
-  if (loteoStatus === 'loading') {
+  if (developmentStatus === 'loading') {
     return (
       <section className="flex min-h-0 flex-1 flex-col gap-4">
-        <BackLink loteoId={loteoId} />
+        <BackLink developmentId={developmentId} />
         <SaleCreateHeader />
         <SaleCreatePageSkeleton />
       </section>
     )
   }
 
-  if (loteoStatus !== 'loaded' || loteo === null) {
-    const message = loteoStatus === 'not-found'
+  if (developmentStatus !== 'loaded' || development === null) {
+    const message = developmentStatus === 'not-found'
       ? 'No encontramos este loteo.'
-      : loteoStatus === 'error'
-        ? loteoError
+      : developmentStatus === 'error'
+        ? developmentError
         : 'No se pudo cargar el loteo.'
     return (
       <section className="flex flex-col gap-4">
-        <BackLink loteoId={loteoId} />
+        <BackLink developmentId={developmentId} />
         <Alert variant="destructive">
           <AlertTitle>No se puede iniciar la venta</AlertTitle>
           <AlertDescription>{message}</AlertDescription>
@@ -93,29 +105,29 @@ export default function SaleCreatePage({
     )
   }
 
-  const selectedLot = loteo.lotes.find((lot) => lot.id === loteId) ?? null
-  const selectedBlock = loteo.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
+  const selectedLot = development.lotes.find((lot) => lot.id === lotId) ?? null
+  const selectedBlock = development.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
   const isUnavailable = selectedLot === null || selectedLot.estado !== 'disponible'
-  const lote = isUnavailable ? null : loteOptionFromDevelopment(loteo, loteId)
+  const lot = isUnavailable ? null : lotOptionFromDevelopment(development, lotId)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <BackLink loteoId={loteo.id} />
+      <BackLink developmentId={development.id} />
       <SaleCreateHeader />
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
           {renderPlan}
           <Card>
             <CardHeader>
-              <CardTitle>{loteo.nombre}</CardTitle>
+              <CardTitle>{development.nombre}</CardTitle>
               <CardDescription>
-                {loteo.ubicacion}
+                {development.ubicacion}
                 {selectedBlock ? ` · Manzana ${selectedBlock.numero || 'sin número'}` : ''}
                 {selectedLot ? ` · Lote ${selectedLot.numero || 'sin número'}` : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 text-sm">
-              {loteo.descripcion && <p className="text-muted-foreground">{loteo.descripcion}</p>}
+              {development.descripcion && <p className="text-muted-foreground">{development.descripcion}</p>}
               {selectedLot ? (
                 <dl className="grid gap-2 sm:grid-cols-3">
                   <Info label="Estado" value={createdSale ? 'vendido' : selectedLot.estado} className="capitalize" />
@@ -181,9 +193,13 @@ export default function SaleCreatePage({
             </Card>
           ) : (
             <SaleForm
-              lote={lote}
-              loadClientes={loadClientes}
-              createCliente={createCliente}
+              lot={lot}
+              clients={clients}
+              clientsLoading={clientsLoading}
+              clientsError={clientsError}
+              createdClient={createdClient}
+              onRegisterClient={onRegisterClient}
+              renderClientDialog={renderClientDialog}
               loadSellers={loadSellers}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
@@ -202,10 +218,10 @@ export default function SaleCreatePage({
   )
 }
 
-function BackLink({ loteoId }: { loteoId: string }) {
+function BackLink({ developmentId }: { developmentId: string }) {
   return (
     <Link
-      to={`/lotes/${loteoId}`}
+      to={`/lotes/${developmentId}`}
       className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft aria-hidden className="size-4" />

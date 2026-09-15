@@ -12,7 +12,11 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-const saleActiveIndex = "ventas_lote_id_activa_idx"
+const (
+	saleActiveIndex      = "ventas_lote_id_activa_idx"
+	saleIdempotencyIndex = "ventas_usuario_alta_idempotency_key_idx"
+	saleRetryCount       = 3
+)
 
 type SaleRepository struct {
 	pool *pgxpool.Pool
@@ -24,21 +28,43 @@ func NewSaleRepository(pool *pgxpool.Pool) *SaleRepository {
 
 // Create registers the venta and moves the lote to vendido in one
 // transaction. The lote row is locked first, so two sales of the same lote
-// serialize on it and the second one finds it already vendido.
+// serialize on it and the second one finds it already vendido. A retry
+// carrying the Idempotency-Key of a venta this actor already registered
+// gets that venta back instead of a lote-unavailable conflict.
 func (repository *SaleRepository) Create(ctx context.Context, command gateway.CreateSaleCommand) (domain.Sale, error) {
+	var sale domain.Sale
+	var err error
+	for attempt := 0; attempt < saleRetryCount; attempt++ {
+		sale, err = repository.create(ctx, command)
+		if err == nil || errors.Is(err, errRetrySaleWrite) || !isTransientDBError(err) || attempt == saleRetryCount-1 {
+			break
+		}
+		if waitErr := waitForReservationRetry(ctx, attempt); waitErr != nil {
+			return domain.Sale{}, waitErr
+		}
+	}
+	if err == nil || !errors.Is(err, errRetrySaleWrite) {
+		return sale, err
+	}
+	return repository.reconcileIdempotentCreate(ctx, command, err)
+}
+
+var errRetrySaleWrite = errors.New("retry sale write")
+
+func (repository *SaleRepository) create(ctx context.Context, command gateway.CreateSaleCommand) (domain.Sale, error) {
 	tx, err := repository.pool.Begin(ctx)
 	if err != nil {
 		return domain.Sale{}, err
 	}
 	defer rollbackTransaction(tx)
 
-	var loteoID string
+	var developmentID string
 	err = tx.QueryRow(ctx, `
 		SELECT id::text
 		FROM loteos
 		WHERE id = $1::uuid AND fecha_baja IS NULL
 		FOR SHARE
-	`, command.LoteoID).Scan(&loteoID)
+	`, command.DevelopmentID).Scan(&developmentID)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
@@ -54,7 +80,7 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 		FROM lotes
 		WHERE id = $1::uuid AND loteo_id = $2::uuid AND fecha_baja IS NULL
 		FOR UPDATE
-	`, command.LoteID, command.LoteoID).Scan(&lotState, &lotNumber, &lotPrice, &currency)
+	`, command.LotID, command.DevelopmentID).Scan(&lotState, &lotNumber, &lotPrice, &currency)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Sale{}, domain.ErrLoteNotFound
 	}
@@ -69,8 +95,41 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 	if !domain.IsSaleRole(actorRole) {
 		return domain.Sale{}, domain.ErrNoAutorizado
 	}
+	if actorRole == domain.RolInmobiliaria {
+		assigned, assignmentErr := agencyAssigned(ctx, tx, actorAgency, developmentID)
+		if assignmentErr != nil {
+			return domain.Sale{}, assignmentErr
+		}
+		if !assigned {
+			return domain.Sale{}, domain.ErrSaleAgencyNotAssigned
+		}
+	}
 
-	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.VendedorID)
+	var existingID, existingHash string
+	err = tx.QueryRow(ctx, `
+		SELECT id::text, COALESCE(idempotency_payload_hash, '')
+		FROM ventas
+		WHERE usuario_alta = $1::uuid AND idempotency_key = $2
+		FOR UPDATE
+	`, command.ActorID, command.IdempotencyKey).Scan(&existingID, &existingHash)
+	if err == nil {
+		if existingHash != command.IdempotencyPayloadHash {
+			return domain.Sale{}, domain.ErrSaleIdempotencyConflict
+		}
+		existing, readErr := loadSale(ctx, tx, existingID, gateway.SaleScope{}, true)
+		if readErr != nil {
+			return domain.Sale{}, readErr
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			return domain.Sale{}, fmt.Errorf("%w: %w", errRetrySaleWrite, commitErr)
+		}
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return domain.Sale{}, err
+	}
+
+	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.SellerID)
 	if err != nil {
 		if errors.Is(err, domain.ErrReservationSellerNotEligible) {
 			return domain.Sale{}, domain.ErrSaleSellerNotEligible
@@ -95,7 +154,7 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 		}
 	}
 
-	if err := lockActiveClient(ctx, tx, command.ClienteID); err != nil {
+	if err := lockActiveClient(ctx, tx, command.ClientID); err != nil {
 		if errors.Is(err, domain.ErrReservationInvalidClient) {
 			return domain.Sale{}, domain.ErrSaleInvalidClient
 		}
@@ -123,13 +182,17 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 	err = tx.QueryRow(ctx, `
 		INSERT INTO ventas (
 			lote_id, cliente_id, modalidad_pago, monto, moneda, vendedor_id, usuario_alta,
-			fecha_creacion, fecha_modificacion
+			fecha_creacion, fecha_modificacion, idempotency_key, idempotency_payload_hash
 		)
-		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid, $8, $8)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid, $8, $8, $9, $10)
 		RETURNING id::text
-	`, command.LoteID, command.ClienteID, command.PaymentMethod, *lotPrice, currency,
-		command.VendedorID, command.ActorID, command.CreatedAt).Scan(&saleID)
+	`, command.LotID, command.ClientID, command.PaymentMethod, *lotPrice, currency,
+		command.SellerID, command.ActorID, command.CreatedAt,
+		command.IdempotencyKey, command.IdempotencyPayloadHash).Scan(&saleID)
 	if err != nil {
+		if isConstraint(err, saleIdempotencyIndex) {
+			return domain.Sale{}, errRetrySaleWrite
+		}
 		if isConstraint(err, saleActiveIndex) {
 			return domain.Sale{}, domain.ErrSaleActiveConflict
 		}
@@ -142,8 +205,8 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 	}
 
 	if _, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
-		DevelopmentID: loteoID,
-		LotID:         command.LoteID,
+		DevelopmentID: developmentID,
+		LotID:         command.LotID,
 		ExpectedState: domain.LotStateAvailable,
 		NextState:     domain.LotStateSold,
 		Origin:        domain.LotStateOriginSale,
@@ -158,9 +221,31 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 		return domain.Sale{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return domain.Sale{}, err
+		return domain.Sale{}, fmt.Errorf("%w: %w", errRetrySaleWrite, err)
 	}
 	return sale, nil
+}
+
+// reconcileIdempotentCreate resolves a write whose outcome is unknown (a
+// commit that may have landed, or a duplicate key raced in by a concurrent
+// retry) by reading back the venta stored under the actor's key.
+func (repository *SaleRepository) reconcileIdempotentCreate(ctx context.Context, command gateway.CreateSaleCommand, original error) (domain.Sale, error) {
+	var id, hash string
+	err := repository.pool.QueryRow(ctx, `
+		SELECT id::text, COALESCE(idempotency_payload_hash, '')
+		FROM ventas
+		WHERE usuario_alta = $1::uuid AND idempotency_key = $2
+	`, command.ActorID, command.IdempotencyKey).Scan(&id, &hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Sale{}, original
+	}
+	if err != nil {
+		return domain.Sale{}, err
+	}
+	if hash != command.IdempotencyPayloadHash {
+		return domain.Sale{}, domain.ErrSaleIdempotencyConflict
+	}
+	return repository.Get(ctx, id, gateway.SaleScope{})
 }
 
 func (repository *SaleRepository) List(ctx context.Context, filter domain.SaleListFilter, scope gateway.SaleScope) (domain.SalePage, error) {
@@ -191,7 +276,7 @@ func (repository *SaleRepository) List(ctx context.Context, filter domain.SaleLi
 		`+saleFromClause+where+`
 		ORDER BY v.fecha_creacion DESC, v.id DESC
 		LIMIT $8 OFFSET $9
-	`, states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
+	`, states, filter.DevelopmentID, filter.Search, filter.LotID, scope.AssigneeAuthProviderID,
 		scope.ByAgency, containsPattern(filter.Search), filter.Limit, offset)
 	if err != nil {
 		return domain.SalePage{}, err
@@ -213,7 +298,7 @@ func (repository *SaleRepository) List(ctx context.Context, filter domain.SaleLi
 	}
 	if !hasTotal {
 		if err := repository.pool.QueryRow(ctx, `SELECT count(*) `+saleFromClause+where,
-			states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
+			states, filter.DevelopmentID, filter.Search, filter.LotID, scope.AssigneeAuthProviderID,
 			scope.ByAgency, containsPattern(filter.Search)).Scan(&page.Total); err != nil {
 			return domain.SalePage{}, err
 		}

@@ -483,11 +483,31 @@ Decisiones de este recorte:
   `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}` listan y consultan con el
   alcance de reservas: internos ven todo; un usuario de inmobiliaria solo las
   ventas cuyo vendedor es de su agencia, porque `ventas` no guarda agencia y
-  se lee de `usuarios.inmobiliaria_id`. No hay `Idempotency-Key`: reintentar
-  el alta choca con el lote ya vendido, que es el resultado correcto.
+  se lee de `usuarios.inmobiliaria_id`. Un actor de inmobiliaria además solo
+  vende en un loteo al que su agencia está asignada
+  (`sale_agency_not_assigned`); administrador y administrativo no tienen esa
+  restricción y eligen cualquier agencia activa con vendedores.
+- **El alta de la venta es idempotente como la de la reserva.** El handler
+  exige `Idempotency-Key`; el use case la normaliza y calcula el hash SHA-256
+  del payload (loteo, lote, cliente, vendedor, modalidad); el repositorio
+  guarda ambos en `ventas` (`00011_add_sale_idempotency.sql`) y, antes de
+  insertar, busca una venta del mismo actor con esa clave: si el hash
+  coincide devuelve la venta original, si difiere responde
+  `idempotency_key_conflict`. Si el `COMMIT` falla o el índice único de la
+  clave salta por una carrera, `reconcileIdempotentCreate` relee por clave y
+  devuelve la venta que quedó persistida. Así un reintento tras perder la
+  respuesta recupera la venta en lugar de chocar con `sale_lot_unavailable`.
+  El frontend genera la clave con `shared/lib/idempotencyKey` (compartido
+  con reservas), la reutiliza mientras el alta falle y la rota al confirmar.
+- **Una sola regla decide si un lote se puede vender.** `saleDisabledReason`
+  (`features/sales/types.ts`) exige número, precio mayor que cero y moneda,
+  que es exactamente lo que el backend rechaza con `sale_lot_incomplete`.
+  La usan `SellLotLink` en el visor, `PaymentConditions` para el monto y
+  `buildSaleReceipt` para habilitar `Confirmar venta`, así el editor de lotes,
+  que admite precio `0`, no deja llegar a un alta que nunca persiste.
 - **Confirmar registra la venta y abre el recibo de la venta persistida.**
-  `buildSaleReceipt` sigue validando el borrador en el cliente (lote con
-  precio, cliente, modalidad disponible, vendedor) para deshabilitar
+  `buildSaleReceipt` sigue validando el borrador en el cliente (lote
+  vendible, cliente, modalidad disponible, vendedor) para deshabilitar
   `Confirmar venta` y mostrar qué falta; con el borrador completo `SaleForm`
   llama a `createSale` y `SaleCreatePage` reemplaza el formulario por la
   tarjeta «Venta registrada» (imprimir recibo, ver detalle, ir al listado) y
@@ -512,9 +532,10 @@ Decisiones de este recorte:
   la fila del usuario logueado —el cliente no conoce su `usuarios.id`, solo su
   identidad de Supabase—, y el formulario la preselecciona junto con su
   inmobiliaria. Para un administrador o administrativo, que no pertenecen a
-  ninguna agencia, eso deja el formulario en «Venta directa» a su nombre sin
-  tocar ningún selector. Los dos selectores siguen habilitados: la preselección
-  es un punto de partida, no un candado. Si el actor no aparece en el catálogo
+  ninguna agencia, eso deja el formulario en «Venta directa» a su nombre: con
+  «Venta directa» el vendedor es siempre quien carga y el selector queda
+  deshabilitado; elegir una inmobiliaria lo habilita para escoger entre sus
+  vendedores, y volver a «Venta directa» lo fija de nuevo. Si el actor no aparece en el catálogo
   pero hay un único elegible, se preselecciona ese.
 - **El alcance de ese catálogo no es el mismo en reservas que en ventas.** Una
   reserva la toma siempre el usuario que la carga, así que para un actor con
@@ -542,7 +563,7 @@ Decisiones de este recorte:
 - **La venta arranca desde el visualizador del loteo, como la reserva.** En el
   panel del lote, «Pasar a venta» (`SellLotLink`) lleva a
   `/ventas/nueva/{loteoId}/{loteId}`, deshabilitado con el motivo si al lote
-  le falta número o precio, y solo para lotes `disponible`. `SaleCreatePage`
+  le falta número, precio o moneda, y solo para lotes `disponible`. `SaleCreatePage`
   es el espejo de `ReservationCreatePage`: plano de referencia y ficha del
   lote a la izquierda, formulario a la derecha, y el mismo aviso si el lote
   cambió de estado. El formulario en sí es `SaleForm` (cliente, inmobiliaria,
@@ -554,13 +575,20 @@ Decisiones de este recorte:
   (`SaleDetailsPage`) muestra la venta con el plano de referencia del lote y
   vuelve a imprimir el recibo.
 - **Ventas no importa `clients`, `lots` ni `reservations`.** Como una feature
-  no toca los archivos de otra, `SaleForm` recibe `loadClientes`,
-  `createCliente` y `loadSellers` como props, `SaleCreatePage` recibe
-  `createSale` y describe el loteo que necesita como `SaleCreateDevelopment`;
-  `app/SalesRoute.tsx`, `app/SaleCreateRoute.tsx` y `app/SaleDetailsRoute.tsx`
-  —composición, no feature— inyectan las implementaciones, mapean el
-  `LoteoDetail` de `lots` y reutilizan el plano de referencia de reservas
-  (`LoteReferencePlan`).
+  no toca los archivos de otra, `SaleForm` recibe los clientes ya cargados
+  (`clients`, `clientsLoading`, `clientsError`), `loadSellers`,
+  `onRegisterClient` y `renderClientDialog` como props, `SaleCreatePage`
+  recibe `createSale` y describe el loteo que necesita como
+  `SaleCreateDevelopment`; `app/SalesRoute.tsx`, `app/SaleCreateRoute.tsx` y
+  `app/SaleDetailsRoute.tsx` —composición, no feature— inyectan las
+  implementaciones, mapean el `LoteoDetail` de `lots` y reutilizan el plano
+  de referencia de reservas (`LoteReferencePlan`). El alta de cliente desde
+  la venta es el mismo `clients/CreateClientDialog` + `ClientForm` que usa
+  la reserva: `SaleCreateRoute` lo renderiza con `useClients` y le pasa el
+  cliente creado como `createdClient`, que `SaleForm` selecciona al llegar.
+  Los identificadores internos de `features/sales` van en inglés
+  (`LotOption`, `ClientOption`, `SaleReceipt.issuedAt`, `development`); el español queda
+  solo en los nombres de propiedad que son contrato JSON de la API.
 - **El plan de pago se calcula en dominio y se persiste con la venta.**
   `domain.ValidatePaymentPlan` aplica las reglas que no dependen del precio
   (plan obligatorio en `financiado`/`entrega_financiada` y prohibido en
@@ -573,7 +601,9 @@ Decisiones de este recorte:
   regular y cada cuota con su vencimiento); la fórmula y los vencimientos
   están en `docs/domain.md`. El repositorio inserta `planes_pago` y las
   `cuotas` (con `CopyFrom`) en la misma transacción que `ventas` y el cambio
-  de estado del lote, así una venta financiada nunca queda sin plan.
+  de estado del lote, así una venta financiada nunca queda sin plan. El
+  plan forma parte del payload que firma la clave de idempotencia, así un
+  reintento con otro plan es un conflicto y no devuelve la venta anterior.
   `Sale.PlanPago` publica el resumen (`montoFinanciado`, `montoCuota`,
   `montoTotal` leídos de las cuotas persistidas, no recalculados) en el
   listado y además las `cuotas` en el detalle.
@@ -588,9 +618,10 @@ Decisiones de este recorte:
   selector lista las tres modalidades de `ventas.modalidad_pago`; en contado
   el monto no se escribe — es el precio del lote elegido, mostrado en su
   moneda — y en las financiadas ese precio es la base del plan. Un lote sin
-  precio cargado avisa en lugar de dejar seguir. El recibo imprime el plan
-  y el detalle (`SaleDetails`) lista las cuotas con número, vencimiento,
-  monto y estado.
+  precio cargado avisa en lugar de dejar seguir (`saleDisabledReason`, la
+  misma regla que usa el enlace «Vender» del visor). El recibo imprime el
+  plan y el detalle (`SaleDetails`) lista las cuotas con número,
+  vencimiento, monto y estado.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive

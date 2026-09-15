@@ -192,6 +192,13 @@ la reserva. Si el vendedor histórico no permite recuperar la agencia, queda
 `NULL`; el `Down` restaura el trigger anterior y elimina índice y columna, por
 lo que se perdería esa atribución histórica.
 
+`00011_add_sale_idempotency.sql` agrega a `ventas` la misma identidad
+idempotente por actor que tienen las reservas (`idempotency_key` y hash del
+payload, con sus validaciones) y el índice único parcial
+`ventas_usuario_alta_idempotency_key_idx`. El `Down` elimina columnas,
+constraints e índice, así que un rollback pierde las claves aunque conserva
+las ventas.
+
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
 ```sql

@@ -2,6 +2,8 @@ package postgres_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"testing"
@@ -33,13 +35,15 @@ func TestSaleRepository(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	repository := postgres.NewSaleRepository(pool)
 	command := gateway.CreateSaleCommand{
-		LoteoID:       loteoID,
-		LoteID:        lotID,
-		ClienteID:     clientID,
-		VendedorID:    actorID,
-		ActorID:       actorID,
-		PaymentMethod: domain.PaymentMethodCash,
-		CreatedAt:     now,
+		DevelopmentID:          loteoID,
+		LotID:                  lotID,
+		ClientID:               clientID,
+		SellerID:               actorID,
+		ActorID:                actorID,
+		PaymentMethod:          domain.PaymentMethodCash,
+		IdempotencyKey:         newUUID(t),
+		IdempotencyPayloadHash: saleHash(t),
+		CreatedAt:              now,
 	}
 
 	created, err := repository.Create(context.Background(), command)
@@ -73,7 +77,25 @@ func TestSaleRepository(t *testing.T) {
 		t.Fatalf("lot state after sale = %q, want vendido", lotState)
 	}
 
-	if _, err := repository.Create(context.Background(), command); !errors.Is(err, domain.ErrSaleLotUnavailable) {
+	// A retry with the same key and payload is the lost response of the
+	// first request, so it gets the same venta back.
+	retried, err := repository.Create(context.Background(), command)
+	if err != nil {
+		t.Fatalf("retried Create() error = %v", err)
+	}
+	if retried.ID != created.ID || len(retried.Historial) != 1 {
+		t.Errorf("retried Create() = %#v, want the original sale %q", retried, created.ID)
+	}
+
+	reused := command
+	reused.IdempotencyPayloadHash = saleHash(t)
+	if _, err := repository.Create(context.Background(), reused); !errors.Is(err, domain.ErrSaleIdempotencyConflict) {
+		t.Fatalf("Create() reusing the key with other data error = %v, want %v", err, domain.ErrSaleIdempotencyConflict)
+	}
+
+	fresh := command
+	fresh.IdempotencyKey = newUUID(t)
+	if _, err := repository.Create(context.Background(), fresh); !errors.Is(err, domain.ErrSaleLotUnavailable) {
 		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrSaleLotUnavailable)
 	}
 
@@ -85,7 +107,7 @@ func TestSaleRepository(t *testing.T) {
 		t.Errorf("Get() = %#v", fetched)
 	}
 
-	page, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID}, gateway.SaleScope{})
+	page, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -93,28 +115,28 @@ func TestSaleRepository(t *testing.T) {
 		t.Errorf("List() = %#v", page)
 	}
 
-	byClient, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID, Search: "Cliente"}, gateway.SaleScope{})
+	byClient, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID, Search: "Cliente"}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() by client error = %v", err)
 	}
 	if byClient.Total != 1 {
 		t.Errorf("List() by client = %#v, want the sale", byClient)
 	}
-	noMatch, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID, Search: "nadie"}, gateway.SaleScope{})
+	noMatch, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID, Search: "nadie"}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() no match error = %v", err)
 	}
 	if noMatch.Total != 0 || len(noMatch.Items) != 0 {
 		t.Errorf("List() no match = %#v", noMatch)
 	}
-	cancelled, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID, States: []domain.SaleState{domain.SaleStateCancelled}}, gateway.SaleScope{})
+	cancelled, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID, States: []domain.SaleState{domain.SaleStateCancelled}}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() cancelled error = %v", err)
 	}
 	if cancelled.Total != 0 {
 		t.Errorf("List() cancelled = %#v, want none", cancelled)
 	}
-	outsidePage, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID, Page: 99}, gateway.SaleScope{})
+	outsidePage, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID, Page: 99}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() out-of-range error = %v", err)
 	}
@@ -127,7 +149,7 @@ func TestSaleRepository(t *testing.T) {
 	if _, err := repository.Get(context.Background(), created.ID, agencyScope); !errors.Is(err, domain.ErrSaleNotFound) {
 		t.Fatalf("Get() outside scope error = %v, want %v", err, domain.ErrSaleNotFound)
 	}
-	scoped, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID}, agencyScope)
+	scoped, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID}, agencyScope)
 	if err != nil {
 		t.Fatalf("List() outside scope error = %v", err)
 	}
@@ -157,19 +179,32 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
+	// An agency actor sells only on a loteo their agency is assigned to; the
+	// administrator is free to pick an unassigned agency's seller.
+	_, err = repository.Create(context.Background(), gateway.CreateSaleCommand{
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: otherSellerID,
+		ActorID: otherSellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+	})
+	if !errors.Is(err, domain.ErrSaleAgencyNotAssigned) {
+		t.Fatalf("Create() by an unassigned agency error = %v, want %v", err, domain.ErrSaleAgencyNotAssigned)
+	}
+
 	// An agency actor can register the sale for a colleague, but not for a
 	// seller of another agency.
 	_, err = repository.Create(context.Background(), gateway.CreateSaleCommand{
-		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: otherSellerID,
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: otherSellerID,
 		ActorID: sellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	})
 	if !errors.Is(err, domain.ErrSaleSellerNotEligible) {
 		t.Fatalf("Create() for another agency error = %v, want %v", err, domain.ErrSaleSellerNotEligible)
 	}
 
 	created, err := repository.Create(context.Background(), gateway.CreateSaleCommand{
-		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: peerID,
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: peerID,
 		ActorID: sellerID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	})
 	if err != nil {
 		t.Fatalf("Create() for a colleague error = %v", err)
@@ -189,7 +224,7 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	if fetched.ID != created.ID {
 		t.Errorf("Get() within agency scope = %#v", fetched)
 	}
-	page, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID}, ownScope)
+	page, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID}, ownScope)
 	if err != nil {
 		t.Fatalf("List() within agency scope error = %v", err)
 	}
@@ -199,7 +234,40 @@ func TestSaleRepositoryAgencySellerAndScope(t *testing.T) {
 	if _, err := repository.Get(context.Background(), created.ID, gateway.SaleScope{}); err != nil {
 		t.Fatalf("Get() as administrator error = %v", err)
 	}
-	_ = actorID
+
+	_, otherLotID := secondLotFixture(t, pool, loteoID)
+	byAdmin, err := repository.Create(context.Background(), gateway.CreateSaleCommand{
+		DevelopmentID: loteoID, LotID: otherLotID, ClientID: clientID, SellerID: otherSellerID,
+		ActorID: actorID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+	})
+	if err != nil {
+		t.Fatalf("Create() by the administrator with an unassigned agency seller error = %v", err)
+	}
+	if byAdmin.Vendedor.ID != otherSellerID {
+		t.Errorf("administrator sale seller = %#v, want %q", byAdmin.Vendedor, otherSellerID)
+	}
+}
+
+func secondLotFixture(t *testing.T, pool *pgxpool.Pool, loteoID string) (manzanaID, lotID string) {
+	t.Helper()
+	if err := pool.QueryRow(context.Background(), `
+		SELECT id::text FROM manzanas WHERE loteo_id = $1::uuid LIMIT 1
+	`, loteoID).Scan(&manzanaID); err != nil {
+		t.Fatalf("find fixture manzana: %v", err)
+	}
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO lotes (manzana_id, loteo_id, numero, precio, moneda) VALUES ($1::uuid, $2::uuid, '2', 90000, 'USD') RETURNING id::text
+	`, manzanaID, loteoID).Scan(&lotID); err != nil {
+		t.Fatalf("create second lot: %v", err)
+	}
+	return manzanaID, lotID
+}
+
+func saleHash(t *testing.T) string {
+	t.Helper()
+	sum := sha256.Sum256([]byte(newUUID(t)))
+	return hex.EncodeToString(sum[:])
 }
 
 func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
@@ -218,19 +286,20 @@ func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Now().UTC()
 	valid := gateway.CreateSaleCommand{
-		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID,
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID,
 		ActorID: actorID, PaymentMethod: domain.PaymentMethodCash, CreatedAt: now,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	}
 
 	for name, test := range map[string]struct {
 		mutate func(command *gateway.CreateSaleCommand)
 		want   error
 	}{
-		"unknown loteo":  {func(c *gateway.CreateSaleCommand) { c.LoteoID = newUUID(t) }, domain.ErrLoteNotFound},
-		"malformed lote": {func(c *gateway.CreateSaleCommand) { c.LoteID = "nope" }, domain.ErrLoteNotFound},
+		"unknown loteo":  {func(c *gateway.CreateSaleCommand) { c.DevelopmentID = newUUID(t) }, domain.ErrLoteNotFound},
+		"malformed lote": {func(c *gateway.CreateSaleCommand) { c.LotID = "nope" }, domain.ErrLoteNotFound},
 		"unknown actor":  {func(c *gateway.CreateSaleCommand) { c.ActorID = newUUID(t) }, domain.ErrActorNoAprovisionado},
-		"unknown seller": {func(c *gateway.CreateSaleCommand) { c.VendedorID = newUUID(t) }, domain.ErrSaleSellerNotEligible},
-		"unknown client": {func(c *gateway.CreateSaleCommand) { c.ClienteID = newUUID(t) }, domain.ErrSaleInvalidClient},
+		"unknown seller": {func(c *gateway.CreateSaleCommand) { c.SellerID = newUUID(t) }, domain.ErrSaleSellerNotEligible},
+		"unknown client": {func(c *gateway.CreateSaleCommand) { c.ClientID = newUUID(t) }, domain.ErrSaleInvalidClient},
 	} {
 		t.Run(name, func(t *testing.T) {
 			command := valid
@@ -275,7 +344,8 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Date(2026, 1, 31, 15, 0, 0, 0, time.UTC)
 	command := gateway.CreateSaleCommand{
-		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID,
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 		PaymentMethod: domain.PaymentMethodFinanced,
 		PaymentPlan:   &domain.PaymentPlanInput{CantidadCuotas: 12, TasaInteres: 10, Periodicidad: domain.PaymentPeriodMonthly},
 		CreatedAt:     now,
@@ -333,7 +403,7 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 		t.Errorf("Get() plan = %#v", fetched.PlanPago)
 	}
 
-	page, err := repository.List(context.Background(), domain.SaleListFilter{LoteoID: loteoID}, gateway.SaleScope{})
+	page, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID}, gateway.SaleScope{})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -362,7 +432,8 @@ func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
 	command := gateway.CreateSaleCommand{
-		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID,
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 		PaymentMethod: domain.PaymentMethodDownAndFi,
 		PaymentPlan:   &domain.PaymentPlanInput{CantidadCuotas: 3, TasaInteres: 0, Periodicidad: domain.PaymentPeriodQuarterly, MontoEntrega: 40000},
 		CreatedAt:     now,
@@ -410,7 +481,9 @@ func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
 		t.Errorf("persisted monto_entrega = %v, want 40000", downPayment)
 	}
 
-	if _, err := repository.Create(context.Background(), command); !errors.Is(err, domain.ErrSaleLotUnavailable) {
+	fresh := command
+	fresh.IdempotencyKey = newUUID(t)
+	if _, err := repository.Create(context.Background(), fresh); !errors.Is(err, domain.ErrSaleLotUnavailable) {
 		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrSaleLotUnavailable)
 	}
 }
