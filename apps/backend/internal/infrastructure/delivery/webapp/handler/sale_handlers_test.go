@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/usecase/sales"
@@ -77,6 +78,65 @@ func TestCreateSaleHandler(t *testing.T) {
 	if got.ID != "sale-1" || got.Monto != 100000 {
 		t.Errorf("response = %#v", got)
 	}
+	if stub.input.PaymentPlan != nil {
+		t.Errorf("plan = %#v, want none for contado", stub.input.PaymentPlan)
+	}
+}
+
+func TestCreateSaleHandlerPassesThePaymentPlan(t *testing.T) {
+	due := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
+	stub := &createSaleHandlerStub{result: domain.Sale{
+		ID: "sale-2", Monto: 100000, Moneda: "USD", ModalidadPago: domain.PaymentMethodDownAndFi,
+		PlanPago: &domain.PaymentPlan{
+			ID: "plan-1", MontoEntrega: 20000, CantidadCuotas: 2, TasaInteres: 10, Periodicidad: domain.PaymentPeriodMonthly,
+			Moneda: "USD", MontoFinanciado: 80000, MontoCuota: 44000, MontoTotal: 88000,
+			Cuotas: []domain.Installment{
+				{ID: "c-1", Numero: 1, Monto: 44000, Estado: domain.InstallmentStatePending, FechaVencimiento: due},
+				{ID: "c-2", Numero: 2, Monto: 44000, Estado: domain.InstallmentStatePending, FechaVencimiento: due.AddDate(0, 1, 0)},
+			},
+		},
+	}}
+	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/loteos/{loteoId}/lotes/{loteId}/ventas", handler.NewCreateSaleHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/development-1/lotes/lot-1/ventas", strings.NewReader(
+		`{"clienteId":"client-1","vendedorId":"seller-1","modalidadPago":"entrega_financiada",
+		  "planPago":{"cantidadCuotas":2,"tasaInteres":10,"periodicidad":"mensual","montoEntrega":20000}}`))
+	request.Header.Set("Authorization", "Bearer token")
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
+	}
+	want := sales.PaymentPlanInput{CantidadCuotas: 2, TasaInteres: 10, Periodicidad: "mensual", MontoEntrega: 20000}
+	if stub.input.PaymentMethod != "entrega_financiada" || stub.input.PaymentPlan == nil || *stub.input.PaymentPlan != want {
+		t.Errorf("input = %#v, plan = %#v", stub.input, stub.input.PaymentPlan)
+	}
+	var got struct {
+		PlanPago struct {
+			CantidadCuotas int     `json:"cantidadCuotas"`
+			MontoEntrega   float64 `json:"montoEntrega"`
+			TasaInteres    float64 `json:"tasaInteres"`
+			Periodicidad   string  `json:"periodicidad"`
+			MontoCuota     float64 `json:"montoCuota"`
+			MontoTotal     float64 `json:"montoTotal"`
+			Cuotas         []struct {
+				Numero           int     `json:"numero"`
+				Monto            float64 `json:"monto"`
+				Estado           string  `json:"estado"`
+				FechaVencimiento string  `json:"fechaVencimiento"`
+			} `json:"cuotas"`
+		} `json:"planPago"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	plan := got.PlanPago
+	if plan.CantidadCuotas != 2 || plan.MontoEntrega != 20000 || plan.TasaInteres != 10 || plan.Periodicidad != "mensual" || plan.MontoCuota != 44000 || plan.MontoTotal != 88000 {
+		t.Errorf("response plan = %#v", plan)
+	}
+	if len(plan.Cuotas) != 2 || plan.Cuotas[0].Numero != 1 || plan.Cuotas[0].Estado != "pendiente" || plan.Cuotas[0].FechaVencimiento != "2026-10-15T00:00:00Z" {
+		t.Errorf("response cuotas = %#v", plan.Cuotas)
+	}
 }
 
 func TestCreateSaleHandlerRejectsInvalidBodyAndMapsErrors(t *testing.T) {
@@ -104,7 +164,8 @@ func TestCreateSaleHandlerRejectsInvalidBodyAndMapsErrors(t *testing.T) {
 	}{
 		{name: "lot unavailable", err: domain.ErrSaleLotUnavailable, wantStatus: http.StatusConflict, wantCode: "sale_lot_unavailable"},
 		{name: "seller not eligible", err: domain.ErrSaleSellerNotEligible, wantStatus: http.StatusForbidden, wantCode: "sale_seller_not_eligible"},
-		{name: "payment method unavailable", err: domain.ErrSalePaymentMethodUnavailable, wantStatus: http.StatusBadRequest, wantCode: "payment_method_unavailable"},
+		{name: "payment plan required", err: domain.ErrSalePaymentPlanRequired, wantStatus: http.StatusBadRequest, wantCode: "sale_payment_plan_required"},
+		{name: "invalid down payment", err: domain.ErrSaleInvalidDownPayment, wantStatus: http.StatusBadRequest, wantCode: "invalid_sale_down_payment"},
 		{name: "unexpected", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 	}
 	for _, test := range tests {

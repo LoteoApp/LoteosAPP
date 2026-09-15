@@ -108,6 +108,16 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 	if lotState != domain.LotStateAvailable {
 		return domain.Sale{}, domain.ErrSaleLotUnavailable
 	}
+	if err := domain.ValidatePaymentPlan(command.PaymentMethod, command.PaymentPlan); err != nil {
+		return domain.Sale{}, err
+	}
+	var schedule domain.PaymentSchedule
+	if command.PaymentPlan != nil {
+		schedule, err = domain.BuildPaymentSchedule(*lotPrice, *command.PaymentPlan, command.CreatedAt)
+		if err != nil {
+			return domain.Sale{}, err
+		}
+	}
 
 	var saleID string
 	err = tx.QueryRow(ctx, `
@@ -124,6 +134,11 @@ func (repository *SaleRepository) Create(ctx context.Context, command gateway.Cr
 			return domain.Sale{}, domain.ErrSaleActiveConflict
 		}
 		return domain.Sale{}, err
+	}
+	if command.PaymentPlan != nil {
+		if err := insertPaymentPlan(ctx, tx, saleID, currency, command, schedule); err != nil {
+			return domain.Sale{}, err
+		}
 	}
 
 	if _, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
@@ -219,8 +234,11 @@ const saleFromClause = `
 	JOIN clientes c ON c.id = v.cliente_id
 	JOIN usuarios seller ON seller.id = v.vendedor_id
 	JOIN usuarios alta ON alta.id = v.usuario_alta
-	LEFT JOIN inmobiliarias agency ON agency.id = seller.inmobiliaria_id`
+	LEFT JOIN inmobiliarias agency ON agency.id = seller.inmobiliaria_id
+	LEFT JOIN planes_pago plan ON plan.venta_id = v.id AND plan.fecha_baja IS NULL`
 
+// The plan summary reads the regular installment (cuota 1) and the total
+// straight from cuotas, so the list never recomputes the schedule.
 const saleColumns = `
 	v.id::text, l.id::text, l.nombre, lo.id::text, COALESCE(lo.numero, ''), COALESCE(mz.numero, ''),
 	lo.superficie::float8,
@@ -229,6 +247,10 @@ const saleColumns = `
 	alta.id::text, alta.nombre, alta.apellido, alta.email, alta.rol,
 	agency.id::text, COALESCE(agency.razon_social, ''),
 	v.modalidad_pago, v.monto::float8, v.moneda,
+	plan.id::text, COALESCE(plan.monto_entrega, 0)::float8, plan.cantidad_cuotas,
+	COALESCE(plan.tasa_interes, 0)::float8, COALESCE(plan.periodicidad, ''), COALESCE(plan.moneda, ''),
+	COALESCE((SELECT c1.monto FROM cuotas c1 WHERE c1.plan_pago_id = plan.id AND c1.numero = 1), 0)::float8,
+	COALESCE((SELECT sum(cs.monto) FROM cuotas cs WHERE cs.plan_pago_id = plan.id), 0)::float8,
 	v.estado_actual, v.fecha_creacion, v.fecha_modificacion`
 
 // saleScopePredicate keeps an agency actor within the sales of their own
@@ -259,8 +281,65 @@ func loadSale(ctx context.Context, queryer reservationQueryer, id string, scope 
 		if err != nil {
 			return domain.Sale{}, err
 		}
+		if sale.PlanPago != nil {
+			sale.PlanPago.Cuotas, err = loadInstallments(ctx, queryer, sale.PlanPago.ID)
+			if err != nil {
+				return domain.Sale{}, err
+			}
+		}
 	}
 	return sale, nil
+}
+
+func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID, currency string, command gateway.CreateSaleCommand, schedule domain.PaymentSchedule) error {
+	var downPayment *float64
+	if command.PaymentMethod == domain.PaymentMethodDownAndFi {
+		downPayment = &command.PaymentPlan.MontoEntrega
+	}
+	var planID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO planes_pago (
+			venta_id, monto_entrega, cantidad_cuotas, tasa_interes, periodicidad, moneda,
+			usuario_modificacion, fecha_creacion, fecha_modificacion
+		)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::uuid, $8, $8)
+		RETURNING id::text
+	`, saleID, downPayment, command.PaymentPlan.CantidadCuotas, command.PaymentPlan.TasaInteres,
+		string(command.PaymentPlan.Periodicidad), currency, command.ActorID, command.CreatedAt).Scan(&planID)
+	if err != nil {
+		return err
+	}
+	rows := make([][]any, len(schedule.Cuotas))
+	for i, installment := range schedule.Cuotas {
+		rows[i] = []any{planID, installment.Numero, installment.Monto, string(installment.Estado),
+			installment.FechaVencimiento, command.ActorID, command.CreatedAt, command.CreatedAt}
+	}
+	_, err = tx.CopyFrom(ctx, pgx.Identifier{"cuotas"},
+		[]string{"plan_pago_id", "numero", "monto", "estado", "fecha_vencimiento", "usuario_modificacion", "fecha_creacion", "fecha_modificacion"},
+		pgx.CopyFromRows(rows))
+	return err
+}
+
+func loadInstallments(ctx context.Context, queryer reservationQueryer, planID string) ([]domain.Installment, error) {
+	rows, err := queryer.Query(ctx, `
+		SELECT id::text, numero, monto::float8, estado, fecha_vencimiento, fecha_pago
+		FROM cuotas
+		WHERE plan_pago_id = $1::uuid
+		ORDER BY numero
+	`, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	installments := make([]domain.Installment, 0)
+	for rows.Next() {
+		var installment domain.Installment
+		if err := rows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago); err != nil {
+			return nil, err
+		}
+		installments = append(installments, installment)
+	}
+	return installments, rows.Err()
 }
 
 func normalizeSaleScope(scope gateway.SaleScope) gateway.SaleScope {
@@ -298,55 +377,69 @@ func loadSaleHistory(ctx context.Context, queryer reservationQueryer, saleID str
 	return entries, rows.Err()
 }
 
-func saleScanTargets(sale *domain.Sale, client *domain.Cliente, seller, alta *domain.ReservationActor, agencyID **string, agencyName *string) []any {
+// saleRow holds the nullable pieces of a sale row until the sale is assembled.
+type saleRow struct {
+	sale         domain.Sale
+	client       domain.Cliente
+	seller, alta domain.ReservationActor
+	agencyID     *string
+	agencyName   string
+	planID       *string
+	plan         domain.PaymentPlan
+	planCuotas   *int
+}
+
+func (row *saleRow) targets() []any {
 	return []any{
-		&sale.ID, &sale.LoteoID, &sale.LoteoNombre, &sale.LoteID, &sale.LoteNumero, &sale.ManzanaNumero,
-		&sale.LoteSuperficie,
-		&client.ID, &client.Nombre, &client.Apellido, &client.DNI, &client.Celular, &client.Email,
-		&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol,
-		&alta.ID, &alta.Nombre, &alta.Apellido, &alta.Email, &alta.Rol,
-		agencyID, agencyName,
-		&sale.ModalidadPago, &sale.Monto, &sale.Moneda,
-		&sale.Estado, &sale.FechaCreacion, &sale.FechaModificacion,
+		&row.sale.ID, &row.sale.LoteoID, &row.sale.LoteoNombre, &row.sale.LoteID, &row.sale.LoteNumero, &row.sale.ManzanaNumero,
+		&row.sale.LoteSuperficie,
+		&row.client.ID, &row.client.Nombre, &row.client.Apellido, &row.client.DNI, &row.client.Celular, &row.client.Email,
+		&row.seller.ID, &row.seller.Nombre, &row.seller.Apellido, &row.seller.Email, &row.seller.Rol,
+		&row.alta.ID, &row.alta.Nombre, &row.alta.Apellido, &row.alta.Email, &row.alta.Rol,
+		&row.agencyID, &row.agencyName,
+		&row.sale.ModalidadPago, &row.sale.Monto, &row.sale.Moneda,
+		&row.planID, &row.plan.MontoEntrega, &row.planCuotas,
+		&row.plan.TasaInteres, &row.plan.Periodicidad, &row.plan.Moneda,
+		&row.plan.MontoCuota, &row.plan.MontoTotal,
+		&row.sale.Estado, &row.sale.FechaCreacion, &row.sale.FechaModificacion,
 	}
 }
 
-func assembleSale(sale domain.Sale, client domain.Cliente, seller, alta domain.ReservationActor, agencyID *string, agencyName string) domain.Sale {
-	sale.Cliente, sale.Vendedor, sale.UsuarioAlta = client, seller, alta
-	if agencyID != nil {
-		sale.Inmobiliaria = &domain.ReservationAgency{ID: *agencyID, BusinessName: agencyName}
+func (row *saleRow) assemble() domain.Sale {
+	sale := row.sale
+	sale.Cliente, sale.Vendedor, sale.UsuarioAlta = row.client, row.seller, row.alta
+	if row.agencyID != nil {
+		sale.Inmobiliaria = &domain.ReservationAgency{ID: *row.agencyID, BusinessName: row.agencyName}
+	}
+	if row.planID != nil {
+		plan := row.plan
+		plan.ID = *row.planID
+		if row.planCuotas != nil {
+			plan.CantidadCuotas = *row.planCuotas
+		}
+		plan.MontoFinanciado = domain.RoundMoney(sale.Monto - plan.MontoEntrega)
+		sale.PlanPago = &plan
 	}
 	return sale
 }
 
-func scanSale(row reservationScanner) (domain.Sale, error) {
-	var (
-		sale         domain.Sale
-		client       domain.Cliente
-		seller, alta domain.ReservationActor
-		agencyID     *string
-		agencyName   string
-	)
-	if err := row.Scan(saleScanTargets(&sale, &client, &seller, &alta, &agencyID, &agencyName)...); err != nil {
+func scanSale(scanner reservationScanner) (domain.Sale, error) {
+	var row saleRow
+	if err := scanner.Scan(row.targets()...); err != nil {
 		return domain.Sale{}, err
 	}
-	return assembleSale(sale, client, seller, alta, agencyID, agencyName), nil
+	return row.assemble(), nil
 }
 
-func scanSaleWithTotal(row reservationScanner) (domain.Sale, int64, error) {
+func scanSaleWithTotal(scanner reservationScanner) (domain.Sale, int64, error) {
 	var (
-		total        int64
-		sale         domain.Sale
-		client       domain.Cliente
-		seller, alta domain.ReservationActor
-		agencyID     *string
-		agencyName   string
+		total int64
+		row   saleRow
 	)
-	targets := append(saleScanTargets(&sale, &client, &seller, &alta, &agencyID, &agencyName), &total)
-	if err := row.Scan(targets...); err != nil {
+	if err := scanner.Scan(append(row.targets(), &total)...); err != nil {
 		return domain.Sale{}, 0, err
 	}
-	return assembleSale(sale, client, seller, alta, agencyID, agencyName), total, nil
+	return row.assemble(), total, nil
 }
 
 func agencyActive(ctx context.Context, tx pgx.Tx, agencyID *string) (bool, error) {
