@@ -6,7 +6,7 @@ import { PAYMENT_METHOD_LABELS, type Sale } from '../types'
 import SaleStatusBadge from './SaleStatusBadge'
 
 export default function SaleDetails({ sale }: { sale: Sale }) {
-  const loteLabel = sale.loteNumero ? `Lote ${sale.loteNumero}` : 'Lote sin número'
+  const lotLabel = sale.loteNumero ? `Lote ${sale.loteNumero}` : 'Lote sin número'
   return (
     <Card>
       <CardHeader>
@@ -16,7 +16,7 @@ export default function SaleDetails({ sale }: { sale: Sale }) {
         </div>
         <CardDescription>
           {sale.manzanaNumero ? `Manzana ${sale.manzanaNumero} · ` : ''}
-          {loteLabel}
+          {lotLabel}
           {sale.loteSuperficie !== null ? ` · ${formatArea(sale.loteSuperficie)}` : ''}
         </CardDescription>
       </CardHeader>

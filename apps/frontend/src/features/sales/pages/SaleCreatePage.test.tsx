@@ -6,7 +6,7 @@ import { ApiError } from '../../../shared/api/client'
 import SaleCreatePage, { type SaleCreatePageProps } from './SaleCreatePage'
 import type { ClientOption, Sale, SaleCreateDevelopment, SellerOption } from '../types'
 
-const loteo: SaleCreateDevelopment = {
+const development: SaleCreateDevelopment = {
   id: 'loteo-1',
   nombre: 'Las Acacias',
   ubicacion: 'Córdoba',
@@ -18,7 +18,7 @@ const loteo: SaleCreateDevelopment = {
   ],
 }
 
-const cliente: ClientOption = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
+const client: ClientOption = { id: 'cl-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' }
 
 const agencySeller: SellerOption = {
   id: 'us-1',
@@ -39,7 +39,7 @@ const sale: Sale = {
   loteNumero: '7',
   manzanaNumero: '2',
   loteSuperficie: 300,
-  cliente,
+  cliente: client,
   vendedor: { id: 'us-1', nombre: 'Marta', apellido: 'Suárez', rol: 'inmobiliaria' },
   usuarioAlta: { id: 'us-9', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
   inmobiliaria: { id: 'ag-1', razonSocial: 'Inmobiliaria Sur' },
@@ -53,11 +53,11 @@ const sale: Sale = {
 
 function baseProps(): SaleCreatePageProps {
   return {
-    loteoId: loteo.id,
+    loteoId: development.id,
     loteId: 'lot-1',
-    loteo,
-    loteoStatus: 'loaded',
-    clients: [cliente],
+    development,
+    developmentStatus: 'loaded',
+    clients: [client],
     loadSellers: vi.fn().mockResolvedValue([agencySeller, directSeller]),
     createSale: vi.fn().mockResolvedValue(sale),
     renderPlan: <p>Plano del loteo</p>,
@@ -201,7 +201,7 @@ describe('SaleCreatePage', () => {
       <MemoryRouter>
         <SaleCreatePage
           {...baseProps()}
-          clients={[created, cliente]}
+          clients={[created, client]}
           createdClient={created}
           onRegisterClient={onRegisterClient}
           renderClientDialog={<p>Diálogo de cliente</p>}
@@ -237,21 +237,21 @@ describe('SaleCreatePage', () => {
   })
 
   it('shows the loading state before the loteo arrives', () => {
-    renderPage({ loteo: null, loteoStatus: 'loading' })
+    renderPage({ development: null, developmentStatus: 'loading' })
 
     expect(screen.getByRole('status', { name: 'Cargando los datos para registrar la venta…' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Cliente')).not.toBeInTheDocument()
   })
 
   it('explains when the loteo cannot be loaded', () => {
-    renderPage({ loteo: null, loteoStatus: 'not-found' })
+    renderPage({ development: null, developmentStatus: 'not-found' })
     expect(screen.getByText('No se puede iniciar la venta')).toBeInTheDocument()
     expect(screen.getByText('No encontramos este loteo.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver al loteo' })).toHaveAttribute('href', '/lotes/loteo-1')
   })
 
   it('shows the backend error when the loteo fails to load', () => {
-    renderPage({ loteo: null, loteoStatus: 'error', loteoError: 'Servicio no disponible' })
+    renderPage({ development: null, developmentStatus: 'error', developmentError: 'Servicio no disponible' })
     expect(screen.getByText('Servicio no disponible')).toBeInTheDocument()
   })
 

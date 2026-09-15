@@ -588,7 +588,7 @@ Decisiones de este recorte:
   la reserva: `SaleCreateRoute` lo renderiza con `useClients` y le pasa el
   cliente creado como `createdClient`, que `SaleForm` selecciona al llegar.
   Los identificadores internos de `features/sales` van en inglés
-  (`LotOption`, `ClientOption`, `SaleReceipt.issuedAt`); el español queda
+  (`LotOption`, `ClientOption`, `SaleReceipt.issuedAt`, `development`); el español queda
   solo en los nombres de propiedad que son contrato JSON de la API.
 - **De las tres modalidades de pago solo está implementada `contado`.** El
   selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`

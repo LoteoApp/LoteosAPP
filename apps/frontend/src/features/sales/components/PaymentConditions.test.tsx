@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import PaymentConditions from './PaymentConditions'
 import type { LotOption } from '../types'
 
-function lote(overrides: Partial<LotOption> = {}): LotOption {
+function lot(overrides: Partial<LotOption> = {}): LotOption {
   return {
     id: 'lt-1',
     numero: '7',
@@ -22,7 +22,7 @@ function lote(overrides: Partial<LotOption> = {}): LotOption {
 
 describe('PaymentConditions', () => {
   it('starts on contado', () => {
-    render(<PaymentConditions method="contado" lot={lote()} onMethodChange={vi.fn()} />)
+    render(<PaymentConditions method="contado" lot={lot()} onMethodChange={vi.fn()} />)
 
     expect(screen.getByLabelText('Condiciones de pago')).toHaveTextContent('Contado')
   })
@@ -30,7 +30,7 @@ describe('PaymentConditions', () => {
   it('lists the three modalidades, with the pending ones unavailable', async () => {
     const user = userEvent.setup()
     const onMethodChange = vi.fn()
-    render(<PaymentConditions method="contado" lot={lote()} onMethodChange={onMethodChange} />)
+    render(<PaymentConditions method="contado" lot={lot()} onMethodChange={onMethodChange} />)
 
     await user.click(screen.getByLabelText('Condiciones de pago'))
 
@@ -49,7 +49,7 @@ describe('PaymentConditions', () => {
   })
 
   it('shows the price of the lote as the amount, without letting it be edited', () => {
-    render(<PaymentConditions method="contado" lot={lote()} onMethodChange={vi.fn()} />)
+    render(<PaymentConditions method="contado" lot={lot()} onMethodChange={vi.fn()} />)
 
     expect(screen.getByText('Monto')).toBeInTheDocument()
     expect(screen.getByText(/150\.000/)).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('PaymentConditions', () => {
 
   it('warns when the lote has no price loaded', () => {
     render(
-      <PaymentConditions method="contado" lot={lote({ precio: null })} onMethodChange={vi.fn()} />,
+      <PaymentConditions method="contado" lot={lot({ precio: null })} onMethodChange={vi.fn()} />,
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
@@ -73,7 +73,7 @@ describe('PaymentConditions', () => {
 
   it('warns instead of showing an amount when the price is zero', () => {
     render(
-      <PaymentConditions method="contado" lot={lote({ precio: 0 })} onMethodChange={vi.fn()} />,
+      <PaymentConditions method="contado" lot={lot({ precio: 0 })} onMethodChange={vi.fn()} />,
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('Completá el precio del lote')
@@ -84,7 +84,7 @@ describe('PaymentConditions', () => {
     render(
       <PaymentConditions
         method="contado"
-        lot={lote({ precio: 2500, moneda: 'ARS' })}
+        lot={lot({ precio: 2500, moneda: 'ARS' })}
         onMethodChange={vi.fn()}
       />,
     )
@@ -93,7 +93,7 @@ describe('PaymentConditions', () => {
   })
 
   it('hides the amount on a modalidad that is not contado', () => {
-    render(<PaymentConditions method="financiado" lot={lote()} onMethodChange={vi.fn()} />)
+    render(<PaymentConditions method="financiado" lot={lot()} onMethodChange={vi.fn()} />)
 
     expect(screen.queryByText('Monto')).not.toBeInTheDocument()
   })

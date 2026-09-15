@@ -15,20 +15,20 @@ export default function SaleCreateRoute() {
   const { session } = useAuth()
   const { loteoId = '', loteId = '' } = useParams()
   const token = session?.access_token ?? ''
-  const loteoState = useLoteo(loteoId, token)
+  const developmentState = useLoteo(loteoId, token)
   const clientsState = useClients(token, { enabled: token !== '' })
   const [createdClient, setCreatedClient] = useState<Cliente | null>(null)
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false)
 
-  const sourceLoteo = loteoState.status === 'loaded' ? loteoState.loteo : null
-  const loteo = useMemo<SaleCreateDevelopment | null>(() => sourceLoteo ? ({
-    id: sourceLoteo.id,
-    nombre: sourceLoteo.nombre,
-    ubicacion: sourceLoteo.ubicacion,
-    descripcion: sourceLoteo.descripcion,
-    manzanas: sourceLoteo.manzanas,
-    lotes: sourceLoteo.lotes,
-  }) : null, [sourceLoteo])
+  const sourceDevelopment = developmentState.status === 'loaded' ? developmentState.loteo : null
+  const development = useMemo<SaleCreateDevelopment | null>(() => sourceDevelopment ? ({
+    id: sourceDevelopment.id,
+    nombre: sourceDevelopment.nombre,
+    ubicacion: sourceDevelopment.ubicacion,
+    descripcion: sourceDevelopment.descripcion,
+    manzanas: sourceDevelopment.manzanas,
+    lotes: sourceDevelopment.lotes,
+  }) : null, [sourceDevelopment])
   const clients = useMemo<Cliente[]>(() => [...(createdClient ? [createdClient] : []), ...clientsState.clientes]
     .filter((client, index, values) => values.findIndex((item) => item.id === client.id) === index),
   [clientsState.clientes, createdClient])
@@ -36,8 +36,8 @@ export default function SaleCreateRoute() {
   // A venta lists every agency with sellers, assigned to the loteo or not, and
   // lets an agency user pick a colleague; a reserva does neither.
   const loadSellers = useCallback(
-    (targetLoteoId: string, signal?: AbortSignal) =>
-      listEligibleSellers(token, targetLoteoId, signal, 'agencia'),
+    (developmentId: string, signal?: AbortSignal) =>
+      listEligibleSellers(token, developmentId, signal, 'agencia'),
     [token],
   )
 
@@ -50,9 +50,9 @@ export default function SaleCreateRoute() {
     <SaleCreatePage
       loteoId={loteoId}
       loteId={loteId}
-      loteo={loteo}
-      loteoStatus={loteoState.status}
-      loteoError={loteoState.status === 'error' ? loteoState.message : undefined}
+      development={development}
+      developmentStatus={developmentState.status}
+      developmentError={developmentState.status === 'error' ? developmentState.message : undefined}
       clients={clients}
       clientsLoading={clientsState.isLoading}
       clientsError={clientsState.error}
@@ -70,7 +70,7 @@ export default function SaleCreateRoute() {
       )}
       loadSellers={loadSellers}
       createSale={registerSale}
-      renderPlan={sourceLoteo && <ReservationLoteoPlan loteo={sourceLoteo} selectedLoteId={loteId} variant="reference" />}
+      renderPlan={sourceDevelopment && <ReservationLoteoPlan loteo={sourceDevelopment} selectedLoteId={loteId} variant="reference" />}
     />
   )
 }

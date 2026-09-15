@@ -20,7 +20,7 @@ vi.mock('../features/reservations/api/reservations', () => ({ listEligibleSeller
 vi.mock('../features/sales/api/sales', () => ({ createSale: createSaleMock }))
 
 const triangle = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]
-const loteo: LoteoDetail = {
+const development: LoteoDetail = {
   id: 'loteo-1', nombre: 'Las Acacias', ubicacion: 'Córdoba', descripcion: 'A metros de la ruta.',
   contorno: triangle,
   manzanas: [{ id: 'block-1', numero: '2', tieneAgua: true, tieneCloaca: false, tieneLuz: true, tieneGas: false, calleIds: [], poligono: triangle }],
@@ -55,7 +55,7 @@ afterEach(() => vi.clearAllMocks())
 
 describe('SaleCreateRoute', () => {
   it('composes the loteo, the clients and the sale-scoped sellers into the sale page', async () => {
-    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo: development })
     listClientsMock.mockResolvedValue([client])
     listEligibleSellersMock.mockResolvedValue([seller])
     createSaleMock.mockResolvedValue(sale)
@@ -87,7 +87,7 @@ describe('SaleCreateRoute', () => {
   })
 
   it('registers a new client through the shared clients dialog and selects it', async () => {
-    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo: development })
     listClientsMock.mockResolvedValue([])
     listEligibleSellersMock.mockResolvedValue([seller])
     createClientMock.mockResolvedValue(client)
@@ -115,7 +115,7 @@ describe('SaleCreateRoute', () => {
   })
 
   it('discards what was typed when the client dialog is closed without saving', async () => {
-    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo: development })
     listClientsMock.mockResolvedValue([])
     listEligibleSellersMock.mockResolvedValue([seller])
     const user = userEvent.setup()

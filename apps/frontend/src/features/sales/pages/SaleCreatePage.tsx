@@ -23,16 +23,16 @@ import type {
 export type SaleCreatePageProps = {
   loteoId: string
   loteId: string
-  loteo: SaleCreateDevelopment | null
-  loteoStatus: 'loading' | 'loaded' | 'not-found' | 'error'
-  loteoError?: string
+  development: SaleCreateDevelopment | null
+  developmentStatus: 'loading' | 'loaded' | 'not-found' | 'error'
+  developmentError?: string
   clients: readonly ClientOption[]
   clientsLoading?: boolean
   clientsError?: string | null
   createdClient?: ClientOption | null
   onRegisterClient?: () => void
   renderClientDialog?: ReactNode
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
+  loadSellers: (developmentId: string, signal?: AbortSignal) => Promise<SellerOption[]>
   createSale: (values: CreateSaleValues, idempotencyKey: string) => Promise<Sale>
   renderPlan?: ReactNode
 }
@@ -40,9 +40,9 @@ export type SaleCreatePageProps = {
 export default function SaleCreatePage({
   loteoId,
   loteId,
-  loteo,
-  loteoStatus,
-  loteoError,
+  development,
+  developmentStatus,
+  developmentError,
   clients,
   clientsLoading = false,
   clientsError = null,
@@ -78,7 +78,7 @@ export default function SaleCreatePage({
     }
   }
 
-  if (loteoStatus === 'loading') {
+  if (developmentStatus === 'loading') {
     return (
       <section className="flex min-h-0 flex-1 flex-col gap-4">
         <BackLink loteoId={loteoId} />
@@ -88,11 +88,11 @@ export default function SaleCreatePage({
     )
   }
 
-  if (loteoStatus !== 'loaded' || loteo === null) {
-    const message = loteoStatus === 'not-found'
+  if (developmentStatus !== 'loaded' || development === null) {
+    const message = developmentStatus === 'not-found'
       ? 'No encontramos este loteo.'
-      : loteoStatus === 'error'
-        ? loteoError
+      : developmentStatus === 'error'
+        ? developmentError
         : 'No se pudo cargar el loteo.'
     return (
       <section className="flex flex-col gap-4">
@@ -105,29 +105,29 @@ export default function SaleCreatePage({
     )
   }
 
-  const selectedLot = loteo.lotes.find((lot) => lot.id === loteId) ?? null
-  const selectedBlock = loteo.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
+  const selectedLot = development.lotes.find((lot) => lot.id === loteId) ?? null
+  const selectedBlock = development.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
   const isUnavailable = selectedLot === null || selectedLot.estado !== 'disponible'
-  const lot = isUnavailable ? null : lotOptionFromDevelopment(loteo, loteId)
+  const lot = isUnavailable ? null : lotOptionFromDevelopment(development, loteId)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <BackLink loteoId={loteo.id} />
+      <BackLink loteoId={development.id} />
       <SaleCreateHeader />
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
           {renderPlan}
           <Card>
             <CardHeader>
-              <CardTitle>{loteo.nombre}</CardTitle>
+              <CardTitle>{development.nombre}</CardTitle>
               <CardDescription>
-                {loteo.ubicacion}
+                {development.ubicacion}
                 {selectedBlock ? ` · Manzana ${selectedBlock.numero || 'sin número'}` : ''}
                 {selectedLot ? ` · Lote ${selectedLot.numero || 'sin número'}` : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 text-sm">
-              {loteo.descripcion && <p className="text-muted-foreground">{loteo.descripcion}</p>}
+              {development.descripcion && <p className="text-muted-foreground">{development.descripcion}</p>}
               {selectedLot ? (
                 <dl className="grid gap-2 sm:grid-cols-3">
                   <Info label="Estado" value={createdSale ? 'vendido' : selectedLot.estado} className="capitalize" />

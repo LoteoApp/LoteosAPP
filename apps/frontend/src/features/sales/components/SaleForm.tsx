@@ -36,7 +36,7 @@ export type SaleFormProps = {
   createdClient?: ClientOption | null
   onRegisterClient?: () => void
   renderClientDialog?: ReactNode
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
+  loadSellers: (developmentId: string, signal?: AbortSignal) => Promise<SellerOption[]>
   onSubmit: (values: CreateSaleValues) => Promise<boolean>
   isSubmitting?: boolean
   error?: string | null
@@ -70,13 +70,13 @@ export default function SaleForm({
     }
   }
 
-  const loteoId = lot === null ? '' : lot.loteoId
-  const sellersState = useSaleSellers(loteoId, loadSellers)
+  const developmentId = lot === null ? '' : lot.loteoId
+  const sellersState = useSaleSellers(developmentId, loadSellers)
 
   // A different loteo invalidates both selectors before the new list arrives.
-  const [sellersLoteoId, setSellersLoteoId] = useState(loteoId)
-  if (sellersLoteoId !== loteoId) {
-    setSellersLoteoId(loteoId)
+  const [sellersDevelopmentId, setSellersDevelopmentId] = useState(developmentId)
+  if (sellersDevelopmentId !== developmentId) {
+    setSellersDevelopmentId(developmentId)
     setAgency(null)
     setSeller(null)
   }
