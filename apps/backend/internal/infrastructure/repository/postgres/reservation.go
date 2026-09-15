@@ -495,23 +495,31 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 func (repository *ReservationRepository) ListEligibleSellers(ctx context.Context, loteoID string, scope gateway.ReservationScope) ([]domain.SellerOption, error) {
 	scope = normalizeReservationScope(scope)
 	rows, err := repository.pool.Query(ctx, `
-		SELECT u.id::text, u.nombre, u.apellido, u.email, u.rol
+		SELECT u.id::text, u.nombre, u.apellido, u.email, u.rol,
+		       COALESCE(a.id::text, ''), COALESCE(a.razon_social, ''),
+		       COALESCE(u.auth_provider_id = $5::uuid, false)
 		FROM usuarios u
 		LEFT JOIN inmobiliarias a ON a.id = u.inmobiliaria_id
 		JOIN loteos l ON l.id = $1::uuid AND l.fecha_baja IS NULL
 		WHERE u.fecha_baja IS NULL
 		  AND u.rol IN ('administrador', 'administrativo', 'inmobiliaria')
-		  AND ($2::uuid IS NULL OR ($3 AND u.auth_provider_id = $2::uuid))
+		  AND ($2::uuid IS NULL OR ($3 AND (
+			 u.auth_provider_id = $2::uuid
+			 OR ($4 AND u.inmobiliaria_id = (
+				SELECT peer.inmobiliaria_id FROM usuarios peer
+				WHERE peer.auth_provider_id = $2::uuid
+			 ))
+		  )))
 		  AND (
 			 u.rol IN ('administrador', 'administrativo')
-			 OR (a.fecha_baja IS NULL AND EXISTS (
+			 OR (a.fecha_baja IS NULL AND ($4 OR EXISTS (
 				SELECT 1 FROM inmobiliaria_loteos il
 				WHERE il.inmobiliaria_id = u.inmobiliaria_id
 				  AND il.loteo_id = l.id AND il.fecha_baja IS NULL
-			 ))
+			 )))
 		  )
 		ORDER BY u.apellido, u.nombre, u.id
-	`, loteoID, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment)
+	`, loteoID, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment, scope.ForSale, scope.ActorAuthProviderID)
 	if err != nil {
 		if isInvalidUUID(err) {
 			return []domain.SellerOption{}, domain.ErrLoteoNotFound
@@ -523,7 +531,16 @@ func (repository *ReservationRepository) ListEligibleSellers(ctx context.Context
 	result := make([]domain.SellerOption, 0)
 	for rows.Next() {
 		var seller domain.SellerOption
-		if err := rows.Scan(&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol); err != nil {
+		if err := rows.Scan(
+			&seller.ID,
+			&seller.Nombre,
+			&seller.Apellido,
+			&seller.Email,
+			&seller.Rol,
+			&seller.InmobiliariaID,
+			&seller.InmobiliariaRazonSocial,
+			&seller.IsActor,
+		); err != nil {
 			return nil, err
 		}
 		result = append(result, seller)

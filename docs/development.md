@@ -104,6 +104,19 @@ Endpoints operativos del backend:
 - `GET /api/v1/loteos/{loteoId}/vendedores`: devuelve el catálogo mínimo de
   vendedores elegibles para ese loteo, sin otorgar acceso adicional al ABM de
   usuarios.
+- `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/ventas` (requiere cuenta
+  activa con rol `administrador`, `administrativo` o `inmobiliaria`): registra
+  una venta al contado de un lote `disponible` y lo pasa a `vendido`. Recibe
+  `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (solo `contado`
+  por ahora); exige el header `Idempotency-Key`. El monto y la moneda salen
+  del precio del lote. Un usuario de inmobiliaria solo puede vender en un
+  loteo al que su agencia está asignada (`sale_agency_not_assigned`) y solo
+  puede elegir vendedores de su propia agencia; administrador y
+  administrativo eligen cualquier agencia activa con vendedores.
+- `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}`: listan o consultan ventas
+  dentro del alcance del actor: administrativos ven todas y los usuarios de
+  inmobiliaria las vendidas por su agencia. El listado admite `estado`,
+  `loteoId`, `loteId`, `q`, `pagina` y `porPagina`.
 
 El backend ejecuta el vencimiento automático al iniciar y cada minuto. Se
 puede deshabilitar o ajustar sin recompilar mediante las variables

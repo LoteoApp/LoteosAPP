@@ -113,3 +113,19 @@
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+@page {
+  margin: 16mm;
+}
+
+@media print {
+  body:has([data-print-area]) > *:not(:has([data-print-area])) {
+    display: none;
+  }
+
+  [data-print-area] {
+    color: black;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

@@ -118,7 +118,7 @@ quien asigna loteos y permisos.
 | **Administrativo** | Visualizar información, editar ciertos datos (configurable, ver [Roles y permisos](#gestión-de-roles-y-permisos)), cargar ventas | Crear usuarios, asignar permisos, vender por sí mismo sin definición del admin, editar/eliminar lotes |
 | **Agrimensor** | Cargar DXF; cargar fotos y planos del loteo o de un lote (no de una manzana); editar información de manzanas/lotes/calles en loteos asignados | Operar loteos no asignados |
 | **Escribano** | Administrar documentación legal (escrituras, certificaciones, poderes, cartas documento) en loteos asignados | Editar información de loteos, manzanas, lotes o calles |
-| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar lotes individuales, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
+| **Inmobiliaria** | Ver loteos asignados (completo, manzanas, lotes y calles), consultar disponibilidad/precio/estado, gestionar clientes (alta/modificación), reservar y vender lotes individuales en loteos asignados, cobrar sobre el loteo asignado | Reservar manzanas o loteos completos, operar loteos no asignados |
 
 Los clientes no son usuarios del sistema.
 
@@ -220,18 +220,52 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 
 ## Venta
 
-Cargada por administrador o administrativo (`usuario_alta`):
+Cargada por administrador, administrativo o un usuario de inmobiliaria cuya
+agencia está asignada al loteo (`usuario_alta`):
 
 - lote vendido, cliente comprador;
+- la venta se inicia desde el visualizador del loteo, con el lote ya
+  elegido —solo un lote `disponible` con número y precio—, igual que la
+  reserva;
 - vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
-  agencia se lee de `usuarios.inmobiliaria_id`;
+  agencia se lee de `usuarios.inmobiliaria_id`. Administrador y administrativo
+  eligen primero la inmobiliaria —cualquiera activa con al menos un vendedor
+  cargado, o «Venta directa» para vender como internos— y después uno de sus
+  vendedores; a diferencia de la reserva, para ellos la agencia no tiene que
+  estar asignada al loteo. Un usuario con rol inmobiliaria solo puede cargar
+  la venta si su agencia está asignada al loteo, y elige el vendedor entre
+  los de su propia agencia, así que puede cargar la venta de un colega. Es
+  la diferencia con la reserva, donde la inmobiliaria siempre queda como
+  vendedor responsable. Por defecto el
+  vendedor es quien carga la venta: un administrador o administrativo, que no
+  pertenece a ninguna agencia, queda como vendedor de una venta directa sin
+  tener que elegir nada;
 - estado vigente en `ventas.estado_actual`; las transiciones se registran
-  solo en `venta_estados`. Una venta no cancelada por lote;
+  solo en `venta_estados`. Una venta no cancelada por lote; al confirmar,
+  el lote pasa a `vendido` en la misma transacción y el monto y la moneda
+  quedan copiados del precio del lote en ese momento;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
-  o entrega + financiación.
+  o entrega + financiación. Hoy solo se registra al contado;
+- el alta acepta una clave de idempotencia por actor, como la reserva:
+  repetir la misma clave y payload devuelve la misma venta; reutilizarla con
+  otro payload es un conflicto;
+- listado y detalle desde el módulo **Ventas**, con el mismo alcance que
+  las reservas: administrador y administrativo ven todas; un usuario de
+  inmobiliaria, las vendidas por su agencia. Se busca por cliente, loteo,
+  lote o vendedor y se filtra por estado; el detalle vuelve a imprimir el
+  recibo.
 
-Al completarse, se genera un recibo PDF con descripción de lo comprado, medio
-de pago y código QR o link de verificación de autenticidad.
+Vender un lote `reservado` solo lo puede hacer el vendedor responsable de esa
+reserva (`reservas.vendedor_id`): la reserva le pertenece a quien la tomó, y
+la venta la concreta esa misma persona. El vendedor de la venta no se elige
+entonces, sale de la reserva. Un lote `disponible` no tiene esa restricción y
+lo vende cualquier vendedor elegible. La conversión de una reserva en venta
+todavía no está implementada: hoy solo se vende un lote `disponible`.
+
+Al completarse, se genera un recibo con descripción de lo comprado, comprador,
+vendedor e inmobiliaria y medio de pago, que se imprime desde el navegador (o
+se guarda como PDF). El código QR o link de verificación de autenticidad queda
+para más adelante.
 
 ## Cobranza
 

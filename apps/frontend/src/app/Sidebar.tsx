@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   { to: '/lotes', label: 'Lotes', icon: LandPlot },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/reservas', label: 'Reservas', icon: CalendarCheck, roles: RESERVATION_ROLES },
-  { to: '/ventas', label: 'Ventas', icon: Handshake },
+  { to: '/ventas', label: 'Ventas', icon: Handshake, roles: RESERVATION_ROLES },
   { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog, roles: [ROLE.administrador] },
   { to: '/inmobiliarias', label: 'Inmobiliarias', icon: Building2 },

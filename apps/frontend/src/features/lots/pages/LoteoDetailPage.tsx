@@ -31,6 +31,7 @@ type LoteoDetailPageProps = {
   accessToken: string | null
   canEdit?: boolean
   renderReservationAction?: (lote: LoteoDetail['lotes'][number], onCreated: () => void) => ReactNode
+  renderSaleAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
   renderReservations?: (
     loteo: LoteoDetail,
     onReservationCanceled: (loteId: string) => void,
@@ -57,6 +58,7 @@ export default function LoteoDetailPage({
   accessToken,
   canEdit = false,
   renderReservationAction,
+  renderSaleAction,
   renderReservations,
   renderReservationSummary,
 }: LoteoDetailPageProps) {
@@ -295,6 +297,7 @@ export default function LoteoDetailPage({
                   ? (lote) => renderReservationAction(lote, () => handleReservationCreated(lote))
                   : undefined
               }
+              renderSaleAction={renderSaleAction}
               renderReservationSummary={
                 renderReservationSummary
                   ? (lote) => renderReservationSummary(lote, () => handleReservationCanceled(lote))

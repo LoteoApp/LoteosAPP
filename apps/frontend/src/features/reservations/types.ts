@@ -90,7 +90,13 @@ export type Reservation = {
   puedeCancelar?: boolean
 }
 
-export type SellerOption = ReservationActor
+// The endpoint carries the agency of each seller so a caller can group them
+// by inmobiliaria; internal users sell without one.
+export type SellerOption = ReservationActor & {
+  esActor?: boolean
+  inmobiliariaId?: string
+  inmobiliariaRazonSocial?: string
+}
 
 export type ReservationPage = {
   reservas: Reservation[]

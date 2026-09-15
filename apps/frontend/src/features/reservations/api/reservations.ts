@@ -12,6 +12,10 @@ function isState(value: unknown): value is Reservation['estado'] {
   return value === 'activa' || value === 'vencida' || value === 'cancelada' || value === 'convertida'
 }
 
+function isOptionalText(value: unknown): boolean {
+  return value === undefined || typeof value === 'string'
+}
+
 function isActor(value: unknown): value is SellerOption {
   return (
     isRecord(value) &&
@@ -92,9 +96,34 @@ export async function getReservation(token: string, id: string, signal?: AbortSi
   return readBody(body, isReservation)
 }
 
-export async function listEligibleSellers(token: string, loteoId: string, signal?: AbortSignal): Promise<SellerOption[]> {
-  const body = await apiFetch<unknown>(`/api/v1/loteos/${encodeURIComponent(loteoId)}/vendedores`, { token, signal })
-  if (!isRecord(body) || !Array.isArray(body.vendedores) || !body.vendedores.every(isActor)) {
+function isSeller(value: unknown): value is SellerOption {
+  if (!isActor(value)) {
+    return false
+  }
+  const candidate = value as Record<string, unknown>
+  return (
+    isOptionalText(candidate.inmobiliariaId) &&
+    isOptionalText(candidate.inmobiliariaRazonSocial) &&
+    (candidate.esActor === undefined || typeof candidate.esActor === 'boolean')
+  )
+}
+
+// `propio` leaves an agency user with themselves, which is what a reserva
+// needs; `agencia` widens it to their colleagues, which is what a venta needs.
+export type SellerScope = 'propio' | 'agencia'
+
+export async function listEligibleSellers(
+  token: string,
+  loteoId: string,
+  signal?: AbortSignal,
+  scope: SellerScope = 'propio',
+): Promise<SellerOption[]> {
+  const path = `/api/v1/loteos/${encodeURIComponent(loteoId)}/vendedores`
+  const body = await apiFetch<unknown>(scope === 'agencia' ? `${path}?alcance=agencia` : path, {
+    token,
+    signal,
+  })
+  if (!isRecord(body) || !Array.isArray(body.vendedores) || !body.vendedores.every(isSeller)) {
     throw new Error(GENERIC_ERROR)
   }
   return body.vendedores

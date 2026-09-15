@@ -11,8 +11,13 @@ type ReservationScope struct {
 	AssigneeAuthProviderID *string
 	ByAgencyAssignment     bool
 	// ActorAuthProviderID is used only to calculate action permissions in a
-	// response. It never narrows administrative reads.
+	// response and to mark the actor in a seller listing. It never narrows
+	// administrative reads.
 	ActorAuthProviderID *string
+	// Marks a seller listing for a venta instead of a reserva: an agency actor
+	// gets every seller of their agency (not just themselves), and every active
+	// agency with sellers is listed whether or not it is assigned to the loteo.
+	ForSale bool
 }
 
 type CreateReservationCommand struct {

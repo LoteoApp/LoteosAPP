@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { BadgeDollarSign, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -38,6 +38,7 @@ type PlanSelectionPanelProps = {
   calleUpdateState: UpdateCalleState
   onSaveCalle: (calleId: string, payload: UpdateCallePayload) => Promise<boolean>
   renderReservationAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
+  renderSaleAction?: (lote: LoteoDetail['lotes'][number]) => ReactNode
   renderReservationSummary?: (lote: LoteoDetail['lotes'][number]) => ReactNode
 }
 
@@ -55,6 +56,7 @@ export default function PlanSelectionPanel({
   calleUpdateState,
   onSaveCalle,
   renderReservationAction,
+  renderSaleAction,
   renderReservationSummary,
 }: PlanSelectionPanelProps) {
   const title = titleFor(selected, loteo, polygonLabels, selectedPolygonId)
@@ -126,10 +128,7 @@ export default function PlanSelectionPanel({
           {!isEditing && (
             <div className="flex flex-wrap gap-2">
               {renderReservationAction && lote.estado === 'disponible' && renderReservationAction(lote)}
-              <Button type="button" variant="outline" disabled title="Próximamente">
-                <BadgeDollarSign aria-hidden />
-                Pasar a venta
-              </Button>
+              {renderSaleAction && lote.estado === 'disponible' && renderSaleAction(lote)}
               {showEditAction && (
                 <Button
                   type="button"

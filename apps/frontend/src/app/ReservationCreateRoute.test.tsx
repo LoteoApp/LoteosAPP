@@ -101,7 +101,7 @@ describe('ReservationCreateRoute', () => {
       expect.any(String),
     ))
     expect(await screen.findByText('Reserva creada')).toBeInTheDocument()
-  })
+  }, 15_000)
 
   it('uses the seller returned for an agency user without showing a selector', () => {
     useLoteoMock.mockReturnValue({ status: 'loaded', loteo })

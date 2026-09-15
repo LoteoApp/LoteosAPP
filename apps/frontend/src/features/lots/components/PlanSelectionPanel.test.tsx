@@ -89,7 +89,8 @@ describe('PlanSelectionPanel', () => {
     expect(screen.getByText('Reservado por Ana Pérez')).toBeInTheDocument()
   })
 
-  it('offers the sale action as coming soon', () => {
+  it('renders the sale action for an available lote', () => {
+    const renderSaleAction = vi.fn((lote: { id: string }) => <button type="button">Vender {lote.id}</button>)
     render(
       <PlanSelectionPanel
         selected={{ kind: 'lote', id: 'lt-1' }}
@@ -102,10 +103,36 @@ describe('PlanSelectionPanel', () => {
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
         onSaveCalle={vi.fn()}
+        renderSaleAction={renderSaleAction}
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Pasar a venta' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Vender lt-1' })).toBeInTheDocument()
+    expect(renderSaleAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'lt-1' }))
+  })
+
+  it('does not offer the sale action for a lote that is not available', () => {
+    const renderSaleAction = vi.fn(() => <button type="button">Vender</button>)
+    const withSoldLot = loteo()
+    withSoldLot.lotes = withSoldLot.lotes.map((lote) => (lote.id === 'lt-1' ? { ...lote, estado: 'vendido' } : lote))
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={withSoldLot}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+        renderSaleAction={renderSaleAction}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Vender' })).not.toBeInTheDocument()
+    expect(renderSaleAction).not.toHaveBeenCalled()
   })
 
   it('prompts the user when nothing is selected', () => {
