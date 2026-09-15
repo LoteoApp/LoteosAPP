@@ -10,6 +10,7 @@ import (
 	"loteosapp/backend/internal/business/usecase/clients"
 	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/reservations"
+	"loteosapp/backend/internal/business/usecase/sales"
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
@@ -53,6 +54,9 @@ type Container struct {
 	GetReservationHandler      *handler.GetReservationHandler
 	ReservationReceiptHandler  *handler.ReservationReceiptHandler
 	CancelReservationHandler   *handler.CancelReservationHandler
+	CreateSaleHandler          *handler.CreateSaleHandler
+	ListSalesHandler           *handler.ListSalesHandler
+	GetSaleHandler             *handler.GetSaleHandler
 	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
 	TransitionLotState         loteos.TransitionLotState
 	ReservationExpiryWorker    *worker.ReservationExpiryWorker
@@ -132,6 +136,11 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	reservationReceiptHandler := handler.NewReservationReceiptHandler(reservations.NewGetReservationReceipt(reservationRepo, loteoRepo))
 	cancelReservationHandler := handler.NewCancelReservationHandler(reservations.NewCancelReservation(reservationRepo, userRepo))
 	listEligibleSellersHandler := handler.NewListEligibleSellersHandler(reservations.NewListEligibleSellers(reservationRepo))
+
+	saleRepo := postgres.NewSaleRepository(pool)
+	createSaleHandler := handler.NewCreateSaleHandler(sales.NewCreateSale(saleRepo, userRepo))
+	listSalesHandler := handler.NewListSalesHandler(sales.NewListSales(saleRepo))
+	getSaleHandler := handler.NewGetSaleHandler(sales.NewGetSale(saleRepo))
 	var reservationExpiryWorker *worker.ReservationExpiryWorker
 	if cfg.ReservationExpiry.Enabled {
 		reservationExpiryWorker = worker.NewReservationExpiryWorker(
@@ -176,6 +185,9 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		GetReservationHandler:      getReservationHandler,
 		ReservationReceiptHandler:  reservationReceiptHandler,
 		CancelReservationHandler:   cancelReservationHandler,
+		CreateSaleHandler:          createSaleHandler,
+		ListSalesHandler:           listSalesHandler,
+		GetSaleHandler:             getSaleHandler,
 		ListEligibleSellersHandler: listEligibleSellersHandler,
 		TransitionLotState:         transitionLotState,
 		ReservationExpiryWorker:    reservationExpiryWorker,

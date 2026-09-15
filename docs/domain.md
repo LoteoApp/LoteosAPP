@@ -239,18 +239,28 @@ Cargada por administrador o administrativo (`usuario_alta`):
   pertenece a ninguna agencia, queda como vendedor de una venta directa sin
   tener que elegir nada;
 - estado vigente en `ventas.estado_actual`; las transiciones se registran
-  solo en `venta_estados`. Una venta no cancelada por lote;
+  solo en `venta_estados`. Una venta no cancelada por lote; al confirmar,
+  el lote pasa a `vendido` en la misma transacción y el monto y la moneda
+  quedan copiados del precio del lote en ese momento;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
-  o entrega + financiación.
+  o entrega + financiación. Hoy solo se registra al contado;
+- listado y detalle desde el módulo **Ventas**, con el mismo alcance que
+  las reservas: administrador y administrativo ven todas; un usuario de
+  inmobiliaria, las vendidas por su agencia. Se busca por cliente, loteo,
+  lote o vendedor y se filtra por estado; el detalle vuelve a imprimir el
+  recibo.
 
 Vender un lote `reservado` solo lo puede hacer el vendedor responsable de esa
 reserva (`reservas.vendedor_id`): la reserva le pertenece a quien la tomó, y
 la venta la concreta esa misma persona. El vendedor de la venta no se elige
 entonces, sale de la reserva. Un lote `disponible` no tiene esa restricción y
-lo vende cualquier vendedor elegible.
+lo vende cualquier vendedor elegible. La conversión de una reserva en venta
+todavía no está implementada: hoy solo se vende un lote `disponible`.
 
-Al completarse, se genera un recibo PDF con descripción de lo comprado, medio
-de pago y código QR o link de verificación de autenticidad.
+Al completarse, se genera un recibo con descripción de lo comprado, comprador,
+vendedor e inmobiliaria y medio de pago, que se imprime desde el navegador (o
+se guarda como PDF). El código QR o link de verificación de autenticidad queda
+para más adelante.
 
 ## Cobranza
 

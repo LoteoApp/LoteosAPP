@@ -9,6 +9,8 @@ import {
   loteOptionFromDevelopment,
   loteOptionLabel,
   saleDisabledReason,
+  saleLoteLabel,
+  saleReceiptFromSale,
   sellerAgencyLabel,
   sellerOptionLabel,
   sellersOfAgency,
@@ -298,5 +300,52 @@ describe('saleDisabledReason', () => {
     expect(saleDisabledReason({ numero: '  ', precio: null })).toBe(
       'Completá el número y el precio del lote para habilitar la venta.',
     )
+  })
+})
+
+describe('saleReceiptFromSale', () => {
+  const sale = {
+    id: 'sale-1',
+    loteoId: 'loteo-1',
+    loteoNombre: 'Las Acacias',
+    loteId: 'lot-1',
+    loteNumero: '7',
+    manzanaNumero: '2',
+    loteSuperficie: 300,
+    cliente: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222' },
+    vendedor: { id: 'seller-1', nombre: 'Marta', apellido: 'Suárez', rol: 'inmobiliaria' },
+    usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
+    inmobiliaria: { id: 'ag-1', razonSocial: 'Inmobiliaria Sur' },
+    modalidadPago: 'contado' as const,
+    monto: 120000,
+    moneda: 'USD',
+    estado: 'activa' as const,
+    fechaCreacion: '2026-09-14T15:00:00Z',
+    fechaModificacion: '2026-09-14T15:00:00Z',
+  }
+
+  it('turns the persisted sale into the receipt the dialog prints', () => {
+    const receipt = saleReceiptFromSale(sale)
+
+    expect(receipt.emitidoEl).toBe('2026-09-14T15:00:00Z')
+    expect(receipt.monto).toBe(120000)
+    expect(receipt.moneda).toBe('USD')
+    expect(receipt.method).toBe('contado')
+    expect(loteOptionLabel(receipt.lote)).toBe('Las Acacias · Mz 2 · Lote 7')
+    expect(receipt.lote.superficie).toBe(300)
+    expect(receipt.cliente).toEqual(sale.cliente)
+    expect(sellerOptionLabel(receipt.seller)).toBe('Suárez, Marta')
+    expect(sellerAgencyLabel(receipt.seller)).toBe('Inmobiliaria Sur')
+  })
+
+  it('labels a sale without an agency as a venta directa', () => {
+    const { inmobiliaria: _agency, ...direct } = sale
+
+    expect(sellerAgencyLabel(saleReceiptFromSale(direct).seller)).toBe('Venta directa')
+  })
+
+  it('labels the lote of a sale', () => {
+    expect(saleLoteLabel(sale)).toBe('Las Acacias · Mz 2 · Lote 7')
+    expect(saleLoteLabel({ loteoNombre: 'Norte', manzanaNumero: '', loteNumero: '' })).toBe('Norte · Mz — · Lote —')
   })
 })

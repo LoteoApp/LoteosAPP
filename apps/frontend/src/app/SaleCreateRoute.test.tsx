@@ -9,6 +9,7 @@ const useLoteoMock = vi.hoisted(() => vi.fn())
 const listClientsMock = vi.hoisted(() => vi.fn())
 const createClientMock = vi.hoisted(() => vi.fn())
 const listEligibleSellersMock = vi.hoisted(() => vi.fn())
+const createSaleMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../features/auth/hooks/use-auth', () => ({
   useAuth: () => ({ session: { access_token: 'token' }, user: { app_metadata: { role: 'administrativo' } } }),
@@ -16,6 +17,7 @@ vi.mock('../features/auth/hooks/use-auth', () => ({
 vi.mock('../features/lots/hooks/use-loteo', () => ({ useLoteo: useLoteoMock }))
 vi.mock('../features/clients/api/clients', () => ({ listClients: listClientsMock, createClient: createClientMock }))
 vi.mock('../features/reservations/api/reservations', () => ({ listEligibleSellers: listEligibleSellersMock }))
+vi.mock('../features/sales/api/sales', () => ({ createSale: createSaleMock }))
 
 const triangle = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]
 const loteo: LoteoDetail = {
@@ -30,6 +32,14 @@ const loteo: LoteoDetail = {
 }
 const client = { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '30111222', celular: '', email: '' }
 const seller = { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrativo', esActor: true }
+const sale = {
+  id: 'sale-1', loteoId: 'loteo-1', loteoNombre: 'Las Acacias', loteId: 'lot-1', loteNumero: '7', manzanaNumero: '2', loteSuperficie: 300,
+  cliente: { id: client.id, nombre: client.nombre, apellido: client.apellido, dni: client.dni },
+  vendedor: { id: seller.id, nombre: seller.nombre, apellido: seller.apellido, rol: seller.rol },
+  usuarioAlta: { id: seller.id, nombre: seller.nombre, apellido: seller.apellido, rol: seller.rol },
+  modalidadPago: 'contado' as const, monto: 120000, moneda: 'USD', estado: 'activa' as const,
+  fechaCreacion: '2026-09-14T15:00:00Z', fechaModificacion: '2026-09-14T15:00:00Z',
+}
 
 function renderRoute() {
   return render(
@@ -48,6 +58,7 @@ describe('SaleCreateRoute', () => {
     useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
     listClientsMock.mockResolvedValue([client])
     listEligibleSellersMock.mockResolvedValue([seller])
+    createSaleMock.mockResolvedValue(sale)
     const user = userEvent.setup()
     const print = vi.spyOn(window, 'print').mockImplementation(() => {})
 
@@ -66,6 +77,9 @@ describe('SaleCreateRoute', () => {
     await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
     await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
 
+    await waitFor(() => expect(createSaleMock).toHaveBeenCalledWith('token', {
+      loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado',
+    }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Las Acacias · Mz 2 · Lote 7')
     expect(dialog).toHaveTextContent('Gómez, Beto')

@@ -12,6 +12,7 @@ import ReservationsRoute from './ReservationsRoute'
 import ReservationDetailsRoute from './ReservationDetailsRoute'
 import ReservationCreateRoute from './ReservationCreateRoute'
 import SaleCreateRoute from './SaleCreateRoute'
+import SaleDetailsRoute from './SaleDetailsRoute'
 import SalesRoute from './SalesRoute'
 import BillingPage from '../features/billing/pages/BillingPage'
 import UsersRoute from './UsersRoute'
@@ -79,13 +80,25 @@ export const router = createBrowserRouter([
       },
       {
         path: '/ventas',
-        element: <SalesRoute />,
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <SalesRoute />
+          </RequireRole>
+        ),
       },
       {
         path: '/ventas/nueva/:loteoId/:loteId',
         element: (
           <RequireRole roles={RESERVATION_ROLES}>
             <SaleCreateRoute />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/ventas/:id',
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <SaleDetailsRoute />
           </RequireRole>
         ),
       },

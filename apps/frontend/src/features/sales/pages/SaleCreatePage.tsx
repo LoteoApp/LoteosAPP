@@ -1,14 +1,24 @@
-import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ArrowLeft, Printer } from 'lucide-react'
 import { Link } from 'react-router'
+import { messageFromError } from '../../../shared/api/client'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
+import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { formatArea } from '../../../shared/lib/formatArea'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import SaleForm from '../components/SaleForm'
 import SaleCreatePageSkeleton from '../components/SaleCreatePageSkeleton'
-import { loteOptionFromDevelopment } from '../types'
-import type { ClienteOption, NewClientValues, SaleCreateDevelopment, SellerOption } from '../types'
+import SaleReceiptDialog from '../components/SaleReceiptDialog'
+import { loteOptionFromDevelopment, saleReceiptFromSale } from '../types'
+import type {
+  ClienteOption,
+  CreateSaleValues,
+  NewClientValues,
+  Sale,
+  SaleCreateDevelopment,
+  SellerOption,
+} from '../types'
 
 export type SaleCreatePageProps = {
   loteoId: string
@@ -19,6 +29,7 @@ export type SaleCreatePageProps = {
   loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
   createCliente: (values: NewClientValues) => Promise<ClienteOption>
   loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
+  createSale: (values: CreateSaleValues) => Promise<Sale>
   renderPlan?: ReactNode
 }
 
@@ -31,8 +42,30 @@ export default function SaleCreatePage({
   loadClientes,
   createCliente,
   loadSellers,
+  createSale,
   renderPlan,
 }: SaleCreatePageProps) {
+  const [createdSale, setCreatedSale] = useState<Sale | null>(null)
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  async function handleSubmit(values: CreateSaleValues): Promise<boolean> {
+    setIsSubmitting(true)
+    setSubmitError(null)
+    try {
+      const sale = await createSale(values)
+      setCreatedSale(sale)
+      setIsReceiptOpen(true)
+      return true
+    } catch (error) {
+      setSubmitError(messageFromError(error))
+      return false
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (loteoStatus === 'loading') {
     return (
       <section className="flex min-h-0 flex-1 flex-col gap-4">
@@ -85,7 +118,7 @@ export default function SaleCreatePage({
               {loteo.descripcion && <p className="text-muted-foreground">{loteo.descripcion}</p>}
               {selectedLot ? (
                 <dl className="grid gap-2 sm:grid-cols-3">
-                  <Info label="Estado" value={selectedLot.estado} className="capitalize" />
+                  <Info label="Estado" value={createdSale ? 'vendido' : selectedLot.estado} className="capitalize" />
                   <Info
                     label="Precio"
                     value={selectedLot.precio === null ? 'A consultar' : formatCurrency(selectedLot.precio, selectedLot.moneda)}
@@ -114,7 +147,7 @@ export default function SaleCreatePage({
                   ].filter(Boolean).join(' · ') || 'Sin servicios informados'}
                 />
               )}
-              {isUnavailable && selectedLot && (
+              {isUnavailable && selectedLot && !createdSale && (
                 <Alert variant="destructive">
                   <AlertTitle>Lote no disponible</AlertTitle>
                   <AlertDescription>El lote cambió de estado. Volvé al visor para elegir otro.</AlertDescription>
@@ -124,15 +157,47 @@ export default function SaleCreatePage({
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
-          <SaleForm
-            lote={lote}
-            loadClientes={loadClientes}
-            createCliente={createCliente}
-            loadSellers={loadSellers}
-            disabled={isUnavailable}
-          />
+          {createdSale ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Venta registrada</CardTitle>
+                <CardDescription>
+                  El lote quedó vendido a {createdSale.cliente.apellido}, {createdSale.cliente.nombre} por{' '}
+                  {formatCurrency(createdSale.monto, createdSale.moneda)}.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button onClick={() => setIsReceiptOpen(true)}>
+                  <Printer aria-hidden />
+                  Imprimir recibo
+                </Button>
+                <Link className={buttonVariants({ variant: 'outline' })} to={`/ventas/${createdSale.id}`}>
+                  Ver detalle
+                </Link>
+                <Link className={buttonVariants({ variant: 'ghost' })} to="/ventas">
+                  Ir al listado
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <SaleForm
+              lote={lote}
+              loadClientes={loadClientes}
+              createCliente={createCliente}
+              loadSellers={loadSellers}
+              onSubmit={handleSubmit}
+              isSubmitting={isSubmitting}
+              error={submitError}
+              disabled={isUnavailable}
+            />
+          )}
         </div>
       </div>
+      <SaleReceiptDialog
+        open={isReceiptOpen && createdSale !== null}
+        receipt={createdSale ? saleReceiptFromSale(createdSale) : null}
+        onClose={() => setIsReceiptOpen(false)}
+      />
     </section>
   )
 }

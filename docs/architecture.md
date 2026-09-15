@@ -470,29 +470,32 @@ Decisiones de este recorte:
   cuatro valores del contrato y `LotStateBadge` presenta una etiqueta común
   en la tabla de lotes. Las acciones operativas pertenecen a sus flujos y no
   se ofrece un selector libre.
-- **La pantalla de venta todavía no persiste nada.** `features/sales` resuelve
-  la selección de lote, cliente y vendedor contra endpoints existentes;
-  el alta de la venta y la transición del lote a `vendido` quedan para la
-  entrega siguiente. `GET /api/v1/lotes` alimenta el buscador de lotes: es la
-  única pieza de backend que agrega, devuelve cada lote con su manzana, su
-  loteo y su estado, y acepta `?q=` y `?estado=`. La pantalla pide
-  `estado=disponible` para no ofrecer un lote reservado o vendido —cuando la
-  conversión de reserva entre al circuito habrá que sumar los `reservado` y
-  fijar el vendedor al de la reserva, según la regla de `docs/domain.md`—, y
-  el scope
-  por rol es el mismo de `ListLoteos`, así que una inmobiliaria solo alcanza
-  los lotes de los loteos de su agencia.
-- **Confirmar la venta hoy solo emite el recibo.** `buildSaleReceipt` valida el
-  borrador en el cliente (lote elegido y con precio, cliente elegido, modalidad
-  disponible, vendedor elegido) y devuelve el recibo o el mensaje de lo que
-  falta: mientras algo
-  falte, `Confirmar venta` queda deshabilitado y el mensaje se muestra al lado
-  del botón. Con el borrador completo, `SaleReceiptDialog` muestra el recibo y
-  `window.print()` lo manda a la impresora.
-  Sale rotulado «Comprobante provisorio» porque todavía no hay una venta
-  registrada detrás: cuando exista el alta, el diálogo se abrirá con la venta
-  persistida y el rótulo se cae. El recibo nombra al vendedor y deriva de él
-  la inmobiliaria; para un vendedor interno dice «Venta directa». Al imprimir,
+- **La venta se persiste con el mismo esquema que la reserva.**
+  `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/ventas` (`usecase/sales`,
+  `postgres.SaleRepository`) inserta en `ventas` y, en la misma transacción,
+  pasa el lote de `disponible` a `vendido` por la máquina de estados
+  (`lote_estados` con origen `venta` y `venta_id`). El lote se bloquea con
+  `FOR UPDATE` antes de mirar su estado, así dos ventas del mismo lote se
+  serializan y la segunda lo encuentra vendido (`sale_lot_unavailable`); el
+  índice único `ventas_lote_id_activa_idx` es la red de seguridad. El monto
+  y la moneda se copian del precio del lote en ese momento: un lote sin
+  número, precio o moneda es `sale_lot_incomplete`. Solo `contado` está
+  disponible (`payment_method_unavailable` para las otras dos modalidades).
+  `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}` listan y consultan con el
+  alcance de reservas: internos ven todo; un usuario de inmobiliaria solo las
+  ventas cuyo vendedor es de su agencia, porque `ventas` no guarda agencia y
+  se lee de `usuarios.inmobiliaria_id`. No hay `Idempotency-Key`: reintentar
+  el alta choca con el lote ya vendido, que es el resultado correcto.
+- **Confirmar registra la venta y abre el recibo de la venta persistida.**
+  `buildSaleReceipt` sigue validando el borrador en el cliente (lote con
+  precio, cliente, modalidad disponible, vendedor) para deshabilitar
+  `Confirmar venta` y mostrar qué falta; con el borrador completo `SaleForm`
+  llama a `createSale` y `SaleCreatePage` reemplaza el formulario por la
+  tarjeta «Venta registrada» (imprimir recibo, ver detalle, ir al listado) y
+  abre `SaleReceiptDialog` con `saleReceiptFromSale(venta)`, que
+  `window.print()` manda a la impresora. El recibo nombra al vendedor y
+  deriva de él la inmobiliaria; para un vendedor interno dice «Venta
+  directa». Al imprimir,
   el backdrop del diálogo compartido se esconde con `print:hidden` e
   `index.css` oculta con
   `display: none` todo hermano de `body` que no contenga `[data-print-area]`
@@ -544,16 +547,21 @@ Decisiones de este recorte:
   es el espejo de `ReservationCreatePage`: plano de referencia y ficha del
   lote a la izquierda, formulario a la derecha, y el mismo aviso si el lote
   cambió de estado. El formulario en sí es `SaleForm` (cliente, inmobiliaria,
-  vendedor, condiciones de pago, confirmación y recibo), compartido con
-  `SalesPage`, la pantalla de `/ventas` que en vez de recibir el lote de la
-  ruta lo deja elegir con un buscador (`leading`). Los vendedores los carga
-  `useSaleSellers` por loteo.
+  vendedor, condiciones de pago y confirmación); los vendedores los carga
+  `useSaleSellers` por loteo. `/ventas` (`SalesPage`) es el listado, espejo
+  de `/reservas`: búsqueda por cliente, loteo, lote o vendedor, filtro por
+  estado y paginación (`useSales` sobre `GET /api/v1/ventas`), con «Abrir
+  visor de lotes» como único camino para crear una; `/ventas/{id}`
+  (`SaleDetailsPage`) muestra la venta con el plano de referencia del lote y
+  vuelve a imprimir el recibo.
 - **Ventas no importa `clients`, `lots` ni `reservations`.** Como una feature
   no toca los archivos de otra, `SaleForm` recibe `loadClientes`,
-  `createCliente` y `loadSellers` como props y `SaleCreatePage` describe el
-  loteo que necesita como `SaleCreateDevelopment`; `app/SalesRoute.tsx` y
-  `app/SaleCreateRoute.tsx` —composición, no feature— inyectan las
-  implementaciones y mapean el `LoteoDetail` de `lots`.
+  `createCliente` y `loadSellers` como props, `SaleCreatePage` recibe
+  `createSale` y describe el loteo que necesita como `SaleCreateDevelopment`;
+  `app/SalesRoute.tsx`, `app/SaleCreateRoute.tsx` y `app/SaleDetailsRoute.tsx`
+  —composición, no feature— inyectan las implementaciones, mapean el
+  `LoteoDetail` de `lots` y reutilizan el plano de referencia de reservas
+  (`LoteReferencePlan`).
 - **De las tres modalidades de pago solo está implementada `contado`.** El
   selector lista las tres que admite `ventas.modalidad_pago`, con `financiado`
   y `entrega_financiada` deshabilitadas y rotuladas «(próximamente)»: la

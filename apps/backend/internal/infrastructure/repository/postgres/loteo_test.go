@@ -1842,6 +1842,7 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 		`DELETE FROM manzana_calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM calles WHERE loteo_id = $1::uuid`,
 		`DELETE FROM manzanas WHERE loteo_id = $1::uuid`,
+		`DELETE FROM inmobiliaria_loteos WHERE loteo_id = $1::uuid`,
 		`UPDATE loteos SET dxf_entidad_id = NULL WHERE id = $1::uuid`,
 		`DELETE FROM dxf_entidades WHERE loteo_id = $1::uuid`,
 		`DELETE FROM loteos WHERE id = $1::uuid`,

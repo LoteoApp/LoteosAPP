@@ -50,7 +50,6 @@ describe('SaleReceiptDialog', () => {
     expect(dialog).toHaveTextContent('Contado')
     expect(dialog).toHaveTextContent('US$ 150.000,00')
     expect(dialog).toHaveTextContent('07/09/2026')
-    expect(dialog).toHaveTextContent('Comprobante provisorio')
   })
 
   it('reads a sale without inmobiliaria as a direct sale', () => {

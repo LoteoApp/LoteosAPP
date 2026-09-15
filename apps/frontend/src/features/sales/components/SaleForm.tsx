@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { messageFromError } from '../../../shared/api/client'
@@ -7,7 +8,6 @@ import AgencyCombobox from './AgencyCombobox'
 import ClientCombobox from './ClientCombobox'
 import NewClientDialog from './NewClientDialog'
 import PaymentConditions from './PaymentConditions'
-import SaleReceiptDialog from './SaleReceiptDialog'
 import SellerCombobox from './SellerCombobox'
 import {
   agencyOfSeller,
@@ -19,10 +19,10 @@ import {
 import type {
   AgencyOption,
   ClienteOption,
+  CreateSaleValues,
   LoteOption,
   NewClientValues,
   PaymentMethod,
-  SaleReceipt,
   SellerOption,
 } from '../types'
 
@@ -33,8 +33,9 @@ export type SaleFormProps = {
   loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
   createCliente: (values: NewClientValues) => Promise<ClienteOption>
   loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
-  // Rendered as the first field, for a caller that also chooses the lote.
-  leading?: ReactNode
+  onSubmit: (values: CreateSaleValues) => Promise<boolean>
+  isSubmitting?: boolean
+  error?: string | null
   disabled?: boolean
 }
 
@@ -43,7 +44,9 @@ export default function SaleForm({
   loadClientes,
   createCliente,
   loadSellers,
-  leading,
+  onSubmit,
+  isSubmitting = false,
+  error = null,
   disabled = false,
 }: SaleFormProps) {
   const [clientes, setClientes] = useState<ClienteOption[]>([])
@@ -54,8 +57,6 @@ export default function SaleForm({
   const [cliente, setCliente] = useState<ClienteOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
-
-  const [receipt, setReceipt] = useState<SaleReceipt | null>(null)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingCliente, setIsCreatingCliente] = useState(false)
@@ -73,11 +74,11 @@ export default function SaleForm({
         }
         setClientes(loaded)
         setClientesError(null)
-      } catch (error) {
+      } catch (loadError) {
         if (controller.signal.aborted) {
           return
         }
-        setClientesError(messageFromError(error))
+        setClientesError(messageFromError(loadError))
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingClientes(false)
@@ -122,8 +123,8 @@ export default function SaleForm({
         setClientes((current) => [created, ...current])
         setCliente(created)
         setIsDialogOpen(false)
-      } catch (error) {
-        setCreateError(messageFromError(error))
+      } catch (creationError) {
+        setCreateError(messageFromError(creationError))
       } finally {
         setIsCreatingCliente(false)
       }
@@ -137,12 +138,25 @@ export default function SaleForm({
     [sellersState.sellers, agency],
   )
 
-  const sale = buildSaleReceipt(
+  const draft = buildSaleReceipt(
     { lote, cliente, seller, method: paymentMethod },
     new Date().toISOString(),
   )
-  const readyReceipt = sale.ok ? sale.receipt : null
-  const pendingReason = sale.ok ? null : sale.error
+  const pendingReason = draft.ok ? null : draft.error
+  const isBusy = disabled || isSubmitting
+
+  async function handleConfirm() {
+    if (lote === null || cliente === null || seller === null || !draft.ok) {
+      return
+    }
+    await onSubmit({
+      loteoId: lote.loteoId,
+      loteId: lote.id,
+      clienteId: cliente.id,
+      vendedorId: seller.id,
+      modalidadPago: paymentMethod,
+    })
+  }
 
   return (
     <>
@@ -157,7 +171,6 @@ export default function SaleForm({
           <CardTitle>Datos de la venta</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {leading}
           <ClientCombobox
             clientes={clientes}
             value={cliente}
@@ -167,7 +180,7 @@ export default function SaleForm({
               setIsDialogOpen(true)
             }}
             isLoading={isLoadingClientes}
-            disabled={disabled}
+            disabled={isBusy}
           />
           <AgencyCombobox
             agencies={agencies}
@@ -177,14 +190,14 @@ export default function SaleForm({
               setSeller(null)
             }}
             isLoading={sellersState.isLoading}
-            disabled={disabled || lote === null}
+            disabled={isBusy || lote === null}
           />
           <SellerCombobox
             sellers={agencySellers}
             value={seller}
             onChange={setSeller}
             isLoading={sellersState.isLoading}
-            disabled={disabled || agency === null}
+            disabled={isBusy || agency === null}
           />
           {sellersState.error !== null && (
             <p role="alert" className="text-sm text-destructive">
@@ -195,10 +208,16 @@ export default function SaleForm({
             method={paymentMethod}
             lote={lote}
             onMethodChange={setPaymentMethod}
-            disabled={disabled}
+            disabled={isBusy}
           />
         </CardContent>
       </Card>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         {pendingReason !== null && (
@@ -207,10 +226,10 @@ export default function SaleForm({
         <Button
           type="button"
           className="min-h-11 w-full sm:min-h-9 sm:w-auto"
-          onClick={() => setReceipt(readyReceipt)}
-          disabled={disabled || readyReceipt === null}
+          onClick={() => void handleConfirm()}
+          disabled={isBusy || !draft.ok}
         >
-          Confirmar venta
+          {isSubmitting ? 'Registrando venta…' : 'Confirmar venta'}
         </Button>
       </div>
 
@@ -220,12 +239,6 @@ export default function SaleForm({
         error={createError}
         onSubmit={handleCreateCliente}
         onClose={() => setIsDialogOpen(false)}
-      />
-
-      <SaleReceiptDialog
-        open={receipt !== null}
-        receipt={receipt}
-        onClose={() => setReceipt(null)}
       />
     </>
   )

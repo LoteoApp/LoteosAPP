@@ -96,12 +96,6 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
               <p className="text-sm font-medium text-foreground print:text-black">
                 {formatDate(emitidoEl)}
               </p>
-              <Badge
-                variant="outline"
-                className="mt-1 bg-card print:border-black print:text-black"
-              >
-                Comprobante provisorio
-              </Badge>
             </div>
           </header>
 

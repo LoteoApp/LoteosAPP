@@ -1,90 +1,54 @@
-import { useEffect, useState } from 'react'
-import { messageFromError } from '../../../shared/api/client'
-import LoteCombobox from '../components/LoteCombobox'
-import SaleForm from '../components/SaleForm'
-import type { ClienteOption, LoteOption, NewClientValues, SellerOption } from '../types'
+import { useState } from 'react'
+import { Link } from 'react-router'
+import { Alert, AlertDescription } from '../../../shared/ui/alert'
+import { Button } from '../../../shared/ui/button'
+import SaleFilters from '../components/SaleFilters'
+import SalesList from '../components/SalesList'
+import SalesListSkeleton from '../components/SalesListSkeleton'
+import SalesPagination from '../components/SalesPagination'
+import { useSales } from '../hooks/use-sales'
+import type { SaleState } from '../types'
 
-export type SalesPageProps = {
-  // The composition root injects every data source: sales never imports
-  // another feature's files.
-  loadLotes: (signal?: AbortSignal) => Promise<LoteOption[]>
-  loadClientes: (signal?: AbortSignal) => Promise<ClienteOption[]>
-  createCliente: (values: NewClientValues) => Promise<ClienteOption>
-  // Eligibility depends on the loteo of the lote being sold, so the sellers
-  // can only be loaded once there is a lote.
-  loadSellers: (loteoId: string, signal?: AbortSignal) => Promise<SellerOption[]>
-}
+type SalesPageProps = { accessToken?: string }
 
-export default function SalesPage({
-  loadLotes,
-  loadClientes,
-  createCliente,
-  loadSellers,
-}: SalesPageProps) {
-  const [lotes, setLotes] = useState<LoteOption[]>([])
-  const [lote, setLote] = useState<LoteOption | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load() {
-      setIsLoading(true)
-      try {
-        const loaded = await loadLotes(controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        setLotes(loaded)
-        setLoadError(null)
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return
-        }
-        setLoadError(messageFromError(error))
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    void load()
-
-    return () => controller.abort()
-  }, [loadLotes])
+export default function SalesPage({ accessToken = '' }: SalesPageProps) {
+  const [search, setSearch] = useState('')
+  const [state, setState] = useState<SaleState | ''>('')
+  const [pageNumber, setPageNumber] = useState(1)
+  const sales = useSales(accessToken, { q: search || undefined, estado: state || undefined, pagina: pageNumber })
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-foreground">Nueva venta</h1>
-        <p className="text-muted-foreground">
-          Elegí el lote, el cliente comprador y quién realizó la venta.
-        </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Ventas</h1>
+          <p className="text-sm text-muted-foreground">
+            Consultá las ventas registradas desde el visor de lotes.
+          </p>
+        </div>
+        <Button render={<Link to="/lotes" />}>Abrir visor de lotes</Button>
       </div>
-
-      {loadError !== null && (
-        <p role="alert" className="text-sm text-destructive">
-          {loadError}
-        </p>
-      )}
-
-      <SaleForm
-        lote={lote}
-        loadClientes={loadClientes}
-        createCliente={createCliente}
-        loadSellers={loadSellers}
-        disabled={isLoading}
-        leading={
-          <LoteCombobox
-            lotes={lotes}
-            value={lote}
-            onChange={setLote}
-            isLoading={isLoading}
-          />
-        }
-      />
+      <section className="grid gap-3">
+        <SaleFilters
+          search={search}
+          state={state}
+          onSearchChange={(value) => {
+            setSearch(value)
+            setPageNumber(1)
+          }}
+          onStateChange={(value) => {
+            setState(value)
+            setPageNumber(1)
+          }}
+        />
+        {sales.error && (
+          <Alert variant="destructive">
+            <AlertDescription>{sales.error}</AlertDescription>
+          </Alert>
+        )}
+        {sales.isLoading ? <SalesListSkeleton /> : <SalesList sales={sales.page.ventas} />}
+        <SalesPagination page={sales.page} isLoading={sales.isLoading} onPageChange={setPageNumber} />
+      </section>
     </section>
   )
 }

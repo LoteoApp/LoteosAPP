@@ -70,6 +70,9 @@ func New(ctx context.Context) (*App, error) {
 		GetReservationHandler:      container.GetReservationHandler,
 		ReservationReceiptHandler:  container.ReservationReceiptHandler,
 		CancelReservationHandler:   container.CancelReservationHandler,
+		CreateSaleHandler:          container.CreateSaleHandler,
+		ListSalesHandler:           container.ListSalesHandler,
+		GetSaleHandler:             container.GetSaleHandler,
 		ListEligibleSellersHandler: container.ListEligibleSellersHandler,
 	}, container.Verifier, container.UserRepository)
 

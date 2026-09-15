@@ -281,3 +281,109 @@ export function saleDisabledReason(lote: { numero: string; precio: number | null
   }
   return `Completá ${missing.join(' y ')} del lote para habilitar la venta.`
 }
+
+// A venta as GET /api/v1/ventas publishes it. The agency comes from the
+// seller's profile, so it is absent for a venta directa by an internal user.
+export const SALE_STATES = ['activa', 'completada', 'cancelada'] as const
+
+export type SaleState = (typeof SALE_STATES)[number]
+
+export const SALE_STATE_LABELS: Record<SaleState, string> = {
+  activa: 'Activa',
+  completada: 'Completada',
+  cancelada: 'Cancelada',
+}
+
+export function isSaleState(value: unknown): value is SaleState {
+  return typeof value === 'string' && (SALE_STATES as readonly string[]).includes(value)
+}
+
+export type SaleActor = {
+  id: string
+  nombre: string
+  apellido: string
+  rol: string
+}
+
+export type Sale = {
+  id: string
+  loteoId: string
+  loteoNombre: string
+  loteId: string
+  loteNumero: string
+  manzanaNumero: string
+  loteSuperficie: number | null
+  cliente: ClienteOption
+  vendedor: SaleActor
+  usuarioAlta: SaleActor
+  inmobiliaria?: AgencyOption
+  modalidadPago: PaymentMethod
+  monto: number
+  moneda: string
+  estado: SaleState
+  fechaCreacion: string
+  fechaModificacion: string
+}
+
+export type SalePage = {
+  ventas: Sale[]
+  pagina: number
+  porPagina: number
+  total: number
+  paginas: number
+}
+
+export type SaleListFilters = {
+  estado?: SaleState | ''
+  loteoId?: string
+  loteId?: string
+  q?: string
+  pagina?: number
+  porPagina?: number
+}
+
+export type CreateSaleValues = {
+  loteoId: string
+  loteId: string
+  clienteId: string
+  vendedorId: string
+  modalidadPago: PaymentMethod
+}
+
+export function saleLoteLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 'loteNumero'>): string {
+  const manzana = sale.manzanaNumero || '—'
+  const numero = sale.loteNumero || '—'
+  return `${sale.loteoNombre} · Mz ${manzana} · Lote ${numero}`
+}
+
+// The receipt of a persisted sale: what the dialog prints once the backend
+// has registered the venta.
+export function saleReceiptFromSale(sale: Sale): SaleReceipt {
+  return {
+    emitidoEl: sale.fechaCreacion,
+    lote: {
+      id: sale.loteId,
+      numero: sale.loteNumero,
+      manzanaId: '',
+      manzanaNumero: sale.manzanaNumero,
+      loteoId: sale.loteoId,
+      loteoNombre: sale.loteoNombre,
+      estado: 'vendido',
+      precio: sale.monto,
+      moneda: sale.moneda,
+      superficie: sale.loteSuperficie,
+    },
+    cliente: sale.cliente,
+    seller: {
+      id: sale.vendedor.id,
+      nombre: sale.vendedor.nombre,
+      apellido: sale.vendedor.apellido,
+      rol: sale.vendedor.rol,
+      inmobiliariaId: sale.inmobiliaria?.id,
+      inmobiliariaRazonSocial: sale.inmobiliaria?.razonSocial,
+    },
+    method: sale.modalidadPago,
+    monto: sale.monto,
+    moneda: sale.moneda,
+  }
+}

@@ -4,8 +4,9 @@ import { useAuth } from '../features/auth/hooks/use-auth'
 import { createClient, listClients } from '../features/clients/api/clients'
 import { useLoteo } from '../features/lots/hooks/use-loteo'
 import { listEligibleSellers } from '../features/reservations/api/reservations'
+import { createSale } from '../features/sales/api/sales'
 import SaleCreatePage from '../features/sales/pages/SaleCreatePage'
-import type { NewClientValues, SaleCreateDevelopment } from '../features/sales/types'
+import type { CreateSaleValues, NewClientValues, SaleCreateDevelopment } from '../features/sales/types'
 import ReservationLoteoPlan from './ReservationLoteoPlan'
 
 export default function SaleCreateRoute() {
@@ -42,6 +43,11 @@ export default function SaleCreateRoute() {
     [token],
   )
 
+  const registerSale = useCallback(
+    (values: CreateSaleValues) => createSale(token, values),
+    [token],
+  )
+
   return (
     <SaleCreatePage
       loteoId={loteoId}
@@ -52,6 +58,7 @@ export default function SaleCreateRoute() {
       loadClientes={loadClientes}
       createCliente={createCliente}
       loadSellers={loadSellers}
+      createSale={registerSale}
       renderPlan={sourceLoteo && <ReservationLoteoPlan loteo={sourceLoteo} selectedLoteId={loteId} variant="reference" />}
     />
   )

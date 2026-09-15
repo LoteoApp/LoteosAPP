@@ -46,10 +46,16 @@ export default function ReservationLoteoPlan({
 }
 
 export function ReservationDetailsPlan({ accessToken, reservation }: { accessToken: string; reservation: Reservation }) {
-  const state = useLoteo(reservation.loteoId, accessToken)
+  return <LoteReferencePlan accessToken={accessToken} loteoId={reservation.loteoId} loteId={reservation.loteId} />
+}
+
+// The reference plan of one lote, loaded by loteo id: what a reserva or a
+// venta detail shows next to its data.
+export function LoteReferencePlan({ accessToken, loteoId, loteId }: { accessToken: string; loteoId: string; loteId: string }) {
+  const state = useLoteo(loteoId, accessToken)
   if (state.status === 'loading') return <ReservationDetailsPlanSkeleton message="Cargando plano del loteo…" />
   if (state.status !== 'loaded') {
     return <Alert variant="destructive"><AlertDescription>No se pudo cargar el plano del loteo.</AlertDescription></Alert>
   }
-  return <ReservationLoteoPlan loteo={state.loteo} selectedLoteId={reservation.loteId} variant="reference" />
+  return <ReservationLoteoPlan loteo={state.loteo} selectedLoteId={loteId} variant="reference" />
 }
