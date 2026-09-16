@@ -27,6 +27,9 @@ func TestSaleStateAndPaymentMethodValidity(t *testing.T) {
 	if !domain.PaymentMethodCash.IsAvailable() || domain.PaymentMethodFinanced.IsAvailable() || domain.PaymentMethodDownAndFi.IsAvailable() {
 		t.Error("only contado should be available")
 	}
+	if !domain.PaymentMethodCash.SettlesOnRegistration() || domain.PaymentMethodFinanced.SettlesOnRegistration() || domain.PaymentMethodDownAndFi.SettlesOnRegistration() {
+		t.Error("only contado settles on registration")
+	}
 	if !domain.IsSaleRole(domain.RolInmobiliaria) || domain.IsSaleRole(domain.RolEscribano) {
 		t.Error("sale roles should match reservation roles")
 	}

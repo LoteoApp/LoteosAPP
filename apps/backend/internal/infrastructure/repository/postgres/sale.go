@@ -16,6 +16,7 @@ const (
 	saleActiveIndex      = "ventas_lote_id_activa_idx"
 	saleIdempotencyIndex = "ventas_usuario_alta_idempotency_key_idx"
 	saleRetryCount       = 3
+	saleSettledReason    = "Pago al contado"
 )
 
 type SaleRepository struct {
@@ -199,6 +200,11 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		SaleID:        stringReference(saleID),
 	}, lotState); err != nil {
 		return domain.Sale{}, err
+	}
+	if command.PaymentMethod.SettlesOnRegistration() {
+		if err := settleSale(ctx, tx, saleID, developmentID, command); err != nil {
+			return domain.Sale{}, err
+		}
 	}
 
 	sale, err := loadSale(ctx, tx, saleID, gateway.SaleScope{}, true)
@@ -448,4 +454,27 @@ func agencyActive(ctx context.Context, tx pgx.Tx, agencyID *string) (bool, error
 		return false, nil
 	}
 	return present, err
+}
+
+// settleSale closes a sale that is paid in full on registration: the venta
+// moves to completada and the lote, already vendido in this transaction, to
+// finalizado. The estado row uses clock_timestamp() so it sorts after the
+// activa row the ventas_seed_estado_inicial trigger stamped with now().
+func settleSale(ctx context.Context, tx pgx.Tx, saleID, developmentID string, command gateway.CreateSaleCommand) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO venta_estados (venta_id, estado, razon, usuario_modificacion, fecha_creacion)
+		VALUES ($1::uuid, $2, $3, $4::uuid, clock_timestamp())
+	`, saleID, string(domain.SaleStateCompleted), saleSettledReason, command.ActorID); err != nil {
+		return err
+	}
+	_, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
+		DevelopmentID: developmentID,
+		LotID:         command.LotID,
+		ExpectedState: domain.LotStateSold,
+		NextState:     domain.LotStateCompleted,
+		Origin:        domain.LotStateOriginSale,
+		ActorID:       command.ActorID,
+		SaleID:        stringReference(saleID),
+	}, domain.LotStateSold)
+	return err
 }

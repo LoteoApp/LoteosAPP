@@ -143,7 +143,9 @@ migrations/
 ├── 00007_add_inmobiliarias_cuit_idx.sql
 ├── 00008_add_lot_state_machine.sql
 ├── 00009_harden_reservations.sql
-└── 00010_add_reservation_agency.sql
+├── 00010_add_reservation_agency.sql
+├── 00011_add_sale_idempotency.sql
+└── 00012_allow_sale_to_finalize_lot.sql
 ```
 
 `00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
@@ -198,6 +200,12 @@ payload, con sus validaciones) y el índice único parcial
 `ventas_usuario_alta_idempotency_key_idx`. El `Down` elimina columnas,
 constraints e índice, así que un rollback pierde las claves aunque conserva
 las ventas.
+
+`00012_allow_sale_to_finalize_lot.sql` reemplaza `lote_estados_validate_transition`
+para que `vendido → finalizado` acepte también el origen `venta`, además de
+`cobranza`: una venta al contado se cobra al registrarse y finaliza el lote
+en la misma transacción. El `Down` vuelve a exigir `cobranza` sin tocar el
+historial ya registrado.
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 

@@ -141,6 +141,33 @@ func TestLotStateTransitionValidation(t *testing.T) {
 				command.SaleID = &saleID
 			},
 		},
+		"contado sale completes the lote on registration": {
+			mutate: func(command *domain.LotStateTransition) {
+				command.ExpectedState = domain.LotStateSold
+				command.NextState = domain.LotStateCompleted
+				command.Origin = domain.LotStateOriginSale
+				command.ReservationID = nil
+				command.SaleID = &saleID
+			},
+		},
+		"a sale cannot complete the lote without its reference": {
+			mutate: func(command *domain.LotStateTransition) {
+				command.ExpectedState = domain.LotStateSold
+				command.NextState = domain.LotStateCompleted
+				command.Origin = domain.LotStateOriginSale
+				command.ReservationID = nil
+			},
+			want: domain.ErrLotStateReferenceRequired,
+		},
+		"system cannot complete a sale": {
+			mutate: func(command *domain.LotStateTransition) {
+				command.ExpectedState = domain.LotStateSold
+				command.NextState = domain.LotStateCompleted
+				command.Origin = domain.LotStateOriginSystem
+				command.ReservationID = nil
+			},
+			want: domain.ErrInvalidLotStateOrigin,
+		},
 		"system releases an expired reservation": {
 			mutate: func(command *domain.LotStateTransition) {
 				command.ExpectedState = domain.LotStateReserved
