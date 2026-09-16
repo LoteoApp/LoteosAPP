@@ -29,7 +29,7 @@ func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 		return err
 	}
 
-	usuario, temporaryPassword, err := handler.createUser.Execute(
+	usuario, temporaryPassword, inviteEmailSent, err := handler.createUser.Execute(
 		request.Context(), principal.Roles, body.Nombre, body.Apellido, body.Email, body.Rol, body.InmobiliariaID,
 	)
 	if err != nil {
@@ -39,6 +39,7 @@ func (handler *CreateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 	response.WriteJSON(w, http.StatusCreated, dto.CreateUserResponse{
 		Usuario:           usuario,
 		TemporaryPassword: temporaryPassword,
+		InviteEmailSent:   inviteEmailSent,
 	})
 	return nil
 }

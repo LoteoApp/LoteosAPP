@@ -28,6 +28,12 @@ var (
 	// (a write targeting an inactive user) — this one blocks every request
 	// from an inactive caller, checked once per request in middleware.
 	ErrCuentaInactiva = &Error{Kind: KindForbidden, Code: "account_inactive", Message: "Tu cuenta fue dada de baja"}
+	// ErrInviteEmailUnavailable: ResendInviteEmail's send failed. Unlike
+	// CreateUser (which swallows the same failure — the admin already has
+	// the temporary password to hand over another way), this is a caller
+	// explicitly asking for the mail to go out, so it's surfaced instead of
+	// logged and dropped.
+	ErrInviteEmailUnavailable = &Error{Kind: KindUnavailable, Code: "invite_email_unavailable", Message: "No se pudo enviar el mail de invitación"}
 )
 
 type Usuario struct {

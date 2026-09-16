@@ -45,6 +45,9 @@ services:
       CLOUDFLARE_R2_BUCKET_NAME: ${CLOUDFLARE_R2_BUCKET_NAME:?CLOUDFLARE_R2_BUCKET_NAME is required, see docs/secrets.md}
       CLOUDFLARE_R2_ACCESS_KEY_ID: ${CLOUDFLARE_R2_ACCESS_KEY_ID:?CLOUDFLARE_R2_ACCESS_KEY_ID is required, see docs/secrets.md}
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${CLOUDFLARE_R2_SECRET_ACCESS_KEY:?CLOUDFLARE_R2_SECRET_ACCESS_KEY is required, see docs/secrets.md}
+      RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY is required, see docs/secrets.md}
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-no-reply@loteosapp.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-LoteosAPP}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

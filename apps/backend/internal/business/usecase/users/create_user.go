@@ -15,17 +15,29 @@ import (
 // agencyID is required when rol is inmobiliaria (the agency the user
 // operates on behalf of) and ignored for every other role.
 type CreateUser interface {
-	Execute(ctx context.Context, actorRoles []string, nombre, apellido, email, rol, agencyID string) (domain.Usuario, string, error)
+	// The bool result reports whether the invite email went out; a false
+	// with a nil error means the usuario was created but the caller should
+	// fall back to communicating the temporary password some other way (or
+	// retry via ResendInviteEmail) — it never fails the request.
+	Execute(ctx context.Context, actorRoles []string, nombre, apellido, email, rol, agencyID string) (domain.Usuario, string, bool, error)
 }
 
 type createUserUseCase struct {
 	repository gateway.UserRepository
 	identity   gateway.IdentityProvider
 	agencies   gateway.AgencyRepository
+	mailer     gateway.Mailer
+	loginURL   string
 }
 
-func NewCreateUser(repository gateway.UserRepository, identity gateway.IdentityProvider, agencies gateway.AgencyRepository) CreateUser {
-	return &createUserUseCase{repository: repository, identity: identity, agencies: agencies}
+func NewCreateUser(
+	repository gateway.UserRepository,
+	identity gateway.IdentityProvider,
+	agencies gateway.AgencyRepository,
+	mailer gateway.Mailer,
+	loginURL string,
+) CreateUser {
+	return &createUserUseCase{repository: repository, identity: identity, agencies: agencies, mailer: mailer, loginURL: loginURL}
 }
 
 // Execute creates the account in the identity provider first and, if
@@ -35,24 +47,24 @@ func (useCase *createUserUseCase) Execute(
 	ctx context.Context,
 	actorRoles []string,
 	nombre, apellido, email, rol, agencyID string,
-) (domain.Usuario, string, error) {
+) (domain.Usuario, string, bool, error) {
 	if !domain.HasRole(actorRoles, domain.RolAdministrador) {
-		return domain.Usuario{}, "", domain.ErrNoAutorizado
+		return domain.Usuario{}, "", false, domain.ErrNoAutorizado
 	}
 
 	nombre = strings.TrimSpace(nombre)
 	apellido = strings.TrimSpace(apellido)
 	if nombre == "" || apellido == "" {
-		return domain.Usuario{}, "", domain.ErrPerfilInvalido
+		return domain.Usuario{}, "", false, domain.ErrPerfilInvalido
 	}
 
 	email = strings.TrimSpace(email)
 	if !domain.EmailValido(email) {
-		return domain.Usuario{}, "", domain.ErrEmailInvalido
+		return domain.Usuario{}, "", false, domain.ErrEmailInvalido
 	}
 
 	if !esRolGestionable(domain.Rol(rol)) {
-		return domain.Usuario{}, "", domain.ErrRolInvalido
+		return domain.Usuario{}, "", false, domain.ErrRolInvalido
 	}
 
 	// Only rol inmobiliaria carries an agency: any id sent for another role
@@ -61,17 +73,17 @@ func (useCase *createUserUseCase) Execute(
 	if domain.Rol(rol) == domain.RolInmobiliaria {
 		agencyID = strings.TrimSpace(agencyID)
 		if agencyID == "" {
-			return domain.Usuario{}, "", domain.ErrAgenciaRequerida
+			return domain.Usuario{}, "", false, domain.ErrAgenciaRequerida
 		}
 		if _, err := useCase.agencies.FindByID(ctx, agencyID); err != nil {
-			return domain.Usuario{}, "", fromRepository(err)
+			return domain.Usuario{}, "", false, fromRepository(err)
 		}
 		agencyIDPtr = &agencyID
 	}
 
 	authProviderID, temporaryPassword, err := useCase.identity.CreateUser(ctx, email, rol)
 	if err != nil {
-		return domain.Usuario{}, "", fromRepository(err)
+		return domain.Usuario{}, "", false, fromRepository(err)
 	}
 
 	usuario, err := useCase.repository.Create(ctx, domain.Usuario{
@@ -88,8 +100,30 @@ func (useCase *createUserUseCase) Execute(
 			slog.ErrorContext(ctx, "compensating identity provider delete failed after local persistence error",
 				"auth_provider_id", authProviderID, "error", deleteErr)
 		}
-		return domain.Usuario{}, "", fromRepository(err)
+		return domain.Usuario{}, "", false, fromRepository(err)
 	}
 
-	return usuario, temporaryPassword, nil
+	inviteEmailSent := useCase.sendInvite(ctx, usuario, temporaryPassword)
+
+	return usuario, temporaryPassword, inviteEmailSent, nil
+}
+
+// sendInvite is a best-effort side effect: the usuario already exists (and
+// the admin already has temporaryPassword to hand over some other way), so a
+// send failure is only logged, never returned as an error. The caller can
+// retry it on demand via ResendInviteEmail.
+func (useCase *createUserUseCase) sendInvite(ctx context.Context, usuario domain.Usuario, temporaryPassword string) bool {
+	err := useCase.mailer.SendUserInvite(ctx, gateway.UserInviteEmail{
+		To:                usuario.Email,
+		Nombre:            usuario.Nombre,
+		Apellido:          usuario.Apellido,
+		Rol:               usuario.Rol,
+		TemporaryPassword: temporaryPassword,
+		LoginURL:          useCase.loginURL,
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "invite email send failed", "usuario_id", usuario.ID, "error", err)
+		return false
+	}
+	return true
 }

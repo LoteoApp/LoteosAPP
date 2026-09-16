@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from './users'
+import { createUser, deactivateUser, listUsers, reactivateUser, resendInviteEmail, updateUser } from './users'
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -156,6 +156,7 @@ describe('createUser', () => {
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
         temporaryPassword: 'temp-pass-123',
+        invitacionEnviada: true,
       })
     )
 
@@ -168,6 +169,7 @@ describe('createUser', () => {
 
     expect(created.usuario.id).toBe('usuario-1')
     expect(created.temporaryPassword).toBe('temp-pass-123')
+    expect(created.invitacionEnviada).toBe(true)
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(init.method).toBe('POST')
@@ -178,6 +180,32 @@ describe('createUser', () => {
       email: 'ana@example.com',
       rol: 'administrativo',
     })
+  })
+
+  it('reports when the invite email failed to send', async () => {
+    stubFetch(
+      jsonResponse(201, {
+        id: 'usuario-1',
+        email: 'ana@example.com',
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        rol: 'administrativo',
+        perfilCompleto: true,
+        fechaBaja: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        temporaryPassword: 'temp-pass-123',
+        invitacionEnviada: false,
+      })
+    )
+
+    const created = await createUser('token-123', {
+      nombre: 'Ana',
+      apellido: 'Pérez',
+      email: 'ana@example.com',
+      rol: 'administrativo',
+    })
+
+    expect(created.invitacionEnviada).toBe(false)
   })
 
   it('rejects a created user with no temporary password', async () => {
@@ -191,6 +219,32 @@ describe('createUser', () => {
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
+        invitacionEnviada: true,
+      })
+    )
+
+    await expect(
+      createUser('token-123', {
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        email: 'ana@example.com',
+        rol: 'administrativo',
+      })
+    ).rejects.toThrow('No se pudo completar la operación, intentá nuevamente.')
+  })
+
+  it('rejects a created user with no invitacionEnviada flag', async () => {
+    stubFetch(
+      jsonResponse(201, {
+        id: 'usuario-1',
+        email: 'ana@example.com',
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        rol: 'administrativo',
+        perfilCompleto: true,
+        fechaBaja: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        temporaryPassword: 'temp-pass-123',
       })
     )
 
@@ -296,5 +350,27 @@ describe('reactivateUser', () => {
     stubFetch(jsonResponse(409, { code: 'user_already_active', message: 'El usuario ya está activo' }))
 
     await expect(reactivateUser('token-123', 'usuario-1')).rejects.toThrow('El usuario ya está activo')
+  })
+})
+
+describe('resendInviteEmail', () => {
+  it('posts to the reenviar-invitacion endpoint', async () => {
+    const fetchMock = stubFetch(new Response(null, { status: 204 }))
+
+    await resendInviteEmail('token-123', 'usuario-1')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toContain('/api/v1/usuarios/usuario-1/reenviar-invitacion')
+    expect(init.method).toBe('POST')
+  })
+
+  it('throws the message returned by the backend when the mail provider is unavailable', async () => {
+    stubFetch(
+      jsonResponse(503, { code: 'invite_email_unavailable', message: 'No se pudo enviar el mail de invitación' })
+    )
+
+    await expect(resendInviteEmail('token-123', 'usuario-1')).rejects.toThrow(
+      'No se pudo enviar el mail de invitación'
+    )
   })
 })

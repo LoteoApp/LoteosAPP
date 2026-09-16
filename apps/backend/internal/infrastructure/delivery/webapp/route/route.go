@@ -54,6 +54,7 @@ type Handlers struct {
 	UpdateUser                 *handler.UpdateUserHandler
 	DeactivateUser             *handler.DeactivateUserHandler
 	ReactivateUser             *handler.ReactivateUserHandler
+	ResendInviteEmail          *handler.ResendInviteEmailHandler
 	CreateClient               *handler.CreateClientHandler
 	UpdateClient               *handler.UpdateClientHandler
 	DeleteClient               *handler.DeleteClientHandler
@@ -102,6 +103,7 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("PATCH /api/v1/usuarios/{id}", protected(handler.Adapt(handlers.UpdateUser, usersTimeout)))
 	mux.Handle("DELETE /api/v1/usuarios/{id}", protected(handler.Adapt(handlers.DeactivateUser, usersTimeout)))
 	mux.Handle("POST /api/v1/usuarios/{id}/reactivar", protected(handler.Adapt(handlers.ReactivateUser, usersTimeout)))
+	mux.Handle("POST /api/v1/usuarios/{id}/reenviar-invitacion", protected(handler.Adapt(handlers.ResendInviteEmail, usersTimeout)))
 
 	mux.Handle("POST /api/v1/clientes", protected(handler.Adapt(handlers.CreateClient, clientsTimeout)))
 	mux.Handle("PATCH /api/v1/clientes/{id}", protected(handler.Adapt(handlers.UpdateClient, clientsTimeout)))

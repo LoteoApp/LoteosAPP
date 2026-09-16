@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../../shared/api/client'
-import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from '../api/users'
+import { createUser, deactivateUser, listUsers, reactivateUser, resendInviteEmail, updateUser } from '../api/users'
 import type { Usuario, UsuarioFormValues, UsuarioUpdateValues } from '../types'
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+}
+
+export type CreatedCredentials = {
+  id: string
+  temporaryPassword: string
+  invitacionEnviada: boolean
 }
 
 export type UseUsers = {
@@ -13,10 +19,11 @@ export type UseUsers = {
   isSubmitting: boolean
   error: string | null
   clearError: () => void
-  create: (values: UsuarioFormValues) => Promise<string | null>
+  create: (values: UsuarioFormValues) => Promise<CreatedCredentials | null>
   update: (id: string, values: UsuarioUpdateValues) => Promise<boolean>
   deactivate: (id: string) => Promise<boolean>
   reactivate: (id: string) => Promise<boolean>
+  resendInvite: (id: string) => Promise<boolean>
 }
 
 export function useUsers(token: string): UseUsers {
@@ -68,13 +75,13 @@ export function useUsers(token: string): UseUsers {
   }, [])
 
   const create = useCallback(
-    async (values: UsuarioFormValues): Promise<string | null> => {
+    async (values: UsuarioFormValues): Promise<CreatedCredentials | null> => {
       setIsSubmitting(true)
       try {
-        const { usuario, temporaryPassword } = await createUser(token, values)
+        const { usuario, temporaryPassword, invitacionEnviada } = await createUser(token, values)
         setUsuarios((current) => [...current, usuario])
         setMutationError(null)
-        return temporaryPassword
+        return { id: usuario.id, temporaryPassword, invitacionEnviada }
       } catch (createError) {
         setMutationError(messageOf(createError))
         return null
@@ -136,6 +143,14 @@ export function useUsers(token: string): UseUsers {
     [run, token],
   )
 
+  // No local state to reconcile here (unlike deactivate/reactivate): sending
+  // an invite doesn't change anything on the Usuario itself, so a failure
+  // just surfaces as an error for the admin to retry.
+  const resendInvite = useCallback(
+    (id: string) => run(() => resendInviteEmail(token, id)),
+    [run, token],
+  )
+
   const clearError = useCallback(() => setMutationError(null), [])
 
   return {
@@ -148,5 +163,6 @@ export function useUsers(token: string): UseUsers {
     update,
     deactivate,
     reactivate,
+    resendInvite,
   }
 }

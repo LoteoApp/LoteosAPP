@@ -100,6 +100,36 @@ func (client *AdminClient) DeleteUser(ctx context.Context, supabaseID string) er
 	return nil
 }
 
+// ResetTemporaryPassword implements gateway.IdentityProvider.
+func (client *AdminClient) ResetTemporaryPassword(ctx context.Context, supabaseID string) (string, error) {
+	temporaryPassword, err := generateTemporaryPassword()
+	if err != nil {
+		return "", fmt.Errorf("generate temporary password: %w", err)
+	}
+
+	body, err := json.Marshal(map[string]any{"password": temporaryPassword})
+	if err != nil {
+		return "", fmt.Errorf("encode password payload: %w", err)
+	}
+
+	request, err := client.newRequest(ctx, http.MethodPut, client.adminURL("/users/"+supabaseID), body)
+	if err != nil {
+		return "", err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("reset supabase user password: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("reset supabase user password: %w", unexpectedStatus(response))
+	}
+
+	return temporaryPassword, nil
+}
+
 func (client *AdminClient) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {
 	var reader io.Reader
 	if body != nil {

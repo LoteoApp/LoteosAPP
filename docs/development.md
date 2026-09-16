@@ -70,7 +70,13 @@ Endpoints operativos del backend:
 
 - `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
   usuario nuevo en Supabase Auth y en Postgres, devuelve una contraseña
-  temporal de un solo uso.
+  temporal de un solo uso y le manda un mail de invitación con esos datos y
+  el link de login. Si el envío falla no bloquea el alta (la respuesta indica
+  `invitacionEnviada: false`); se puede reintentar con el endpoint de abajo.
+- `POST /api/v1/usuarios/{id}/reenviar-invitacion` (requiere rol
+  `administrador`): genera una contraseña temporal nueva y vuelve a mandar el
+  mail de invitación. A diferencia del alta, acá un fallo de envío sí se
+  devuelve como error (`invite_email_unavailable`).
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una
@@ -281,6 +287,19 @@ CLOUDFLARE_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 CLOUDFLARE_R2_BUCKET_NAME=loteos-files-dev
 CLOUDFLARE_R2_ACCESS_KEY_ID=...
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+```
+
+El backend también manda el mail de invitación de usuarios a través de
+Resend. `RESEND_API_KEY` es obligatoria y sin ella el proceso no arranca;
+`MAIL_FROM_EMAIL` y `MAIL_FROM_NAME` tienen default. En `dev`, sin un dominio
+propio verificado en Resend, `MAIL_FROM_EMAIL` se pisa a
+`onboarding@resend.dev` (ver [secrets.md](secrets.md#resend) para el porqué y
+lo que falta para producción).
+
+```text
+RESEND_API_KEY=re_...
+MAIL_FROM_EMAIL=no-reply@loteosapp.com
+MAIL_FROM_NAME=LoteosAPP
 ```
 
 El frontend, al correr en el navegador, necesita la URL y la clave pública

@@ -3,26 +3,37 @@ import { Button } from '../../../shared/ui/button'
 import { Card, CardContent } from '../../../shared/ui/card'
 import { ROLE_LABELS, isActivo, type Usuario } from '../types'
 
+export type ResendStatus = 'success' | 'error' | undefined
+
+// Success has no dedicated Button variant (it's the only place that needs
+// one), so it's a border/text color override on top of "outline" instead of
+// a new shared variant.
+const RESEND_SUCCESS_CLASS = 'border-green-600 text-green-700 dark:border-green-500 dark:text-green-400'
+
 type UserCardProps = {
   usuario: Usuario
   isSubmitting: boolean
   isConfirmingBaja: boolean
+  resendStatus: ResendStatus
   onEdit: () => void
   onStartConfirmBaja: () => void
   onCancelConfirmBaja: () => void
   onConfirmBaja: () => void
   onReactivar: () => void
+  onResendInvite: () => void
 }
 
 export default function UserCard({
   usuario,
   isSubmitting,
   isConfirmingBaja,
+  resendStatus,
   onEdit,
   onStartConfirmBaja,
   onCancelConfirmBaja,
   onConfirmBaja,
   onReactivar,
+  onResendInvite,
 }: UserCardProps) {
   const activo = isActivo(usuario)
 
@@ -47,6 +58,17 @@ export default function UserCard({
               <Button variant="outline" size="sm" onClick={onEdit}>
                 Editar
               </Button>
+              {!isConfirmingBaja && (
+                <Button
+                  variant={resendStatus === 'error' ? 'destructive' : 'outline'}
+                  size="sm"
+                  disabled={isSubmitting}
+                  onClick={onResendInvite}
+                  className={resendStatus === 'success' ? RESEND_SUCCESS_CLASS : undefined}
+                >
+                  Reenviar credenciales
+                </Button>
+              )}
               {isConfirmingBaja ? (
                 <>
                   <span className="text-sm text-muted-foreground">¿Confirmar baja?</span>

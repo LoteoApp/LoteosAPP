@@ -14,6 +14,7 @@ import (
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
+	"loteosapp/backend/internal/infrastructure/email/resend"
 	"loteosapp/backend/internal/infrastructure/environments"
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
 	"loteosapp/backend/internal/infrastructure/storage/r2"
@@ -57,6 +58,7 @@ type Container struct {
 	ListSalesHandler           *handler.ListSalesHandler
 	GetSaleHandler             *handler.GetSaleHandler
 	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
+	ResendInviteEmailHandler   *handler.ResendInviteEmailHandler
 	TransitionLotState         loteos.TransitionLotState
 	ReservationExpiryWorker    *worker.ReservationExpiryWorker
 	Pool                       *pgxpool.Pool
@@ -88,15 +90,27 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		return nil, err
 	}
 
+	mailer, err := resend.NewClient(resend.Config{
+		APIKey:    cfg.Mailer.APIKey,
+		FromEmail: cfg.Mailer.FromEmail,
+		FromName:  cfg.Mailer.FromName,
+	})
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+
 	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
 	userRepo := postgres.NewUserRepository(pool)
 	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
-	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo))
+	loginURL := cfg.FrontendOrigin + "/login"
+	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer, loginURL))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
 	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
 	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
 	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
+	resendInviteEmailHandler := handler.NewResendInviteEmailHandler(users.NewResendInviteEmail(userRepo, adminClient, mailer, loginURL))
 
 	clienteRepo := postgres.NewClienteRepository(pool)
 	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
@@ -186,6 +200,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		ListSalesHandler:           listSalesHandler,
 		GetSaleHandler:             getSaleHandler,
 		ListEligibleSellersHandler: listEligibleSellersHandler,
+		ResendInviteEmailHandler:   resendInviteEmailHandler,
 		TransitionLotState:         transitionLotState,
 		ReservationExpiryWorker:    reservationExpiryWorker,
 		Pool:                       pool,

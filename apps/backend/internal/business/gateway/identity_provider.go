@@ -13,4 +13,10 @@ type IdentityProvider interface {
 	// DeleteUser removes the account. Used to compensate a CreateUser call
 	// whose local persistence step failed afterwards.
 	DeleteUser(ctx context.Context, authProviderID string) error
+
+	// ResetTemporaryPassword sets a fresh one-time password on an existing
+	// account and returns it. Used to retry an invite email: the original
+	// temporary password is never persisted, so a retry mints a new one
+	// instead of resending a password that only ever lived in memory.
+	ResetTemporaryPassword(ctx context.Context, authProviderID string) (temporaryPassword string, err error)
 }

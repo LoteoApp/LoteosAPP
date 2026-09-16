@@ -6,6 +6,7 @@ import CreatedCredentialsAlert from '../components/CreatedCredentialsAlert'
 import UserCard from '../components/UserCard'
 import UserForm from '../components/UserForm'
 import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
+import type { ResendStatus } from '../components/UserCard'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { normalizeText } from '../../../shared/lib/normalizeText'
@@ -35,16 +36,30 @@ type UsersPageProps = {
 // for an administrador, so no further role check is needed on top of it.
 export default function UsersPage({ accessToken }: UsersPageProps) {
   const token = accessToken ?? ''
-  const { usuarios, isLoading, isSubmitting, error, clearError, create, update, deactivate, reactivate } =
-    useUsers(token)
+  const {
+    usuarios,
+    isLoading,
+    isSubmitting,
+    error,
+    clearError,
+    create,
+    update,
+    deactivate,
+    reactivate,
+    resendInvite,
+  } = useUsers(token)
   const [formState, setFormState] = useState<FormState>({ mode: 'closed' })
   const [search, setSearch] = useState('')
   const [rolFilter, setRolFilter] = useState<RolFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [confirmingBajaId, setConfirmingBajaId] = useState<string | null>(null)
+  const [isResendingInvite, setIsResendingInvite] = useState(false)
+  const [rowResendStatus, setRowResendStatus] = useState<{ id: string; ok: boolean } | null>(null)
   const [createdCredentials, setCreatedCredentials] = useState<{
+    id: string
     email: string
     temporaryPassword: string
+    invitacionEnviada: boolean
   } | null>(null)
 
   const formView = resolveFormView(formState, usuarios)
@@ -78,10 +93,24 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
   }
 
   async function handleCreate(values: UsuarioFormValues) {
-    const temporaryPassword = await create(values)
-    if (temporaryPassword) {
-      setCreatedCredentials({ email: values.email, temporaryPassword })
+    const created = await create(values)
+    if (created) {
+      setCreatedCredentials({ email: values.email, ...created })
       setFormState({ mode: 'closed' })
+    }
+  }
+
+  async function handleResendCreatedInvite() {
+    if (!createdCredentials) {
+      return
+    }
+    setIsResendingInvite(true)
+    try {
+      if (await resendInvite(createdCredentials.id)) {
+        setCreatedCredentials({ ...createdCredentials, invitacionEnviada: true })
+      }
+    } finally {
+      setIsResendingInvite(false)
     }
   }
 
@@ -99,6 +128,11 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
   async function handleReactivar(usuario: Usuario) {
     await reactivate(usuario.id)
+  }
+
+  async function handleResendInvite(usuario: Usuario) {
+    const ok = await resendInvite(usuario.id)
+    setRowResendStatus({ id: usuario.id, ok })
   }
 
   return (
@@ -129,6 +163,9 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
         <CreatedCredentialsAlert
           email={createdCredentials.email}
           temporaryPassword={createdCredentials.temporaryPassword}
+          invitacionEnviada={createdCredentials.invitacionEnviada}
+          isResending={isResendingInvite}
+          onResend={handleResendCreatedInvite}
           onClose={() => setCreatedCredentials(null)}
         />
       )}
@@ -197,26 +234,32 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
 
           {filteredUsuarios.length > 0 && (
             <ul className="flex flex-col gap-3">
-              {filteredUsuarios.map((usuario) => (
-                <UserCard
-                  key={usuario.id}
-                  usuario={usuario}
-                  isSubmitting={isSubmitting}
-                  isConfirmingBaja={confirmingBajaId === usuario.id}
-                  onEdit={() => {
-                    setCreatedCredentials(null)
-                    clearError()
-                    setFormState({ mode: 'edit', id: usuario.id })
-                  }}
-                  onStartConfirmBaja={() => setConfirmingBajaId(usuario.id)}
-                  onCancelConfirmBaja={() => {
-                    clearError()
-                    setConfirmingBajaId(null)
-                  }}
-                  onConfirmBaja={() => handleBaja(usuario)}
-                  onReactivar={() => handleReactivar(usuario)}
-                />
-              ))}
+              {filteredUsuarios.map((usuario) => {
+                const resendStatus: ResendStatus =
+                  rowResendStatus?.id === usuario.id ? (rowResendStatus.ok ? 'success' : 'error') : undefined
+                return (
+                  <UserCard
+                    key={usuario.id}
+                    usuario={usuario}
+                    isSubmitting={isSubmitting}
+                    isConfirmingBaja={confirmingBajaId === usuario.id}
+                    resendStatus={resendStatus}
+                    onEdit={() => {
+                      setCreatedCredentials(null)
+                      clearError()
+                      setFormState({ mode: 'edit', id: usuario.id })
+                    }}
+                    onStartConfirmBaja={() => setConfirmingBajaId(usuario.id)}
+                    onCancelConfirmBaja={() => {
+                      clearError()
+                      setConfirmingBajaId(null)
+                    }}
+                    onConfirmBaja={() => handleBaja(usuario)}
+                    onReactivar={() => handleReactivar(usuario)}
+                    onResendInvite={() => handleResendInvite(usuario)}
+                  />
+                )
+              })}
             </ul>
           )}
         </>

@@ -225,6 +225,10 @@ vacíos antes de que exista una funcionalidad que los necesite.
   contra Cloudflare R2 a través de su API S3, con el SDK de AWS v2. Guarda,
   lee y borra los archivos que sube el usuario (el DXF original del alta de
   loteo, fotos y planos). Ver [almacenamiento de archivos](#almacenamiento-de-archivos).
+- `internal/infrastructure/email/resend`: implementa `gateway.Mailer` contra
+  la API REST de Resend con `net/http` plano (sin SDK: es un único POST
+  JSON). Manda el mail de invitación al dar de alta un usuario y al
+  reenviarla. Ver [invitación de usuarios por mail](#invitación-de-usuarios-por-mail).
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
   HTTP, agrupados por feature (`dto/users`, `dto/clients`, `dto/loteos`)
   igual que `usecase`. Cada subpaquete declara `package dto`; como el
@@ -344,6 +348,26 @@ iniciar y periódicamente; cada vencimiento usa una transacción independiente,
 revalida estado y plazo después de los locks y tolera varias instancias sin
 un mutex en memoria. `internal/app` inicia y detiene el worker antes de cerrar
 el pool.
+
+### Invitación de usuarios por mail
+
+`usecase/users.CreateUser`, después de crear el usuario, intenta mandarle el
+mail de invitación (nombre, rol, la contraseña temporal que ya tiene en
+memoria y el link de login) por mejor esfuerzo: si `gateway.Mailer` falla,
+se loguea y `Execute` devuelve `inviteEmailSent = false` junto con el usuario
+y la contraseña ya creados — nunca falla el alta por esto. El admin ya tiene
+la contraseña en la respuesta (`dto.CreateUserResponse.TemporaryPassword`),
+así que el mail es un canal adicional, no la única vía de acceso; no hay
+tabla ni worker de reintento automático.
+
+`usecase/users.ResendInviteEmail` (`POST /api/v1/usuarios/{id}/reenviar-invitacion`,
+solo administrador) cubre el caso en que el mail no salió: pide una
+contraseña temporal nueva vía `gateway.IdentityProvider.ResetTemporaryPassword`
+(la original nunca se persiste, solo vive en memoria durante un intento) y
+vuelve a mandar el mail. A diferencia de `CreateUser`, acá un fallo de envío
+sí se devuelve como error (`domain.ErrInviteEmailUnavailable`): es una acción
+explícita del admin, no un efecto colateral de otra operación, así que
+conviene que sepa si no funcionó.
 
 ### ABM de inmobiliarias
 

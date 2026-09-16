@@ -26,6 +26,7 @@ let failure: { status: number; message: string; code?: string } | null = null
 let nextId = 0
 let getGate: Promise<void> | null = null
 let rejectWith: unknown = null
+let inviteEmailSent = true
 
 function usuario(overrides: Partial<StoredUsuario>): StoredUsuario {
   return {
@@ -82,6 +83,10 @@ function installFetch() {
         return jsonResponse(200, stored.find((candidate) => candidate.id === targetId))
       }
 
+      if (method === 'POST' && url.endsWith('/reenviar-invitacion')) {
+        return new Response(null, { status: 204 })
+      }
+
       if (method === 'POST') {
         const values = JSON.parse(String(init?.body)) as Omit<
           StoredUsuario,
@@ -92,7 +97,7 @@ function installFetch() {
         }
         const created = usuario(values)
         stored = [...stored, created]
-        return jsonResponse(201, { ...created, temporaryPassword: 'temp-pass-123' })
+        return jsonResponse(201, { ...created, temporaryPassword: 'temp-pass-123', invitacionEnviada: inviteEmailSent })
       }
 
       const id = url.slice(url.lastIndexOf('/') + 1).split('?')[0]
@@ -148,6 +153,7 @@ beforeEach(() => {
   nextId = 0
   getGate = null
   rejectWith = null
+  inviteEmailSent = true
   installFetch()
 })
 
@@ -277,6 +283,34 @@ describe('UsersPage', () => {
     const card = (await screen.findByText('Ana Pérez')).closest('li') as HTMLElement
     expect(within(card).getByText('Escribano')).toBeInTheDocument()
     expect(screen.getByText('temp-pass-123')).toBeInTheDocument()
+    expect(screen.queryByText(/no se pudo enviar el mail/i)).not.toBeInTheDocument()
+  })
+
+  it('warns and offers a resend when the invite email fails to send on creation', async () => {
+    const user = userEvent.setup()
+    inviteEmailSent = false
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, {
+      nombre: 'Ana',
+      apellido: 'Pérez',
+      email: 'ana@example.com',
+      rol: 'escribano',
+    })
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    await screen.findByText('temp-pass-123')
+    expect(screen.getByText(/no se pudo enviar el mail de invitación/i)).toBeInTheDocument()
+    const alert = screen.getByRole('alert')
+    const resendButton = within(alert).getByRole('button', { name: 'Reenviar credenciales' })
+
+    await user.click(resendButton)
+
+    expect(screen.queryByText(/no se pudo enviar el mail de invitación/i)).not.toBeInTheDocument()
+    expect(within(alert).queryByRole('button', { name: 'Reenviar credenciales' })).not.toBeInTheDocument()
+    expect(within(alert).getByText('temp-pass-123')).toBeInTheDocument()
   })
 
   it('shows the agency selector only while rol is inmobiliaria', async () => {
@@ -497,6 +531,29 @@ describe('UsersPage', () => {
 
     expect(await screen.findByText('El usuario ya está activo')).toBeInTheDocument()
     expect(screen.getByText('Dado de baja')).toBeInTheDocument()
+  })
+
+  it('resends the invite email for an active user', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Reenviar credenciales' }))
+
+    expect(screen.queryByText(/no se pudo completar la operación/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the backend error when resending the invite email fails', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    failure = { status: 503, code: 'invite_email_unavailable', message: 'No se pudo enviar el mail de invitación' }
+    await user.click(screen.getByRole('button', { name: 'Reenviar credenciales' }))
+
+    expect(await screen.findByText('No se pudo enviar el mail de invitación')).toBeInTheDocument()
   })
 
   it('filters the list by rol', async () => {

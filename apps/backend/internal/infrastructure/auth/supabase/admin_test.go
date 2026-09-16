@@ -26,15 +26,20 @@ type fakeAdminServer struct {
 	deleteStatus     int
 	deleteCalls      int
 	sawAuthHeaders   bool
+
+	resetPasswordStatus int
+	resetPasswordCalls  int
+	resetPasswordBody   string
 }
 
 func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 	t.Helper()
 
 	fake := &fakeAdminServer{
-		mux:              http.NewServeMux(),
-		createUserStatus: http.StatusOK,
-		deleteStatus:     http.StatusNoContent,
+		mux:                 http.NewServeMux(),
+		createUserStatus:    http.StatusOK,
+		deleteStatus:        http.StatusNoContent,
+		resetPasswordStatus: http.StatusOK,
 	}
 
 	fake.mux.HandleFunc("POST /auth/v1/admin/users", func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +80,32 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 		fake.requireAuthHeaders(t, r)
 		fake.deleteCalls++
 		w.WriteHeader(fake.deleteStatus)
+	})
+
+	fake.mux.HandleFunc("PUT /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
+		fake.requireAuthHeaders(t, r)
+		fake.resetPasswordCalls++
+
+		if fake.resetPasswordStatus != http.StatusOK {
+			w.WriteHeader(fake.resetPasswordStatus)
+			if fake.resetPasswordBody != "" {
+				_, _ = w.Write([]byte(fake.resetPasswordBody))
+			}
+			return
+		}
+
+		var payload struct {
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode reset password payload: %v", err)
+		}
+		if payload.Password == "" {
+			t.Error("reset password payload missing password")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
 	})
 
 	return fake
@@ -277,5 +308,58 @@ func TestAdminClientDeleteUserSurfacesUnexpectedStatus(t *testing.T) {
 
 	if err := client.DeleteUser(context.Background(), testUserID); err == nil {
 		t.Error("DeleteUser() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientResetTemporaryPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	temporaryPassword, err := client.ResetTemporaryPassword(context.Background(), testUserID)
+	if err != nil {
+		t.Fatalf("ResetTemporaryPassword() error = %v", err)
+	}
+	if len(temporaryPassword) < 16 {
+		t.Errorf("ResetTemporaryPassword() password too short: %q", temporaryPassword)
+	}
+	if fake.resetPasswordCalls != 1 {
+		t.Errorf("ResetTemporaryPassword() calls = %d, want 1", fake.resetPasswordCalls)
+	}
+	if !fake.sawAuthHeaders {
+		t.Error("ResetTemporaryPassword() never sent apikey/Authorization headers")
+	}
+}
+
+func TestAdminClientResetTemporaryPasswordSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.resetPasswordStatus = http.StatusInternalServerError
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	if _, err := client.ResetTemporaryPassword(context.Background(), testUserID); err == nil {
+		t.Error("ResetTemporaryPassword() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientResetTemporaryPasswordPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	if _, err := client.ResetTemporaryPassword(context.Background(), testUserID); err == nil {
+		t.Error("ResetTemporaryPassword() error = nil, want error when the server is unreachable")
 	}
 }

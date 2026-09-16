@@ -46,6 +46,7 @@ export async function listUsers(token: string, signal?: AbortSignal): Promise<Us
 export type CreatedUsuario = {
   usuario: Usuario
   temporaryPassword: string
+  invitacionEnviada: boolean
 }
 
 export async function createUser(token: string, values: UsuarioFormValues): Promise<CreatedUsuario> {
@@ -54,12 +55,18 @@ export async function createUser(token: string, values: UsuarioFormValues): Prom
   if (!isUsuarioResponse(body)) {
     throw new Error(GENERIC_ERROR)
   }
-  const { temporaryPassword } = body as { temporaryPassword?: unknown }
+  const { temporaryPassword, invitacionEnviada } = body as {
+    temporaryPassword?: unknown
+    invitacionEnviada?: unknown
+  }
   if (typeof temporaryPassword !== 'string' || temporaryPassword === '') {
     throw new Error(GENERIC_ERROR)
   }
+  if (typeof invitacionEnviada !== 'boolean') {
+    throw new Error(GENERIC_ERROR)
+  }
 
-  return { usuario: body, temporaryPassword }
+  return { usuario: body, temporaryPassword, invitacionEnviada }
 }
 
 export async function updateUser(
@@ -92,4 +99,8 @@ export async function reactivateUser(token: string, id: string): Promise<Usuario
   }
 
   return body
+}
+
+export async function resendInviteEmail(token: string, id: string): Promise<void> {
+  await apiFetch(`${USERS_PATH}/${id}/reenviar-invitacion`, { method: 'POST', token })
 }

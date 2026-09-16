@@ -115,3 +115,40 @@ tope de gasto que corte el servicio**: sus
 solo mandan un email al cruzar un umbral —"informational only. They do not
 pause or cap usage"—. Conviene configurarlos igual, pero el control real es
 vigilar el uso y el límite de tamaño por archivo del lado de la aplicación.
+
+## Resend
+
+El backend manda el mail de invitación al dar de alta un usuario, y al
+reenviarla (nombre, rol, contraseña temporal y link de login) a través de
+[Resend](https://resend.com), con un cliente HTTP propio en
+`internal/infrastructure/email/resend` (sin el SDK: la API es un único POST
+JSON).
+
+| Variable | Qué es |
+| --- | --- |
+| `RESEND_API_KEY` | API key de la cuenta de Resend. Obligatoria, sin default. |
+| `MAIL_FROM_EMAIL` | Dirección remitente. Default `no-reply@loteosapp.com`. |
+| `MAIL_FROM_NAME` | Nombre remitente. Default `LoteosAPP`. |
+
+El tier gratuito de Resend (3000 mails/mes) alcanza de sobra para el volumen
+de altas de usuario. Si falta `RESEND_API_KEY`, `environments.LoadServer`
+corta el arranque igual que con las otras credenciales obligatorias.
+
+Sin verificar un dominio propio en Resend, solo se puede mandar a la casilla
+dueña de la cuenta — suficiente para desarrollo. Por eso en el config `dev` de
+Doppler `MAIL_FROM_EMAIL` está en `onboarding@resend.dev` (el remitente de
+prueba que Resend habilita sin verificar nada): con `no-reply@loteosapp.com`
+sin verificar, todo envío devuelve 403 `domain is not verified`.
+
+### Pendiente antes de producción
+
+- [ ] Verificar el dominio `loteosapp.com` en Resend (Domains → Add Domain) y
+  cargar los registros SPF/DKIM (y DMARC si se quiere) en el DNS del dominio.
+  Sin esto, ningún mail sale salvo a la casilla dueña de la cuenta.
+- [ ] Crear una API key de Resend separada de la de desarrollo (no reusar la
+  de `dev`), para no mezclar tráfico de prueba con la reputación de envío
+  real, y cargarla como `RESEND_API_KEY` en el config `prd` de Doppler.
+- [ ] Cargar `MAIL_FROM_EMAIL=no-reply@loteosapp.com` (o la dirección que se
+  defina) en el config `prd` una vez verificado el dominio — si se despliega
+  sin esto, vuelve a fallar con `domain is not verified` porque
+  `onboarding@resend.dev` es solo para pruebas.

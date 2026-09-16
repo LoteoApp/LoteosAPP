@@ -43,6 +43,7 @@ func New(ctx context.Context) (*App, error) {
 		UpdateUser:                 container.UpdateUserHandler,
 		DeactivateUser:             container.DeactivateUserHandler,
 		ReactivateUser:             container.ReactivateUserHandler,
+		ResendInviteEmail:          container.ResendInviteEmailHandler,
 		CreateClient:               container.CreateClientHandler,
 		UpdateClient:               container.UpdateClientHandler,
 		DeleteClient:               container.DeleteClientHandler,
