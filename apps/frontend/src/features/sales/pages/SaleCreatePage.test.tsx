@@ -179,7 +179,7 @@ describe('SaleCreatePage', () => {
 
     const preview = screen.getByLabelText('Detalle del plan')
     expect(preview).toHaveTextContent('US$ 100.000,00')
-    expect(preview).toHaveTextContent('10 × US$ 10.500,00')
+    expect(preview).toHaveTextContent('10 de US$ 10.500,00')
     expect(preview).toHaveTextContent('US$ 105.000,00')
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeEnabled()
 
@@ -200,7 +200,7 @@ describe('SaleCreatePage', () => {
     )
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Entrega + financiación')
-    expect(within(dialog).getByLabelText('Plan de pago')).toHaveTextContent('10 × US$ 10.500,00 · mensual')
+    expect(within(dialog).getByLabelText('Plan de pago')).toHaveTextContent('10 de US$ 10.500,00 · mensual')
   })
 
   it('keeps the form and shows the backend error when the sale is rejected', async () => {

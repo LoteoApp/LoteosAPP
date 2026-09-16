@@ -119,7 +119,7 @@ describe('SaleDetailsPage', () => {
     expect(rows[2]).toHaveTextContent('Pendiente')
 
     await user.click(screen.getByRole('button', { name: 'Imprimir recibo' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('2 × US$ 55.000,00 · bimestral')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('2 de US$ 55.000,00 · bimestral')
   })
 
   it('describes a financed plan without entrega or cuotas', async () => {

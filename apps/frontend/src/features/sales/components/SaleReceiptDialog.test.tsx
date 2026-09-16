@@ -80,7 +80,7 @@ describe('SaleReceiptDialog', () => {
     expect(plan).toHaveTextContent('US$ 50.000,00')
     expect(plan).toHaveTextContent('Monto financiado')
     expect(plan).toHaveTextContent('US$ 100.000,00')
-    expect(plan).toHaveTextContent('10 × US$ 11.250,00 · mensual')
+    expect(plan).toHaveTextContent('10 de US$ 11.250,00 · mensual')
     expect(plan).toHaveTextContent('12,5 %')
     expect(plan).toHaveTextContent('US$ 112.500,00')
   })
@@ -107,7 +107,7 @@ describe('SaleReceiptDialog', () => {
     )
 
     expect(screen.getByLabelText('Plan de pago')).toHaveTextContent(
-      '2 × US$ 33,33 + 1 × US$ 33,34 · mensual',
+      '3 de US$ 33,33 (la última de US$ 33,34) · mensual',
     )
   })
 
@@ -133,7 +133,7 @@ describe('SaleReceiptDialog', () => {
     )
 
     expect(screen.getByLabelText('Plan de pago')).not.toHaveTextContent('Entrega')
-    expect(screen.getByLabelText('Plan de pago')).toHaveTextContent('3 × US$ 50.000,00 · trimestral')
+    expect(screen.getByLabelText('Plan de pago')).toHaveTextContent('3 de US$ 50.000,00 · trimestral')
 
     rerender(<SaleReceiptDialog open receipt={receipt()} onClose={vi.fn()} />)
     expect(screen.queryByLabelText('Plan de pago')).not.toBeInTheDocument()

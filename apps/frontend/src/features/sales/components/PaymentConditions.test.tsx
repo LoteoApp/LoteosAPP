@@ -131,7 +131,7 @@ describe('PaymentConditions', () => {
 
     const preview = screen.getByLabelText('Detalle del plan')
     expect(within(preview).getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 150.000,00')
-    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent('12 × US$ 13.750,00')
+    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent('12 de US$ 13.750,00')
     expect(within(preview).getByText('Total financiado').nextSibling).toHaveTextContent('US$ 165.000,00')
     expect(within(preview).queryByText('Entrega')).not.toBeInTheDocument()
   })
@@ -147,7 +147,7 @@ describe('PaymentConditions', () => {
     expect(within(preview).getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 100.000,00')
     // 100000 / 7 = 14285.71 x 6 + 14285.74
     expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent(
-      '6 × US$ 14.285,71 + 1 × US$ 14.285,74',
+      '7 de US$ 14.285,71 (la última de US$ 14.285,74)',
     )
 
     await user.type(screen.getByLabelText('Monto de entrega'), '1')

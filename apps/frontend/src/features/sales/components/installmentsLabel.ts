@@ -1,16 +1,17 @@
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 
-// "12 × US$ 100,00" when every cuota is the same, or
-// "11 × US$ 33,33 + 1 × US$ 33,37" when the last one absorbs the rounding
-// remainder, so what is printed adds up to what is persisted.
+// "12 de US$ 383,33", plus "(la última de US$ 383,37)" when the last cuota
+// absorbs the rounding remainder, so what is printed adds up to what is
+// persisted without hiding the regular amount behind an arithmetic.
 export function installmentsLabel(
   count: number,
   regular: number,
   last: number,
   currency: string,
 ): string {
+  const base = `${count} de ${formatCurrency(regular, currency)}`
   if (count === 1 || last === regular) {
-    return `${count} × ${formatCurrency(regular, currency)}`
+    return base
   }
-  return `${count - 1} × ${formatCurrency(regular, currency)} + 1 × ${formatCurrency(last, currency)}`
+  return `${base} (la última de ${formatCurrency(last, currency)})`
 }

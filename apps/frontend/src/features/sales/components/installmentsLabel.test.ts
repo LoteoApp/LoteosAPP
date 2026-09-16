@@ -5,15 +5,17 @@ import { installmentsLabel } from './installmentsLabel'
 const plain = (value: string) => value.replace(/\s/g, ' ')
 
 describe('installmentsLabel', () => {
-  it('prints one term when every cuota is the same', () => {
-    expect(plain(installmentsLabel(12, 13750, 13750, 'USD'))).toBe('12 × US$ 13.750,00')
+  it('prints the count and the regular cuota when every cuota is the same', () => {
+    expect(plain(installmentsLabel(12, 13750, 13750, 'USD'))).toBe('12 de US$ 13.750,00')
   })
 
-  it('prints the last cuota apart when it absorbs the remainder', () => {
-    expect(plain(installmentsLabel(3, 33.33, 33.34, 'USD'))).toBe('2 × US$ 33,33 + 1 × US$ 33,34')
+  it('notes the last cuota when it absorbs the remainder', () => {
+    expect(plain(installmentsLabel(12, 383.33, 383.37, 'USD'))).toBe(
+      '12 de US$ 383,33 (la última de US$ 383,37)',
+    )
   })
 
-  it('never prints "0 ×" for a single cuota', () => {
-    expect(plain(installmentsLabel(1, 1124.99, 1124.99, 'ARS'))).toBe('1 × $ 1.124,99')
+  it('never notes a last cuota for a single one', () => {
+    expect(plain(installmentsLabel(1, 1124.99, 1124.99, 'ARS'))).toBe('1 de $ 1.124,99')
   })
 })
