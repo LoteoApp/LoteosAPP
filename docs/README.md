@@ -21,6 +21,9 @@ Esta carpeta contiene la documentación que debe mantenerse junto con el código
   corre cada uno y su relación con la auditoría de dependencias.
 - [Secrets con Doppler](secrets.md): setup del CLI, cómo correr comandos con
   secrets inyectados y cómo administrar valores por config.
+- [Despliegue en Dokploy](deployment.md): imágenes de producción, configuración
+  de build por app, variables de entorno vs. build args, migraciones y
+  aspectos de seguridad.
 
 ## Planes
 
