@@ -249,10 +249,12 @@ agencia está asignada al loteo (`usuario_alta`):
   origen `venta`; las financiadas quedan `activa` hasta que Cobranza cobre
   la última cuota;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
-  o entrega + financiación. Hoy solo se registra al contado;
+  o entrega + financiación (una entrega inicial y el resto en cuotas). Las
+  dos modalidades financiadas llevan un plan de pago que se registra junto
+  con la venta (ver «Plan de pago»);
 - el alta acepta una clave de idempotencia por actor, como la reserva:
-  repetir la misma clave y payload devuelve la misma venta; reutilizarla con
-  otro payload es un conflicto;
+  repetir la misma clave y payload (incluido el plan de pago) devuelve la
+  misma venta; reutilizarla con otro payload es un conflicto;
 - listado y detalle desde el módulo **Ventas**, con el mismo alcance que
   las reservas: administrador y administrativo ven todas; un usuario de
   inmobiliaria, las vendidas por su agencia. Se busca por cliente, loteo,
@@ -270,6 +272,41 @@ Al completarse, se genera un recibo con descripción de lo comprado, comprador,
 vendedor e inmobiliaria y medio de pago, que se imprime desde el navegador (o
 se guarda como PDF). El código QR o link de verificación de autenticidad queda
 para más adelante.
+
+### Plan de pago
+
+Una venta financiada o con entrega + financiación crea, en la misma
+transacción, un plan de pago (`planes_pago`) y sus cuotas (`cuotas`), todas
+`pendiente`. Cobrarlas es tarea del módulo de Cobranza.
+
+- `cantidadCuotas`: entero entre 1 y 360.
+- `tasaInteres`: porcentaje entre 0 y 1000, con hasta 4 decimales (lo que
+  guarda `planes_pago.tasa_interes`), que se aplica **una sola vez** sobre el
+  monto financiado (interés simple); 0 o ausente es sin interés.
+- `periodicidad`: `mensual`, `bimestral`, `trimestral` o `semestral`.
+- `montoEntrega`: obligatorio, mayor a cero, con hasta 2 decimales y menor al
+  precio del lote, solo en entrega + financiación. En financiado no se admite.
+  La entrega no se registra como cobrada: queda en el plan para Cobranza.
+- Una venta al contado no admite plan.
+
+Fórmula (idéntica en backend y frontend, redondeando a 2 decimales):
+
+```text
+financiado = round2(precio - montoEntrega)
+cuota      = round2(round2(financiado * (1 + tasaInteres / 100)) / cantidadCuotas)
+total      = round2(cuota * cantidadCuotas)
+```
+
+Todas las cuotas valen lo mismo; el total financiado es lo que suman las
+cuotas y puede diferir del interés exacto en unos centavos (4.600 en 12
+cuotas son 12 de 383,33 = 4.599,96). Si la cuota queda por debajo de un
+centavo, la venta se rechaza.
+
+Vencimientos: la cuota `k` vence `k` períodos después de la fecha de la
+venta, el mismo día del mes; si el mes destino es más corto, vence el último
+día (una venta del 31 de enero con cuotas mensuales vence el 28/29 de
+febrero, el 31 de marzo, el 30 de abril…). No se ingresa una fecha de primer
+vencimiento.
 
 ## Cobranza
 

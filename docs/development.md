@@ -106,19 +106,30 @@ Endpoints operativos del backend:
   usuarios.
 - `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/ventas` (requiere cuenta
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): registra
-  una venta al contado de un lote `disponible`: el lote pasa a `vendido` y,
-  como el contado se cobra al registrarse, la venta queda `completada` y el
-  lote `finalizado` en la misma transacción. Recibe
-  `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (solo `contado`
-  por ahora); exige el header `Idempotency-Key`. El monto y la moneda salen
-  del precio del lote. Un usuario de inmobiliaria solo puede vender en un
-  loteo al que su agencia está asignada (`sale_agency_not_assigned`) y solo
-  puede elegir vendedores de su propia agencia; administrador y
-  administrativo eligen cualquier agencia activa con vendedores.
+  una venta de un lote `disponible` y lo pasa a `vendido`. Recibe
+  `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (`contado` por
+  defecto, `financiado` o `entrega_financiada`); exige el header
+  `Idempotency-Key`. Como el contado se cobra al registrarse, una venta
+  `contado` queda `completada` y su lote `finalizado` en la misma
+  transacción; las ventas financiadas quedan `activa` hasta cobrar la última
+  cuota. Las dos modalidades financiadas exigen `planPago` con
+  `cantidadCuotas` (1..360), `tasaInteres` (porcentaje, 0..1000, hasta 4
+  decimales, opcional), `periodicidad` (`mensual`, `bimestral`, `trimestral`,
+  `semestral`) y, solo en `entrega_financiada`, `montoEntrega` (mayor a 0,
+  hasta 2 decimales y menor al precio del lote); `contado` no admite
+  `planPago`. Los vencimientos se derivan de la
+  fecha de la venta. El monto y la moneda salen del precio del lote. La
+  respuesta incluye `planPago` con el resumen (`montoFinanciado`,
+  `montoCuota`, `montoTotal`) y las `cuotas`. Un usuario de inmobiliaria
+  solo puede vender en un loteo al que su agencia está asignada
+  (`sale_agency_not_assigned`) y solo puede elegir vendedores de su propia
+  agencia; administrador y administrativo eligen cualquier agencia activa
+  con vendedores.
 - `GET /api/v1/ventas` y `GET /api/v1/ventas/{id}`: listan o consultan ventas
   dentro del alcance del actor: administrativos ven todas y los usuarios de
   inmobiliaria las vendidas por su agencia. El listado admite `estado`,
-  `loteoId`, `loteId`, `q`, `pagina` y `porPagina`.
+  `loteoId`, `loteId`, `q`, `pagina` y `porPagina` y trae el resumen del
+  `planPago`; el detalle agrega sus `cuotas`.
 
 El backend ejecuta el vencimiento automático al iniciar y cada minuto. Se
 puede deshabilitar o ajustar sin recompilar mediante las variables

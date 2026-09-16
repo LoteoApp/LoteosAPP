@@ -12,12 +12,16 @@ import { cn } from '../../../shared/lib/utils'
 import { formatArea } from '../../../shared/lib/formatArea'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import { formatDate } from '../../../shared/lib/formatDate'
+import { formatPercent } from '../../../shared/lib/formatPercent'
+import { installmentsLabel } from './installmentsLabel'
 import {
   PAYMENT_METHOD_LABELS,
+  PAYMENT_PERIOD_LABELS,
   lotOptionLabel,
   sellerAgencyLabel,
   sellerOptionLabel,
   type SaleReceipt,
+  type SaleReceiptPlan,
 } from '../types'
 
 type SaleReceiptDialogProps = {
@@ -45,6 +49,26 @@ function Field({
   )
 }
 
+function PlanSummary({ plan, currency }: { plan: SaleReceiptPlan; currency: string }) {
+  return (
+    <dl
+      aria-label="Plan de pago"
+      className="grid grid-cols-1 gap-x-6 gap-y-5 border-t border-border px-4 py-5 sm:grid-cols-2 sm:px-6 print:border-black"
+    >
+      {plan.downPayment > 0 && (
+        <Field term="Entrega">{formatCurrency(plan.downPayment, currency)}</Field>
+      )}
+      <Field term="Monto financiado">{formatCurrency(plan.financedAmount, currency)}</Field>
+      <Field term="Cuotas">
+        {installmentsLabel(plan.installments, plan.installmentAmount, currency)} ·{' '}
+        {PAYMENT_PERIOD_LABELS[plan.period].toLowerCase()}
+      </Field>
+      <Field term="Tasa de interés">{formatPercent(plan.interestRate)}</Field>
+      <Field term="Total financiado">{formatCurrency(plan.totalAmount, currency)}</Field>
+    </dl>
+  )
+}
+
 function SignatureLine({ label }: { label: string }) {
   return (
     <div className="flex flex-col">
@@ -59,7 +83,7 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
     return null
   }
 
-  const { lot, client, seller, method, amount, currency, issuedAt } = receipt
+  const { lot, client, seller, method, amount, currency, issuedAt, plan } = receipt
 
   return (
     <Dialog
@@ -127,6 +151,8 @@ export default function SaleReceiptDialog({ open, receipt, onClose }: SaleReceip
             <Field term="Vendedor">{sellerOptionLabel(seller)}</Field>
             <Field term="Inmobiliaria">{sellerAgencyLabel(seller)}</Field>
           </dl>
+
+          {plan !== undefined && <PlanSummary plan={plan} currency={currency} />}
 
           <footer className="flex flex-col gap-5 border-t border-border bg-muted/40 px-4 py-5 sm:px-6 print:border-black">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-10">

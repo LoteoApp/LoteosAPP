@@ -1714,6 +1714,11 @@ func deleteLoteo(t *testing.T, pool *pgxpool.Pool, developmentID string) {
 		`DELETE FROM venta_estados WHERE venta_id IN (
 			SELECT id FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
 		)`,
+		`DELETE FROM cuotas WHERE plan_pago_id IN (
+			SELECT id FROM planes_pago WHERE venta_id IN (
+				SELECT id FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
+			)
+		)`,
 		`DELETE FROM planes_pago WHERE venta_id IN (
 			SELECT id FROM ventas WHERE lote_id IN (SELECT id FROM lotes WHERE loteo_id = $1::uuid)
 		)`,

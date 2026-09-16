@@ -24,7 +24,10 @@ type CreateSaleCommand struct {
 	PaymentMethod          domain.PaymentMethod
 	IdempotencyKey         string
 	IdempotencyPayloadHash string
-	CreatedAt              time.Time
+	// PaymentPlan is nil for contado; the repository builds and persists its
+	// schedule over the lote price.
+	PaymentPlan *domain.PaymentPlanInput
+	CreatedAt   time.Time
 }
 
 type SaleRepository interface {

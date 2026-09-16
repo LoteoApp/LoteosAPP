@@ -338,3 +338,175 @@ func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
 		t.Fatalf("List() invalid page error = %v, want %v", err, domain.ErrSaleInvalidPage)
 	}
 }
+
+func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set, skipping postgres integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
+	repository := postgres.NewSaleRepository(pool)
+	now := time.Date(2026, 1, 31, 15, 0, 0, 0, time.UTC)
+	command := gateway.CreateSaleCommand{
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+		PaymentMethod: domain.PaymentMethodFinanced,
+		PaymentPlan:   &domain.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
+		CreatedAt:     now,
+	}
+
+	created, err := repository.Create(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if created.ModalidadPago != domain.PaymentMethodFinanced || created.Monto != 100000 || created.PlanPago == nil {
+		t.Fatalf("created sale = %#v", created)
+	}
+	// A financed sale is collected cuota by cuota, so unlike contado it is
+	// not settled on registration.
+	if created.Estado != domain.SaleStateActive || len(created.Historial) != 1 {
+		t.Errorf("financed sale state = %q with %d history entries, want activa with 1", created.Estado, len(created.Historial))
+	}
+	var lotState string
+	if err := pool.QueryRow(context.Background(), `SELECT estado_actual FROM lotes WHERE id = $1::uuid`, lotID).Scan(&lotState); err != nil {
+		t.Fatalf("read lot state: %v", err)
+	}
+	if lotState != string(domain.LotStateSold) {
+		t.Errorf("lot state after a financed sale = %q, want vendido", lotState)
+	}
+	plan := created.PlanPago
+	// 100000 financed at 10% = 110000 in 12 equal cuotas of 9166.67 = 110000.04.
+	if plan.ID == "" || plan.MontoEntrega != 0 || plan.CantidadCuotas != 12 || plan.TasaInteres != 10 || plan.Periodicidad != domain.PaymentPeriodMonthly || plan.Moneda != "USD" {
+		t.Errorf("plan = %#v", plan)
+	}
+	if plan.MontoFinanciado != 100000 || plan.MontoTotal != 110000.04 || plan.MontoCuota != 9166.67 {
+		t.Errorf("plan amounts = %#v", plan)
+	}
+	if len(plan.Cuotas) != 12 {
+		t.Fatalf("cuotas = %d, want 12", len(plan.Cuotas))
+	}
+	sum := 0.0
+	for i, installment := range plan.Cuotas {
+		sum += installment.Monto
+		if installment.ID == "" || installment.Numero != i+1 || installment.Estado != domain.InstallmentStatePending || installment.FechaPago != nil {
+			t.Errorf("cuota %d = %#v", i+1, installment)
+		}
+	}
+	if domain.RoundMoney(sum) != 110000.04 || plan.Cuotas[11].Monto != 9166.67 {
+		t.Errorf("cuotas sum = %v, last = %v", sum, plan.Cuotas[11].Monto)
+	}
+	// Due dates: one month apart from the sale date, clamped to month end.
+	if !plan.Cuotas[0].FechaVencimiento.Equal(time.Date(2026, 2, 28, 15, 0, 0, 0, time.UTC)) ||
+		!plan.Cuotas[11].FechaVencimiento.Equal(time.Date(2027, 1, 31, 15, 0, 0, 0, time.UTC)) {
+		t.Errorf("due dates = %s .. %s", plan.Cuotas[0].FechaVencimiento, plan.Cuotas[11].FechaVencimiento)
+	}
+
+	var persisted int
+	if err := pool.QueryRow(context.Background(), `
+		SELECT count(*) FROM cuotas c JOIN planes_pago p ON p.id = c.plan_pago_id WHERE p.venta_id = $1::uuid
+	`, created.ID).Scan(&persisted); err != nil {
+		t.Fatalf("count cuotas: %v", err)
+	}
+	if persisted != 12 {
+		t.Errorf("persisted cuotas = %d, want 12", persisted)
+	}
+
+	fetched, err := repository.Get(context.Background(), created.ID, gateway.SaleScope{})
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if fetched.PlanPago == nil || len(fetched.PlanPago.Cuotas) != 12 || fetched.PlanPago.MontoTotal != 110000.04 {
+		t.Errorf("Get() plan = %#v", fetched.PlanPago)
+	}
+
+	page, err := repository.List(context.Background(), domain.SaleListFilter{DevelopmentID: loteoID}, gateway.SaleScope{})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].PlanPago == nil {
+		t.Fatalf("List() = %#v, want the plan summary", page)
+	}
+	summary := page.Items[0].PlanPago
+	if summary.CantidadCuotas != 12 || summary.MontoCuota != 9166.67 || summary.MontoTotal != 110000.04 || summary.MontoFinanciado != 100000 || len(summary.Cuotas) != 0 {
+		t.Errorf("List() plan summary = %#v", summary)
+	}
+}
+
+func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set, skipping postgres integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
+	repository := postgres.NewSaleRepository(pool)
+	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	command := gateway.CreateSaleCommand{
+		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
+		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
+		PaymentMethod: domain.PaymentMethodDownAndFi,
+		PaymentPlan:   &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
+		CreatedAt:     now,
+	}
+
+	// The lote price bounds the down payment; the repository is the first
+	// place that knows it.
+	tooHigh := command
+	tooHigh.PaymentPlan = &domain.PaymentPlanInput{Installments: 3, Period: domain.PaymentPeriodMonthly, DownPayment: 100000}
+	if _, err := repository.Create(context.Background(), tooHigh); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
+		t.Fatalf("Create() with the price as down payment error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
+	}
+	noPlan := command
+	noPlan.PaymentPlan = nil
+	if _, err := repository.Create(context.Background(), noPlan); !errors.Is(err, domain.ErrSalePaymentPlanRequired) {
+		t.Fatalf("Create() without plan error = %v, want %v", err, domain.ErrSalePaymentPlanRequired)
+	}
+	var lotState string
+	if err := pool.QueryRow(context.Background(), `SELECT estado_actual FROM lotes WHERE id = $1::uuid`, lotID).Scan(&lotState); err != nil {
+		t.Fatalf("read lot state: %v", err)
+	}
+	if lotState != string(domain.LotStateAvailable) {
+		t.Fatalf("lot state after rejected sales = %q, want disponible", lotState)
+	}
+
+	created, err := repository.Create(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if created.PlanPago == nil {
+		t.Fatalf("created sale = %#v, want a plan", created)
+	}
+	plan := created.PlanPago
+	if plan.MontoEntrega != 40000 || plan.MontoFinanciado != 60000 || plan.MontoTotal != 60000 || plan.MontoCuota != 20000 || plan.Periodicidad != domain.PaymentPeriodQuarterly {
+		t.Errorf("plan = %#v", plan)
+	}
+	if len(plan.Cuotas) != 3 || !plan.Cuotas[0].FechaVencimiento.Equal(now.AddDate(0, 3, 0)) || !plan.Cuotas[2].FechaVencimiento.Equal(now.AddDate(0, 9, 0)) {
+		t.Errorf("cuotas = %#v", plan.Cuotas)
+	}
+	var downPayment *float64
+	if err := pool.QueryRow(context.Background(), `SELECT monto_entrega::float8 FROM planes_pago WHERE venta_id = $1::uuid`, created.ID).Scan(&downPayment); err != nil {
+		t.Fatalf("read plan: %v", err)
+	}
+	if downPayment == nil || *downPayment != 40000 {
+		t.Errorf("persisted monto_entrega = %v, want 40000", downPayment)
+	}
+
+	fresh := command
+	fresh.IdempotencyKey = newUUID(t)
+	if _, err := repository.Create(context.Background(), fresh); !errors.Is(err, domain.ErrSaleLotUnavailable) {
+		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrSaleLotUnavailable)
+	}
+}

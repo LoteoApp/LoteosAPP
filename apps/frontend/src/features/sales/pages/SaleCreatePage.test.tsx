@@ -144,6 +144,65 @@ describe('SaleCreatePage', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('Recibo de venta')
   })
 
+  it('registers an entrega + financiación sale with its plan', async () => {
+    const user = userEvent.setup()
+    const props = renderPage({
+      createSale: vi.fn().mockResolvedValue({
+        ...sale,
+        modalidadPago: 'entrega_financiada',
+        planPago: {
+          id: 'plan-1',
+          montoEntrega: 20000,
+          cantidadCuotas: 10,
+          tasaInteres: 5,
+          periodicidad: 'mensual',
+          moneda: 'USD',
+          montoFinanciado: 100000,
+          montoCuota: 10500,
+          montoTotal: 105000,
+          cuotas: [],
+        },
+      }),
+    })
+
+    await fillSale(user)
+    await user.click(screen.getByLabelText('Condiciones de pago'))
+    await user.click(await screen.findByRole('option', { name: 'Entrega + financiación' }))
+
+    expect(screen.getByText('Ingresá una cantidad de cuotas entre 1 y 360.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()
+
+    await user.type(screen.getByLabelText('Cantidad de cuotas'), '10')
+    expect(screen.getByText('Ingresá el monto de la entrega, con hasta 2 decimales.')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Monto de entrega'), '20000')
+    await user.type(screen.getByLabelText('Tasa de interés (%)'), '5')
+
+    const preview = screen.getByLabelText('Detalle del plan')
+    expect(preview).toHaveTextContent('US$ 100.000,00')
+    expect(preview).toHaveTextContent('10 de US$ 10.500,00')
+    expect(preview).toHaveTextContent('US$ 105.000,00')
+    expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar venta' }))
+
+    await waitFor(() =>
+      expect(props.createSale).toHaveBeenCalledWith(
+        {
+          loteoId: 'loteo-1',
+          loteId: 'lot-1',
+          clienteId: 'cl-1',
+          vendedorId: 'us-1',
+          modalidadPago: 'entrega_financiada',
+          planPago: { cantidadCuotas: 10, tasaInteres: 5, periodicidad: 'mensual', montoEntrega: 20000 },
+        },
+        expect.any(String),
+      ),
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Entrega + financiación')
+    expect(within(dialog).getByLabelText('Plan de pago')).toHaveTextContent('10 de US$ 10.500,00 · mensual')
+  })
+
   it('keeps the form and shows the backend error when the sale is rejected', async () => {
     const user = userEvent.setup()
     renderPage({
