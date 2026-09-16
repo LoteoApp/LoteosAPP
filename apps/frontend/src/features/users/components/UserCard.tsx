@@ -1,3 +1,4 @@
+import { CircleCheck, CircleX } from 'lucide-react'
 import { Badge } from '../../../shared/ui/badge'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent } from '../../../shared/ui/card'
@@ -66,6 +67,8 @@ export default function UserCard({
                   onClick={onResendInvite}
                   className={resendStatus === 'success' ? RESEND_SUCCESS_CLASS : undefined}
                 >
+                  {resendStatus === 'success' && <CircleCheck aria-hidden />}
+                  {resendStatus === 'error' && <CircleX aria-hidden />}
                   Reenviar credenciales
                 </Button>
               )}
