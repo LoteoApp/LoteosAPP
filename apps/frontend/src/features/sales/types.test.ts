@@ -267,7 +267,7 @@ describe('buildSaleReceipt', () => {
         client,
         seller,
         method: 'financiado',
-        plan: { cantidadCuotas: '12', tasaInteres: '10', periodicidad: 'mensual', montoEntrega: '' },
+        plan: { installments: '12', interestRate: '10', period: 'mensual', downPayment: '' },
       },
       'now',
     )
@@ -279,13 +279,14 @@ describe('buildSaleReceipt', () => {
         method: 'financiado',
         amount: 150000,
         plan: {
-          montoEntrega: 0,
-          cantidadCuotas: 12,
-          tasaInteres: 10,
-          periodicidad: 'mensual',
-          montoFinanciado: 150000,
-          montoCuota: 13750,
-          montoTotal: 165000,
+          downPayment: 0,
+          installments: 12,
+          interestRate: 10,
+          period: 'mensual',
+          financedAmount: 150000,
+          installmentAmount: 13750,
+          lastInstallmentAmount: 13750,
+          totalAmount: 165000,
         },
       }),
     })
@@ -298,7 +299,7 @@ describe('buildSaleReceipt', () => {
         client,
         seller,
         method: 'entrega_financiada',
-        plan: { cantidadCuotas: '3', tasaInteres: '', periodicidad: 'trimestral', montoEntrega: '50.000,50' },
+        plan: { installments: '3', interestRate: '', period: 'trimestral', downPayment: '50.000,50' },
       },
       'now',
     )
@@ -307,13 +308,15 @@ describe('buildSaleReceipt', () => {
     if (!result.ok) return
     expect(result.plan).toEqual({ cantidadCuotas: 3, tasaInteres: 0, periodicidad: 'trimestral', montoEntrega: 50000.5 })
     expect(result.receipt.plan).toEqual({
-      montoEntrega: 50000.5,
-      cantidadCuotas: 3,
-      tasaInteres: 0,
-      periodicidad: 'trimestral',
-      montoFinanciado: 99999.5,
-      montoCuota: 33333.17,
-      montoTotal: 99999.5,
+      downPayment: 50000.5,
+      installments: 3,
+      interestRate: 0,
+      period: 'trimestral',
+      financedAmount: 99999.5,
+      installmentAmount: 33333.17,
+      // 99999.5 - 33333.17 * 2
+      lastInstallmentAmount: 33333.16,
+      totalAmount: 99999.5,
     })
   })
 
@@ -325,37 +328,63 @@ describe('buildSaleReceipt', () => {
       ok: false,
       error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
     })
-    expect(draft('financiado', { cantidadCuotas: '2.5' })).toEqual({
+    expect(draft('financiado', { installments: '2.5' })).toEqual({
       ok: false,
       error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
     })
-    expect(draft('financiado', { cantidadCuotas: '361' })).toEqual({
+    expect(draft('financiado', { installments: '361' })).toEqual({
       ok: false,
       error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
     })
-    expect(draft('financiado', { cantidadCuotas: '12', tasaInteres: '-1' })).toEqual({
+    expect(draft('financiado', { installments: '12', interestRate: '-1' })).toEqual({
       ok: false,
-      error: 'Ingresá una tasa de interés entre 0 y 1000 %.',
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
     })
-    expect(draft('financiado', { cantidadCuotas: '12', tasaInteres: 'diez' })).toEqual({
+    expect(draft('financiado', { installments: '12', interestRate: 'diez' })).toEqual({
       ok: false,
-      error: 'Ingresá una tasa de interés entre 0 y 1000 %.',
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
     })
-    expect(draft('entrega_financiada', { cantidadCuotas: '12' })).toEqual({
+    expect(draft('entrega_financiada', { installments: '12' })).toEqual({
       ok: false,
-      error: 'Ingresá el monto de la entrega.',
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
     })
-    expect(draft('entrega_financiada', { cantidadCuotas: '12', montoEntrega: '0' })).toEqual({
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '0' })).toEqual({
       ok: false,
-      error: 'Ingresá el monto de la entrega.',
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
     })
-    expect(draft('entrega_financiada', { cantidadCuotas: '12', montoEntrega: '150000' })).toEqual({
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '150000' })).toEqual({
       ok: false,
       error: 'La entrega tiene que ser menor al precio del lote.',
     })
-    expect(draft('entrega_financiada', { cantidadCuotas: '360', montoEntrega: '149.999,99' })).toEqual({
+    expect(draft('entrega_financiada', { installments: '360', downPayment: '149.999,99' })).toEqual({
       ok: false,
       error: 'El monto financiado no alcanza para esa cantidad de cuotas.',
+    })
+  })
+
+  it('rejects more decimals than the backend persists instead of rounding them', () => {
+    const draft = (method: 'financiado' | 'entrega_financiada', values: Partial<typeof plan>) =>
+      buildSaleReceipt({ lot: lot(), client, seller, method, plan: { ...plan, ...values } }, 'now')
+
+    expect(draft('financiado', { installments: '12', interestRate: '12,3456' })).toMatchObject({
+      ok: true,
+      plan: { tasaInteres: 12.3456 },
+    })
+    expect(draft('financiado', { installments: '12', interestRate: '12.34567' })).toEqual({
+      ok: false,
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '1000,05' })).toMatchObject({
+      ok: true,
+      plan: { montoEntrega: 1000.05 },
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '0,004' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '1000.005' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
     })
   })
 })
@@ -371,13 +400,13 @@ describe('buildPaymentSchedule', () => {
       montoEntrega: 0,
     })
 
-    expect(schedule.montoFinanciado).toBe(100000)
-    expect(schedule.montoTotal).toBe(100000)
-    expect(schedule.montoCuota).toBe(8333.33)
-    expect(schedule.cuotas).toHaveLength(12)
-    expect(schedule.cuotas.slice(0, 11).every((cuota) => cuota === 8333.33)).toBe(true)
-    expect(schedule.cuotas[11]).toBe(8333.37)
-    expect(sum(schedule.cuotas)).toBe(100000)
+    expect(schedule.financedAmount).toBe(100000)
+    expect(schedule.totalAmount).toBe(100000)
+    expect(schedule.installmentAmount).toBe(8333.33)
+    expect(schedule.installments).toHaveLength(12)
+    expect(schedule.installments.slice(0, 11).every((cuota) => cuota === 8333.33)).toBe(true)
+    expect(schedule.installments[11]).toBe(8333.37)
+    expect(sum(schedule.installments)).toBe(100000)
   })
 
   it('applies simple interest on the amount left after the down payment', () => {
@@ -389,21 +418,21 @@ describe('buildPaymentSchedule', () => {
     })
 
     expect(schedule).toEqual({
-      montoFinanciado: 100,
-      montoTotal: 110,
-      montoCuota: 36.67,
-      cuotas: [36.67, 36.67, 36.66],
+      financedAmount: 100,
+      totalAmount: 110,
+      installmentAmount: 36.67,
+      installments: [36.67, 36.67, 36.66],
     })
   })
 
   it('matches the backend on a single cuota and on awkward decimals', () => {
     expect(
       buildPaymentSchedule(999.99, { cantidadCuotas: 1, tasaInteres: 12.5, periodicidad: 'mensual', montoEntrega: 0 }),
-    ).toEqual({ montoFinanciado: 999.99, montoTotal: 1124.99, montoCuota: 1124.99, cuotas: [1124.99] })
+    ).toEqual({ financedAmount: 999.99, totalAmount: 1124.99, installmentAmount: 1124.99, installments: [1124.99] })
 
     for (const cantidadCuotas of [2, 7, 13, 97, 360]) {
       const schedule = buildPaymentSchedule(123456.78, { cantidadCuotas, tasaInteres: 33.3, periodicidad: 'mensual', montoEntrega: 0 })
-      expect(sum(schedule.cuotas)).toBe(schedule.montoTotal)
+      expect(sum(schedule.installments)).toBe(schedule.totalAmount)
     }
   })
 
@@ -514,32 +543,61 @@ describe('saleReceiptFromSale', () => {
   })
 
   it('carries the plan of a financed sale into the receipt', () => {
-    const receipt = saleReceiptFromSale({
-      ...sale,
-      modalidadPago: 'entrega_financiada',
-      planPago: {
-        id: 'plan-1',
-        montoEntrega: 20000,
-        cantidadCuotas: 10,
-        tasaInteres: 5,
-        periodicidad: 'mensual',
-        moneda: 'USD',
-        montoFinanciado: 100000,
-        montoCuota: 10500,
-        montoTotal: 105000,
-      },
-    })
+    const planPago = {
+      id: 'plan-1',
+      montoEntrega: 20000,
+      cantidadCuotas: 3,
+      tasaInteres: 5,
+      periodicidad: 'mensual' as const,
+      moneda: 'USD',
+      montoFinanciado: 100000,
+      montoCuota: 35000,
+      montoTotal: 105000,
+    }
+    const receipt = saleReceiptFromSale({ ...sale, modalidadPago: 'entrega_financiada', planPago })
 
     expect(receipt.method).toBe('entrega_financiada')
     expect(receipt.plan).toEqual({
-      montoEntrega: 20000,
-      cantidadCuotas: 10,
-      tasaInteres: 5,
-      periodicidad: 'mensual',
-      montoFinanciado: 100000,
-      montoCuota: 10500,
-      montoTotal: 105000,
+      downPayment: 20000,
+      installments: 3,
+      interestRate: 5,
+      period: 'mensual',
+      financedAmount: 100000,
+      installmentAmount: 35000,
+      lastInstallmentAmount: 35000,
+      totalAmount: 105000,
     })
+  })
+
+  it('takes the last cuota from the persisted cuotas, or derives it from the total', () => {
+    const planPago = {
+      id: 'plan-1',
+      montoEntrega: 0,
+      cantidadCuotas: 3,
+      tasaInteres: 0,
+      periodicidad: 'mensual' as const,
+      moneda: 'USD',
+      montoFinanciado: 100,
+      montoCuota: 33.33,
+      montoTotal: 100,
+    }
+    const cuota = (numero: number, monto: number) => ({
+      id: `c-${numero}`,
+      numero,
+      monto,
+      estado: 'pendiente' as const,
+      fechaVencimiento: '2026-10-15T00:00:00Z',
+    })
+
+    const fromDetail = saleReceiptFromSale({
+      ...sale,
+      modalidadPago: 'financiado',
+      planPago: { ...planPago, cuotas: [cuota(1, 33.33), cuota(2, 33.33), cuota(3, 33.34)] },
+    })
+    expect(fromDetail.plan?.lastInstallmentAmount).toBe(33.34)
+
+    const fromList = saleReceiptFromSale({ ...sale, modalidadPago: 'financiado', planPago })
+    expect(fromList.plan?.lastInstallmentAmount).toBe(33.34)
   })
 
   it('labels the lote of a sale', () => {

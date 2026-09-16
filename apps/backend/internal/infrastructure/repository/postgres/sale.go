@@ -379,7 +379,7 @@ func loadSale(ctx context.Context, queryer reservationQueryer, id string, scope 
 func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID, currency string, command gateway.CreateSaleCommand, schedule domain.PaymentSchedule) error {
 	var downPayment *float64
 	if command.PaymentMethod == domain.PaymentMethodDownAndFi {
-		downPayment = &command.PaymentPlan.MontoEntrega
+		downPayment = &command.PaymentPlan.DownPayment
 	}
 	var planID string
 	err := tx.QueryRow(ctx, `
@@ -389,13 +389,13 @@ func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID, currency string, 
 		)
 		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::uuid, $8, $8)
 		RETURNING id::text
-	`, saleID, downPayment, command.PaymentPlan.CantidadCuotas, command.PaymentPlan.TasaInteres,
-		string(command.PaymentPlan.Periodicidad), currency, command.ActorID, command.CreatedAt).Scan(&planID)
+	`, saleID, downPayment, command.PaymentPlan.Installments, command.PaymentPlan.InterestRate,
+		string(command.PaymentPlan.Period), currency, command.ActorID, command.CreatedAt).Scan(&planID)
 	if err != nil {
 		return err
 	}
-	rows := make([][]any, len(schedule.Cuotas))
-	for i, installment := range schedule.Cuotas {
+	rows := make([][]any, len(schedule.Installments))
+	for i, installment := range schedule.Installments {
 		rows[i] = []any{planID, installment.Numero, installment.Monto, string(installment.Estado),
 			installment.FechaVencimiento, command.ActorID, command.CreatedAt, command.CreatedAt}
 	}

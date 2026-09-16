@@ -26,10 +26,10 @@ func (handler *CreateSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 	var plan *sales.PaymentPlanInput
 	if body.PlanPago != nil {
 		plan = &sales.PaymentPlanInput{
-			CantidadCuotas: body.PlanPago.CantidadCuotas,
-			TasaInteres:    body.PlanPago.TasaInteres,
-			Periodicidad:   body.PlanPago.Periodicidad,
-			MontoEntrega:   body.PlanPago.MontoEntrega,
+			Installments: body.PlanPago.CantidadCuotas,
+			InterestRate: body.PlanPago.TasaInteres,
+			Period:       body.PlanPago.Periodicidad,
+			DownPayment:  body.PlanPago.MontoEntrega,
 		}
 	}
 	sale, err := handler.createSale.Execute(request.Context(), sales.CreateSaleInput{

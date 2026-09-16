@@ -276,12 +276,13 @@ transacción, un plan de pago (`planes_pago`) y sus cuotas (`cuotas`), todas
 `pendiente`. Cobrarlas es tarea del módulo de Cobranza.
 
 - `cantidadCuotas`: entero entre 1 y 360.
-- `tasaInteres`: porcentaje entre 0 y 1000 que se aplica **una sola vez**
-  sobre el monto financiado (interés simple); 0 o ausente es sin interés.
+- `tasaInteres`: porcentaje entre 0 y 1000, con hasta 4 decimales (lo que
+  guarda `planes_pago.tasa_interes`), que se aplica **una sola vez** sobre el
+  monto financiado (interés simple); 0 o ausente es sin interés.
 - `periodicidad`: `mensual`, `bimestral`, `trimestral` o `semestral`.
-- `montoEntrega`: obligatorio y mayor a cero solo en entrega + financiación;
-  tiene que ser menor al precio del lote. En financiado no se admite. La
-  entrega no se registra como cobrada: queda en el plan para Cobranza.
+- `montoEntrega`: obligatorio, mayor a cero, con hasta 2 decimales y menor al
+  precio del lote, solo en entrega + financiación. En financiado no se admite.
+  La entrega no se registra como cobrada: queda en el plan para Cobranza.
 - Una venta al contado no admite plan.
 
 Fórmula (idéntica en backend y frontend, redondeando a 2 decimales):

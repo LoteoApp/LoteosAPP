@@ -173,7 +173,7 @@ describe('SaleCreatePage', () => {
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled()
 
     await user.type(screen.getByLabelText('Cantidad de cuotas'), '10')
-    expect(screen.getByText('Ingresá el monto de la entrega.')).toBeInTheDocument()
+    expect(screen.getByText('Ingresá el monto de la entrega, con hasta 2 decimales.')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Monto de entrega'), '20000')
     await user.type(screen.getByLabelText('Tasa de interés (%)'), '5')
 

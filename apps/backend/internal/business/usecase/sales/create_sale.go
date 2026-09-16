@@ -20,13 +20,13 @@ type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now() }
 
-// PaymentPlanInput is the plan as the request describes it. TasaInteres is a
-// percentage; MontoEntrega only applies to entrega_financiada.
+// PaymentPlanInput is the plan as the request describes it. InterestRate is a
+// percentage; DownPayment only applies to entrega_financiada.
 type PaymentPlanInput struct {
-	CantidadCuotas int
-	TasaInteres    float64
-	Periodicidad   string
-	MontoEntrega   float64
+	Installments int
+	InterestRate float64
+	Period       string
+	DownPayment  float64
 }
 
 type CreateSaleInput struct {
@@ -99,10 +99,10 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	var plan *domain.PaymentPlanInput
 	if input.PaymentPlan != nil {
 		plan = &domain.PaymentPlanInput{
-			CantidadCuotas: input.PaymentPlan.CantidadCuotas,
-			TasaInteres:    input.PaymentPlan.TasaInteres,
-			Periodicidad:   domain.PaymentPeriod(strings.TrimSpace(input.PaymentPlan.Periodicidad)),
-			MontoEntrega:   input.PaymentPlan.MontoEntrega,
+			Installments: input.PaymentPlan.Installments,
+			InterestRate: input.PaymentPlan.InterestRate,
+			Period:       domain.PaymentPeriod(strings.TrimSpace(input.PaymentPlan.Period)),
+			DownPayment:  input.PaymentPlan.DownPayment,
 		}
 	}
 	if err := domain.ValidatePaymentPlan(method, plan); err != nil {
@@ -140,7 +140,7 @@ func salePayloadHash(developmentID, lotID, clientID, sellerID string, method dom
 		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
 		len(sellerID), sellerID, len(method), method)
 	if plan != nil {
-		payload += fmt.Sprintf("|%d:%g:%s:%g", plan.CantidadCuotas, plan.TasaInteres, plan.Periodicidad, plan.MontoEntrega)
+		payload += fmt.Sprintf("|%d:%g:%s:%g", plan.Installments, plan.InterestRate, plan.Period, plan.DownPayment)
 	}
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])

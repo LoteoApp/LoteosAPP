@@ -160,9 +160,14 @@ export function isPaymentPeriod(value: unknown): value is PaymentPeriod {
 
 export const MAX_SALE_INSTALLMENTS = 360
 export const MAX_SALE_INTEREST_RATE = 1000
+// The backend persists the rate as NUMERIC(8,4) and amounts as NUMERIC(14,2)
+// and rejects anything finer, so the form does too.
+const INTEREST_RATE_DECIMALS = 4
+const MONEY_DECIMALS = 2
 
-// The plan as POST .../ventas receives it. tasaInteres is a percentage and
-// montoEntrega is 0 unless the modalidad is entrega_financiada.
+// The plan as POST .../ventas receives it (the `planPago` body): keys are the
+// JSON contract. tasaInteres is a percentage and montoEntrega is 0 unless the
+// modalidad is entrega_financiada.
 export type PaymentPlanInput = {
   cantidadCuotas: number
   tasaInteres: number
@@ -173,24 +178,24 @@ export type PaymentPlanInput = {
 // What the form holds while the user types: strings, so a half-typed number
 // never snaps to something else under their cursor.
 export type PaymentPlanValues = {
-  cantidadCuotas: string
-  tasaInteres: string
-  periodicidad: PaymentPeriod
-  montoEntrega: string
+  installments: string
+  interestRate: string
+  period: PaymentPeriod
+  downPayment: string
 }
 
 export const EMPTY_PAYMENT_PLAN: PaymentPlanValues = {
-  cantidadCuotas: '',
-  tasaInteres: '',
-  periodicidad: 'mensual',
-  montoEntrega: '',
+  installments: '',
+  interestRate: '',
+  period: 'mensual',
+  downPayment: '',
 }
 
 export type PaymentSchedule = {
-  montoFinanciado: number
-  montoTotal: number
-  montoCuota: number
-  cuotas: number[]
+  financedAmount: number
+  totalAmount: number
+  installmentAmount: number
+  installments: number[]
 }
 
 // Mirrors domain.RoundMoney on the backend: Math.round(value * 100) / 100
@@ -203,32 +208,38 @@ export function roundMoney(value: number): number {
 // Formula (simple interest on the financed amount; keep in sync with
 // domain.BuildPaymentSchedule in apps/backend):
 //
-//   financiado = round2(monto - montoEntrega)
-//   total      = round2(financiado * (1 + tasaInteres / 100))
-//   cuota      = round2(total / cantidadCuotas)
-//   última     = round2(total - cuota * (cantidadCuotas - 1))
+//   financed    = round2(amount - downPayment)
+//   total       = round2(financed * (1 + interestRate / 100))
+//   installment = round2(total / installments)
+//   last        = round2(total - installment * (installments - 1))
 //
-// The last cuota absorbs the rounding remainder so the cuotas add up to
+// The last installment absorbs the rounding remainder so they add up to
 // total exactly. Due dates are derived by the backend from the sale date.
-export function buildPaymentSchedule(monto: number, plan: PaymentPlanInput): PaymentSchedule {
-  const montoFinanciado = roundMoney(monto - plan.montoEntrega)
-  const montoTotal = roundMoney(montoFinanciado * (1 + plan.tasaInteres / 100))
-  const montoCuota = roundMoney(montoTotal / plan.cantidadCuotas)
-  const last = roundMoney(montoTotal - montoCuota * (plan.cantidadCuotas - 1))
-  const cuotas = Array.from({ length: plan.cantidadCuotas }, (_, index) =>
-    index === plan.cantidadCuotas - 1 ? last : montoCuota,
+export function buildPaymentSchedule(amount: number, plan: PaymentPlanInput): PaymentSchedule {
+  const financedAmount = roundMoney(amount - plan.montoEntrega)
+  const totalAmount = roundMoney(financedAmount * (1 + plan.tasaInteres / 100))
+  const installmentAmount = roundMoney(totalAmount / plan.cantidadCuotas)
+  const last = roundMoney(totalAmount - installmentAmount * (plan.cantidadCuotas - 1))
+  const installments = Array.from({ length: plan.cantidadCuotas }, (_, index) =>
+    index === plan.cantidadCuotas - 1 ? last : installmentAmount,
   )
-  return { montoFinanciado, montoTotal, montoCuota, cuotas }
+  return { financedAmount, totalAmount, installmentAmount, installments }
+}
+
+export function lastInstallmentAmount(schedule: PaymentSchedule): number {
+  return schedule.installments[schedule.installments.length - 1]
 }
 
 // Accepts "1234.5", "1234,5" and "1.234,50": with a comma present the dots
-// are thousands separators, as people type prices here.
-function parseDecimal(value: string): number | null {
+// are thousands separators, as people type prices here. More decimals than
+// `maxDecimals` is a typo, not something to round.
+function parseDecimal(value: string, maxDecimals: number): number | null {
   const trimmed = value.trim()
   const normalized = trimmed.includes(',')
     ? trimmed.replace(/\./g, '').replace(',', '.')
     : trimmed
-  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+  const match = /^\d+(?:\.(\d+))?$/.exec(normalized)
+  if (match === null || (match[1]?.length ?? 0) > maxDecimals) {
     return null
   }
   return Number(normalized)
@@ -244,18 +255,18 @@ export type PaymentPlanResult =
 export function parsePaymentPlan(
   method: PaymentMethod,
   values: PaymentPlanValues,
-  monto: number,
+  amount: number,
 ): PaymentPlanResult {
   if (!isFinancedMethod(method)) {
     return { ok: true, plan: undefined }
   }
 
-  const cantidadCuotas = Number(values.cantidadCuotas.trim())
+  const installments = Number(values.installments.trim())
   if (
-    values.cantidadCuotas.trim() === '' ||
-    !Number.isInteger(cantidadCuotas) ||
-    cantidadCuotas < 1 ||
-    cantidadCuotas > MAX_SALE_INSTALLMENTS
+    values.installments.trim() === '' ||
+    !Number.isInteger(installments) ||
+    installments < 1 ||
+    installments > MAX_SALE_INSTALLMENTS
   ) {
     return {
       ok: false,
@@ -263,34 +274,35 @@ export function parsePaymentPlan(
     }
   }
 
-  const tasaInteres = values.tasaInteres.trim() === '' ? 0 : parseDecimal(values.tasaInteres)
-  if (tasaInteres === null || tasaInteres < 0 || tasaInteres > MAX_SALE_INTEREST_RATE) {
+  const interestRate =
+    values.interestRate.trim() === '' ? 0 : parseDecimal(values.interestRate, INTEREST_RATE_DECIMALS)
+  if (interestRate === null || interestRate < 0 || interestRate > MAX_SALE_INTEREST_RATE) {
     return {
       ok: false,
-      error: `Ingresá una tasa de interés entre 0 y ${MAX_SALE_INTEREST_RATE} %.`,
+      error: `Ingresá una tasa de interés entre 0 y ${MAX_SALE_INTEREST_RATE} %, con hasta ${INTEREST_RATE_DECIMALS} decimales.`,
     }
   }
 
-  let montoEntrega = 0
+  let downPayment = 0
   if (method === 'entrega_financiada') {
-    const parsed = parseDecimal(values.montoEntrega)
+    const parsed = parseDecimal(values.downPayment, MONEY_DECIMALS)
     if (parsed === null || parsed <= 0) {
-      return { ok: false, error: 'Ingresá el monto de la entrega.' }
+      return { ok: false, error: 'Ingresá el monto de la entrega, con hasta 2 decimales.' }
     }
-    if (parsed >= monto) {
+    if (parsed >= amount) {
       return { ok: false, error: 'La entrega tiene que ser menor al precio del lote.' }
     }
-    montoEntrega = parsed
+    downPayment = parsed
   }
 
   const plan: PaymentPlanInput = {
-    cantidadCuotas,
-    tasaInteres,
-    periodicidad: values.periodicidad,
-    montoEntrega,
+    cantidadCuotas: installments,
+    tasaInteres: interestRate,
+    periodicidad: values.period,
+    montoEntrega: downPayment,
   }
-  const schedule = buildPaymentSchedule(monto, plan)
-  if (schedule.montoCuota < 0.01 || schedule.cuotas[schedule.cuotas.length - 1] < 0.01) {
+  const schedule = buildPaymentSchedule(amount, plan)
+  if (schedule.installmentAmount < 0.01 || lastInstallmentAmount(schedule) < 0.01) {
     return { ok: false, error: 'El monto financiado no alcanza para esa cantidad de cuotas.' }
   }
   return { ok: true, plan }
@@ -327,15 +339,31 @@ export type SaleDraft = {
 }
 
 // The plan as the receipt prints it: the typed terms plus the derived
-// amounts, all of which the backend also publishes in Sale.planPago.
+// amounts, all of which the backend also publishes in Sale.planPago. The
+// last installment is listed apart because it absorbs the rounding
+// remainder and may differ from the regular one.
 export type SaleReceiptPlan = {
-  montoEntrega: number
-  cantidadCuotas: number
-  tasaInteres: number
-  periodicidad: PaymentPeriod
-  montoFinanciado: number
-  montoCuota: number
-  montoTotal: number
+  downPayment: number
+  installments: number
+  interestRate: number
+  period: PaymentPeriod
+  financedAmount: number
+  installmentAmount: number
+  lastInstallmentAmount: number
+  totalAmount: number
+}
+
+function saleReceiptPlan(plan: PaymentPlanInput, schedule: PaymentSchedule): SaleReceiptPlan {
+  return {
+    downPayment: plan.montoEntrega,
+    installments: plan.cantidadCuotas,
+    interestRate: plan.tasaInteres,
+    period: plan.periodicidad,
+    financedAmount: schedule.financedAmount,
+    installmentAmount: schedule.installmentAmount,
+    lastInstallmentAmount: lastInstallmentAmount(schedule),
+    totalAmount: schedule.totalAmount,
+  }
 }
 
 export type SaleReceipt = {
@@ -389,16 +417,7 @@ export function buildSaleReceipt(draft: SaleDraft, issuedAt: string): SaleReceip
     currency: lot.currency,
   }
   if (parsed.plan !== undefined) {
-    const schedule = buildPaymentSchedule(price, parsed.plan)
-    receipt.plan = {
-      montoEntrega: parsed.plan.montoEntrega,
-      cantidadCuotas: parsed.plan.cantidadCuotas,
-      tasaInteres: parsed.plan.tasaInteres,
-      periodicidad: parsed.plan.periodicidad,
-      montoFinanciado: schedule.montoFinanciado,
-      montoCuota: schedule.montoCuota,
-      montoTotal: schedule.montoTotal,
-    }
+    receipt.plan = saleReceiptPlan(parsed.plan, buildPaymentSchedule(price, parsed.plan))
   }
 
   return { ok: true, receipt, plan: parsed.plan }
@@ -572,24 +591,11 @@ export function saleLotLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 
   const number = sale.loteNumero || '—'
   return `${sale.loteoNombre} · Mz ${block} · Lote ${number}`
 }
-
 // The receipt of a persisted sale: what the dialog prints once the backend
 // has registered the venta.
 export function saleReceiptFromSale(sale: Sale): SaleReceipt {
-  const plan = sale.planPago
   return {
-    plan:
-      plan === undefined
-        ? undefined
-        : {
-            montoEntrega: plan.montoEntrega,
-            cantidadCuotas: plan.cantidadCuotas,
-            tasaInteres: plan.tasaInteres,
-            periodicidad: plan.periodicidad,
-            montoFinanciado: plan.montoFinanciado,
-            montoCuota: plan.montoCuota,
-            montoTotal: plan.montoTotal,
-          },
+    plan: sale.planPago === undefined ? undefined : persistedReceiptPlan(sale.planPago),
     issuedAt: sale.fechaCreacion,
     lot: {
       id: sale.loteId,
@@ -615,5 +621,23 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
     method: sale.modalidadPago,
     amount: sale.monto,
     currency: sale.moneda,
+  }
+}
+
+// The last installment comes from the persisted cuotas when the response
+// carries them; otherwise it is derived with the same formula the backend
+// used, so a list summary prints the same remainder as the detail.
+function persistedReceiptPlan(plan: PaymentPlan): SaleReceiptPlan {
+  const persistedLast = plan.cuotas?.[plan.cuotas.length - 1]?.monto
+  return {
+    downPayment: plan.montoEntrega,
+    installments: plan.cantidadCuotas,
+    interestRate: plan.tasaInteres,
+    period: plan.periodicidad,
+    financedAmount: plan.montoFinanciado,
+    installmentAmount: plan.montoCuota,
+    lastInstallmentAmount:
+      persistedLast ?? roundMoney(plan.montoTotal - plan.montoCuota * (plan.cantidadCuotas - 1)),
+    totalAmount: plan.montoTotal,
   }
 }

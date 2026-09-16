@@ -592,7 +592,8 @@ Decisiones de este recorte:
 - **El plan de pago se calcula en dominio y se persiste con la venta.**
   `domain.ValidatePaymentPlan` aplica las reglas que no dependen del precio
   (plan obligatorio en `financiado`/`entrega_financiada` y prohibido en
-  `contado`, cuotas 1..360, tasa 0..1000, periodicidad válida, entrega solo
+  `contado`, cuotas 1..360, tasa 0..1000 con hasta 4 decimales, periodicidad
+  válida, entrega con hasta 2 decimales y solo
   en `entrega_financiada`); el caso de uso la corre antes de tocar la base y
   `SaleRepository.Create` la repite y agrega la única regla que necesita el
   lote: la entrega tiene que ser menor al precio

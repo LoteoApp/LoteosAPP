@@ -9,12 +9,14 @@ import {
   SelectValue,
 } from '../../../shared/ui/select'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
+import { installmentsLabel } from './installmentsLabel'
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
   PAYMENT_PERIODS,
   PAYMENT_PERIOD_LABELS,
   buildPaymentSchedule,
+  lastInstallmentAmount,
   isFinancedMethod,
   saleDisabledReason,
   parsePaymentPlan,
@@ -82,11 +84,12 @@ function PlanPreview({
     )
   }
   const schedule = buildPaymentSchedule(lot.price, parsed.plan)
-  const lastAmount = schedule.cuotas[schedule.cuotas.length - 1]
-  const cuotaLabel =
-    lastAmount === schedule.montoCuota
-      ? `${schedule.cuotas.length} × ${formatCurrency(schedule.montoCuota, lot.currency)}`
-      : `${schedule.cuotas.length - 1} × ${formatCurrency(schedule.montoCuota, lot.currency)} + 1 × ${formatCurrency(lastAmount, lot.currency)}`
+  const installmentsText = installmentsLabel(
+    schedule.installments.length,
+    schedule.installmentAmount,
+    lastInstallmentAmount(schedule),
+    lot.currency,
+  )
 
   return (
     <dl
@@ -96,9 +99,9 @@ function PlanPreview({
       {method === 'entrega_financiada' && (
         <PreviewItem term="Entrega" value={formatCurrency(parsed.plan.montoEntrega, lot.currency)} />
       )}
-      <PreviewItem term="Monto financiado" value={formatCurrency(schedule.montoFinanciado, lot.currency)} />
-      <PreviewItem term="Cuotas" value={cuotaLabel} />
-      <PreviewItem term="Total financiado" value={formatCurrency(schedule.montoTotal, lot.currency)} />
+      <PreviewItem term="Monto financiado" value={formatCurrency(schedule.financedAmount, lot.currency)} />
+      <PreviewItem term="Cuotas" value={installmentsText} />
+      <PreviewItem term="Total financiado" value={formatCurrency(schedule.totalAmount, lot.currency)} />
     </dl>
   )
 }
@@ -164,11 +167,11 @@ export default function PaymentConditions({
               <FieldLabel htmlFor="venta-entrega">Monto de entrega</FieldLabel>
               <Input
                 id="venta-entrega"
-                name="montoEntrega"
+                name="downPayment"
                 inputMode="decimal"
                 autoComplete="off"
-                value={plan.montoEntrega}
-                onChange={(event) => update('montoEntrega', event.target.value)}
+                value={plan.downPayment}
+                onChange={(event) => update('downPayment', event.target.value)}
                 disabled={disabled}
                 className="min-h-11 md:min-h-9"
               />
@@ -183,11 +186,11 @@ export default function PaymentConditions({
               <FieldLabel htmlFor="venta-cuotas">Cantidad de cuotas</FieldLabel>
               <Input
                 id="venta-cuotas"
-                name="cantidadCuotas"
+                name="installments"
                 inputMode="numeric"
                 autoComplete="off"
-                value={plan.cantidadCuotas}
-                onChange={(event) => update('cantidadCuotas', event.target.value)}
+                value={plan.installments}
+                onChange={(event) => update('installments', event.target.value)}
                 disabled={disabled}
                 className="min-h-11 md:min-h-9"
               />
@@ -196,12 +199,12 @@ export default function PaymentConditions({
               <FieldLabel htmlFor="venta-tasa">Tasa de interés (%)</FieldLabel>
               <Input
                 id="venta-tasa"
-                name="tasaInteres"
+                name="interestRate"
                 inputMode="decimal"
                 autoComplete="off"
                 placeholder="0"
-                value={plan.tasaInteres}
-                onChange={(event) => update('tasaInteres', event.target.value)}
+                value={plan.interestRate}
+                onChange={(event) => update('interestRate', event.target.value)}
                 disabled={disabled}
                 className="min-h-11 md:min-h-9"
               />
@@ -209,9 +212,9 @@ export default function PaymentConditions({
             <Field>
               <FieldLabel htmlFor="venta-periodicidad">Periodicidad</FieldLabel>
               <Select
-                name="periodicidad"
-                value={plan.periodicidad}
-                onValueChange={(next) => update('periodicidad', next as PaymentPeriod)}
+                name="period"
+                value={plan.period}
+                onValueChange={(next) => update('period', next as PaymentPeriod)}
                 disabled={disabled}
               >
                 <SelectTrigger id="venta-periodicidad" className="min-h-11 md:min-h-9">

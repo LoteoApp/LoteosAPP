@@ -59,13 +59,14 @@ describe('SaleReceiptDialog', () => {
         receipt={receipt({
           method: 'entrega_financiada',
           plan: {
-            montoEntrega: 50000,
-            cantidadCuotas: 10,
-            tasaInteres: 12.5,
-            periodicidad: 'mensual',
-            montoFinanciado: 100000,
-            montoCuota: 11250,
-            montoTotal: 112500,
+            downPayment: 50000,
+            installments: 10,
+            interestRate: 12.5,
+            period: 'mensual',
+            financedAmount: 100000,
+            installmentAmount: 11250,
+            lastInstallmentAmount: 11250,
+            totalAmount: 112500,
           },
         })}
         onClose={vi.fn()}
@@ -84,6 +85,32 @@ describe('SaleReceiptDialog', () => {
     expect(plan).toHaveTextContent('US$ 112.500,00')
   })
 
+  it('prints the last cuota apart when it absorbs the rounding remainder', () => {
+    render(
+      <SaleReceiptDialog
+        open
+        receipt={receipt({
+          method: 'financiado',
+          plan: {
+            downPayment: 0,
+            installments: 3,
+            interestRate: 0,
+            period: 'mensual',
+            financedAmount: 100,
+            installmentAmount: 33.33,
+            lastInstallmentAmount: 33.34,
+            totalAmount: 100,
+          },
+        })}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Plan de pago')).toHaveTextContent(
+      '2 × US$ 33,33 + 1 × US$ 33,34 · mensual',
+    )
+  })
+
   it('omits the entrega row of a plan without one and the plan of a contado sale', () => {
     const { rerender } = render(
       <SaleReceiptDialog
@@ -91,13 +118,14 @@ describe('SaleReceiptDialog', () => {
         receipt={receipt({
           method: 'financiado',
           plan: {
-            montoEntrega: 0,
-            cantidadCuotas: 3,
-            tasaInteres: 0,
-            periodicidad: 'trimestral',
-            montoFinanciado: 150000,
-            montoCuota: 50000,
-            montoTotal: 150000,
+            downPayment: 0,
+            installments: 3,
+            interestRate: 0,
+            period: 'trimestral',
+            financedAmount: 150000,
+            installmentAmount: 50000,
+            lastInstallmentAmount: 50000,
+            totalAmount: 150000,
           },
         })}
         onClose={vi.fn()}

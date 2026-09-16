@@ -347,7 +347,7 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 		PaymentMethod: domain.PaymentMethodFinanced,
-		PaymentPlan:   &domain.PaymentPlanInput{CantidadCuotas: 12, TasaInteres: 10, Periodicidad: domain.PaymentPeriodMonthly},
+		PaymentPlan:   &domain.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
 		CreatedAt:     now,
 	}
 
@@ -435,14 +435,14 @@ func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
 		PaymentMethod: domain.PaymentMethodDownAndFi,
-		PaymentPlan:   &domain.PaymentPlanInput{CantidadCuotas: 3, TasaInteres: 0, Periodicidad: domain.PaymentPeriodQuarterly, MontoEntrega: 40000},
+		PaymentPlan:   &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
 		CreatedAt:     now,
 	}
 
 	// The lote price bounds the down payment; the repository is the first
 	// place that knows it.
 	tooHigh := command
-	tooHigh.PaymentPlan = &domain.PaymentPlanInput{CantidadCuotas: 3, Periodicidad: domain.PaymentPeriodMonthly, MontoEntrega: 100000}
+	tooHigh.PaymentPlan = &domain.PaymentPlanInput{Installments: 3, Period: domain.PaymentPeriodMonthly, DownPayment: 100000}
 	if _, err := repository.Create(context.Background(), tooHigh); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
 		t.Fatalf("Create() with the price as down payment error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
 	}

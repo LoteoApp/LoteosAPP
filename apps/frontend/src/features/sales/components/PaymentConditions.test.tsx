@@ -113,20 +113,20 @@ describe('PaymentConditions', () => {
     expect(screen.getByText('Completá el plan para ver el detalle de las cuotas.')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Cantidad de cuotas'), '1')
-    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, cantidadCuotas: '1' })
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, installments: '1' })
 
     await user.type(screen.getByLabelText('Tasa de interés (%)'), '5')
-    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, tasaInteres: '5' })
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, interestRate: '5' })
 
     await user.click(screen.getByLabelText('Periodicidad'))
     await user.click(await screen.findByRole('option', { name: 'Trimestral' }))
-    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, periodicidad: 'trimestral' })
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...EMPTY_PAYMENT_PLAN, period: 'trimestral' })
   })
 
   it('previews the cuotas of a financed plan with the interest applied', () => {
     renderConditions({
       method: 'financiado',
-      plan: { cantidadCuotas: '12', tasaInteres: '10', periodicidad: 'mensual', montoEntrega: '' },
+      plan: { installments: '12', interestRate: '10', period: 'mensual', downPayment: '' },
     })
 
     const preview = screen.getByLabelText('Detalle del plan')
@@ -139,7 +139,7 @@ describe('PaymentConditions', () => {
   it('asks for the entrega and takes it off the financed amount', async () => {
     const user = userEvent.setup()
     const onPlanChange = vi.fn()
-    const plan: PaymentPlanValues = { cantidadCuotas: '7', tasaInteres: '', periodicidad: 'mensual', montoEntrega: '50000' }
+    const plan: PaymentPlanValues = { installments: '7', interestRate: '', period: 'mensual', downPayment: '50000' }
     renderConditions({ method: 'entrega_financiada', plan, onPlanChange })
 
     const preview = screen.getByLabelText('Detalle del plan')
@@ -151,13 +151,13 @@ describe('PaymentConditions', () => {
     )
 
     await user.type(screen.getByLabelText('Monto de entrega'), '1')
-    expect(onPlanChange).toHaveBeenLastCalledWith({ ...plan, montoEntrega: '500001' })
+    expect(onPlanChange).toHaveBeenLastCalledWith({ ...plan, downPayment: '500001' })
   })
 
   it('keeps the preview quiet while the plan is invalid', () => {
     renderConditions({
       method: 'entrega_financiada',
-      plan: { cantidadCuotas: '12', tasaInteres: '', periodicidad: 'mensual', montoEntrega: '150000' },
+      plan: { installments: '12', interestRate: '', period: 'mensual', downPayment: '150000' },
     })
 
     expect(screen.queryByLabelText('Detalle del plan')).not.toBeInTheDocument()

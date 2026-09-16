@@ -18,6 +18,8 @@ const (
 	MaxSaleInstallments  = 360
 	MaxSaleInterestRate  = 1000
 	installmentAmountMin = 0.01
+	interestRateDecimals = 4
+	moneyDecimals        = 2
 )
 
 type InstallmentState string
@@ -56,20 +58,24 @@ func (period PaymentPeriod) Months() int {
 	return paymentPeriodMonths[period]
 }
 
-// PaymentPlanInput is the plan as the caller describes it: TasaInteres is a
-// percentage over the financed amount and MontoEntrega is only meaningful
-// for entrega_financiada.
+// PaymentPlanInput is the plan as the caller describes it: InterestRate is a
+// percentage over the financed amount and DownPayment is only meaningful for
+// entrega_financiada.
 type PaymentPlanInput struct {
-	CantidadCuotas int
-	TasaInteres    float64
-	Periodicidad   PaymentPeriod
-	MontoEntrega   float64
+	Installments int
+	InterestRate float64
+	Period       PaymentPeriod
+	DownPayment  float64
 }
 
 // ValidatePaymentPlan checks the plan against the modalidad before the lote
 // price is known: contado takes no plan, the other two require one, and only
 // entrega_financiada carries a down payment. The down payment's upper bound
 // (the lote price) is checked by BuildPaymentSchedule.
+//
+// InterestRate is persisted as NUMERIC(8,4) and DownPayment as NUMERIC(14,2),
+// so values with more decimals than the columns keep are rejected here rather
+// than silently rounded after the schedule was computed on the exact value.
 func ValidatePaymentPlan(method PaymentMethod, plan *PaymentPlanInput) error {
 	if method == PaymentMethodCash {
 		if plan != nil {
@@ -80,29 +86,40 @@ func ValidatePaymentPlan(method PaymentMethod, plan *PaymentPlanInput) error {
 	if plan == nil {
 		return ErrSalePaymentPlanRequired
 	}
-	if plan.CantidadCuotas < 1 || plan.CantidadCuotas > MaxSaleInstallments {
+	if plan.Installments < 1 || plan.Installments > MaxSaleInstallments {
 		return ErrSaleInvalidInstallments
 	}
-	if math.IsNaN(plan.TasaInteres) || math.IsInf(plan.TasaInteres, 0) || plan.TasaInteres < 0 || plan.TasaInteres > MaxSaleInterestRate {
+	if !isFinite(plan.InterestRate) || plan.InterestRate < 0 || plan.InterestRate > MaxSaleInterestRate || !hasAtMostDecimals(plan.InterestRate, interestRateDecimals) {
 		return ErrSaleInvalidInterestRate
 	}
-	if !plan.Periodicidad.IsValid() {
+	if !plan.Period.IsValid() {
 		return ErrSaleInvalidPeriodicity
 	}
-	if math.IsNaN(plan.MontoEntrega) || math.IsInf(plan.MontoEntrega, 0) {
+	if !isFinite(plan.DownPayment) || !hasAtMostDecimals(plan.DownPayment, moneyDecimals) {
 		return ErrSaleInvalidDownPayment
 	}
 	switch method {
 	case PaymentMethodFinanced:
-		if plan.MontoEntrega != 0 {
+		if plan.DownPayment != 0 {
 			return ErrSaleDownPaymentNotApplicable
 		}
 	case PaymentMethodDownAndFi:
-		if plan.MontoEntrega <= 0 {
+		if plan.DownPayment <= 0 {
 			return ErrSaleInvalidDownPayment
 		}
 	}
 	return nil
+}
+
+func isFinite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+// hasAtMostDecimals tolerates the representation error of a decimal typed by
+// the user (0.1 is not exact in binary) but not a real extra digit.
+func hasAtMostDecimals(value float64, decimals int) bool {
+	scaled := value * math.Pow10(decimals)
+	return math.Abs(scaled-math.Round(scaled)) < 1e-6
 }
 
 // Installment is a cuota as the API publishes it.
@@ -135,10 +152,10 @@ type PaymentPlan struct {
 
 // PaymentSchedule is the deterministic outcome of a plan over a sale amount.
 type PaymentSchedule struct {
-	MontoFinanciado float64
-	MontoTotal      float64
-	MontoCuota      float64
-	Cuotas          []Installment
+	FinancedAmount    float64
+	TotalAmount       float64
+	InstallmentAmount float64
+	Installments      []Installment
 }
 
 // RoundMoney rounds to 2 decimals, half away from zero. It is written as
@@ -154,47 +171,47 @@ func RoundMoney(value float64) float64 {
 // Formula (simple interest on the financed amount; keep in sync with
 // buildPaymentSchedule in apps/frontend/src/features/sales/types.ts):
 //
-//	financiado = round2(monto - montoEntrega)
-//	total      = round2(financiado * (1 + tasaInteres / 100))
-//	cuota      = round2(total / cantidadCuotas)
-//	última     = round2(total - cuota * (cantidadCuotas - 1))
+//	financed    = round2(amount - downPayment)
+//	total       = round2(financed * (1 + interestRate / 100))
+//	installment = round2(total / installments)
+//	last        = round2(total - installment * (installments - 1))
 //
 // The last installment absorbs the rounding remainder so the cuotas add up
 // to total exactly. Due dates: installment k (1-based) falls k periods after
 // the sale date, on the same day of the month, clamped to the last day when
 // the target month is shorter (a sale on Jan 31 is due Feb 28/29, Mar 31...).
-func BuildPaymentSchedule(monto float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
-	if plan.MontoEntrega >= monto {
+func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
+	if plan.DownPayment >= amount {
 		return PaymentSchedule{}, ErrSaleInvalidDownPayment
 	}
-	financed := RoundMoney(monto - plan.MontoEntrega)
-	total := RoundMoney(financed * (1 + plan.TasaInteres/100))
-	amount := RoundMoney(total / float64(plan.CantidadCuotas))
-	last := RoundMoney(total - amount*float64(plan.CantidadCuotas-1))
-	if amount < installmentAmountMin || last < installmentAmountMin {
+	financed := RoundMoney(amount - plan.DownPayment)
+	total := RoundMoney(financed * (1 + plan.InterestRate/100))
+	regular := RoundMoney(total / float64(plan.Installments))
+	last := RoundMoney(total - regular*float64(plan.Installments-1))
+	if regular < installmentAmountMin || last < installmentAmountMin {
 		return PaymentSchedule{}, ErrSaleInstallmentTooSmall
 	}
 
-	months := plan.Periodicidad.Months()
-	installments := make([]Installment, plan.CantidadCuotas)
+	months := plan.Period.Months()
+	installments := make([]Installment, plan.Installments)
 	for i := range installments {
 		number := i + 1
 		installment := Installment{
 			Numero:           number,
-			Monto:            amount,
+			Monto:            regular,
 			Estado:           InstallmentStatePending,
 			FechaVencimiento: addMonthsClamped(saleDate, months*number),
 		}
-		if number == plan.CantidadCuotas {
+		if number == plan.Installments {
 			installment.Monto = last
 		}
 		installments[i] = installment
 	}
 	return PaymentSchedule{
-		MontoFinanciado: financed,
-		MontoTotal:      total,
-		MontoCuota:      amount,
-		Cuotas:          installments,
+		FinancedAmount:    financed,
+		TotalAmount:       total,
+		InstallmentAmount: regular,
+		Installments:      installments,
 	}, nil
 }
 

@@ -108,7 +108,7 @@ func TestCreateSaleHandlerPassesThePaymentPlan(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
 	}
-	want := sales.PaymentPlanInput{CantidadCuotas: 2, TasaInteres: 10, Periodicidad: "mensual", MontoEntrega: 20000}
+	want := sales.PaymentPlanInput{Installments: 2, InterestRate: 10, Period: "mensual", DownPayment: 20000}
 	if stub.input.PaymentMethod != "entrega_financiada" || stub.input.PaymentPlan == nil || *stub.input.PaymentPlan != want {
 		t.Errorf("input = %#v, plan = %#v", stub.input, stub.input.PaymentPlan)
 	}

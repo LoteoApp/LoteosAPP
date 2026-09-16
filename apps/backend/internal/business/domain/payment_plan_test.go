@@ -10,7 +10,7 @@ import (
 )
 
 func monthlyPlan(installments int, rate float64) domain.PaymentPlanInput {
-	return domain.PaymentPlanInput{CantidadCuotas: installments, TasaInteres: rate, Periodicidad: domain.PaymentPeriodMonthly}
+	return domain.PaymentPlanInput{Installments: installments, InterestRate: rate, Period: domain.PaymentPeriodMonthly}
 }
 
 func sumInstallments(installments []domain.Installment) float64 {
@@ -38,7 +38,7 @@ func TestPaymentPeriodValidityAndMonths(t *testing.T) {
 func TestValidatePaymentPlan(t *testing.T) {
 	valid := monthlyPlan(12, 10)
 	withDown := valid
-	withDown.MontoEntrega = 1000
+	withDown.DownPayment = 1000
 
 	tests := []struct {
 		name   string
@@ -55,42 +55,67 @@ func TestValidatePaymentPlan(t *testing.T) {
 		{"entrega without down payment", domain.PaymentMethodDownAndFi, &valid, domain.ErrSaleInvalidDownPayment},
 		{"entrega negative down payment", domain.PaymentMethodDownAndFi, func() *domain.PaymentPlanInput {
 			plan := withDown
-			plan.MontoEntrega = -1
+			plan.DownPayment = -1
 			return &plan
 		}(), domain.ErrSaleInvalidDownPayment},
 		{"entrega NaN down payment", domain.PaymentMethodDownAndFi, func() *domain.PaymentPlanInput {
 			plan := withDown
-			plan.MontoEntrega = math.NaN()
+			plan.DownPayment = math.NaN()
 			return &plan
 		}(), domain.ErrSaleInvalidDownPayment},
 		{"zero installments", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.CantidadCuotas = 0
+			plan.Installments = 0
 			return &plan
 		}(), domain.ErrSaleInvalidInstallments},
 		{"too many installments", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.CantidadCuotas = domain.MaxSaleInstallments + 1
+			plan.Installments = domain.MaxSaleInstallments + 1
 			return &plan
 		}(), domain.ErrSaleInvalidInstallments},
 		{"negative rate", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.TasaInteres = -0.5
+			plan.InterestRate = -0.5
 			return &plan
 		}(), domain.ErrSaleInvalidInterestRate},
 		{"rate above max", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.TasaInteres = domain.MaxSaleInterestRate + 1
+			plan.InterestRate = domain.MaxSaleInterestRate + 1
 			return &plan
 		}(), domain.ErrSaleInvalidInterestRate},
 		{"infinite rate", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.TasaInteres = math.Inf(1)
+			plan.InterestRate = math.Inf(1)
 			return &plan
 		}(), domain.ErrSaleInvalidInterestRate},
+		{"rate with four decimals", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
+			plan := valid
+			plan.InterestRate = 12.3456
+			return &plan
+		}(), nil},
+		{"rate beyond NUMERIC(8,4)", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
+			plan := valid
+			plan.InterestRate = 12.34567
+			return &plan
+		}(), domain.ErrSaleInvalidInterestRate},
+		{"down payment with cents", domain.PaymentMethodDownAndFi, func() *domain.PaymentPlanInput {
+			plan := withDown
+			plan.DownPayment = 1000.05
+			return &plan
+		}(), nil},
+		{"sub-cent down payment", domain.PaymentMethodDownAndFi, func() *domain.PaymentPlanInput {
+			plan := withDown
+			plan.DownPayment = 0.004
+			return &plan
+		}(), domain.ErrSaleInvalidDownPayment},
+		{"down payment beyond NUMERIC(14,2)", domain.PaymentMethodDownAndFi, func() *domain.PaymentPlanInput {
+			plan := withDown
+			plan.DownPayment = 1000.005
+			return &plan
+		}(), domain.ErrSaleInvalidDownPayment},
 		{"unknown periodicity", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
 			plan := valid
-			plan.Periodicidad = "semanal"
+			plan.Period = "semanal"
 			return &plan
 		}(), domain.ErrSaleInvalidPeriodicity},
 		{"single installment without interest", domain.PaymentMethodFinanced, func() *domain.PaymentPlanInput {
@@ -133,25 +158,25 @@ func TestBuildPaymentScheduleWithoutInterest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
-	if schedule.MontoFinanciado != 100000 || schedule.MontoTotal != 100000 || schedule.MontoCuota != 8333.33 {
+	if schedule.FinancedAmount != 100000 || schedule.TotalAmount != 100000 || schedule.InstallmentAmount != 8333.33 {
 		t.Errorf("schedule amounts = %#v", schedule)
 	}
-	if len(schedule.Cuotas) != 12 {
-		t.Fatalf("installments = %d, want 12", len(schedule.Cuotas))
+	if len(schedule.Installments) != 12 {
+		t.Fatalf("installments = %d, want 12", len(schedule.Installments))
 	}
-	for i, installment := range schedule.Cuotas[:11] {
+	for i, installment := range schedule.Installments[:11] {
 		if installment.Numero != i+1 || installment.Monto != 8333.33 || installment.Estado != domain.InstallmentStatePending {
 			t.Errorf("installment %d = %#v", i+1, installment)
 		}
 	}
 	// 100000 - 11 * 8333.33 = 8333.37: the last one absorbs the remainder.
-	if last := schedule.Cuotas[11]; last.Numero != 12 || last.Monto != 8333.37 {
+	if last := schedule.Installments[11]; last.Numero != 12 || last.Monto != 8333.37 {
 		t.Errorf("last installment = %#v, want 8333.37", last)
 	}
-	if got := sumInstallments(schedule.Cuotas); got != 100000 {
+	if got := sumInstallments(schedule.Installments); got != 100000 {
 		t.Errorf("sum of installments = %v, want 100000", got)
 	}
-	for i, installment := range schedule.Cuotas {
+	for i, installment := range schedule.Installments {
 		want := time.Date(2026, time.Month(10+i), 15, 12, 30, 0, 0, time.UTC)
 		if !installment.FechaVencimiento.Equal(want) {
 			t.Errorf("installment %d due = %s, want %s", i+1, installment.FechaVencimiento, want)
@@ -161,17 +186,17 @@ func TestBuildPaymentScheduleWithoutInterest(t *testing.T) {
 
 func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 	saleDate := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
-	plan := domain.PaymentPlanInput{CantidadCuotas: 3, TasaInteres: 10, Periodicidad: domain.PaymentPeriodMonthly, MontoEntrega: 1000}
+	plan := domain.PaymentPlanInput{Installments: 3, InterestRate: 10, Period: domain.PaymentPeriodMonthly, DownPayment: 1000}
 	schedule, err := domain.BuildPaymentSchedule(1100, plan, saleDate)
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
 	// financed 100, total 110, cuota 36.67, last 110 - 73.34 = 36.66.
-	if schedule.MontoFinanciado != 100 || schedule.MontoTotal != 110 || schedule.MontoCuota != 36.67 {
+	if schedule.FinancedAmount != 100 || schedule.TotalAmount != 110 || schedule.InstallmentAmount != 36.67 {
 		t.Errorf("schedule amounts = %#v", schedule)
 	}
-	if schedule.Cuotas[2].Monto != 36.66 || sumInstallments(schedule.Cuotas) != 110 {
-		t.Errorf("installments = %#v", schedule.Cuotas)
+	if schedule.Installments[2].Monto != 36.66 || sumInstallments(schedule.Installments) != 110 {
+		t.Errorf("installments = %#v", schedule.Installments)
 	}
 	// Due dates clamp to the end of shorter months instead of spilling over.
 	wantDue := []time.Time{
@@ -179,7 +204,7 @@ func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 		time.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
 	}
-	for i, installment := range schedule.Cuotas {
+	for i, installment := range schedule.Installments {
 		if !installment.FechaVencimiento.Equal(wantDue[i]) {
 			t.Errorf("installment %d due = %s, want %s", i+1, installment.FechaVencimiento, wantDue[i])
 		}
@@ -188,7 +213,7 @@ func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 
 func TestBuildPaymentScheduleSpacesInstallmentsByPeriod(t *testing.T) {
 	saleDate := time.Date(2026, 11, 30, 9, 0, 0, 0, time.UTC)
-	plan := domain.PaymentPlanInput{CantidadCuotas: 2, TasaInteres: 0, Periodicidad: domain.PaymentPeriodQuarterly}
+	plan := domain.PaymentPlanInput{Installments: 2, InterestRate: 0, Period: domain.PaymentPeriodQuarterly}
 	schedule, err := domain.BuildPaymentSchedule(50, plan, saleDate)
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
@@ -197,7 +222,7 @@ func TestBuildPaymentScheduleSpacesInstallmentsByPeriod(t *testing.T) {
 		time.Date(2027, 2, 28, 9, 0, 0, 0, time.UTC),
 		time.Date(2027, 5, 30, 9, 0, 0, 0, time.UTC),
 	}
-	for i, installment := range schedule.Cuotas {
+	for i, installment := range schedule.Installments {
 		if !installment.FechaVencimiento.Equal(wantDue[i]) || installment.Monto != 25 {
 			t.Errorf("installment %d = %#v, want due %s", i+1, installment, wantDue[i])
 		}
@@ -211,7 +236,7 @@ func TestBuildPaymentScheduleSingleInstallmentAndRounding(t *testing.T) {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
 	// 999.99 * 1.125 = 1124.98875 -> 1124.99 in a single cuota.
-	if schedule.MontoTotal != 1124.99 || schedule.MontoCuota != 1124.99 || len(schedule.Cuotas) != 1 || schedule.Cuotas[0].Monto != 1124.99 {
+	if schedule.TotalAmount != 1124.99 || schedule.InstallmentAmount != 1124.99 || len(schedule.Installments) != 1 || schedule.Installments[0].Monto != 1124.99 {
 		t.Errorf("schedule = %#v", schedule)
 	}
 
@@ -221,19 +246,19 @@ func TestBuildPaymentScheduleSingleInstallmentAndRounding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("BuildPaymentSchedule(%d) error = %v", count, err)
 		}
-		if got := sumInstallments(schedule.Cuotas); got != schedule.MontoTotal {
-			t.Errorf("%d installments sum to %v, want %v", count, got, schedule.MontoTotal)
+		if got := sumInstallments(schedule.Installments); got != schedule.TotalAmount {
+			t.Errorf("%d installments sum to %v, want %v", count, got, schedule.TotalAmount)
 		}
 	}
 }
 
 func TestBuildPaymentScheduleRejectsImpossiblePlans(t *testing.T) {
 	saleDate := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-	plan := domain.PaymentPlanInput{CantidadCuotas: 2, Periodicidad: domain.PaymentPeriodMonthly, MontoEntrega: 100}
+	plan := domain.PaymentPlanInput{Installments: 2, Period: domain.PaymentPeriodMonthly, DownPayment: 100}
 	if _, err := domain.BuildPaymentSchedule(100, plan, saleDate); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
 		t.Errorf("down payment equal to the price: error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
 	}
-	plan.MontoEntrega = 150
+	plan.DownPayment = 150
 	if _, err := domain.BuildPaymentSchedule(100, plan, saleDate); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
 		t.Errorf("down payment above the price: error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
 	}
@@ -246,7 +271,7 @@ func TestBuildPaymentScheduleRejectsImpossiblePlans(t *testing.T) {
 	}
 	// 0.04 in 3 cuotas rounds to 0.01 each and 0.02 for the last one.
 	schedule, err := domain.BuildPaymentSchedule(0.04, monthlyPlan(3, 0), saleDate)
-	if err != nil || schedule.Cuotas[2].Monto != 0.02 {
+	if err != nil || schedule.Installments[2].Monto != 0.02 {
 		t.Errorf("four cents in three installments = %#v, error = %v", schedule, err)
 	}
 }

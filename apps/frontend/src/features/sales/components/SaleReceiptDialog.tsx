@@ -13,6 +13,7 @@ import { formatArea } from '../../../shared/lib/formatArea'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import { formatDate } from '../../../shared/lib/formatDate'
 import { formatPercent } from '../../../shared/lib/formatPercent'
+import { installmentsLabel } from './installmentsLabel'
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_PERIOD_LABELS,
@@ -54,16 +55,16 @@ function PlanSummary({ plan, currency }: { plan: SaleReceiptPlan; currency: stri
       aria-label="Plan de pago"
       className="grid grid-cols-1 gap-x-6 gap-y-5 border-t border-border px-4 py-5 sm:grid-cols-2 sm:px-6 print:border-black"
     >
-      {plan.montoEntrega > 0 && (
-        <Field term="Entrega">{formatCurrency(plan.montoEntrega, currency)}</Field>
+      {plan.downPayment > 0 && (
+        <Field term="Entrega">{formatCurrency(plan.downPayment, currency)}</Field>
       )}
-      <Field term="Monto financiado">{formatCurrency(plan.montoFinanciado, currency)}</Field>
+      <Field term="Monto financiado">{formatCurrency(plan.financedAmount, currency)}</Field>
       <Field term="Cuotas">
-        {plan.cantidadCuotas} × {formatCurrency(plan.montoCuota, currency)} ·{' '}
-        {PAYMENT_PERIOD_LABELS[plan.periodicidad].toLowerCase()}
+        {installmentsLabel(plan.installments, plan.installmentAmount, plan.lastInstallmentAmount, currency)} ·{' '}
+        {PAYMENT_PERIOD_LABELS[plan.period].toLowerCase()}
       </Field>
-      <Field term="Tasa de interés">{formatPercent(plan.tasaInteres)}</Field>
-      <Field term="Total financiado">{formatCurrency(plan.montoTotal, currency)}</Field>
+      <Field term="Tasa de interés">{formatPercent(plan.interestRate)}</Field>
+      <Field term="Total financiado">{formatCurrency(plan.totalAmount, currency)}</Field>
     </dl>
   )
 }

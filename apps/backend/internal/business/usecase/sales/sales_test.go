@@ -95,7 +95,7 @@ func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 
 	financed := validInput()
 	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
-	financed.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, TasaInteres: 10, Periodicidad: "mensual"}
+	financed.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: "mensual"}
 	if _, err := useCase.Execute(context.Background(), financed); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -108,7 +108,7 @@ func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 	}
 
 	otherPlan := financed
-	otherPlan.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 24, TasaInteres: 10, Periodicidad: "mensual"}
+	otherPlan.PaymentPlan = &sales.PaymentPlanInput{Installments: 24, InterestRate: 10, Period: "mensual"}
 	if _, err := useCase.Execute(context.Background(), otherPlan); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -124,7 +124,7 @@ func TestCreateSalePassesTheNormalizedPlanToTheRepository(t *testing.T) {
 
 	input := validInput()
 	input.PaymentMethod = string(domain.PaymentMethodDownAndFi)
-	input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 24, TasaInteres: 15.5, Periodicidad: " mensual ", MontoEntrega: 20000}
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 24, InterestRate: 15.5, Period: " mensual ", DownPayment: 20000}
 	if _, err := useCase.Execute(context.Background(), input); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -132,7 +132,7 @@ func TestCreateSalePassesTheNormalizedPlanToTheRepository(t *testing.T) {
 	if command.PaymentMethod != domain.PaymentMethodDownAndFi || command.PaymentPlan == nil {
 		t.Fatalf("command = %#v, want a plan", command)
 	}
-	want := domain.PaymentPlanInput{CantidadCuotas: 24, TasaInteres: 15.5, Periodicidad: domain.PaymentPeriodMonthly, MontoEntrega: 20000}
+	want := domain.PaymentPlanInput{Installments: 24, InterestRate: 15.5, Period: domain.PaymentPeriodMonthly, DownPayment: 20000}
 	if *command.PaymentPlan != want {
 		t.Errorf("plan = %#v, want %#v", *command.PaymentPlan, want)
 	}
@@ -212,37 +212,37 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 		}, domain.ErrSalePaymentPlanRequired},
 		{"contado with plan", func() sales.CreateSaleInput {
 			input := validInput()
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, Periodicidad: "mensual"}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual"}
 			return input
 		}, domain.ErrSalePaymentPlanNotApplicable},
 		{"invalid installments", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodFinanced)
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 0, Periodicidad: "mensual"}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 0, Period: "mensual"}
 			return input
 		}, domain.ErrSaleInvalidInstallments},
 		{"invalid rate", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodFinanced)
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, TasaInteres: -1, Periodicidad: "mensual"}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, InterestRate: -1, Period: "mensual"}
 			return input
 		}, domain.ErrSaleInvalidInterestRate},
 		{"invalid periodicity", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodFinanced)
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, Periodicidad: "semanal"}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "semanal"}
 			return input
 		}, domain.ErrSaleInvalidPeriodicity},
 		{"down payment on financiado", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodFinanced)
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, Periodicidad: "mensual", MontoEntrega: 10}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual", DownPayment: 10}
 			return input
 		}, domain.ErrSaleDownPaymentNotApplicable},
 		{"entrega without down payment", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodDownAndFi)
-			input.PaymentPlan = &sales.PaymentPlanInput{CantidadCuotas: 12, Periodicidad: "mensual"}
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual"}
 			return input
 		}, domain.ErrSaleInvalidDownPayment},
 	}
