@@ -109,7 +109,10 @@ Endpoints operativos del backend:
   una venta de un lote `disponible` y lo pasa a `vendido`. Recibe
   `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (`contado` por
   defecto, `financiado` o `entrega_financiada`); exige el header
-  `Idempotency-Key`. Las dos modalidades financiadas exigen `planPago` con
+  `Idempotency-Key`. Como el contado se cobra al registrarse, una venta
+  `contado` queda `completada` y su lote `finalizado` en la misma
+  transacción; las ventas financiadas quedan `activa` hasta cobrar la última
+  cuota. Las dos modalidades financiadas exigen `planPago` con
   `cantidadCuotas` (1..360), `tasaInteres` (porcentaje, 0..1000, hasta 4
   decimales, opcional), `periodicidad` (`mensual`, `bimestral`, `trimestral`,
   `semestral`) y, solo en `entrega_financiada`, `montoEntrega` (mayor a 0,

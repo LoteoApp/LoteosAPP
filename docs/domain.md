@@ -243,7 +243,11 @@ agencia está asignada al loteo (`usuario_alta`):
 - estado vigente en `ventas.estado_actual`; las transiciones se registran
   solo en `venta_estados`. Una venta no cancelada por lote; al confirmar,
   el lote pasa a `vendido` en la misma transacción y el monto y la moneda
-  quedan copiados del precio del lote en ese momento;
+  quedan copiados del precio del lote en ese momento. Una venta al contado
+  se cobra al registrarse: en esa misma transacción pasa a `completada`
+  (razón «Pago al contado») y el lote de `vendido` a `finalizado`, con
+  origen `venta`; las financiadas quedan `activa` hasta que Cobranza cobre
+  la última cuota;
 - modalidad de pago: contado, financiado (cuotas y % interés configurable),
   o entrega + financiación (una entrega inicial y el resto en cuotas). Las
   dos modalidades financiadas llevan un plan de pago que se registra junto
