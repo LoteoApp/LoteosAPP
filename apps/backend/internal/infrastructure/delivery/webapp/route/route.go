@@ -96,6 +96,10 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 		return requireAuth(requireActiveAccount(h))
 	}
 
+	// Unauthenticated so an orchestrator (Dokploy/Docker) can probe it without
+	// credentials.
+	mux.HandleFunc("GET /health", handler.Live)
+
 	mux.Handle("POST /api/v1/usuarios", protected(handler.Adapt(handlers.CreateUser, usersTimeout)))
 	mux.Handle("PATCH /api/v1/usuarios/me", protected(handler.Adapt(handlers.CompleteProfile, usersTimeout)))
 	mux.Handle("GET /api/v1/usuarios", protected(handler.Adapt(handlers.ListUsers, usersTimeout)))

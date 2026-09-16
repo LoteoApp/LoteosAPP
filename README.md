@@ -70,6 +70,7 @@ compose.yaml       # Entorno completo de desarrollo
 - [Desarrollo y Docker Compose](docs/development.md)
 - [PostgreSQL y migraciones](docs/database.md)
 - [Secrets con Doppler](docs/secrets.md)
+- [Despliegue en Dokploy](docs/deployment.md)
 - [Arquitectura y estructura](docs/architecture.md)
 - [Pruebas y cobertura](docs/testing.md)
 - [Integración continua](docs/ci.md)
