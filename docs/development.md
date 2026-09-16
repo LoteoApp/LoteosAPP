@@ -106,7 +106,9 @@ Endpoints operativos del backend:
   usuarios.
 - `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/ventas` (requiere cuenta
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): registra
-  una venta al contado de un lote `disponible` y lo pasa a `vendido`. Recibe
+  una venta al contado de un lote `disponible`: el lote pasa a `vendido` y,
+  como el contado se cobra al registrarse, la venta queda `completada` y el
+  lote `finalizado` en la misma transacción. Recibe
   `clienteId`, `vendedorId` y opcionalmente `modalidadPago` (solo `contado`
   por ahora); exige el header `Idempotency-Key`. El monto y la moneda salen
   del precio del lote. Un usuario de inmobiliaria solo puede vender en un

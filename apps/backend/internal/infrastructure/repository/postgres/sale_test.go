@@ -50,7 +50,7 @@ func TestSaleRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if created.Estado != domain.SaleStateActive || created.Monto != 100000 || created.Moneda != "USD" {
+	if created.Estado != domain.SaleStateCompleted || created.Monto != 100000 || created.Moneda != "USD" {
 		t.Errorf("created sale = %#v", created)
 	}
 	if created.LoteoID != loteoID || created.LoteID != lotID || created.LoteNumero != "1" || created.ManzanaNumero != "1" {
@@ -65,25 +65,36 @@ func TestSaleRepository(t *testing.T) {
 	if created.ModalidadPago != domain.PaymentMethodCash || !created.FechaCreacion.Equal(now) {
 		t.Errorf("created sale payment = %q at %s", created.ModalidadPago, created.FechaCreacion)
 	}
-	if len(created.Historial) != 1 || created.Historial[0].Estado != domain.SaleStateActive {
-		t.Errorf("initial history = %#v", created.Historial)
+	// A contado sale is paid in full on registration: activa, then completada.
+	if len(created.Historial) != 2 || created.Historial[0].Estado != domain.SaleStateActive || created.Historial[1].Estado != domain.SaleStateCompleted || created.Historial[1].Razon != "Pago al contado" {
+		t.Errorf("history = %#v", created.Historial)
+	}
+	if created.Historial[1].Usuario == nil || created.Historial[1].Usuario.ID != actorID {
+		t.Errorf("completada entry actor = %#v, want %s", created.Historial[1].Usuario, actorID)
 	}
 
 	var lotState string
 	if err := pool.QueryRow(context.Background(), `SELECT estado_actual FROM lotes WHERE id = $1::uuid`, lotID).Scan(&lotState); err != nil {
 		t.Fatalf("read lot state: %v", err)
 	}
-	if lotState != string(domain.LotStateSold) {
-		t.Fatalf("lot state after sale = %q, want vendido", lotState)
+	if lotState != string(domain.LotStateCompleted) {
+		t.Fatalf("lot state after a contado sale = %q, want finalizado", lotState)
 	}
 
+	var lotEvents int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM lote_estados WHERE lote_id = $1::uuid AND venta_id = $2::uuid AND origen = $3`, lotID, created.ID, string(domain.LotStateOriginSale)).Scan(&lotEvents); err != nil {
+		t.Fatalf("read lot events: %v", err)
+	}
+	if lotEvents != 2 {
+		t.Errorf("lot events for the sale = %d, want vendido and finalizado", lotEvents)
+	}
 	// A retry with the same key and payload is the lost response of the
 	// first request, so it gets the same venta back.
 	retried, err := repository.Create(context.Background(), command)
 	if err != nil {
 		t.Fatalf("retried Create() error = %v", err)
 	}
-	if retried.ID != created.ID || len(retried.Historial) != 1 {
+	if retried.ID != created.ID || len(retried.Historial) != 2 {
 		t.Errorf("retried Create() = %#v, want the original sale %q", retried, created.ID)
 	}
 
@@ -103,7 +114,7 @@ func TestSaleRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
-	if fetched.ID != created.ID || len(fetched.Historial) != 1 {
+	if fetched.ID != created.ID || len(fetched.Historial) != 2 {
 		t.Errorf("Get() = %#v", fetched)
 	}
 

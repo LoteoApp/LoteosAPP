@@ -69,6 +69,14 @@ func (method PaymentMethod) IsAvailable() bool {
 	return method == PaymentMethodCash
 }
 
+// SettlesOnRegistration reports whether a sale with this method is paid in
+// full the moment it is registered: a contado sale needs no cobranza, so it
+// is completada and its lote finalizado at once. Financed sales stay activa
+// until the last cuota is paid.
+func (method PaymentMethod) SettlesOnRegistration() bool {
+	return method == PaymentMethodCash
+}
+
 // IsSaleRole reports who may register a venta: internal users for any loteo,
 // and agency users only for a loteo their agency is assigned to, which the
 // repository checks since the domain doesn't know the assignments.
