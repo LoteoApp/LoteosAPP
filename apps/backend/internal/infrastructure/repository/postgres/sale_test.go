@@ -359,11 +359,11 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 		t.Fatalf("created sale = %#v", created)
 	}
 	plan := created.PlanPago
-	// 100000 financed at 10% = 110000 in 12 cuotas: 9166.67 x 11 + 9166.63.
+	// 100000 financed at 10% = 110000 in 12 equal cuotas of 9166.67 = 110000.04.
 	if plan.ID == "" || plan.MontoEntrega != 0 || plan.CantidadCuotas != 12 || plan.TasaInteres != 10 || plan.Periodicidad != domain.PaymentPeriodMonthly || plan.Moneda != "USD" {
 		t.Errorf("plan = %#v", plan)
 	}
-	if plan.MontoFinanciado != 100000 || plan.MontoTotal != 110000 || plan.MontoCuota != 9166.67 {
+	if plan.MontoFinanciado != 100000 || plan.MontoTotal != 110000.04 || plan.MontoCuota != 9166.67 {
 		t.Errorf("plan amounts = %#v", plan)
 	}
 	if len(plan.Cuotas) != 12 {
@@ -376,7 +376,7 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 			t.Errorf("cuota %d = %#v", i+1, installment)
 		}
 	}
-	if domain.RoundMoney(sum) != 110000 || plan.Cuotas[11].Monto != 9166.63 {
+	if domain.RoundMoney(sum) != 110000.04 || plan.Cuotas[11].Monto != 9166.67 {
 		t.Errorf("cuotas sum = %v, last = %v", sum, plan.Cuotas[11].Monto)
 	}
 	// Due dates: one month apart from the sale date, clamped to month end.
@@ -399,7 +399,7 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
-	if fetched.PlanPago == nil || len(fetched.PlanPago.Cuotas) != 12 || fetched.PlanPago.MontoTotal != 110000 {
+	if fetched.PlanPago == nil || len(fetched.PlanPago.Cuotas) != 12 || fetched.PlanPago.MontoTotal != 110000.04 {
 		t.Errorf("Get() plan = %#v", fetched.PlanPago)
 	}
 
@@ -411,7 +411,7 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 		t.Fatalf("List() = %#v, want the plan summary", page)
 	}
 	summary := page.Items[0].PlanPago
-	if summary.CantidadCuotas != 12 || summary.MontoCuota != 9166.67 || summary.MontoTotal != 110000 || summary.MontoFinanciado != 100000 || len(summary.Cuotas) != 0 {
+	if summary.CantidadCuotas != 12 || summary.MontoCuota != 9166.67 || summary.MontoTotal != 110000.04 || summary.MontoFinanciado != 100000 || len(summary.Cuotas) != 0 {
 		t.Errorf("List() plan summary = %#v", summary)
 	}
 }

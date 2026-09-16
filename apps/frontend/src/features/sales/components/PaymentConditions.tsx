@@ -16,7 +16,6 @@ import {
   PAYMENT_PERIODS,
   PAYMENT_PERIOD_LABELS,
   buildPaymentSchedule,
-  lastInstallmentAmount,
   isFinancedMethod,
   saleDisabledReason,
   parsePaymentPlan,
@@ -87,7 +86,6 @@ function PlanPreview({
   const installmentsText = installmentsLabel(
     schedule.installments.length,
     schedule.installmentAmount,
-    lastInstallmentAmount(schedule),
     lot.currency,
   )
 

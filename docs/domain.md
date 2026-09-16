@@ -289,14 +289,14 @@ Fórmula (idéntica en backend y frontend, redondeando a 2 decimales):
 
 ```text
 financiado = round2(precio - montoEntrega)
-total      = round2(financiado * (1 + tasaInteres / 100))
-cuota      = round2(total / cantidadCuotas)
-última     = round2(total - cuota * (cantidadCuotas - 1))
+cuota      = round2(round2(financiado * (1 + tasaInteres / 100)) / cantidadCuotas)
+total      = round2(cuota * cantidadCuotas)
 ```
 
-La última cuota absorbe el resto del redondeo, así la suma de las cuotas es
-exactamente el total. Si alguna cuota queda por debajo de un centavo, la
-venta se rechaza.
+Todas las cuotas valen lo mismo; el total financiado es lo que suman las
+cuotas y puede diferir del interés exacto en unos centavos (4.600 en 12
+cuotas son 12 de 383,33 = 4.599,96). Si la cuota queda por debajo de un
+centavo, la venta se rechaza.
 
 Vencimientos: la cuota `k` vence `k` períodos después de la fecha de la
 venta, el mismo día del mes; si el mes destino es más corto, vence el último

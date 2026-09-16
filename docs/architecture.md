@@ -598,8 +598,8 @@ Decisiones de este recorte:
   `SaleRepository.Create` la repite y agrega la única regla que necesita el
   lote: la entrega tiene que ser menor al precio
   (`invalid_sale_down_payment`). `domain.BuildPaymentSchedule` es una
-  función pura que devuelve el cronograma (monto financiado, total, cuota
-  regular y cada cuota con su vencimiento); la fórmula y los vencimientos
+  función pura que devuelve el cronograma (monto financiado, total, cuota —
+  todas iguales— y cada una con su vencimiento); la fórmula y los vencimientos
   están en `docs/domain.md`. El repositorio inserta `planes_pago` y las
   `cuotas` (con `CopyFrom`) en la misma transacción que `ventas` y el cambio
   de estado del lote, así una venta financiada nunca queda sin plan. El

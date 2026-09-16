@@ -158,23 +158,20 @@ func TestBuildPaymentScheduleWithoutInterest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
-	if schedule.FinancedAmount != 100000 || schedule.TotalAmount != 100000 || schedule.InstallmentAmount != 8333.33 {
+	// 100000 / 12 = 8333.33 each; the total is what the 12 cuotas add up to.
+	if schedule.FinancedAmount != 100000 || schedule.TotalAmount != 99999.96 || schedule.InstallmentAmount != 8333.33 {
 		t.Errorf("schedule amounts = %#v", schedule)
 	}
 	if len(schedule.Installments) != 12 {
 		t.Fatalf("installments = %d, want 12", len(schedule.Installments))
 	}
-	for i, installment := range schedule.Installments[:11] {
+	for i, installment := range schedule.Installments {
 		if installment.Numero != i+1 || installment.Monto != 8333.33 || installment.Estado != domain.InstallmentStatePending {
 			t.Errorf("installment %d = %#v", i+1, installment)
 		}
 	}
-	// 100000 - 11 * 8333.33 = 8333.37: the last one absorbs the remainder.
-	if last := schedule.Installments[11]; last.Numero != 12 || last.Monto != 8333.37 {
-		t.Errorf("last installment = %#v, want 8333.37", last)
-	}
-	if got := sumInstallments(schedule.Installments); got != 100000 {
-		t.Errorf("sum of installments = %v, want 100000", got)
+	if got := sumInstallments(schedule.Installments); got != schedule.TotalAmount {
+		t.Errorf("sum of installments = %v, want %v", got, schedule.TotalAmount)
 	}
 	for i, installment := range schedule.Installments {
 		want := time.Date(2026, time.Month(10+i), 15, 12, 30, 0, 0, time.UTC)
@@ -191,12 +188,15 @@ func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
-	// financed 100, total 110, cuota 36.67, last 110 - 73.34 = 36.66.
-	if schedule.FinancedAmount != 100 || schedule.TotalAmount != 110 || schedule.InstallmentAmount != 36.67 {
+	// financed 100, with interest 110, cuota 36.67, total 3 * 36.67 = 110.01.
+	if schedule.FinancedAmount != 100 || schedule.TotalAmount != 110.01 || schedule.InstallmentAmount != 36.67 {
 		t.Errorf("schedule amounts = %#v", schedule)
 	}
-	if schedule.Installments[2].Monto != 36.66 || sumInstallments(schedule.Installments) != 110 {
-		t.Errorf("installments = %#v", schedule.Installments)
+	for _, installment := range schedule.Installments {
+		if installment.Monto != 36.67 {
+			t.Errorf("installments = %#v, want every cuota at 36.67", schedule.Installments)
+			break
+		}
 	}
 	// Due dates clamp to the end of shorter months instead of spilling over.
 	wantDue := []time.Time{
@@ -262,16 +262,17 @@ func TestBuildPaymentScheduleRejectsImpossiblePlans(t *testing.T) {
 	if _, err := domain.BuildPaymentSchedule(100, plan, saleDate); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
 		t.Errorf("down payment above the price: error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
 	}
-	if _, err := domain.BuildPaymentSchedule(0.05, monthlyPlan(10, 0), saleDate); !errors.Is(err, domain.ErrSaleInstallmentTooSmall) {
+	if _, err := domain.BuildPaymentSchedule(0.04, monthlyPlan(10, 0), saleDate); !errors.Is(err, domain.ErrSaleInstallmentTooSmall) {
 		t.Errorf("installments below a cent: error = %v, want %v", err, domain.ErrSaleInstallmentTooSmall)
 	}
-	// 0.03 in 2 cuotas leaves 0.02 + 0.01: still valid.
-	if _, err := domain.BuildPaymentSchedule(0.03, monthlyPlan(2, 0), saleDate); err != nil {
-		t.Errorf("two cents in two installments: error = %v", err)
+	// 0.03 in 2 cuotas rounds to 0.02 each: still valid, and the total follows.
+	schedule, err := domain.BuildPaymentSchedule(0.03, monthlyPlan(2, 0), saleDate)
+	if err != nil || schedule.InstallmentAmount != 0.02 || schedule.TotalAmount != 0.04 {
+		t.Errorf("three cents in two installments = %#v, error = %v", schedule, err)
 	}
-	// 0.04 in 3 cuotas rounds to 0.01 each and 0.02 for the last one.
-	schedule, err := domain.BuildPaymentSchedule(0.04, monthlyPlan(3, 0), saleDate)
-	if err != nil || schedule.Installments[2].Monto != 0.02 {
+	// 0.04 in 3 cuotas rounds to 0.01 each.
+	schedule, err = domain.BuildPaymentSchedule(0.04, monthlyPlan(3, 0), saleDate)
+	if err != nil || schedule.InstallmentAmount != 0.01 || schedule.TotalAmount != 0.03 {
 		t.Errorf("four cents in three installments = %#v, error = %v", schedule, err)
 	}
 }

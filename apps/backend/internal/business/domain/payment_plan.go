@@ -135,8 +135,7 @@ type Installment struct {
 // PaymentPlan is a plan de pago as the API publishes it. MontoFinanciado,
 // MontoCuota and MontoTotal are derived from the sale amount and the plan
 // with the same formula the schedule uses, so the client never recomputes
-// them; MontoCuota is the regular installment and the last one may differ by
-// the rounding remainder.
+// them; every cuota is MontoCuota and MontoTotal is what they add up to.
 type PaymentPlan struct {
 	ID              string        `json:"id,omitempty"`
 	MontoEntrega    float64       `json:"montoEntrega"`
@@ -172,45 +171,41 @@ func RoundMoney(value float64) float64 {
 // buildPaymentSchedule in apps/frontend/src/features/sales/types.ts):
 //
 //	financed    = round2(amount - downPayment)
-//	total       = round2(financed * (1 + interestRate / 100))
-//	installment = round2(total / installments)
-//	last        = round2(total - installment * (installments - 1))
+//	installment = round2(round2(financed * (1 + interestRate / 100)) / installments)
+//	total       = round2(installment * installments)
 //
-// The last installment absorbs the rounding remainder so the cuotas add up
-// to total exactly. Due dates: installment k (1-based) falls k periods after
-// the sale date, on the same day of the month, clamped to the last day when
-// the target month is shorter (a sale on Jan 31 is due Feb 28/29, Mar 31...).
+// Every cuota is the same amount, so the total is what the cuotas add up to
+// and may differ from the exact interest by a few cents. Due dates:
+// installment k (1-based) falls k periods after the sale date, on the same
+// day of the month, clamped to the last day when the target month is
+// shorter (a sale on Jan 31 is due Feb 28/29, Mar 31...).
 func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
 	if plan.DownPayment >= amount {
 		return PaymentSchedule{}, ErrSaleInvalidDownPayment
 	}
 	financed := RoundMoney(amount - plan.DownPayment)
-	total := RoundMoney(financed * (1 + plan.InterestRate/100))
-	regular := RoundMoney(total / float64(plan.Installments))
-	last := RoundMoney(total - regular*float64(plan.Installments-1))
-	if regular < installmentAmountMin || last < installmentAmountMin {
+	withInterest := RoundMoney(financed * (1 + plan.InterestRate/100))
+	installment := RoundMoney(withInterest / float64(plan.Installments))
+	if installment < installmentAmountMin {
 		return PaymentSchedule{}, ErrSaleInstallmentTooSmall
 	}
+	total := RoundMoney(installment * float64(plan.Installments))
 
 	months := plan.Period.Months()
 	installments := make([]Installment, plan.Installments)
 	for i := range installments {
 		number := i + 1
-		installment := Installment{
+		installments[i] = Installment{
 			Numero:           number,
-			Monto:            regular,
+			Monto:            installment,
 			Estado:           InstallmentStatePending,
 			FechaVencimiento: addMonthsClamped(saleDate, months*number),
 		}
-		if number == plan.Installments {
-			installment.Monto = last
-		}
-		installments[i] = installment
 	}
 	return PaymentSchedule{
 		FinancedAmount:    financed,
 		TotalAmount:       total,
-		InstallmentAmount: regular,
+		InstallmentAmount: installment,
 		Installments:      installments,
 	}, nil
 }

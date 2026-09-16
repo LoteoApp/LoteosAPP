@@ -60,7 +60,7 @@ function PlanSummary({ plan, currency }: { plan: SaleReceiptPlan; currency: stri
       )}
       <Field term="Monto financiado">{formatCurrency(plan.financedAmount, currency)}</Field>
       <Field term="Cuotas">
-        {installmentsLabel(plan.installments, plan.installmentAmount, plan.lastInstallmentAmount, currency)} ·{' '}
+        {installmentsLabel(plan.installments, plan.installmentAmount, currency)} ·{' '}
         {PAYMENT_PERIOD_LABELS[plan.period].toLowerCase()}
       </Field>
       <Field term="Tasa de interés">{formatPercent(plan.interestRate)}</Field>

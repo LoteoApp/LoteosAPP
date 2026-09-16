@@ -145,10 +145,9 @@ describe('PaymentConditions', () => {
     const preview = screen.getByLabelText('Detalle del plan')
     expect(within(preview).getByText('Entrega').nextSibling).toHaveTextContent('US$ 50.000,00')
     expect(within(preview).getByText('Monto financiado').nextSibling).toHaveTextContent('US$ 100.000,00')
-    // 100000 / 7 = 14285.71 x 6 + 14285.74
-    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent(
-      '7 de US$ 14.285,71 (la última de US$ 14.285,74)',
-    )
+    // 100000 / 7 = 14285.71 each, so the total is 99999.97
+    expect(within(preview).getByText('Cuotas').nextSibling).toHaveTextContent('7 de US$ 14.285,71')
+    expect(within(preview).getByText('Total financiado').nextSibling).toHaveTextContent('US$ 99.999,97')
 
     await user.type(screen.getByLabelText('Monto de entrega'), '1')
     expect(onPlanChange).toHaveBeenLastCalledWith({ ...plan, downPayment: '500001' })

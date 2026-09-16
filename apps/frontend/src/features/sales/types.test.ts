@@ -285,7 +285,6 @@ describe('buildSaleReceipt', () => {
           period: 'mensual',
           financedAmount: 150000,
           installmentAmount: 13750,
-          lastInstallmentAmount: 13750,
           totalAmount: 165000,
         },
       }),
@@ -314,9 +313,8 @@ describe('buildSaleReceipt', () => {
       period: 'trimestral',
       financedAmount: 99999.5,
       installmentAmount: 33333.17,
-      // 99999.5 - 33333.17 * 2
-      lastInstallmentAmount: 33333.16,
-      totalAmount: 99999.5,
+      // 3 × 33333.17
+      totalAmount: 99999.51,
     })
   })
 
@@ -392,7 +390,7 @@ describe('buildSaleReceipt', () => {
 describe('buildPaymentSchedule', () => {
   const sum = (cuotas: number[]) => roundMoney(cuotas.reduce((total, cuota) => total + cuota, 0))
 
-  it('splits the price into equal cuotas and lets the last one absorb the remainder', () => {
+  it('splits the price into equal cuotas and totals what they add up to', () => {
     const schedule = buildPaymentSchedule(100000, {
       cantidadCuotas: 12,
       tasaInteres: 0,
@@ -401,12 +399,11 @@ describe('buildPaymentSchedule', () => {
     })
 
     expect(schedule.financedAmount).toBe(100000)
-    expect(schedule.totalAmount).toBe(100000)
+    expect(schedule.totalAmount).toBe(99999.96)
     expect(schedule.installmentAmount).toBe(8333.33)
     expect(schedule.installments).toHaveLength(12)
-    expect(schedule.installments.slice(0, 11).every((cuota) => cuota === 8333.33)).toBe(true)
-    expect(schedule.installments[11]).toBe(8333.37)
-    expect(sum(schedule.installments)).toBe(100000)
+    expect(schedule.installments.every((cuota) => cuota === 8333.33)).toBe(true)
+    expect(sum(schedule.installments)).toBe(99999.96)
   })
 
   it('applies simple interest on the amount left after the down payment', () => {
@@ -419,9 +416,9 @@ describe('buildPaymentSchedule', () => {
 
     expect(schedule).toEqual({
       financedAmount: 100,
-      totalAmount: 110,
+      totalAmount: 110.01,
       installmentAmount: 36.67,
-      installments: [36.67, 36.67, 36.66],
+      installments: [36.67, 36.67, 36.67],
     })
   })
 
@@ -564,40 +561,8 @@ describe('saleReceiptFromSale', () => {
       period: 'mensual',
       financedAmount: 100000,
       installmentAmount: 35000,
-      lastInstallmentAmount: 35000,
       totalAmount: 105000,
     })
-  })
-
-  it('takes the last cuota from the persisted cuotas, or derives it from the total', () => {
-    const planPago = {
-      id: 'plan-1',
-      montoEntrega: 0,
-      cantidadCuotas: 3,
-      tasaInteres: 0,
-      periodicidad: 'mensual' as const,
-      moneda: 'USD',
-      montoFinanciado: 100,
-      montoCuota: 33.33,
-      montoTotal: 100,
-    }
-    const cuota = (numero: number, monto: number) => ({
-      id: `c-${numero}`,
-      numero,
-      monto,
-      estado: 'pendiente' as const,
-      fechaVencimiento: '2026-10-15T00:00:00Z',
-    })
-
-    const fromDetail = saleReceiptFromSale({
-      ...sale,
-      modalidadPago: 'financiado',
-      planPago: { ...planPago, cuotas: [cuota(1, 33.33), cuota(2, 33.33), cuota(3, 33.34)] },
-    })
-    expect(fromDetail.plan?.lastInstallmentAmount).toBe(33.34)
-
-    const fromList = saleReceiptFromSale({ ...sale, modalidadPago: 'financiado', planPago })
-    expect(fromList.plan?.lastInstallmentAmount).toBe(33.34)
   })
 
   it('labels the lote of a sale', () => {

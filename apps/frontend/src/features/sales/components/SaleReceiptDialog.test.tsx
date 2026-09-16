@@ -65,7 +65,6 @@ describe('SaleReceiptDialog', () => {
             period: 'mensual',
             financedAmount: 100000,
             installmentAmount: 11250,
-            lastInstallmentAmount: 11250,
             totalAmount: 112500,
           },
         })}
@@ -85,32 +84,6 @@ describe('SaleReceiptDialog', () => {
     expect(plan).toHaveTextContent('US$ 112.500,00')
   })
 
-  it('prints the last cuota apart when it absorbs the rounding remainder', () => {
-    render(
-      <SaleReceiptDialog
-        open
-        receipt={receipt({
-          method: 'financiado',
-          plan: {
-            downPayment: 0,
-            installments: 3,
-            interestRate: 0,
-            period: 'mensual',
-            financedAmount: 100,
-            installmentAmount: 33.33,
-            lastInstallmentAmount: 33.34,
-            totalAmount: 100,
-          },
-        })}
-        onClose={vi.fn()}
-      />,
-    )
-
-    expect(screen.getByLabelText('Plan de pago')).toHaveTextContent(
-      '3 de US$ 33,33 (la última de US$ 33,34) · mensual',
-    )
-  })
-
   it('omits the entrega row of a plan without one and the plan of a contado sale', () => {
     const { rerender } = render(
       <SaleReceiptDialog
@@ -124,7 +97,6 @@ describe('SaleReceiptDialog', () => {
             period: 'trimestral',
             financedAmount: 150000,
             installmentAmount: 50000,
-            lastInstallmentAmount: 50000,
             totalAmount: 150000,
           },
         })}

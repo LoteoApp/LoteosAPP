@@ -209,25 +209,19 @@ export function roundMoney(value: number): number {
 // domain.BuildPaymentSchedule in apps/backend):
 //
 //   financed    = round2(amount - downPayment)
-//   total       = round2(financed * (1 + interestRate / 100))
-//   installment = round2(total / installments)
-//   last        = round2(total - installment * (installments - 1))
+//   installment = round2(round2(financed * (1 + interestRate / 100)) / installments)
+//   total       = round2(installment * installments)
 //
-// The last installment absorbs the rounding remainder so they add up to
-// total exactly. Due dates are derived by the backend from the sale date.
+// Every cuota is the same amount, so the total is what the cuotas add up to
+// and may differ from the exact interest by a few cents. Due dates are
+// derived by the backend from the sale date.
 export function buildPaymentSchedule(amount: number, plan: PaymentPlanInput): PaymentSchedule {
   const financedAmount = roundMoney(amount - plan.montoEntrega)
-  const totalAmount = roundMoney(financedAmount * (1 + plan.tasaInteres / 100))
-  const installmentAmount = roundMoney(totalAmount / plan.cantidadCuotas)
-  const last = roundMoney(totalAmount - installmentAmount * (plan.cantidadCuotas - 1))
-  const installments = Array.from({ length: plan.cantidadCuotas }, (_, index) =>
-    index === plan.cantidadCuotas - 1 ? last : installmentAmount,
-  )
+  const withInterest = roundMoney(financedAmount * (1 + plan.tasaInteres / 100))
+  const installmentAmount = roundMoney(withInterest / plan.cantidadCuotas)
+  const totalAmount = roundMoney(installmentAmount * plan.cantidadCuotas)
+  const installments = Array.from({ length: plan.cantidadCuotas }, () => installmentAmount)
   return { financedAmount, totalAmount, installmentAmount, installments }
-}
-
-export function lastInstallmentAmount(schedule: PaymentSchedule): number {
-  return schedule.installments[schedule.installments.length - 1]
 }
 
 // Accepts "1234.5", "1234,5" and "1.234,50": with a comma present the dots
@@ -302,7 +296,7 @@ export function parsePaymentPlan(
     montoEntrega: downPayment,
   }
   const schedule = buildPaymentSchedule(amount, plan)
-  if (schedule.installmentAmount < 0.01 || lastInstallmentAmount(schedule) < 0.01) {
+  if (schedule.installmentAmount < 0.01) {
     return { ok: false, error: 'El monto financiado no alcanza para esa cantidad de cuotas.' }
   }
   return { ok: true, plan }
@@ -339,9 +333,7 @@ export type SaleDraft = {
 }
 
 // The plan as the receipt prints it: the typed terms plus the derived
-// amounts, all of which the backend also publishes in Sale.planPago. The
-// last installment is listed apart because it absorbs the rounding
-// remainder and may differ from the regular one.
+// amounts, all of which the backend also publishes in Sale.planPago.
 export type SaleReceiptPlan = {
   downPayment: number
   installments: number
@@ -349,7 +341,6 @@ export type SaleReceiptPlan = {
   period: PaymentPeriod
   financedAmount: number
   installmentAmount: number
-  lastInstallmentAmount: number
   totalAmount: number
 }
 
@@ -361,7 +352,6 @@ function saleReceiptPlan(plan: PaymentPlanInput, schedule: PaymentSchedule): Sal
     period: plan.periodicidad,
     financedAmount: schedule.financedAmount,
     installmentAmount: schedule.installmentAmount,
-    lastInstallmentAmount: lastInstallmentAmount(schedule),
     totalAmount: schedule.totalAmount,
   }
 }
@@ -624,11 +614,7 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
   }
 }
 
-// The last installment comes from the persisted cuotas when the response
-// carries them; otherwise it is derived with the same formula the backend
-// used, so a list summary prints the same remainder as the detail.
 function persistedReceiptPlan(plan: PaymentPlan): SaleReceiptPlan {
-  const persistedLast = plan.cuotas?.[plan.cuotas.length - 1]?.monto
   return {
     downPayment: plan.montoEntrega,
     installments: plan.cantidadCuotas,
@@ -636,8 +622,6 @@ function persistedReceiptPlan(plan: PaymentPlan): SaleReceiptPlan {
     period: plan.periodicidad,
     financedAmount: plan.montoFinanciado,
     installmentAmount: plan.montoCuota,
-    lastInstallmentAmount:
-      persistedLast ?? roundMoney(plan.montoTotal - plan.montoCuota * (plan.cantidadCuotas - 1)),
     totalAmount: plan.montoTotal,
   }
 }
