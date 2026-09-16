@@ -47,9 +47,20 @@ Para código nuevo o modificado dentro de una funcionalidad:
 | Ramas | 75% |
 | Reglas críticas del negocio | 90% recomendado |
 
-Vitest aplica los umbrales por archivo sobre `src/features`. En Go se revisa la
-cobertura de los paquetes del núcleo y handlers de cada feature. Al agregar una
-feature backend, se debe incorporarla al comando raíz `test:backend:coverage`.
+Vitest aplica los umbrales por archivo sobre `src/features`. En Go, `go tool
+cover` solo imprime porcentajes, así que quien aplica el umbral es
+`scripts/check-go-coverage.mjs`: lee `apps/backend/coverage.out`, agrega las
+sentencias por paquete y falla si un paquete —o el total— queda por debajo del
+80%. Go no reporta ramas; la cobertura de sentencias hace las veces de líneas y
+sentencias. Al agregar una feature backend, se debe incorporar su paquete al
+comando raíz `test:backend:coverage:profile`.
+
+Los paquetes cuyos tests necesitan un servicio externo se miden solo cuando ese
+servicio está configurado (`DATABASE_URL` para `repository/postgres`,
+`CLOUDFLARE_R2_ENDPOINT` para `storage/r2`): sin él sus tests de integración se
+saltan y el número hablaría del entorno, no del código. El job de cobertura de
+CI levanta PostGIS y aplica las migraciones, así que ahí el umbral sí corre
+sobre el repositorio.
 
 La cobertura no reemplaza la calidad de los casos. Cada funcionalidad debe
 probar, cuando corresponda:
@@ -85,6 +96,79 @@ Modo watch del frontend:
 
 ```powershell
 pnpm --filter @loteos/frontend test:watch
+```
+
+## Tests de integración
+
+Los tests que necesitan un servicio real se saltan solos cuando faltan sus
+variables de entorno, así que `pnpm test` pasa sin ellos en local. En CI los de
+PostgreSQL sí corren: los jobs de test y cobertura levantan un servicio
+`postgis/postgis`, aplican las migraciones con `go run ./cmd/migrate` y exportan
+`DATABASE_URL`. Para ejecutarlos localmente, correr la suite con los secrets
+inyectados:
+
+```powershell
+doppler run -- pnpm test:backend
+```
+
+| Test | Necesita | Qué hace |
+| --- | --- | --- |
+| `postgres.TestUserRepository` | `DATABASE_URL` | SQL real contra la base de Supabase con las migraciones aplicadas. |
+| `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote/manzana/calle, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS, que exista un solo archivo DXF activo, el alta/listado/descarga/baja de fotos y planos a nivel loteo y lote, que el DXF y un documento_legal sean inalcanzables por ese flujo, y que el cupo de 20 por entidad se respete bajo carga concurrente. |
+| `postgres.TestReservationRepository` | `DATABASE_URL` | Alta, alcance, idempotencia, cancelación y vencimiento de reservas contra PostgreSQL real, incluyendo la consistencia con el estado e historial del lote. |
+| `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
+
+Los dos tests de PostgreSQL borran lo que crearon. El test de R2 escribe en el
+bucket del entorno y también limpia antes de terminar; no correrlo apuntando a
+un bucket de producción.
+
+La suite `postgres.TestLoteoRepository` también cubre el estado inicial, las
+transiciones atómicas, los conflictos por estado esperado obsoleto y dos
+compare-and-set concurrentes sobre el mismo lote. La suite
+`migrate.TestEntityModelStateHistory` aplica las migraciones en un schema
+descartable y verifica el backfill, los triggers, la justificación obligatoria
+y que el historial del lote sea append-only.
+
+La suite del worker usa un proceso falso y contextos con deadline para verificar
+la ejecución inmediata, el lote configurado, los fallos y el apagado sin sleeps
+de duración comercial. Las pruebas de reservas de PostgreSQL deben ejecutarse
+con las migraciones aplicadas y no se consideran realizadas cuando falta
+`DATABASE_URL`.
+
+## Prueba manual del alta de loteo
+
+El alta (`POST /api/v1/loteos`), el listado y el detalle ya tienen pantalla; el
+detalle permite editar los datos manuales de lotes, manzanas y calles según el
+rol del usuario. `scripts/smoke-loteos.sh`
+prueba el recorrido completo por HTTP como verificación end-to-end
+independiente del frontend: login contra Supabase Auth, alta de un loteo con
+plano, carga de datos de un lote y los caminos de error (número repetido, lote
+de otro loteo, referencia a una manzana que no está en el plano, anillo
+abierto, request sin token).
+
+Levantar el backend en una terminal:
+
+```powershell
+cd apps/backend
+doppler run -- go run ./cmd/server
+```
+
+Y en otra, desde la raíz del repositorio:
+
+```powershell
+$env:ADMIN_EMAIL="<cuenta administrador>"
+$env:ADMIN_PASSWORD="<contraseña>"
+doppler run -- bash scripts/smoke-loteos.sh
+```
+
+Necesita `jq` y `curl`. La contraseña se pasa por variable de entorno y no se
+escribe a ningún archivo.
+
+El script **deja creado** el loteo para poder inspeccionarlo e imprime su id al
+terminar. Para borrarlo, con el id que imprimió:
+
+```powershell
+doppler run -- psql $env:DATABASE_URL -f scripts/smoke-loteos-cleanup.sql -v loteo_id="'<uuid>'"
 ```
 
 El reporte HTML del frontend se genera en

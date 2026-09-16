@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -q -U ${POSTGRES_USER:-loteosapp} -d ${POSTGRES_DB:-loteosapp}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -23,14 +23,11 @@ services:
     working_dir: /app
     command: ["go", "run", "./cmd/migrate"]
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required, see docs/secrets.md}
       MIGRATIONS_DIR: /workspace/migrations
     volumes:
       - ./apps/backend:/app
       - ./migrations:/workspace/migrations:ro
-    depends_on:
-      db:
-        condition: service_healthy
 
   backend:
     build:
@@ -39,22 +36,21 @@ services:
     working_dir: /app
     command: ["go", "run", "./cmd/server"]
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-loteosapp}:${POSTGRES_PASSWORD:-loteosapp}@db:5432/${POSTGRES_DB:-loteosapp}?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required, see docs/secrets.md}
       PORT: 8080
       FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CLOUDFLARE_R2_ENDPOINT: ${CLOUDFLARE_R2_ENDPOINT:?CLOUDFLARE_R2_ENDPOINT is required, see docs/secrets.md}
+      CLOUDFLARE_R2_BUCKET_NAME: ${CLOUDFLARE_R2_BUCKET_NAME:?CLOUDFLARE_R2_BUCKET_NAME is required, see docs/secrets.md}
+      CLOUDFLARE_R2_ACCESS_KEY_ID: ${CLOUDFLARE_R2_ACCESS_KEY_ID:?CLOUDFLARE_R2_ACCESS_KEY_ID is required, see docs/secrets.md}
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${CLOUDFLARE_R2_SECRET_ACCESS_KEY:?CLOUDFLARE_R2_SECRET_ACCESS_KEY is required, see docs/secrets.md}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - ./apps/backend:/app
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/readyz > /dev/null || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
+    restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
@@ -66,6 +62,8 @@ services:
     command: ["pnpm", "--filter", "@loteos/frontend", "dev", "--host", "0.0.0.0"]
     environment:
       VITE_API_URL: http://localhost:${BACKEND_PORT:-8080}
+      VITE_SUPABASE_URL: ${SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
@@ -74,7 +72,7 @@ services:
       - frontend_node_modules:/app/node_modules
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   frontend_app_node_modules:

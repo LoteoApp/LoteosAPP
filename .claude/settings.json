@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr create *)",
+            "command": "grep -oE 'https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' | head -1 | { read -r url; if [ -n \"$url\" ]; then gh pr edit \"$url\" --add-reviewer juanmantovani,LeoZorzoli; fi; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

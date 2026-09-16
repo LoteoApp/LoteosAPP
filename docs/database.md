@@ -12,8 +12,8 @@ Es la opción recomendada porque:
 - Mantiene las queries parametrizadas con placeholders `$1`, `$2`, etc.
 
 La conexión del backend se configura en
-`apps/backend/internal/platform/postgres/pool.go` y se construye desde
-`apps/backend/internal/app/app.go`. Al iniciar:
+`apps/backend/internal/infrastructure/repository/postgres/pool.go` y se
+construye desde `apps/backend/internal/app/app.go`. Al iniciar:
 
 1. Lee `DATABASE_URL`.
 2. Construye un `pgxpool.Pool`.
@@ -32,23 +32,91 @@ row := pool.QueryRow(ctx,
 
 No se deben concatenar valores del usuario dentro del SQL.
 
-## Endpoint de diagnóstico
+## Conexión a Supabase
 
-El backend expone `GET /api/v1/system` para validar el entorno durante el
-desarrollo. Devuelve, sin incluir la contraseña ni la URL completa de conexión:
+La base de la aplicación es el Postgres administrado del proyecto de
+Supabase ([#127](https://github.com/LoteoApp/LoteosAPP/issues/127)), no un
+contenedor local. `DATABASE_URL` se lee desde Doppler (ver
+[secrets.md](secrets.md)) y apunta al **pooler en modo session**:
 
-- Estado de conexión.
-- Versión completa de PostgreSQL.
-- Nombre de la base y usuario conectado.
-- Dirección y puerto del servidor.
-- Hora actual de PostgreSQL.
-- Conexiones máximas, totales, adquiridas, libres, creadas y cerradas del pool.
+```text
+postgres://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
 
-El componente
-`apps/frontend/src/features/system-status/components/DatabaseStatus.tsx`
-consulta este endpoint a través de la capa `api` de su feature y muestra la
-información en la pantalla principal. Este endpoint es diagnóstico de
-desarrollo y debe revisarse antes de exponerlo en producción.
+- **Modo session, no transaction**: el modo transaction (puerto `6543`) no
+  soporta prepared statements, que `pgx` usa por default; el modo session
+  (puerto `5432`) sí.
+- **No la conexión directa**: es IPv6-only en el plan free del proyecto.
+- **`sslmode=require`, no `verify-full`**: cifra la conexión pero no valida
+  la CA del certificado del pooler, que no es una CA pública. `verify-full`
+  necesitaría distribuir el root cert de Supabase como un secreto más; para
+  el tamaño de este proyecto no vale la complejidad operativa extra. Nunca
+  se omite `sslmode` en la URL: el default de `pgx` (`prefer`) baja a texto
+  plano en silencio si la negociación TLS falla.
+
+  **Riesgo aceptado**: sin verificación de CA, un atacante en posición de
+  red puede interponerse (MITM) y ver o modificar el tráfico, incluida la
+  contraseña de la base. Aceptable mientras el proyecto no maneje datos
+  reales de clientes; revisar el paso a `verify-full` con el CA bundle de
+  Supabase antes de eso. El riesgo es mayor mientras la conexión use el rol
+  administrativo (ver más abajo), así que ambas decisiones se revisan juntas.
+- **Rol administrativo, pendiente de separar**: `DATABASE_URL` usa el rol
+  `postgres.<project-ref>`, dueño del esquema `public`. El proceso HTTP no
+  necesita DDL: corresponde separar un rol de aplicación con permisos
+  mínimos del rol que corre las migraciones. Riesgo aceptado por ahora,
+  pendiente de resolver antes de manejar datos reales.
+- **Pool chico** (`pool.go`): el pooler de Supavisor es compartido entre
+  todos los devs en un único proyecto free-tier, a diferencia de un
+  contenedor local sin ese límite. `pgxpool` se configura con pocas
+  conexiones máximas y libera las inactivas rápido en vez de retenerlas. CI
+  no se conecta a esta base: el test de integración en
+  `usuario_test.go` se salta si `DATABASE_URL` no está seteada, que es el
+  caso hoy en CI.
+
+## Exposición por la Data API y RLS
+
+Supabase publica el esquema `public` por su Data API (PostgREST) con la
+`anon` key, que viaja en el bundle del frontend y es pública por diseño. Una
+tabla en `public` sin Row Level Security queda legible y escribible por
+cualquiera que tenga esa clave, salteando el backend por completo.
+
+`00004_enable_rls_on_public_tables.sql` habilita RLS en `usuarios` y
+`goose_db_version` y les revoca los permisos de `anon` y `authenticated`. No
+se definen políticas a propósito: toda la lectura y escritura pasa por el
+backend, que se conecta como dueño de las tablas y por lo tanto no está
+sujeto a RLS. Por la misma razón no debe usarse `FORCE ROW LEVEL SECURITY`,
+que también alcanzaría al dueño y dejaría al backend sin acceso.
+
+Regla para tablas nuevas: toda tabla en `public` nace con RLS habilitada en
+la misma migración que la crea. Si alguna vez el frontend consulta una tabla
+directamente con `supabase-js`, esa tabla necesita además políticas
+explícitas; hoy el cliente de Supabase solo se usa para Auth.
+
+Después de agregar tablas conviene revisar los avisos del proyecto
+(**Advisors > Security** en el dashboard de Supabase), que marcan
+exactamente este problema.
+
+## Archivos y almacenamiento de objetos
+
+La tabla `archivos` (migración `00005`) guarda metadata — `categoria`
+(`dxf`, `foto`, `plano`, `documento_legal`), `storage_key`, `mime_type`,
+`hash_sha256`, baja lógica — para todo archivo que sube un usuario: el DXF
+original de un loteo, sus fotos y planos, y los de sus lotes. `storage_key`
+apunta a un objeto en un bucket de Cloudflare R2; los bytes en sí nunca
+llegan a PostgreSQL. El constraint `archivos_loteo_xor_lote_chk` exige que
+cada fila cuelgue de `loteo_id` o de `lote_id`, nunca de ambos ni de
+ninguno. Ver [Fotos y planos de loteo y lote](architecture.md#fotos-y-planos-de-loteo-y-lote)
+en `architecture.md` para el flujo completo (autorización, cupo por
+entidad, validación del tipo real del contenido, cómo se sirve de vuelta).
+
+## Validar el entorno
+
+Para confirmar que el backend pudo conectarse a la base durante el
+desarrollo, revisar sus logs:
+
+```powershell
+docker compose logs backend
+```
 
 ## Herramienta de migraciones
 
@@ -56,12 +124,80 @@ Se usa [Goose](https://github.com/pressly/goose) con archivos SQL versionados.
 El backend usa `pgxpool`; el comando de migraciones usa `database/sql` con el
 driver `github.com/jackc/pgx/v5/stdlib`, porque Goose trabaja con `*sql.DB`.
 
+`cmd/migrate` toma un advisory lock de sesión de PostgreSQL
+(`goose.WithSessionLocker`) antes de migrar: como `DATABASE_URL` apunta a la
+base compartida de Supabase y no a un contenedor descartable, dos `docker
+compose up` corriendo a la vez (o un dev compitiendo con CI) deben serializar
+en vez de correr `goose_db_version` en paralelo.
+
 Las migraciones están en:
 
 ```text
 migrations/
-└── 00001_init.sql
+├── 00001_init.sql
+├── 00002_create_usuarios.sql
+├── 00003_rename_keycloak_id_to_auth_provider_id.sql
+├── 00004_enable_rls_on_public_tables.sql
+├── 00005_create_entity_model.sql
+├── 00006_enforce_single_active_loteo_dxf.sql
+├── 00007_add_inmobiliarias_cuit_idx.sql
+├── 00008_add_lot_state_machine.sql
+├── 00009_harden_reservations.sql
+└── 00010_add_reservation_agency.sql
 ```
+
+`00005` crea el esquema del diagrama v3 (territorio, DXF/PostGIS, comercial
+y estados) y habilita RLS en cada tabla nueva, igual que `00004`. No edita
+migraciones ya aplicadas.
+
+- PostGIS: si no está instalada, se crea en `extensions`. Si ya existe (en
+  `extensions`, `gis` o `public`), se reutiliza `pg_extension.extnamespace` y
+  `geom` se declara con el tipo calificado (`schema.geometry(Polygon)`). El
+  `Down` no borra la extensión.
+- `usuarios.inmobiliaria_id` queda nullable, sin CHECK: no hay mapeo de
+  usuarios `inmobiliaria` existentes a agencias. La restricción
+  (inmobiliaria_id NOT NULL iff rol = inmobiliaria) va en una migración
+  posterior, después del backfill.
+- `reservas.estado_actual` y `ventas.estado_actual` solo cambian insertando
+  en el historial. Un trigger bloquea el UPDATE directo, las filas del
+  historial rechazan UPDATE, DELETE y TRUNCATE, y el alta crea la primera
+  fila `activa`.
+
+`00007` agrega `inmobiliarias_cuit_idx`, un índice único parcial sobre
+`inmobiliarias (cuit) WHERE cuit IS NOT NULL AND fecha_baja IS NULL`: dos
+agencias activas no pueden compartir CUIT, pero el CUIT sigue siendo opcional
+y se puede reutilizar después de una baja. El
+[ABM de inmobiliarias](architecture.md#abm-de-inmobiliarias) normaliza el CUIT
+a 11 dígitos antes de persistirlo, que es lo que hace comparable el índice;
+como nada lo garantizaba antes, el `Up` primero normaliza las filas
+existentes y aborta si alguna activa queda con un CUIT que no son 11 dígitos
+o si dos comparten valor, en vez de deduplicar por su cuenta. La
+columna `fecha_baja` ya venía de `00005`: la baja de una inmobiliaria es
+lógica (`fecha_baja IS NULL` = activa) porque borrar la fila rompería las FK
+que la nombran (`usuarios.inmobiliaria_id`, `inmobiliaria_loteos`).
+
+`00009_harden_reservations.sql` agrega la identidad idempotente por actor
+(`idempotency_key` y hash del payload), sus validaciones y el índice parcial
+de reservas activas ordenado por vencimiento e ID. También protege las
+transiciones de `reserva_estados` y vuelve inmutables la identidad comercial,
+la fecha de creación y el vencimiento. El `Down` elimina esos metadatos y
+constraints, por lo que no debe ejecutarse sobre datos reales: un rollback
+perdería las claves idempotentes y los hashes, aunque conserva las reservas y
+su historial.
+
+`00010_add_reservation_agency.sql` agrega `reservas.inmobiliaria_id` nullable,
+recupera la agencia histórica desde el vendedor cuando existe, crea un índice
+para el alcance por inmobiliaria y la incluye entre los campos inmutables de
+la reserva. Si el vendedor histórico no permite recuperar la agencia, queda
+`NULL`; el `Down` restaura el trigger anterior y elimina índice y columna, por
+lo que se perdería esa atribución histórica.
+
+`00011_add_sale_idempotency.sql` agrega a `ventas` la misma identidad
+idempotente por actor que tienen las reservas (`idempotency_key` y hash del
+payload, con sus validaciones) y el índice único parcial
+`ventas_usuario_alta_idempotency_key_idx`. El `Down` elimina columnas,
+constraints e índice, así que un rollback pierde las claves aunque conserva
+las ventas.
 
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
@@ -80,11 +216,16 @@ Los marcadores `-- +goose Up` y `-- +goose Down` son obligatorios.
 
 ## Crear una migración
 
-Desde la raíz, apuntando a PostgreSQL publicado por Docker:
+Desde la raíz, con la conexión traída de Doppler. Se usan las variables
+`GOOSE_DRIVER`/`GOOSE_DBSTRING` en vez de pasar la connection string como
+argumento: un argumento de línea de comandos queda visible para cualquier
+proceso de la máquina (Task Manager, `Get-Process`), mientras que una
+variable de entorno del proceso hijo no.
 
 ```powershell
-$env:DATABASE_URL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"
-go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $env:DATABASE_URL create create_lots_table sql
+$env:GOOSE_DRIVER = "postgres"
+$env:GOOSE_DBSTRING = doppler secrets get DATABASE_URL --plain
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations create create_lots_table sql
 ```
 
 Usar nombres descriptivos y una migración por cambio coherente. Goose genera
@@ -95,24 +236,24 @@ un archivo con numeración; no renombrarlo después de aplicarlo.
 La forma normal de desarrollo es:
 
 ```powershell
-docker compose up --build
+doppler run -- docker compose up --build
 ```
 
-Compose espera que PostgreSQL esté saludable, ejecuta el servicio `migrate` y
-recién después inicia el backend.
+Compose ejecuta el servicio `migrate` contra Supabase y recién después inicia
+el backend.
 
 Para ejecutar únicamente el servicio de migraciones:
 
 ```powershell
-docker compose up migrate
+doppler run -- docker compose up migrate
 ```
 
-Para consultar el estado desde el host:
+Para consultar el estado desde el host (con `$env:GOOSE_DRIVER`/
+`$env:GOOSE_DBSTRING` ya resueltas como en el paso anterior):
 
 ```powershell
-$env:DATABASE_URL = "postgres://loteosapp:loteosapp@localhost:5432/loteosapp?sslmode=disable"
-go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $env:DATABASE_URL status
-go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $env:DATABASE_URL version
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations status
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations version
 ```
 
 ## Avanzar o retroceder manualmente
@@ -120,22 +261,46 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $e
 Aplicar una sola migración:
 
 ```powershell
-go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $env:DATABASE_URL up-by-one
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations up-by-one
 ```
 
 Retroceder la última migración:
 
 ```powershell
-go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations postgres $env:DATABASE_URL down
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations down
 ```
 
-No usar `down` en una base compartida sin confirmar el impacto. Para resetear
-la base local completa:
+`down` corre contra la base compartida de Supabase, no una base local
+descartable: no usarlo sin confirmar el impacto con el equipo.
 
-```powershell
-docker compose down -v
-docker compose up --build
-```
+### Máquina de estados del lote
+
+`00008_add_lot_state_machine.sql` materializa el valor vigente en
+`lotes.estado_actual`, crea el evento inicial `disponible` para lotes sin
+historial y sincroniza los que ya tenían eventos. Los eventos anteriores a la
+migración quedan identificados como `sistema` con una razón de migración. Los
+lotes nuevos se inicializan por trigger; otro trigger valida la matriz de
+transiciones y actualiza el valor vigente. `lote_estados` rechaza `UPDATE`,
+`DELETE` y `TRUNCATE`, y su índice `(lote_id, fecha_creacion DESC, id DESC)`
+permite leer el historial en orden estable. El `Down` conserva las filas del
+historial y sus estados, pero elimina los metadatos agregados por esta migración
+(`origen`, `razon` y las referencias comerciales); solo debe usarse sobre una
+base descartable.
+
+### Reservas
+
+`reservas` mantiene una única fila activa por lote y
+`reserva_estados` conserva el historial append-only. La alta crea el evento
+`activa`; cancelación, vencimiento y conversión agregan un único evento
+terminal. `00009` rechaza el alta de un estado distinto de `activa`, las
+transiciones desde un terminal y los cambios directos de los campos
+inmutables. La liberación del lote se escribe junto con el evento de reserva
+mediante la máquina de estados de `lote_estados`.
+
+El worker consulta el índice parcial `reservas_active_expiration_idx`, toma
+candidatos en lotes pequeños y vuelve a verificar la reserva activa y su
+vencimiento después de bloquear lote y reserva. Así un reintento o una segunda
+instancia puede omitir un candidato ya procesado sin duplicar eventos.
 
 ## Reglas del esquema
 

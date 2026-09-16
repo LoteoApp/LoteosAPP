@@ -1,0 +1,562 @@
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import PlanSelectionPanel from './PlanSelectionPanel'
+import * as archivosApi from '../api/archivos'
+import type { LoteoDetail } from '../types'
+
+const triangle = [
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+]
+
+function loteo(overrides: Partial<LoteoDetail> = {}): LoteoDetail {
+  return {
+    id: 'loteo-1',
+    nombre: 'Las Acacias',
+    ubicacion: '',
+    descripcion: '',
+    contorno: triangle,
+    manzanas: [{
+      id: 'mz-1',
+      numero: '1',
+      tieneAgua: false,
+      tieneCloaca: false,
+      tieneLuz: false,
+      tieneGas: false,
+      calleIds: [],
+      poligono: triangle,
+    }],
+    lotes: [
+      {
+        id: 'lt-1',
+        manzanaId: 'mz-1',
+        numero: '7',
+        estado: 'disponible',
+        precio: null,
+        moneda: '',
+        superficie: null,
+        caracteristicas: '',
+        poligono: triangle,
+      },
+    ],
+    calles: [{ id: 'ca-1', nombre: 'Los Álamos', tipo: 'asfalto', poligono: triangle }],
+    fechaCreacion: '2026-08-20T12:00:00Z',
+    ...overrides,
+  }
+}
+
+const labels = new Map([
+  ['lote-lt-1', 'Lote 7'],
+  ['manzana-mz-1', 'Manzana 1'],
+  ['calle-ca-1', 'Calle Los Álamos'],
+])
+
+describe('PlanSelectionPanel', () => {
+  it('shows the price, the meta line and the reservation summary of a lote', () => {
+    const reserved = loteo({
+      lotes: [{
+        ...loteo().lotes[0],
+        estado: 'reservado',
+        precio: 150000,
+        moneda: 'USD',
+        superficie: 300,
+      }],
+      manzanas: [{ ...loteo().manzanas[0], calleIds: ['ca-1'] }],
+    })
+
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={reserved}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+        renderReservationSummary={() => <p>Reservado por Ana Pérez</p>}
+      />,
+    )
+
+    expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText(/150\.000/)).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1 · 300 m² · Los Álamos')).toBeInTheDocument()
+    expect(screen.getByText(/por m²/)).toBeInTheDocument()
+    expect(screen.getByText('Reservado por Ana Pérez')).toBeInTheDocument()
+  })
+
+  it('renders the sale action for an available lote', () => {
+    const renderSaleAction = vi.fn((lote: { id: string }) => <button type="button">Vender {lote.id}</button>)
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+        renderSaleAction={renderSaleAction}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Vender lt-1' })).toBeInTheDocument()
+    expect(renderSaleAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'lt-1' }))
+  })
+
+  it('does not offer the sale action for a lote that is not available', () => {
+    const renderSaleAction = vi.fn(() => <button type="button">Vender</button>)
+    const withSoldLot = loteo()
+    withSoldLot.lotes = withSoldLot.lotes.map((lote) => (lote.id === 'lt-1' ? { ...lote, estado: 'vendido' } : lote))
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={withSoldLot}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+        renderSaleAction={renderSaleAction}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Vender' })).not.toBeInTheDocument()
+    expect(renderSaleAction).not.toHaveBeenCalled()
+  })
+
+  it('prompts the user when nothing is selected', () => {
+    render(
+      <PlanSelectionPanel
+        selected={null}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId={null}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+  })
+
+  it('shows lote data before enabling edit mode', async () => {
+    const user = userEvent.setup()
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+
+    expect(screen.getByLabelText('Número')).toHaveValue('7')
+  })
+
+  it('shows the manzana form for a selected manzana', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'manzana', id: 'mz-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="manzana-mz-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Manzana 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('Número')).toHaveValue('1')
+    expect(screen.getByText('1 lote en esta manzana.')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Los Álamos' })).toBeInTheDocument()
+  })
+
+  it('shows the calle form for a selected calle', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'calle', id: 'ca-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="calle-ca-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Calle Los Álamos')).toBeInTheDocument()
+    expect(screen.getByLabelText('Nombre')).toHaveValue('Los Álamos')
+    expect(screen.getByRole('button', { name: 'Asfalto' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows selected data without edit controls when the user cannot edit', () => {
+    render(
+      <PlanSelectionPanel
+        canEdit={false}
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Lote 7')).toBeInTheDocument()
+    expect(screen.getByText('Manzana 1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Habilitar edición' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument()
+  })
+
+  it('renders read-only manzana and calle details for non-editors', () => {
+    const { rerender } = render(
+      <PlanSelectionPanel
+        canEdit={false}
+        selected={{ kind: 'manzana', id: 'mz-1' }}
+        loteo={loteo({ manzanas: [{ ...loteo().manzanas[0], tieneAgua: true, calleIds: ['ca-1'] }] })}
+        polygonLabels={labels}
+        selectedPolygonId="manzana-mz-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Agua')).toBeInTheDocument()
+    expect(screen.getByText(/Los .*lamos/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
+
+    rerender(
+      <PlanSelectionPanel
+        canEdit={false}
+        selected={{ kind: 'calle', id: 'ca-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="calle-ca-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('asfalto')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument()
+  })
+
+  it('forwards a save from the lote form', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(true)
+
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={onSave}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(onSave).toHaveBeenCalledWith(
+      'lt-1',
+      expect.objectContaining({ numero: '7' }),
+    )
+  })
+
+  it('forwards a save from the calle form', async () => {
+    const user = userEvent.setup()
+    const onSaveCalle = vi.fn().mockResolvedValue(true)
+
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'calle', id: 'ca-1' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="calle-ca-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={onSaveCalle}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(onSaveCalle).toHaveBeenCalledWith(
+      'ca-1',
+      expect.objectContaining({ nombre: 'Los Álamos', tipo: 'asfalto' }),
+    )
+  })
+
+  it('treats the loteo contour as an empty selection', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'loteo' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId="loteo"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+  })
+
+  it('falls back when the selected entity is no longer in the loteo', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'missing' }}
+        loteo={loteo()}
+        polygonLabels={labels}
+        selectedPolygonId={null}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+  })
+
+  it('titles a manzana and a calle from the loteo when the plan has no label', () => {
+    const unnamed = loteo({
+      manzanas: [{
+        id: 'mz-1',
+        numero: '',
+        tieneAgua: false,
+        tieneCloaca: false,
+        tieneLuz: false,
+        tieneGas: false,
+        calleIds: [],
+        poligono: triangle,
+      }],
+      lotes: [
+        { ...loteo().lotes[0], numero: '', manzanaId: 'mz-1' },
+        { ...loteo().lotes[0], id: 'lt-2', numero: '8', manzanaId: 'mz-1' },
+      ],
+      calles: [{ id: 'ca-1', nombre: '', tipo: '', poligono: triangle }],
+    })
+
+    const { rerender } = render(
+      <PlanSelectionPanel
+        selected={{ kind: 'manzana', id: 'mz-1' }}
+        loteo={unnamed}
+        polygonLabels={new Map()}
+        selectedPolygonId="manzana-mz-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Manzana')).toBeInTheDocument()
+    expect(screen.getByText('2 lotes en esta manzana.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Número')).toHaveValue('')
+
+    rerender(
+      <PlanSelectionPanel
+        selected={{ kind: 'calle', id: 'ca-1' }}
+        loteo={unnamed}
+        polygonLabels={new Map()}
+        selectedPolygonId="calle-ca-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Calle')).toBeInTheDocument()
+    expect(screen.getByLabelText('Nombre')).toHaveValue('')
+  })
+
+  it('titles a lote without a number when the plan has no label', () => {
+    render(
+      <PlanSelectionPanel
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={loteo({ lotes: [{ ...loteo().lotes[0], numero: '' }] })}
+        polygonLabels={new Map()}
+        selectedPolygonId={null}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Lote')).toBeInTheDocument()
+  })
+
+  it('still identifies a missing manzana or calle without crashing', () => {
+    const { rerender } = render(
+      <PlanSelectionPanel
+        selected={{ kind: 'manzana', id: 'ghost' }}
+        loteo={loteo()}
+        polygonLabels={new Map()}
+        selectedPolygonId={null}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+
+    rerender(
+      <PlanSelectionPanel
+        selected={{ kind: 'calle', id: 'ghost' }}
+        loteo={loteo()}
+        polygonLabels={new Map()}
+        selectedPolygonId={null}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Tocá una manzana, un lote o una calle.')).toBeInTheDocument()
+  })
+
+  it('never applies an upload from a previously selected lote to the one now shown', async () => {
+    const user = userEvent.setup()
+    const twoLotes = loteo({
+      lotes: [
+        { ...loteo().lotes[0], id: 'lt-1', numero: '7' },
+        { ...loteo().lotes[0], id: 'lt-2', numero: '8' },
+      ],
+    })
+    vi.spyOn(archivosApi, 'listLoteAttachments').mockResolvedValue([])
+    let resolveUpload: (attachment: Awaited<ReturnType<typeof archivosApi.uploadLoteAttachment>>) => void = () => {}
+    vi.spyOn(archivosApi, 'uploadLoteAttachment').mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpload = resolve
+      }),
+    )
+
+    const { rerender } = render(
+      <PlanSelectionPanel
+        accessToken="tok"
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        loteo={twoLotes}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-1"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+    await screen.findByText('Todavía no hay archivos.')
+
+    const file = new File(['bytes'], 'foto-a.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Subir archivo'), file)
+
+    rerender(
+      <PlanSelectionPanel
+        accessToken="tok"
+        selected={{ kind: 'lote', id: 'lt-2' }}
+        loteo={twoLotes}
+        polygonLabels={labels}
+        selectedPolygonId="lote-lt-2"
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        manzanaUpdateState={{ status: 'idle' }}
+        onSaveManzana={vi.fn()}
+        calleUpdateState={{ status: 'idle' }}
+        onSaveCalle={vi.fn()}
+      />,
+    )
+    await screen.findByText('Todavía no hay archivos.')
+
+    await act(async () => {
+      resolveUpload({
+        id: 'archivo-1',
+        category: 'foto',
+        nombreOriginal: 'foto-a.jpg',
+        mimeType: 'image/jpeg',
+        hashSha256: 'abc123',
+        fechaCreacion: '2026-01-01T00:00:00Z',
+      })
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByRole('button', { name: 'Eliminar foto-a.jpg' })).not.toBeInTheDocument()
+    expect(screen.getByText('Todavía no hay archivos.')).toBeInTheDocument()
+  })
+})

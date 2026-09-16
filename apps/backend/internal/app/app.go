@@ -9,42 +9,98 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"loteosapp/backend/internal/platform/config"
-	"loteosapp/backend/internal/platform/httpserver"
-	platformpostgres "loteosapp/backend/internal/platform/postgres"
-	"loteosapp/backend/internal/system"
-	systemhttp "loteosapp/backend/internal/system/http"
-	systempostgres "loteosapp/backend/internal/system/postgres"
+	"loteosapp/backend/internal/infrastructure/auth/supabase"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/dependencies"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/route"
+	"loteosapp/backend/internal/infrastructure/delivery/webapp/server"
+	"loteosapp/backend/internal/infrastructure/environments"
+	"loteosapp/backend/internal/infrastructure/worker"
 )
 
 type App struct {
-	server *http.Server
-	pool   *pgxpool.Pool
+	server            *http.Server
+	pool              *pgxpool.Pool
+	verifier          *supabase.Verifier
+	reservationWorker *worker.ReservationExpiryWorker
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg := config.LoadServer()
-
-	pool, err := platformpostgres.OpenPool(ctx, cfg.DatabaseURL)
+	cfg, err := environments.LoadServer()
 	if err != nil {
 		return nil, err
 	}
 
-	repository := systempostgres.NewRepository(pool)
-	service := system.NewService(repository)
-	handler := systemhttp.NewHandler(service)
+	container, err := dependencies.New(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	route.RegisterRoutes(mux, route.Handlers{
+		CreateUser:                 container.CreateUserHandler,
+		CompleteProfile:            container.CompleteProfileHandler,
+		ListUsers:                  container.ListUsersHandler,
+		UpdateUser:                 container.UpdateUserHandler,
+		DeactivateUser:             container.DeactivateUserHandler,
+		ReactivateUser:             container.ReactivateUserHandler,
+		CreateClient:               container.CreateClientHandler,
+		UpdateClient:               container.UpdateClientHandler,
+		DeleteClient:               container.DeleteClientHandler,
+		ListClients:                container.ListClientsHandler,
+		CreateAgency:               container.CreateAgencyHandler,
+		UpdateAgency:               container.UpdateAgencyHandler,
+		DeleteAgency:               container.DeleteAgencyHandler,
+		ListAgencies:               container.ListAgenciesHandler,
+		CreateLoteo:                container.CreateLoteoHandler,
+		StoreLoteoDxf:              container.StoreLoteoDxfHandler,
+		UpdateLote:                 container.UpdateLoteHandler,
+		UpdateManzana:              container.UpdateManzanaHandler,
+		UpdateCalle:                container.UpdateCalleHandler,
+		ListLoteos:                 container.ListLoteosHandler,
+		GetLoteo:                   container.GetLoteoHandler,
+		StoreLoteoFile:             container.StoreLoteoFileHandler,
+		StoreLoteFile:              container.StoreLoteFileHandler,
+		ListLoteoFiles:             container.ListLoteoFilesHandler,
+		ListLoteFiles:              container.ListLoteFilesHandler,
+		GetFileContent:             container.GetFileContentHandler,
+		DeleteFile:                 container.DeleteFileHandler,
+		CreateReservationHandler:   container.CreateReservationHandler,
+		ListReservationsHandler:    container.ListReservationsHandler,
+		GetReservationHandler:      container.GetReservationHandler,
+		ReservationReceiptHandler:  container.ReservationReceiptHandler,
+		CancelReservationHandler:   container.CancelReservationHandler,
+		CreateSaleHandler:          container.CreateSaleHandler,
+		ListSalesHandler:           container.ListSalesHandler,
+		GetSaleHandler:             container.GetSaleHandler,
+		ListEligibleSellersHandler: container.ListEligibleSellersHandler,
+	}, container.Verifier, container.UserRepository)
 
 	return &App{
-		server: httpserver.New(cfg.Port, httpserver.WithCORS(cfg.FrontendOrigin, mux)),
-		pool:   pool,
+		server:            server.New(cfg.Port, server.WithCORS(cfg.FrontendOrigin, mux), route.MaxHandlerTimeout),
+		pool:              container.Pool,
+		verifier:          container.Verifier,
+		reservationWorker: container.ReservationExpiryWorker,
 	}, nil
 }
 
 func (app *App) Run(ctx context.Context) error {
 	defer app.pool.Close()
+	defer app.verifier.Close()
+
+	workerCtx, cancelWorker := context.WithCancel(ctx)
+	workerDone := make(chan struct{})
+	if app.reservationWorker != nil {
+		go func() {
+			defer close(workerDone)
+			app.reservationWorker.Run(workerCtx)
+		}()
+	} else {
+		close(workerDone)
+	}
+	defer func() {
+		cancelWorker()
+		<-workerDone
+	}()
 
 	serverErrors := make(chan error, 1)
 	go func() {
