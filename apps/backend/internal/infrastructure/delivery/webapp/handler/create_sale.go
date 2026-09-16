@@ -23,6 +23,15 @@ func (handler *CreateSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 	if err != nil {
 		return err
 	}
+	var plan *sales.PaymentPlanInput
+	if body.PlanPago != nil {
+		plan = &sales.PaymentPlanInput{
+			Installments: body.PlanPago.CantidadCuotas,
+			InterestRate: body.PlanPago.TasaInteres,
+			Period:       body.PlanPago.Periodicidad,
+			DownPayment:  body.PlanPago.MontoEntrega,
+		}
+	}
 	sale, err := handler.createSale.Execute(request.Context(), sales.CreateSaleInput{
 		Actor:          sales.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
 		DevelopmentID:  request.PathValue("loteoId"),
@@ -31,6 +40,7 @@ func (handler *CreateSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 		SellerID:       body.VendedorID,
 		PaymentMethod:  body.ModalidadPago,
 		IdempotencyKey: request.Header.Get("Idempotency-Key"),
+		PaymentPlan:    plan,
 	})
 	if err != nil {
 		return err

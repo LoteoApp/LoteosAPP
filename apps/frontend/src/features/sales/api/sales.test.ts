@@ -133,6 +133,67 @@ describe('createSale', () => {
     expect(JSON.parse(String(init.body))).toEqual({ clienteId: 'client-1', vendedorId: 'seller-1', modalidadPago: 'contado' })
   })
 
+  it('sends the plan of a financed sale and reads it back with its cuotas', async () => {
+    const financed = {
+      ...sale,
+      modalidadPago: 'entrega_financiada',
+      planPago: {
+        id: 'plan-1',
+        montoEntrega: 20000,
+        cantidadCuotas: 2,
+        tasaInteres: 10,
+        periodicidad: 'mensual',
+        moneda: 'USD',
+        montoFinanciado: 100000,
+        montoCuota: 55000,
+        montoTotal: 110000,
+        cuotas: [
+          { id: 'c-1', numero: 1, monto: 55000, estado: 'pendiente', fechaVencimiento: '2026-10-14T15:00:00Z' },
+          { id: 'c-2', numero: 2, monto: 55000, estado: 'pendiente', fechaVencimiento: '2026-11-14T15:00:00Z' },
+        ],
+      },
+    }
+    const fetchMock = stubFetch(jsonResponse(201, financed))
+
+    const created = await createSale('token-123', {
+      loteoId: 'loteo-1',
+      loteId: 'lot-1',
+      clienteId: 'client-1',
+      vendedorId: 'seller-1',
+      modalidadPago: 'entrega_financiada',
+      planPago: { cantidadCuotas: 2, tasaInteres: 10, periodicidad: 'mensual', montoEntrega: 20000 },
+    }, 'sale-key-3')
+
+    expect(created.planPago?.cuotas).toHaveLength(2)
+    expect(created.planPago?.montoCuota).toBe(55000)
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('sale-key-3')
+    expect(JSON.parse(String(init.body))).toEqual({
+      clienteId: 'client-1',
+      vendedorId: 'seller-1',
+      modalidadPago: 'entrega_financiada',
+      planPago: { cantidadCuotas: 2, tasaInteres: 10, periodicidad: 'mensual', montoEntrega: 20000 },
+    })
+  })
+
+  it('rejects a plan with an unknown periodicidad or cuota state', async () => {
+    const plan = {
+      id: 'plan-1', montoEntrega: 0, cantidadCuotas: 1, tasaInteres: 0, periodicidad: 'mensual',
+      moneda: 'USD', montoFinanciado: 120000, montoCuota: 120000, montoTotal: 120000,
+    }
+    stubFetch(jsonResponse(200, { ...sale, modalidadPago: 'financiado', planPago: { ...plan, periodicidad: 'semanal' } }))
+    await expect(getSale('token-123', 'sale-1')).rejects.toThrow(GENERIC_ERROR)
+
+    stubFetch(jsonResponse(200, {
+      ...sale, modalidadPago: 'financiado',
+      planPago: { ...plan, cuotas: [{ id: 'c-1', numero: 1, monto: 120000, estado: 'perdida', fechaVencimiento: '2026-10-14T15:00:00Z' }] },
+    }))
+    await expect(getSale('token-123', 'sale-1')).rejects.toThrow(GENERIC_ERROR)
+
+    stubFetch(jsonResponse(200, { ...sale, modalidadPago: 'financiado', planPago: plan }))
+    await expect(getSale('token-123', 'sale-1')).resolves.toMatchObject({ planPago: plan })
+  })
+
   it('throws the backend message when the sale is rejected', async () => {
     stubFetch(jsonResponse(409, { code: 'sale_lot_unavailable', message: 'El lote no está disponible para vender' }))
 

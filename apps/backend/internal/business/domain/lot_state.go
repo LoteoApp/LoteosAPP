@@ -133,7 +133,9 @@ func (transition LotStateTransition) originMatchesTransition() bool {
 	case transition.ExpectedState == LotStateSold && transition.NextState == LotStateAvailable:
 		return transition.Origin == LotStateOriginSale || transition.Origin == LotStateOriginSystem
 	case transition.ExpectedState == LotStateSold && transition.NextState == LotStateCompleted:
-		return transition.Origin == LotStateOriginCollection
+		// cobranza when the last cuota is paid; venta when a contado sale settles
+		// the lote the moment it is registered.
+		return transition.Origin == LotStateOriginCollection || transition.Origin == LotStateOriginSale
 	default:
 		return false
 	}

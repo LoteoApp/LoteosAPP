@@ -28,20 +28,19 @@ const (
 )
 
 var (
-	ErrSaleNotFound                 = &Error{Kind: KindNotFound, Code: "sale_not_found", Message: "La venta solicitada no existe"}
-	ErrSaleInvalidClient            = &Error{Kind: KindInvalid, Code: "invalid_sale_client", Message: "El cliente seleccionado no es válido"}
-	ErrSaleSellerRequired           = &Error{Kind: KindInvalid, Code: "sale_seller_required", Message: "Tenés que seleccionar un vendedor"}
-	ErrSaleSellerNotEligible        = &Error{Kind: KindForbidden, Code: "sale_seller_not_eligible", Message: "El vendedor no está habilitado para vender"}
-	ErrSaleAgencyNotAssigned        = &Error{Kind: KindForbidden, Code: "sale_agency_not_assigned", Message: "Tu inmobiliaria no está asignada a este loteo"}
-	ErrSaleLotUnavailable           = &Error{Kind: KindConflict, Code: "sale_lot_unavailable", Message: "El lote no está disponible para vender"}
-	ErrSaleLotIncomplete            = &Error{Kind: KindConflict, Code: "sale_lot_incomplete", Message: "El lote necesita número y precio para vender"}
-	ErrSaleActiveConflict           = &Error{Kind: KindConflict, Code: "sale_already_active", Message: "El lote ya tiene una venta registrada"}
-	ErrSaleInvalidPaymentMethod     = &Error{Kind: KindInvalid, Code: "invalid_payment_method", Message: "La modalidad de pago no es válida"}
-	ErrSalePaymentMethodUnavailable = &Error{Kind: KindInvalid, Code: "payment_method_unavailable", Message: "Por ahora solo se puede registrar una venta al contado"}
-	ErrSaleInvalidState             = &Error{Kind: KindInvalid, Code: "invalid_sale_state", Message: "El estado de la venta no es válido"}
-	ErrSaleInvalidPage              = &Error{Kind: KindInvalid, Code: "invalid_sale_page", Message: "La paginación solicitada no es válida"}
-	ErrSaleIdempotencyRequired      = &Error{Kind: KindInvalid, Code: "idempotency_key_required", Message: "La solicitud necesita una clave de idempotencia"}
-	ErrSaleIdempotencyConflict      = &Error{Kind: KindConflict, Code: "idempotency_key_conflict", Message: "La clave de idempotencia ya fue utilizada con otros datos"}
+	ErrSaleNotFound             = &Error{Kind: KindNotFound, Code: "sale_not_found", Message: "La venta solicitada no existe"}
+	ErrSaleInvalidClient        = &Error{Kind: KindInvalid, Code: "invalid_sale_client", Message: "El cliente seleccionado no es válido"}
+	ErrSaleSellerRequired       = &Error{Kind: KindInvalid, Code: "sale_seller_required", Message: "Tenés que seleccionar un vendedor"}
+	ErrSaleSellerNotEligible    = &Error{Kind: KindForbidden, Code: "sale_seller_not_eligible", Message: "El vendedor no está habilitado para vender"}
+	ErrSaleAgencyNotAssigned    = &Error{Kind: KindForbidden, Code: "sale_agency_not_assigned", Message: "Tu inmobiliaria no está asignada a este loteo"}
+	ErrSaleLotUnavailable       = &Error{Kind: KindConflict, Code: "sale_lot_unavailable", Message: "El lote no está disponible para vender"}
+	ErrSaleLotIncomplete        = &Error{Kind: KindConflict, Code: "sale_lot_incomplete", Message: "El lote necesita número y precio para vender"}
+	ErrSaleActiveConflict       = &Error{Kind: KindConflict, Code: "sale_already_active", Message: "El lote ya tiene una venta registrada"}
+	ErrSaleInvalidPaymentMethod = &Error{Kind: KindInvalid, Code: "invalid_payment_method", Message: "La modalidad de pago no es válida"}
+	ErrSaleInvalidState         = &Error{Kind: KindInvalid, Code: "invalid_sale_state", Message: "El estado de la venta no es válido"}
+	ErrSaleInvalidPage          = &Error{Kind: KindInvalid, Code: "invalid_sale_page", Message: "La paginación solicitada no es válida"}
+	ErrSaleIdempotencyRequired  = &Error{Kind: KindInvalid, Code: "idempotency_key_required", Message: "La solicitud necesita una clave de idempotencia"}
+	ErrSaleIdempotencyConflict  = &Error{Kind: KindConflict, Code: "idempotency_key_conflict", Message: "La clave de idempotencia ya fue utilizada con otros datos"}
 )
 
 func (state SaleState) IsValid() bool {
@@ -62,10 +61,11 @@ func (method PaymentMethod) IsValid() bool {
 	}
 }
 
-// IsAvailable reports whether the app can register a sale with this method
-// yet. Only contado is implemented; the other two exist in the contract so
-// the selector already lists them.
-func (method PaymentMethod) IsAvailable() bool {
+// SettlesOnRegistration reports whether a sale with this method is paid in
+// full the moment it is registered: a contado sale needs no cobranza, so it
+// is completada and its lote finalizado at once. Financed sales stay activa
+// until the last cuota is paid.
+func (method PaymentMethod) SettlesOnRegistration() bool {
 	return method == PaymentMethodCash
 }
 
@@ -102,6 +102,7 @@ type Sale struct {
 	ModalidadPago     PaymentMethod      `json:"modalidadPago"`
 	Monto             float64            `json:"monto"`
 	Moneda            string             `json:"moneda"`
+	PlanPago          *PaymentPlan       `json:"planPago,omitempty"`
 	Estado            SaleState          `json:"estado"`
 	FechaCreacion     time.Time          `json:"fechaCreacion"`
 	FechaModificacion time.Time          `json:"fechaModificacion"`

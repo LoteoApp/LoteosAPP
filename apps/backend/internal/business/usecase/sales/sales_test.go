@@ -92,6 +92,58 @@ func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 	if repository.CreateCommand.IdempotencyPayloadHash == first {
 		t.Error("a different cliente must produce a different payload hash")
 	}
+
+	financed := validInput()
+	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
+	financed.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: "mensual"}
+	if _, err := useCase.Execute(context.Background(), financed); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	financedHash := repository.CreateCommand.IdempotencyPayloadHash
+	if financedHash == first {
+		t.Error("a financed sale must produce a different payload hash than contado")
+	}
+	if financedHash != sha256Hex("8:loteo-id7:lote-id10:cliente-id9:seller-id10:financiado|12:10:mensual:0") {
+		t.Errorf("financed payload hash = %q", financedHash)
+	}
+
+	otherPlan := financed
+	otherPlan.PaymentPlan = &sales.PaymentPlanInput{Installments: 24, InterestRate: 10, Period: "mensual"}
+	if _, err := useCase.Execute(context.Background(), otherPlan); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash == financedHash {
+		t.Error("a different plan must produce a different payload hash")
+	}
+}
+
+func TestCreateSalePassesTheNormalizedPlanToTheRepository(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.SaleRepository{}
+	useCase := sales.NewCreateSale(repository, users, fixedClock{})
+
+	input := validInput()
+	input.PaymentMethod = string(domain.PaymentMethodDownAndFi)
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 24, InterestRate: 15.5, Period: " mensual ", DownPayment: 20000}
+	if _, err := useCase.Execute(context.Background(), input); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	command := repository.CreateCommand
+	if command.PaymentMethod != domain.PaymentMethodDownAndFi || command.PaymentPlan == nil {
+		t.Fatalf("command = %#v, want a plan", command)
+	}
+	want := domain.PaymentPlanInput{Installments: 24, InterestRate: 15.5, Period: domain.PaymentPeriodMonthly, DownPayment: 20000}
+	if *command.PaymentPlan != want {
+		t.Errorf("plan = %#v, want %#v", *command.PaymentPlan, want)
+	}
+
+	// The repository knows the lote price, so a down payment above it comes
+	// back from there as the same domain error.
+	repository = &gatewayfake.SaleRepository{CreateErr: domain.ErrSaleInvalidDownPayment}
+	useCase = sales.NewCreateSale(repository, users, fixedClock{})
+	if _, err := useCase.Execute(context.Background(), input); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
+	}
 }
 
 func TestCreateSaleLetsAnAgencyUserPickAColleague(t *testing.T) {
@@ -153,11 +205,46 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 			input.PaymentMethod = "cripto"
 			return input
 		}, domain.ErrSaleInvalidPaymentMethod},
-		{"unavailable payment method", func() sales.CreateSaleInput {
+		{"financed without plan", func() sales.CreateSaleInput {
 			input := validInput()
 			input.PaymentMethod = string(domain.PaymentMethodFinanced)
 			return input
-		}, domain.ErrSalePaymentMethodUnavailable},
+		}, domain.ErrSalePaymentPlanRequired},
+		{"contado with plan", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual"}
+			return input
+		}, domain.ErrSalePaymentPlanNotApplicable},
+		{"invalid installments", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentMethod = string(domain.PaymentMethodFinanced)
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 0, Period: "mensual"}
+			return input
+		}, domain.ErrSaleInvalidInstallments},
+		{"invalid rate", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentMethod = string(domain.PaymentMethodFinanced)
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, InterestRate: -1, Period: "mensual"}
+			return input
+		}, domain.ErrSaleInvalidInterestRate},
+		{"invalid periodicity", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentMethod = string(domain.PaymentMethodFinanced)
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "semanal"}
+			return input
+		}, domain.ErrSaleInvalidPeriodicity},
+		{"down payment on financiado", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentMethod = string(domain.PaymentMethodFinanced)
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual", DownPayment: 10}
+			return input
+		}, domain.ErrSaleDownPaymentNotApplicable},
+		{"entrega without down payment", func() sales.CreateSaleInput {
+			input := validInput()
+			input.PaymentMethod = string(domain.PaymentMethodDownAndFi)
+			input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: "mensual"}
+			return input
+		}, domain.ErrSaleInvalidDownPayment},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

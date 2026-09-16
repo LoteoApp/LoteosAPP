@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   DIRECT_SALE,
+  EMPTY_PAYMENT_PLAN,
   agencyOptionsFromSellers,
+  buildPaymentSchedule,
   buildSaleReceipt,
+  roundMoney,
   clientOptionLabel,
   defaultSeller,
   isLotState,
@@ -191,14 +194,17 @@ describe('buildSaleReceipt', () => {
     inmobiliariaRazonSocial: 'Inmobiliaria Sur',
   }
 
+  const plan = EMPTY_PAYMENT_PLAN
+
   it('builds the receipt of a contado sale with the price of the lote', () => {
     const result = buildSaleReceipt(
-      { lot: lot(), client, seller, method: 'contado' },
+      { lot: lot(), client, seller, method: 'contado', plan },
       '2026-09-07T10:00:00.000Z',
     )
 
     expect(result).toEqual({
       ok: true,
+      plan: undefined,
       receipt: {
         issuedAt: '2026-09-07T10:00:00.000Z',
         lot: lot(),
@@ -213,36 +219,29 @@ describe('buildSaleReceipt', () => {
 
   it('accepts a sale by a seller without inmobiliaria', () => {
     const result = buildSaleReceipt(
-      { lot: lot(), client, seller: directSeller, method: 'contado' },
+      { lot: lot(), client, seller: directSeller, method: 'contado', plan },
       '2026-09-07T10:00:00.000Z',
     )
 
     expect(result.ok).toBe(true)
   })
 
-  it('asks for the lote, the cliente, the vendedor, an available modalidad and a price', () => {
+  it('asks for the lote, the cliente, the vendedor and a price', () => {
     expect(
-      buildSaleReceipt({ lot: null, client, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: null, client, seller, method: 'contado', plan }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el lote que se vende.' })
 
     expect(
-      buildSaleReceipt({ lot: lot(), client: null, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lot(), client: null, seller, method: 'contado', plan }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el cliente comprador.' })
 
     expect(
-      buildSaleReceipt({ lot: lot(), client, seller: null, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lot(), client, seller: null, method: 'contado', plan }, 'now'),
     ).toEqual({ ok: false, error: 'Elegí el vendedor que realizó la venta.' })
 
     expect(
-      buildSaleReceipt({ lot: lot(), client, seller, method: 'financiado' }, 'now'),
-    ).toEqual({
-      ok: false,
-      error: 'Por ahora solo se puede registrar una venta al contado.',
-    })
-
-    expect(
       buildSaleReceipt(
-        { lot: lot({ price: null }), client, seller, method: 'contado' },
+        { lot: lot({ price: null }), client, seller, method: 'contado', plan },
         'now',
       ),
     ).toEqual({
@@ -253,12 +252,192 @@ describe('buildSaleReceipt', () => {
 
   it('refuses a lote the backend would reject: price zero or no currency', () => {
     expect(
-      buildSaleReceipt({ lot: lot({ price: 0 }), client, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lot({ price: 0 }), client, seller, method: 'contado', plan }, 'now'),
     ).toEqual({ ok: false, error: 'Completá el precio del lote para habilitar la venta.' })
 
     expect(
-      buildSaleReceipt({ lot: lot({ currency: '' }), client, seller, method: 'contado' }, 'now'),
+      buildSaleReceipt({ lot: lot({ currency: '' }), client, seller, method: 'contado', plan }, 'now'),
     ).toEqual({ ok: false, error: 'Completá la moneda del lote para habilitar la venta.' })
+  })
+
+  it('builds a financed receipt with the plan and its derived amounts', () => {
+    const result = buildSaleReceipt(
+      {
+        lot: lot(),
+        client,
+        seller,
+        method: 'financiado',
+        plan: { installments: '12', interestRate: '10', period: 'mensual', downPayment: '' },
+      },
+      'now',
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      plan: { cantidadCuotas: 12, tasaInteres: 10, periodicidad: 'mensual', montoEntrega: 0 },
+      receipt: expect.objectContaining({
+        method: 'financiado',
+        amount: 150000,
+        plan: {
+          downPayment: 0,
+          installments: 12,
+          interestRate: 10,
+          period: 'mensual',
+          financedAmount: 150000,
+          installmentAmount: 13750,
+          totalAmount: 165000,
+        },
+      }),
+    })
+  })
+
+  it('builds an entrega + financiación receipt with the down payment taken off', () => {
+    const result = buildSaleReceipt(
+      {
+        lot: lot(),
+        client,
+        seller,
+        method: 'entrega_financiada',
+        plan: { installments: '3', interestRate: '', period: 'trimestral', downPayment: '50.000,50' },
+      },
+      'now',
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.plan).toEqual({ cantidadCuotas: 3, tasaInteres: 0, periodicidad: 'trimestral', montoEntrega: 50000.5 })
+    expect(result.receipt.plan).toEqual({
+      downPayment: 50000.5,
+      installments: 3,
+      interestRate: 0,
+      period: 'trimestral',
+      financedAmount: 99999.5,
+      installmentAmount: 33333.17,
+      // 3 × 33333.17
+      totalAmount: 99999.51,
+    })
+  })
+
+  it('explains what is wrong with the plan before confirming', () => {
+    const draft = (method: 'financiado' | 'entrega_financiada', values: Partial<typeof plan>) =>
+      buildSaleReceipt({ lot: lot(), client, seller, method, plan: { ...plan, ...values } }, 'now')
+
+    expect(draft('financiado', {})).toEqual({
+      ok: false,
+      error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
+    })
+    expect(draft('financiado', { installments: '2.5' })).toEqual({
+      ok: false,
+      error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
+    })
+    expect(draft('financiado', { installments: '361' })).toEqual({
+      ok: false,
+      error: 'Ingresá una cantidad de cuotas entre 1 y 360.',
+    })
+    expect(draft('financiado', { installments: '12', interestRate: '-1' })).toEqual({
+      ok: false,
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
+    })
+    expect(draft('financiado', { installments: '12', interestRate: 'diez' })).toEqual({
+      ok: false,
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '0' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '150000' })).toEqual({
+      ok: false,
+      error: 'La entrega tiene que ser menor al precio del lote.',
+    })
+    expect(draft('entrega_financiada', { installments: '360', downPayment: '149.999,99' })).toEqual({
+      ok: false,
+      error: 'El monto financiado no alcanza para esa cantidad de cuotas.',
+    })
+  })
+
+  it('rejects more decimals than the backend persists instead of rounding them', () => {
+    const draft = (method: 'financiado' | 'entrega_financiada', values: Partial<typeof plan>) =>
+      buildSaleReceipt({ lot: lot(), client, seller, method, plan: { ...plan, ...values } }, 'now')
+
+    expect(draft('financiado', { installments: '12', interestRate: '12,3456' })).toMatchObject({
+      ok: true,
+      plan: { tasaInteres: 12.3456 },
+    })
+    expect(draft('financiado', { installments: '12', interestRate: '12.34567' })).toEqual({
+      ok: false,
+      error: 'Ingresá una tasa de interés entre 0 y 1000 %, con hasta 4 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '1000,05' })).toMatchObject({
+      ok: true,
+      plan: { montoEntrega: 1000.05 },
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '0,004' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
+    })
+    expect(draft('entrega_financiada', { installments: '12', downPayment: '1000.005' })).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de la entrega, con hasta 2 decimales.',
+    })
+  })
+})
+
+describe('buildPaymentSchedule', () => {
+  const sum = (cuotas: number[]) => roundMoney(cuotas.reduce((total, cuota) => total + cuota, 0))
+
+  it('splits the price into equal cuotas and totals what they add up to', () => {
+    const schedule = buildPaymentSchedule(100000, {
+      cantidadCuotas: 12,
+      tasaInteres: 0,
+      periodicidad: 'mensual',
+      montoEntrega: 0,
+    })
+
+    expect(schedule.financedAmount).toBe(100000)
+    expect(schedule.totalAmount).toBe(99999.96)
+    expect(schedule.installmentAmount).toBe(8333.33)
+    expect(schedule.installments).toHaveLength(12)
+    expect(schedule.installments.every((cuota) => cuota === 8333.33)).toBe(true)
+    expect(sum(schedule.installments)).toBe(99999.96)
+  })
+
+  it('applies simple interest on the amount left after the down payment', () => {
+    const schedule = buildPaymentSchedule(1100, {
+      cantidadCuotas: 3,
+      tasaInteres: 10,
+      periodicidad: 'mensual',
+      montoEntrega: 1000,
+    })
+
+    expect(schedule).toEqual({
+      financedAmount: 100,
+      totalAmount: 110.01,
+      installmentAmount: 36.67,
+      installments: [36.67, 36.67, 36.67],
+    })
+  })
+
+  it('matches the backend on a single cuota and on awkward decimals', () => {
+    expect(
+      buildPaymentSchedule(999.99, { cantidadCuotas: 1, tasaInteres: 12.5, periodicidad: 'mensual', montoEntrega: 0 }),
+    ).toEqual({ financedAmount: 999.99, totalAmount: 1124.99, installmentAmount: 1124.99, installments: [1124.99] })
+
+    for (const cantidadCuotas of [2, 7, 13, 97, 360]) {
+      const schedule = buildPaymentSchedule(123456.78, { cantidadCuotas, tasaInteres: 33.3, periodicidad: 'mensual', montoEntrega: 0 })
+      expect(sum(schedule.installments)).toBe(schedule.totalAmount)
+    }
+  })
+
+  it('rounds half away from zero on the same doubles as the backend', () => {
+    expect(roundMoney(1.005)).toBe(1)
+    expect(roundMoney(2.675)).toBe(2.68)
+    expect(roundMoney(0.125)).toBe(0.13)
+    expect(roundMoney(33.33333)).toBe(33.33)
   })
 })
 
@@ -357,6 +536,33 @@ describe('saleReceiptFromSale', () => {
     const { inmobiliaria: _agency, ...direct } = sale
 
     expect(sellerAgencyLabel(saleReceiptFromSale(direct).seller)).toBe('Venta directa')
+    expect(saleReceiptFromSale(direct).plan).toBeUndefined()
+  })
+
+  it('carries the plan of a financed sale into the receipt', () => {
+    const planPago = {
+      id: 'plan-1',
+      montoEntrega: 20000,
+      cantidadCuotas: 3,
+      tasaInteres: 5,
+      periodicidad: 'mensual' as const,
+      moneda: 'USD',
+      montoFinanciado: 100000,
+      montoCuota: 35000,
+      montoTotal: 105000,
+    }
+    const receipt = saleReceiptFromSale({ ...sale, modalidadPago: 'entrega_financiada', planPago })
+
+    expect(receipt.method).toBe('entrega_financiada')
+    expect(receipt.plan).toEqual({
+      downPayment: 20000,
+      installments: 3,
+      interestRate: 5,
+      period: 'mensual',
+      financedAmount: 100000,
+      installmentAmount: 35000,
+      totalAmount: 105000,
+    })
   })
 
   it('labels the lote of a sale', () => {

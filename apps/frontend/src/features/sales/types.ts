@@ -124,9 +124,7 @@ export function clientOptionLabel(client: ClientOption): string {
   return `${client.apellido}, ${client.nombre} · DNI ${client.dni}`
 }
 
-// The three modalidades of the ventas.modalidad_pago contract. Only `contado`
-// is implemented; the other two are listed so the selector is already in
-// place for the feature that adds them.
+// The three modalidades of the ventas.modalidad_pago contract.
 export const PAYMENT_METHODS = ['contado', 'financiado', 'entrega_financiada'] as const
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
@@ -137,10 +135,171 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   entrega_financiada: 'Entrega + financiación',
 }
 
-const AVAILABLE_PAYMENT_METHODS: readonly PaymentMethod[] = ['contado']
+export function isPaymentMethod(value: unknown): value is PaymentMethod {
+  return typeof value === 'string' && (PAYMENT_METHODS as readonly string[]).includes(value)
+}
 
-export function isPaymentMethodAvailable(method: PaymentMethod): boolean {
-  return AVAILABLE_PAYMENT_METHODS.includes(method)
+export function isFinancedMethod(method: PaymentMethod): boolean {
+  return method !== 'contado'
+}
+
+export const PAYMENT_PERIODS = ['mensual', 'bimestral', 'trimestral', 'semestral'] as const
+
+export type PaymentPeriod = (typeof PAYMENT_PERIODS)[number]
+
+export const PAYMENT_PERIOD_LABELS: Record<PaymentPeriod, string> = {
+  mensual: 'Mensual',
+  bimestral: 'Bimestral',
+  trimestral: 'Trimestral',
+  semestral: 'Semestral',
+}
+
+export function isPaymentPeriod(value: unknown): value is PaymentPeriod {
+  return typeof value === 'string' && (PAYMENT_PERIODS as readonly string[]).includes(value)
+}
+
+export const MAX_SALE_INSTALLMENTS = 360
+export const MAX_SALE_INTEREST_RATE = 1000
+// The backend persists the rate as NUMERIC(8,4) and amounts as NUMERIC(14,2)
+// and rejects anything finer, so the form does too.
+const INTEREST_RATE_DECIMALS = 4
+const MONEY_DECIMALS = 2
+
+// The plan as POST .../ventas receives it (the `planPago` body): keys are the
+// JSON contract. tasaInteres is a percentage and montoEntrega is 0 unless the
+// modalidad is entrega_financiada.
+export type PaymentPlanInput = {
+  cantidadCuotas: number
+  tasaInteres: number
+  periodicidad: PaymentPeriod
+  montoEntrega: number
+}
+
+// What the form holds while the user types: strings, so a half-typed number
+// never snaps to something else under their cursor.
+export type PaymentPlanValues = {
+  installments: string
+  interestRate: string
+  period: PaymentPeriod
+  downPayment: string
+}
+
+export const EMPTY_PAYMENT_PLAN: PaymentPlanValues = {
+  installments: '',
+  interestRate: '',
+  period: 'mensual',
+  downPayment: '',
+}
+
+export type PaymentSchedule = {
+  financedAmount: number
+  totalAmount: number
+  installmentAmount: number
+  installments: number[]
+}
+
+// Mirrors domain.RoundMoney on the backend: Math.round(value * 100) / 100
+// over the same IEEE 754 doubles, so both sides round every positive amount
+// the same way.
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+// Formula (simple interest on the financed amount; keep in sync with
+// domain.BuildPaymentSchedule in apps/backend):
+//
+//   financed    = round2(amount - downPayment)
+//   installment = round2(round2(financed * (1 + interestRate / 100)) / installments)
+//   total       = round2(installment * installments)
+//
+// Every cuota is the same amount, so the total is what the cuotas add up to
+// and may differ from the exact interest by a few cents. Due dates are
+// derived by the backend from the sale date.
+export function buildPaymentSchedule(amount: number, plan: PaymentPlanInput): PaymentSchedule {
+  const financedAmount = roundMoney(amount - plan.montoEntrega)
+  const withInterest = roundMoney(financedAmount * (1 + plan.tasaInteres / 100))
+  const installmentAmount = roundMoney(withInterest / plan.cantidadCuotas)
+  const totalAmount = roundMoney(installmentAmount * plan.cantidadCuotas)
+  const installments = Array.from({ length: plan.cantidadCuotas }, () => installmentAmount)
+  return { financedAmount, totalAmount, installmentAmount, installments }
+}
+
+// Accepts "1234.5", "1234,5" and "1.234,50": with a comma present the dots
+// are thousands separators, as people type prices here. More decimals than
+// `maxDecimals` is a typo, not something to round.
+function parseDecimal(value: string, maxDecimals: number): number | null {
+  const trimmed = value.trim()
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed
+  const match = /^\d+(?:\.(\d+))?$/.exec(normalized)
+  if (match === null || (match[1]?.length ?? 0) > maxDecimals) {
+    return null
+  }
+  return Number(normalized)
+}
+
+export type PaymentPlanResult =
+  | { ok: true; plan: PaymentPlanInput | undefined }
+  | { ok: false; error: string }
+
+// Validates the typed plan against the modalidad and the lote price. The
+// messages mirror the backend rules so the confirm button explains what is
+// missing before the request is sent.
+export function parsePaymentPlan(
+  method: PaymentMethod,
+  values: PaymentPlanValues,
+  amount: number,
+): PaymentPlanResult {
+  if (!isFinancedMethod(method)) {
+    return { ok: true, plan: undefined }
+  }
+
+  const installments = Number(values.installments.trim())
+  if (
+    values.installments.trim() === '' ||
+    !Number.isInteger(installments) ||
+    installments < 1 ||
+    installments > MAX_SALE_INSTALLMENTS
+  ) {
+    return {
+      ok: false,
+      error: `Ingresá una cantidad de cuotas entre 1 y ${MAX_SALE_INSTALLMENTS}.`,
+    }
+  }
+
+  const interestRate =
+    values.interestRate.trim() === '' ? 0 : parseDecimal(values.interestRate, INTEREST_RATE_DECIMALS)
+  if (interestRate === null || interestRate < 0 || interestRate > MAX_SALE_INTEREST_RATE) {
+    return {
+      ok: false,
+      error: `Ingresá una tasa de interés entre 0 y ${MAX_SALE_INTEREST_RATE} %, con hasta ${INTEREST_RATE_DECIMALS} decimales.`,
+    }
+  }
+
+  let downPayment = 0
+  if (method === 'entrega_financiada') {
+    const parsed = parseDecimal(values.downPayment, MONEY_DECIMALS)
+    if (parsed === null || parsed <= 0) {
+      return { ok: false, error: 'Ingresá el monto de la entrega, con hasta 2 decimales.' }
+    }
+    if (parsed >= amount) {
+      return { ok: false, error: 'La entrega tiene que ser menor al precio del lote.' }
+    }
+    downPayment = parsed
+  }
+
+  const plan: PaymentPlanInput = {
+    cantidadCuotas: installments,
+    tasaInteres: interestRate,
+    periodicidad: values.period,
+    montoEntrega: downPayment,
+  }
+  const schedule = buildPaymentSchedule(amount, plan)
+  if (schedule.installmentAmount < 0.01) {
+    return { ok: false, error: 'El monto financiado no alcanza para esa cantidad de cuotas.' }
+  }
+  return { ok: true, plan }
 }
 
 export type SaleableLot = { number: string; price: number | null; currency: string }
@@ -170,6 +329,31 @@ export type SaleDraft = {
   client: ClientOption | null
   seller: SellerOption | null
   method: PaymentMethod
+  plan: PaymentPlanValues
+}
+
+// The plan as the receipt prints it: the typed terms plus the derived
+// amounts, all of which the backend also publishes in Sale.planPago.
+export type SaleReceiptPlan = {
+  downPayment: number
+  installments: number
+  interestRate: number
+  period: PaymentPeriod
+  financedAmount: number
+  installmentAmount: number
+  totalAmount: number
+}
+
+function saleReceiptPlan(plan: PaymentPlanInput, schedule: PaymentSchedule): SaleReceiptPlan {
+  return {
+    downPayment: plan.montoEntrega,
+    installments: plan.cantidadCuotas,
+    interestRate: plan.tasaInteres,
+    period: plan.periodicidad,
+    financedAmount: schedule.financedAmount,
+    installmentAmount: schedule.installmentAmount,
+    totalAmount: schedule.totalAmount,
+  }
 }
 
 export type SaleReceipt = {
@@ -180,10 +364,11 @@ export type SaleReceipt = {
   method: PaymentMethod
   amount: number
   currency: string
+  plan?: SaleReceiptPlan
 }
 
 export type SaleReceiptResult =
-  | { ok: true; receipt: SaleReceipt }
+  | { ok: true; receipt: SaleReceipt; plan: PaymentPlanInput | undefined }
   | { ok: false; error: string }
 
 export function buildSaleReceipt(draft: SaleDraft, issuedAt: string): SaleReceiptResult {
@@ -201,27 +386,31 @@ export function buildSaleReceipt(draft: SaleDraft, issuedAt: string): SaleReceip
     return { ok: false, error: 'Elegí el vendedor que realizó la venta.' }
   }
 
-  if (!isPaymentMethodAvailable(method)) {
-    return { ok: false, error: 'Por ahora solo se puede registrar una venta al contado.' }
-  }
-
   const disabledReason = saleDisabledReason(lot)
   if (disabledReason !== null) {
     return { ok: false, error: disabledReason }
   }
+  const price = lot.price ?? 0
 
-  return {
-    ok: true,
-    receipt: {
-      issuedAt,
-      lot,
-      client,
-      seller,
-      method,
-      amount: lot.price ?? 0,
-      currency: lot.currency,
-    },
+  const parsed = parsePaymentPlan(method, draft.plan, price)
+  if (!parsed.ok) {
+    return parsed
   }
+
+  const receipt: SaleReceipt = {
+    issuedAt,
+    lot,
+    client,
+    seller,
+    method,
+    amount: price,
+    currency: lot.currency,
+  }
+  if (parsed.plan !== undefined) {
+    receipt.plan = saleReceiptPlan(parsed.plan, buildPaymentSchedule(price, parsed.plan))
+  }
+
+  return { ok: true, receipt, plan: parsed.plan }
 }
 
 // What the sale started from the loteo viewer needs of a loteo: enough to
@@ -302,6 +491,44 @@ export type SaleActor = {
   rol: string
 }
 
+export const INSTALLMENT_STATES = ['pendiente', 'pagada', 'vencida'] as const
+
+export type InstallmentState = (typeof INSTALLMENT_STATES)[number]
+
+export const INSTALLMENT_STATE_LABELS: Record<InstallmentState, string> = {
+  pendiente: 'Pendiente',
+  pagada: 'Pagada',
+  vencida: 'Vencida',
+}
+
+export function isInstallmentState(value: unknown): value is InstallmentState {
+  return typeof value === 'string' && (INSTALLMENT_STATES as readonly string[]).includes(value)
+}
+
+export type Installment = {
+  id: string
+  numero: number
+  monto: number
+  estado: InstallmentState
+  fechaVencimiento: string
+  fechaPago?: string
+}
+
+// The plan as GET /api/v1/ventas publishes it. The list carries the summary
+// and the detail also the cuotas.
+export type PaymentPlan = {
+  id: string
+  montoEntrega: number
+  cantidadCuotas: number
+  tasaInteres: number
+  periodicidad: PaymentPeriod
+  moneda: string
+  montoFinanciado: number
+  montoCuota: number
+  montoTotal: number
+  cuotas?: Installment[]
+}
+
 export type Sale = {
   id: string
   loteoId: string
@@ -317,6 +544,7 @@ export type Sale = {
   modalidadPago: PaymentMethod
   monto: number
   moneda: string
+  planPago?: PaymentPlan
   estado: SaleState
   fechaCreacion: string
   fechaModificacion: string
@@ -345,6 +573,7 @@ export type CreateSaleValues = {
   clienteId: string
   vendedorId: string
   modalidadPago: PaymentMethod
+  planPago?: PaymentPlanInput
 }
 
 export function saleLotLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 'loteNumero'>): string {
@@ -352,11 +581,11 @@ export function saleLotLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 
   const number = sale.loteNumero || '—'
   return `${sale.loteoNombre} · Mz ${block} · Lote ${number}`
 }
-
 // The receipt of a persisted sale: what the dialog prints once the backend
 // has registered the venta.
 export function saleReceiptFromSale(sale: Sale): SaleReceipt {
   return {
+    plan: sale.planPago === undefined ? undefined : persistedReceiptPlan(sale.planPago),
     issuedAt: sale.fechaCreacion,
     lot: {
       id: sale.loteId,
@@ -382,5 +611,17 @@ export function saleReceiptFromSale(sale: Sale): SaleReceipt {
     method: sale.modalidadPago,
     amount: sale.monto,
     currency: sale.moneda,
+  }
+}
+
+function persistedReceiptPlan(plan: PaymentPlan): SaleReceiptPlan {
+  return {
+    downPayment: plan.montoEntrega,
+    installments: plan.cantidadCuotas,
+    interestRate: plan.tasaInteres,
+    period: plan.periodicidad,
+    financedAmount: plan.montoFinanciado,
+    installmentAmount: plan.montoCuota,
+    totalAmount: plan.montoTotal,
   }
 }
