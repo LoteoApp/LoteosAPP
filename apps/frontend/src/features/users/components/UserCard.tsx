@@ -69,7 +69,7 @@ export default function UserCard({
                 >
                   {resendStatus === 'success' && <CircleCheck aria-hidden />}
                   {resendStatus === 'error' && <CircleX aria-hidden />}
-                  Reenviar credenciales
+                  Reenviar invitación
                 </Button>
               )}
               {isConfirmingBaja ? (

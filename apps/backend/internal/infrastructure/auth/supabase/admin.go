@@ -3,12 +3,11 @@ package supabase
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,45 +18,77 @@ import (
 // REST API, authenticating with the project's service_role key. It
 // implements gateway.IdentityProvider.
 type AdminClient struct {
-	httpClient     *http.Client
-	baseURL        string
-	serviceRoleKey string
+	httpClient        *http.Client
+	baseURL           string
+	serviceRoleKey    string
+	inviteRedirectURL string
 }
 
-func NewAdminClient(baseURL, serviceRoleKey string) *AdminClient {
+// NewAdminClient builds an AdminClient. inviteRedirectURL is the frontend
+// page that consumes an invite link (its token_hash and type query params);
+// it's appended by this client, not by Supabase, so Supabase's own
+// "Redirect URLs" allow list never needs to know about it.
+func NewAdminClient(baseURL, serviceRoleKey, inviteRedirectURL string) *AdminClient {
 	return &AdminClient{
-		httpClient:     &http.Client{Timeout: 10 * time.Second},
-		baseURL:        strings.TrimSuffix(baseURL, "/"),
-		serviceRoleKey: serviceRoleKey,
+		httpClient:        &http.Client{Timeout: 10 * time.Second},
+		baseURL:           strings.TrimSuffix(baseURL, "/"),
+		serviceRoleKey:    serviceRoleKey,
+		inviteRedirectURL: inviteRedirectURL,
 	}
 }
 
-// CreateUser implements gateway.IdentityProvider. It stores rol under
-// app_metadata.role so Verifier can read it back from the access token.
+// CreateUser implements gateway.IdentityProvider. It creates the account
+// without a password (GoTrue leaves it unconfirmed until the invite link
+// below is redeemed) and stores rol under app_metadata.role so Verifier can
+// read it back from the access token. generate_link's request body has no
+// app_metadata field, so that's a second call; if it fails, the just-created
+// account is deleted so no passwordless, roleless account is left behind.
 func (client *AdminClient) CreateUser(ctx context.Context, email, rol string) (string, string, error) {
-	temporaryPassword, err := generateTemporaryPassword()
+	supabaseID, inviteURL, err := client.generateLink(ctx, "invite", email)
 	if err != nil {
-		return "", "", fmt.Errorf("generate temporary password: %w", err)
+		return "", "", err
 	}
 
+	if err := client.putAppMetadata(ctx, supabaseID, rol); err != nil {
+		if deleteErr := client.DeleteUser(ctx, supabaseID); deleteErr != nil {
+			return "", "", fmt.Errorf("set app_metadata: %w (compensating delete also failed: %v)", err, deleteErr)
+		}
+		return "", "", fmt.Errorf("set app_metadata: %w", err)
+	}
+
+	return supabaseID, inviteURL, nil
+}
+
+// GenerateInviteLink implements gateway.IdentityProvider.
+func (client *AdminClient) GenerateInviteLink(ctx context.Context, email string) (string, error) {
+	_, inviteURL, err := client.generateLink(ctx, "invite", email)
+	return inviteURL, err
+}
+
+// generateLink calls POST /admin/generate_link and returns the created (or
+// existing, for a resend) user's id plus an invite URL for
+// client.inviteRedirectURL carrying that link's one-time token_hash. It
+// deliberately doesn't pass redirect_to: the token is extracted here instead
+// of relying on Supabase's own verify-and-redirect endpoint, so opening the
+// mail's link never consumes the token by itself — only the frontend calling
+// verifyOtp does, once the recipient actually submits a new password.
+func (client *AdminClient) generateLink(ctx context.Context, linkType, email string) (string, string, error) {
 	body, err := json.Marshal(map[string]any{
-		"email":         email,
-		"password":      temporaryPassword,
-		"email_confirm": true,
-		"app_metadata":  map[string]string{"role": rol},
+		"type":  linkType,
+		"email": email,
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("encode user payload: %w", err)
+		return "", "", fmt.Errorf("encode generate_link payload: %w", err)
 	}
 
-	request, err := client.newRequest(ctx, http.MethodPost, client.adminURL("/users"), body)
+	request, err := client.newRequest(ctx, http.MethodPost, client.adminURL("/generate_link"), body)
 	if err != nil {
 		return "", "", err
 	}
 
 	response, err := client.httpClient.Do(request)
 	if err != nil {
-		return "", "", fmt.Errorf("create supabase user: %w", err)
+		return "", "", fmt.Errorf("generate link: %w", err)
 	}
 	defer response.Body.Close()
 
@@ -66,16 +97,63 @@ func (client *AdminClient) CreateUser(ctx context.Context, email, rol string) (s
 	}
 
 	var created struct {
-		ID string `json:"id"`
+		ID          string `json:"id"`
+		HashedToken string `json:"hashed_token"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&created); err != nil {
-		return "", "", fmt.Errorf("decode created user: %w", err)
+		return "", "", fmt.Errorf("decode generate_link response: %w", err)
 	}
-	if created.ID == "" {
-		return "", "", fmt.Errorf("create supabase user: missing id in response")
+	if created.ID == "" || created.HashedToken == "" {
+		return "", "", fmt.Errorf("generate link: missing id or hashed_token in response")
 	}
 
-	return created.ID, temporaryPassword, nil
+	inviteURL, err := client.buildInviteURL(linkType, created.HashedToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	return created.ID, inviteURL, nil
+}
+
+func (client *AdminClient) buildInviteURL(linkType, tokenHash string) (string, error) {
+	parsed, err := url.Parse(client.inviteRedirectURL)
+	if err != nil {
+		return "", fmt.Errorf("parse invite redirect URL: %w", err)
+	}
+	query := parsed.Query()
+	query.Set("token_hash", tokenHash)
+	query.Set("type", linkType)
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+// putAppMetadata sets app_metadata.role on an existing account.
+// app_metadata (unlike user_metadata) can't be edited by the account's own
+// owner, which is why the domain role lives there and not in the data field
+// generate_link accepts.
+func (client *AdminClient) putAppMetadata(ctx context.Context, supabaseID, rol string) error {
+	body, err := json.Marshal(map[string]any{
+		"app_metadata": map[string]string{"role": rol},
+	})
+	if err != nil {
+		return fmt.Errorf("encode app_metadata payload: %w", err)
+	}
+
+	request, err := client.newRequest(ctx, http.MethodPut, client.adminURL("/users/"+supabaseID), body)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return unexpectedStatus(response)
+	}
+	return nil
 }
 
 // DeleteUser implements gateway.IdentityProvider.
@@ -98,36 +176,6 @@ func (client *AdminClient) DeleteUser(ctx context.Context, supabaseID string) er
 	}
 
 	return nil
-}
-
-// ResetTemporaryPassword implements gateway.IdentityProvider.
-func (client *AdminClient) ResetTemporaryPassword(ctx context.Context, supabaseID string) (string, error) {
-	temporaryPassword, err := generateTemporaryPassword()
-	if err != nil {
-		return "", fmt.Errorf("generate temporary password: %w", err)
-	}
-
-	body, err := json.Marshal(map[string]any{"password": temporaryPassword})
-	if err != nil {
-		return "", fmt.Errorf("encode password payload: %w", err)
-	}
-
-	request, err := client.newRequest(ctx, http.MethodPut, client.adminURL("/users/"+supabaseID), body)
-	if err != nil {
-		return "", err
-	}
-
-	response, err := client.httpClient.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("reset supabase user password: %w", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("reset supabase user password: %w", unexpectedStatus(response))
-	}
-
-	return temporaryPassword, nil
 }
 
 func (client *AdminClient) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {
@@ -159,10 +207,11 @@ func unexpectedStatus(response *http.Response) error {
 	return fmt.Errorf("unexpected status %d", response.StatusCode)
 }
 
-// createUserError maps a non-200 response from POST /admin/users to an
-// error. GoTrue identifies a duplicate email through the error_code field
-// (observed as "email_exists" with HTTP 422), not through the status code
-// alone: other failures, like a weak password, also return 422.
+// createUserError maps a non-200 response from POST /admin/generate_link to
+// an error. GoTrue identifies a duplicate, already-confirmed email through
+// the error_code field (observed as "email_exists" with HTTP 422 on
+// POST /admin/users; generate_link is assumed to share the same code) rather
+// than through the status code alone.
 func createUserError(response *http.Response) error {
 	var apiError struct {
 		ErrorCode string `json:"error_code"`
@@ -174,14 +223,6 @@ func createUserError(response *http.Response) error {
 		return domain.ErrEmailEnUso
 	}
 
-	return fmt.Errorf("create supabase user: unexpected status %d, error_code %q: %s",
+	return fmt.Errorf("generate link: unexpected status %d, error_code %q: %s",
 		response.StatusCode, apiError.ErrorCode, apiError.Message)
-}
-
-func generateTemporaryPassword() (string, error) {
-	raw := make([]byte, 18)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(raw), nil
 }

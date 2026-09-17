@@ -45,7 +45,6 @@ export async function listUsers(token: string, signal?: AbortSignal): Promise<Us
 
 export type CreatedUsuario = {
   usuario: Usuario
-  temporaryPassword: string
   invitacionEnviada: boolean
 }
 
@@ -55,18 +54,12 @@ export async function createUser(token: string, values: UsuarioFormValues): Prom
   if (!isUsuarioResponse(body)) {
     throw new Error(GENERIC_ERROR)
   }
-  const { temporaryPassword, invitacionEnviada } = body as {
-    temporaryPassword?: unknown
-    invitacionEnviada?: unknown
-  }
-  if (typeof temporaryPassword !== 'string' || temporaryPassword === '') {
-    throw new Error(GENERIC_ERROR)
-  }
+  const { invitacionEnviada } = body as { invitacionEnviada?: unknown }
   if (typeof invitacionEnviada !== 'boolean') {
     throw new Error(GENERIC_ERROR)
   }
 
-  return { usuario: body, temporaryPassword, invitacionEnviada }
+  return { usuario: body, invitacionEnviada }
 }
 
 export async function updateUser(

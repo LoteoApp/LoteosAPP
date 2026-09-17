@@ -9,11 +9,10 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
-// ResendInviteEmail mints a fresh temporary password and sends the invite
-// email again, for when CreateUser's own best-effort send failed. The
-// original temporary password is never persisted (it only ever lives in
-// memory during one request), so a resend can't reuse it — it has to reset
-// the account's password before mailing a new one.
+// ResendInviteEmail mints a fresh invite link and sends the invite email
+// again, for when CreateUser's own best-effort send failed. The original
+// link is never persisted (it only ever lives in memory during one
+// request), so a resend can't reuse it — it has to mint a new one.
 type ResendInviteEmail interface {
 	Execute(ctx context.Context, actorRoles []string, id string) error
 }
@@ -36,14 +35,13 @@ type resendInviteEmailUseCase struct {
 	repository gateway.UserRepository
 	identity   gateway.IdentityProvider
 	mailer     gateway.Mailer
-	loginURL   string
 	clock      Clock
 
 	mu       sync.Mutex
 	lastSent map[string]time.Time
 }
 
-func NewResendInviteEmail(repository gateway.UserRepository, identity gateway.IdentityProvider, mailer gateway.Mailer, loginURL string, clocks ...Clock) ResendInviteEmail {
+func NewResendInviteEmail(repository gateway.UserRepository, identity gateway.IdentityProvider, mailer gateway.Mailer, clocks ...Clock) ResendInviteEmail {
 	clock := Clock(SystemClock{})
 	if len(clocks) > 0 && clocks[0] != nil {
 		clock = clocks[0]
@@ -52,7 +50,6 @@ func NewResendInviteEmail(repository gateway.UserRepository, identity gateway.Id
 		repository: repository,
 		identity:   identity,
 		mailer:     mailer,
-		loginURL:   loginURL,
 		clock:      clock,
 		lastSent:   make(map[string]time.Time),
 	}
@@ -77,18 +74,17 @@ func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles
 		return domain.ErrInviteEmailRateLimited
 	}
 
-	temporaryPassword, err := useCase.identity.ResetTemporaryPassword(ctx, target.AuthProviderID)
+	inviteURL, err := useCase.identity.GenerateInviteLink(ctx, target.Email)
 	if err != nil {
 		return fromRepository(err)
 	}
 
 	if err := useCase.mailer.SendUserInvite(ctx, gateway.UserInviteEmail{
-		To:                target.Email,
-		Nombre:            target.Nombre,
-		Apellido:          target.Apellido,
-		Rol:               target.Rol,
-		TemporaryPassword: temporaryPassword,
-		LoginURL:          useCase.loginURL,
+		To:        target.Email,
+		Nombre:    target.Nombre,
+		Apellido:  target.Apellido,
+		Rol:       target.Rol,
+		InviteURL: inviteURL,
 	}); err != nil {
 		return domain.ErrInviteEmailUnavailable.WithCause(err)
 	}

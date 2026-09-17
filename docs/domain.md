@@ -142,16 +142,15 @@ agrimensor es un usuario con `rol = 'agrimensor'` como cualquier otro, sin
 necesidad de un módulo aparte, así que quedó unificado en esta misma
 pantalla.
 
-Al dar de alta un usuario, además de devolver la contraseña temporal en la
-respuesta, se le manda un mail de invitación (nombre, rol, la contraseña
-temporal y el link de login) por si el administrador no llega a comunicársela
-a mano. Si el envío falla no bloquea el alta — el admin ya tiene la
-contraseña igual — y se puede reenviar bajo demanda
-(`POST /api/v1/usuarios/{id}/reenviar-invitacion`); el reenvío pide una
-contraseña temporal nueva (la original nunca se guarda en ningún lado, solo
-vive en memoria durante un intento de envío). El reenvío tiene un cooldown de
-60 segundos por usuario, guardado en memoria (no en la base): protege la
-cuota del proveedor de mail ante un doble click, un reintento de red o varias
+Al dar de alta un usuario no se le asigna ninguna contraseña: se le manda un
+mail de invitación (nombre, rol y un link de un solo uso) para que elija la
+suya al aceptarla. Si el envío falla no bloquea el alta — no hay contraseña
+que comunicar por otra vía, así que la única recuperación es reintentar el
+envío bajo demanda (`POST /api/v1/usuarios/{id}/reenviar-invitacion`), que
+genera un link nuevo (el original nunca se guarda en ningún lado, solo vive
+en memoria durante un intento de envío). El reenvío tiene un cooldown de 60
+segundos por usuario, guardado en memoria (no en la base): protege la cuota
+del proveedor de mail ante un doble click, un reintento de red o varias
 pestañas de admin abiertas a la vez. Un intento rechazado por el cooldown no
 cuenta como un intento real — no reinicia la ventana ni consume el envío.
 

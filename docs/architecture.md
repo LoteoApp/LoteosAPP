@@ -351,23 +351,44 @@ el pool.
 
 ### Invitación de usuarios por mail
 
-`usecase/users.CreateUser`, después de crear el usuario, intenta mandarle el
-mail de invitación (nombre, rol, la contraseña temporal que ya tiene en
-memoria y el link de login) por mejor esfuerzo: si `gateway.Mailer` falla,
-se loguea y `Execute` devuelve `inviteEmailSent = false` junto con el usuario
-y la contraseña ya creados — nunca falla el alta por esto. El admin ya tiene
-la contraseña en la respuesta (`dto.CreateUserResponse.TemporaryPassword`),
-así que el mail es un canal adicional, no la única vía de acceso; no hay
-tabla ni worker de reintento automático.
+Ningún usuario nuevo tiene contraseña hasta que la elige: `usecase/users.
+CreateUser` crea la cuenta en Supabase sin password vía
+`POST /auth/v1/admin/generate_link` (`type: invite`), que la deja sin
+confirmar y devuelve un token de un solo uso. `gateway.IdentityProvider.
+CreateUser` arma con ese token un link propio (`token_hash` + `type` como
+query params de `/aceptar-invitacion` en el frontend, nunca el `action_link`
+de Supabase — ver más abajo) y hace un segundo llamado
+(`PUT /auth/v1/admin/users/{id}`) para setear `app_metadata.role`, porque
+`generate_link` no acepta `app_metadata`; si ese segundo llamado falla, borra
+la cuenta recién creada para no dejar una sin rol.
+
+`CreateUser.Execute` manda ese link por mejor esfuerzo (nombre, rol y el
+link) vía `gateway.Mailer`: si falla, se loguea y `Execute` devuelve
+`inviteEmailSent = false` junto con el usuario ya creado — nunca falla el
+alta por esto. Como no hay contraseña que entregar por otro canal, la única
+recuperación es reintentar el envío.
 
 `usecase/users.ResendInviteEmail` (`POST /api/v1/usuarios/{id}/reenviar-invitacion`,
-solo administrador) cubre el caso en que el mail no salió: pide una
-contraseña temporal nueva vía `gateway.IdentityProvider.ResetTemporaryPassword`
-(la original nunca se persiste, solo vive en memoria durante un intento) y
-vuelve a mandar el mail. A diferencia de `CreateUser`, acá un fallo de envío
-sí se devuelve como error (`domain.ErrInviteEmailUnavailable`): es una acción
-explícita del admin, no un efecto colateral de otra operación, así que
-conviene que sepa si no funcionó.
+solo administrador) cubre el caso en que el mail no salió: pide un link
+nuevo vía `gateway.IdentityProvider.GenerateInviteLink` (el original nunca se
+persiste, solo vive en memoria durante un intento) y vuelve a mandar el
+mail. A diferencia de `CreateUser`, acá un fallo de envío sí se devuelve como
+error (`domain.ErrInviteEmailUnavailable`): es una acción explícita del
+admin, no un efecto colateral de otra operación, así que conviene que sepa
+si no funcionó.
+
+**Por qué el link no es el `action_link` de Supabase**: ese link apunta
+primero a `/auth/v1/verify` de Supabase, que consume el token apenas se
+abre — antes de que la persona elija una contraseña — y deja una sesión
+activa en ese navegador aunque abandone el formulario. En cambio,
+`/aceptar-invitacion` (`features/auth/pages/AcceptInvitePage.tsx`) recibe el
+`token_hash` crudo y recién llama `supabase.auth.verifyOtp` al enviar el
+formulario, junto con `updateUser({ password })`; así abrir el mail (incluido
+un escaneo automático de un cliente de correo corporativo) no quema el link,
+y reabrirlo después de completar el formulario sí falla, porque el token es
+de un solo uso. No hace falta configurar nada en el dashboard de Supabase
+(ni SMTP propio ni la lista de Redirect URLs): el mail lo sigue mandando
+`internal/infrastructure/email/resend` como siempre.
 
 ### ABM de inmobiliarias
 
