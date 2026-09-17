@@ -103,9 +103,23 @@ func (useCase *requestPasswordResetUseCase) reserve(email string) bool {
 	defer useCase.mu.Unlock()
 
 	now := useCase.clock.Now()
+	useCase.sweepLocked(now)
 	if last, ok := useCase.lastSent[email]; ok && now.Sub(last) < passwordResetRequestCooldown {
 		return false
 	}
 	useCase.lastSent[email] = now
 	return true
+}
+
+// sweepLocked drops cooldown entries older than the window, so lastSent
+// stays bounded to recent attempts instead of growing with every distinct
+// email ever tried since the process started — this endpoint is
+// unauthenticated, so that input isn't limited to real accounts. Caller must
+// hold mu.
+func (useCase *requestPasswordResetUseCase) sweepLocked(now time.Time) {
+	for email, last := range useCase.lastSent {
+		if now.Sub(last) >= passwordResetRequestCooldown {
+			delete(useCase.lastSent, email)
+		}
+	}
 }

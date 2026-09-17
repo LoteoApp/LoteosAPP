@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -129,6 +130,39 @@ func TestRequestPasswordResetCooldownAppliesEvenForUnknownEmail(t *testing.T) {
 
 	if err != domain.ErrPasswordResetRateLimited {
 		t.Fatalf("Execute() second call error = %v, want %v — the cooldown must not depend on the email existing", err, domain.ErrPasswordResetRateLimited)
+	}
+}
+
+// TestRequestPasswordResetSweepsExpiredCooldownEntries guards against
+// unbounded growth on an unauthenticated endpoint: without a sweep, an
+// attacker could send a different made-up email on every request and each
+// one would sit in lastSent forever, since this cooldown is checked before
+// the email is even looked up.
+func TestRequestPasswordResetSweepsExpiredCooldownEntries(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado}
+	clock := &mutableClock{now: time.Now()}
+	requestReset := NewRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, clock)
+	useCase := requestReset.(*requestPasswordResetUseCase)
+
+	for i := 0; i < 5; i++ {
+		email := fmt.Sprintf("made-up-%d@example.com", i)
+		if err := requestReset.Execute(context.Background(), email); err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+	}
+	if len(useCase.lastSent) != 5 {
+		t.Fatalf("len(lastSent) = %d, want 5 before the cooldown elapses", len(useCase.lastSent))
+	}
+
+	clock.now = clock.now.Add(passwordResetRequestCooldown)
+	if err := requestReset.Execute(context.Background(), "yet-another@example.com"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(useCase.lastSent) != 1 {
+		t.Errorf("len(lastSent) = %d, want 1 — the sweep should have dropped the 5 stale entries", len(useCase.lastSent))
 	}
 }
 

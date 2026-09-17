@@ -72,3 +72,31 @@ func TestPasswordResetTokensConsumeRejectsUnknownToken(t *testing.T) {
 		t.Error("Consume() ok = true, want false for a token that was never issued")
 	}
 }
+
+// TestPasswordResetTokensIssueSweepsExpiredEntries guards against unbounded
+// growth: unlike the cooldown map, every Issue call adds a brand new key, so
+// nothing but a sweep keeps expired, never-consumed tokens from piling up
+// for the lifetime of the process.
+func TestPasswordResetTokensIssueSweepsExpiredEntries(t *testing.T) {
+	t.Parallel()
+
+	store := NewPasswordResetTokens()
+	now := time.Now()
+
+	for i := 0; i < 5; i++ {
+		if _, err := store.Issue("user-1", now, time.Minute); err != nil {
+			t.Fatalf("Issue() error = %v", err)
+		}
+	}
+	if len(store.tokens) != 5 {
+		t.Fatalf("len(tokens) = %d, want 5 before expiry", len(store.tokens))
+	}
+
+	if _, err := store.Issue("user-1", now.Add(time.Hour), time.Minute); err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	if len(store.tokens) != 1 {
+		t.Errorf("len(tokens) = %d, want 1 — the sweep should have dropped the 5 expired tokens", len(store.tokens))
+	}
+}

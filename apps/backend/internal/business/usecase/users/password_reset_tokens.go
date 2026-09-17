@@ -48,9 +48,21 @@ func (store *PasswordResetTokens) Issue(usuarioID string, now time.Time, ttl tim
 
 	store.mu.Lock()
 	defer store.mu.Unlock()
+	store.sweepLocked(now)
 	store.tokens[token] = passwordResetEntry{usuarioID: usuarioID, expiresAt: now.Add(ttl)}
 
 	return token, nil
+}
+
+// sweepLocked drops every token that has already expired, so the store stays
+// bounded to tokens someone could still redeem instead of growing with every
+// reset ever requested since the process started. Caller must hold mu.
+func (store *PasswordResetTokens) sweepLocked(now time.Time) {
+	for token, entry := range store.tokens {
+		if now.After(entry.expiresAt) {
+			delete(store.tokens, token)
+		}
+	}
 }
 
 // Consume reports the usuarioID a still-valid token was issued for, and
