@@ -88,7 +88,7 @@ func (repository *UserRepository) FindByEmail(ctx context.Context, email string)
 	err := repository.pool.QueryRow(ctx, `
 		SELECT `+usuarioColumns+`
 		FROM usuarios
-		WHERE email = $1
+		WHERE lower(email) = lower($1)
 	`, email).Scan(scanTargets(&usuario)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
