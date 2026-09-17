@@ -142,12 +142,9 @@ func (client *Client) send(ctx context.Context, to, subject, html string) error 
 // every field, so Nombre/Apellido can't inject markup into the message.
 var userInviteTemplate = template.Must(template.New("user_invite").Parse(`
 <p>Hola {{.Nombre}} {{.Apellido}},</p>
-<p>Se creó tu cuenta en LoteosAPP con el rol <strong>{{.Rol}}</strong>.</p>
-<p>
-	Usuario: {{.To}}<br>
-	Contraseña temporal: <strong>{{.TemporaryPassword}}</strong>
-</p>
-<p>Ingresá en <a href="{{.LoginURL}}">{{.LoginURL}}</a> para iniciar sesión y completar tus datos.</p>
+<p>Se creó tu cuenta en LoteosAPP con el rol <strong>{{.Rol}}</strong> ({{.To}}).</p>
+<p><a href="{{.InviteURL}}">Activá tu cuenta</a> para elegir tu contraseña y empezar a usarla.</p>
+<p>Este link es de un solo uso y vence a la hora de haberse generado.</p>
 `))
 
 func renderUserInvite(invite gateway.UserInviteEmail) (string, error) {

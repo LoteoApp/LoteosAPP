@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
-import CreatedCredentialsAlert from '../components/CreatedCredentialsAlert'
+import InviteSentAlert from '../components/InviteSentAlert'
 import UserCard from '../components/UserCard'
 import UserForm from '../components/UserForm'
 import UsersFilters, { type EstadoFilter, type RolFilter } from '../components/UsersFilters'
@@ -58,7 +58,6 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
   const [createdCredentials, setCreatedCredentials] = useState<{
     id: string
     email: string
-    temporaryPassword: string
     invitacionEnviada: boolean
   } | null>(null)
 
@@ -160,9 +159,8 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
       )}
 
       {createdCredentials && formView.mode === 'closed' && (
-        <CreatedCredentialsAlert
+        <InviteSentAlert
           email={createdCredentials.email}
-          temporaryPassword={createdCredentials.temporaryPassword}
           invitacionEnviada={createdCredentials.invitacionEnviada}
           isResending={isResendingInvite}
           onResend={handleResendCreatedInvite}

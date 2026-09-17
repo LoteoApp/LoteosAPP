@@ -102,17 +102,17 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		return nil, err
 	}
 
-	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
+	inviteRedirectURL := cfg.FrontendOrigin + "/aceptar-invitacion"
+	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey, inviteRedirectURL)
 	userRepo := postgres.NewUserRepository(pool)
 	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
-	loginURL := cfg.FrontendOrigin + "/login"
-	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer, loginURL))
+	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
 	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
 	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
 	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
-	resendInviteEmailHandler := handler.NewResendInviteEmailHandler(users.NewResendInviteEmail(userRepo, adminClient, mailer, loginURL))
+	resendInviteEmailHandler := handler.NewResendInviteEmailHandler(users.NewResendInviteEmail(userRepo, adminClient, mailer))
 	resetURL := cfg.FrontendOrigin + "/restablecer-contrasena"
 	passwordResetTokens := users.NewPasswordResetTokens()
 	requestPasswordResetHandler := handler.NewRequestPasswordResetHandler(users.NewRequestPasswordReset(userRepo, mailer, passwordResetTokens, resetURL))

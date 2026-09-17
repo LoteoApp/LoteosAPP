@@ -12,9 +12,8 @@ type CreateUserRequest struct {
 
 type CreateUserResponse struct {
 	domain.Usuario
-	TemporaryPassword string `json:"temporaryPassword"`
 	// InviteEmailSent is false when the best-effort invite email failed to
-	// go out; the temporary password above still works, and
+	// go out; the usuario has no password yet either way, and
 	// POST /api/v1/usuarios/{id}/reenviar-invitacion retries the email.
 	InviteEmailSent bool `json:"invitacionEnviada"`
 }

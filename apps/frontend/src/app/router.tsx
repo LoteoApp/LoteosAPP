@@ -6,6 +6,7 @@ import { RESERVATION_ROLES, ROLE } from '../shared/auth/roles'
 import LoginPage from '../features/auth/pages/LoginPage'
 import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage'
 import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage'
+import AcceptInvitePage from '../features/auth/pages/AcceptInvitePage'
 import LotsRoute from './LotsRoute'
 import LoteosRoute from './LoteosRoute'
 import LoteoDetailRoute from './LoteoDetailRoute'
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
   {
     path: '/restablecer-contrasena',
     element: <ResetPasswordPage />,
+  },
+  {
+    path: '/aceptar-invitacion',
+    element: <AcceptInvitePage />,
   },
   {
     element: (

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"loteosapp/backend/internal/business/domain"
@@ -14,63 +15,83 @@ import (
 )
 
 const (
-	testServiceRoleKey = "test-service-role-key"
-	testUserID         = "11111111-1111-1111-1111-111111111111"
+	testServiceRoleKey    = "test-service-role-key"
+	testUserID            = "11111111-1111-1111-1111-111111111111"
+	testHashedToken       = "hashed-token-abc123"
+	testInviteRedirectURL = "https://app.loteosapp.com/aceptar-invitacion"
 )
 
 type fakeAdminServer struct {
 	mux *http.ServeMux
 
-	createUserStatus int
-	createUserBody   string
-	deleteStatus     int
-	deleteCalls      int
-	sawAuthHeaders   bool
+	generateLinkStatus int
+	generateLinkBody   string
+	generateLinkCalls  int
+	lastGenerateLink   struct {
+		Type  string `json:"type"`
+		Email string `json:"email"`
+	}
 
-	resetPasswordStatus int
-	resetPasswordCalls  int
-	resetPasswordBody   string
+	putStatus   int
+	putBody     string
+	putCalls    int
+	lastPutBody map[string]any
+
+	deleteStatus int
+	deleteCalls  int
+
+	sawAuthHeaders bool
 }
 
 func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 	t.Helper()
 
 	fake := &fakeAdminServer{
-		mux:                 http.NewServeMux(),
-		createUserStatus:    http.StatusOK,
-		deleteStatus:        http.StatusNoContent,
-		resetPasswordStatus: http.StatusOK,
+		mux:                http.NewServeMux(),
+		generateLinkStatus: http.StatusOK,
+		putStatus:          http.StatusOK,
+		deleteStatus:       http.StatusNoContent,
 	}
 
-	fake.mux.HandleFunc("POST /auth/v1/admin/users", func(w http.ResponseWriter, r *http.Request) {
+	fake.mux.HandleFunc("POST /auth/v1/admin/generate_link", func(w http.ResponseWriter, r *http.Request) {
 		fake.requireAuthHeaders(t, r)
+		fake.generateLinkCalls++
 
-		if fake.createUserStatus != http.StatusOK {
+		if err := json.NewDecoder(r.Body).Decode(&fake.lastGenerateLink); err != nil {
+			t.Fatalf("decode generate_link payload: %v", err)
+		}
+
+		if fake.generateLinkStatus != http.StatusOK {
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(fake.createUserStatus)
-			if fake.createUserBody != "" {
-				_, _ = w.Write([]byte(fake.createUserBody))
+			w.WriteHeader(fake.generateLinkStatus)
+			if fake.generateLinkBody != "" {
+				_, _ = w.Write([]byte(fake.generateLinkBody))
 			}
 			return
 		}
 
-		var payload struct {
-			Email       string            `json:"email"`
-			AppMetadata map[string]string `json:"app_metadata"`
+		w.Header().Set("Content-Type", "application/json")
+		if fake.generateLinkBody != "" {
+			_, _ = w.Write([]byte(fake.generateLinkBody))
+			return
 		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode create user payload: %v", err)
-		}
-		if payload.Email == "" {
-			t.Error("create user payload missing email")
-		}
-		if payload.AppMetadata["role"] == "" {
-			t.Error("create user payload missing app_metadata.role")
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID, "hashed_token": testHashedToken})
+	})
+
+	fake.mux.HandleFunc("PUT /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
+		fake.requireAuthHeaders(t, r)
+		fake.putCalls++
+
+		if err := json.NewDecoder(r.Body).Decode(&fake.lastPutBody); err != nil {
+			t.Fatalf("decode put payload: %v", err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if fake.createUserBody != "" {
-			_, _ = w.Write([]byte(fake.createUserBody))
+		w.WriteHeader(fake.putStatus)
+		if fake.putStatus != http.StatusOK {
+			if fake.putBody != "" {
+				_, _ = w.Write([]byte(fake.putBody))
+			}
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
@@ -80,32 +101,6 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 		fake.requireAuthHeaders(t, r)
 		fake.deleteCalls++
 		w.WriteHeader(fake.deleteStatus)
-	})
-
-	fake.mux.HandleFunc("PUT /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
-		fake.requireAuthHeaders(t, r)
-		fake.resetPasswordCalls++
-
-		if fake.resetPasswordStatus != http.StatusOK {
-			w.WriteHeader(fake.resetPasswordStatus)
-			if fake.resetPasswordBody != "" {
-				_, _ = w.Write([]byte(fake.resetPasswordBody))
-			}
-			return
-		}
-
-		var payload struct {
-			Password string `json:"password"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode reset password payload: %v", err)
-		}
-		if payload.Password == "" {
-			t.Error("reset password payload missing password")
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
 	})
 
 	return fake
@@ -122,24 +117,50 @@ func (fake *fakeAdminServer) requireAuthHeaders(t *testing.T, r *http.Request) {
 	fake.sawAuthHeaders = true
 }
 
+func newClient(fake *fakeAdminServer, t *testing.T) (*supabase.AdminClient, string) {
+	t.Helper()
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+	return supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL), server.URL
+}
+
 func TestAdminClientCreateUserHappyPath(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
+	client, _ := newClient(fake, t)
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
-
-	supabaseID, temporaryPassword, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
+	supabaseID, inviteURL, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 	if supabaseID != testUserID {
 		t.Errorf("CreateUser() id = %q, want %q", supabaseID, testUserID)
 	}
-	if len(temporaryPassword) < 16 {
-		t.Errorf("CreateUser() temporary password too short: %q", temporaryPassword)
+	if fake.lastGenerateLink.Type != "invite" || fake.lastGenerateLink.Email != "ana@example.com" {
+		t.Errorf("generate_link payload = %+v", fake.lastGenerateLink)
+	}
+
+	parsed, err := url.Parse(inviteURL)
+	if err != nil {
+		t.Fatalf("CreateUser() invite URL is not a valid URL: %v", err)
+	}
+	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != testInviteRedirectURL {
+		t.Errorf("CreateUser() invite URL base = %q, want %q", got, testInviteRedirectURL)
+	}
+	if parsed.Query().Get("token_hash") != testHashedToken {
+		t.Errorf("CreateUser() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
+	}
+	if parsed.Query().Get("type") != "invite" {
+		t.Errorf("CreateUser() invite URL type = %q, want %q", parsed.Query().Get("type"), "invite")
+	}
+
+	if fake.putCalls != 1 {
+		t.Fatalf("CreateUser() PUT calls = %d, want 1", fake.putCalls)
+	}
+	appMetadata, _ := fake.lastPutBody["app_metadata"].(map[string]any)
+	if appMetadata["role"] != domain.RolAdministrativo {
+		t.Errorf("CreateUser() app_metadata = %+v, want role %q", fake.lastPutBody["app_metadata"], domain.RolAdministrativo)
 	}
 	if !fake.sawAuthHeaders {
 		t.Error("CreateUser() never sent apikey/Authorization headers")
@@ -154,56 +175,28 @@ func TestAdminClientCreateUserDuplicateEmail(t *testing.T) {
 			t.Parallel()
 
 			fake := newFakeAdminServer(t)
-			fake.createUserStatus = http.StatusUnprocessableEntity
-			fake.createUserBody = fmt.Sprintf(`{"code":422,"error_code":%q,"msg":"A user with this email address has already been registered"}`, errorCode)
-			server := httptest.NewServer(fake.mux)
-			t.Cleanup(server.Close)
-
-			client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+			fake.generateLinkStatus = http.StatusUnprocessableEntity
+			fake.generateLinkBody = fmt.Sprintf(`{"code":422,"error_code":%q,"msg":"A user with this email address has already been registered"}`, errorCode)
+			client, _ := newClient(fake, t)
 
 			_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 
 			if !errors.Is(err, domain.ErrEmailEnUso) {
 				t.Fatalf("CreateUser() error = %v, want %v", err, domain.ErrEmailEnUso)
 			}
+			if fake.putCalls != 0 {
+				t.Error("CreateUser() should not set app_metadata when generate_link failed")
+			}
 		})
 	}
 }
 
-// TestAdminClientCreateUserWeakPasswordIsNotDuplicateEmail guards against
-// mapping every 422 to ErrEmailEnUso: GoTrue also returns 422 for a weak
-// password, which must surface as a distinct, generic error instead of
-// telling the caller the email is already registered.
-func TestAdminClientCreateUserWeakPasswordIsNotDuplicateEmail(t *testing.T) {
+func TestAdminClientCreateUserSurfacesUnexpectedGenerateLinkStatus(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.createUserStatus = http.StatusUnprocessableEntity
-	fake.createUserBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
-
-	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
-
-	if err == nil {
-		t.Fatal("CreateUser() error = nil, want error for a weak password")
-	}
-	if errors.Is(err, domain.ErrEmailEnUso) {
-		t.Fatalf("CreateUser() error = %v, want a generic error, not %v", err, domain.ErrEmailEnUso)
-	}
-}
-
-func TestAdminClientCreateUserSurfacesUnexpectedStatus(t *testing.T) {
-	t.Parallel()
-
-	fake := newFakeAdminServer(t)
-	fake.createUserStatus = http.StatusInternalServerError
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	fake.generateLinkStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
 
 	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 	if err == nil {
@@ -215,11 +208,8 @@ func TestAdminClientCreateUserPropagatesDecodeError(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.createUserBody = "not json"
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	fake.generateLinkBody = "not json"
+	client, _ := newClient(fake, t)
 
 	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 	if err == nil {
@@ -227,19 +217,16 @@ func TestAdminClientCreateUserPropagatesDecodeError(t *testing.T) {
 	}
 }
 
-func TestAdminClientCreateUserRejectsResponseMissingID(t *testing.T) {
+func TestAdminClientCreateUserRejectsResponseMissingHashedToken(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.createUserBody = "{}"
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	fake.generateLinkBody = fmt.Sprintf(`{"id":%q}`, testUserID)
+	client, _ := newClient(fake, t)
 
 	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 	if err == nil {
-		t.Fatal("CreateUser() error = nil, want error when the response is missing an id")
+		t.Fatal("CreateUser() error = nil, want error when the response is missing a hashed_token")
 	}
 }
 
@@ -250,11 +237,30 @@ func TestAdminClientCreateUserPropagatesTransportError(t *testing.T) {
 	server := httptest.NewServer(fake.mux)
 	server.Close()
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
 
 	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
 	if err == nil {
 		t.Fatal("CreateUser() error = nil, want error when the server is unreachable")
+	}
+}
+
+// TestAdminClientCreateUserCompensatesWhenAppMetadataFails guards the
+// two-call CreateUser: if setting the role after generate_link fails, the
+// just-created account must not survive without a role.
+func TestAdminClientCreateUserCompensatesWhenAppMetadataFails(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.putStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
+
+	_, _, err := client.CreateUser(context.Background(), "ana@example.com", domain.RolAdministrativo)
+	if err == nil {
+		t.Fatal("CreateUser() error = nil, want error when setting app_metadata fails")
+	}
+	if fake.deleteCalls != 1 {
+		t.Errorf("CreateUser() deleteCalls = %d, want 1 (compensating delete)", fake.deleteCalls)
 	}
 }
 
@@ -265,7 +271,7 @@ func TestAdminClientDeleteUserPropagatesTransportError(t *testing.T) {
 	server := httptest.NewServer(fake.mux)
 	server.Close()
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
 
 	if err := client.DeleteUser(context.Background(), testUserID); err == nil {
 		t.Error("DeleteUser() error = nil, want error when the server is unreachable")
@@ -281,10 +287,7 @@ func TestAdminClientDeleteUser(t *testing.T) {
 
 			fake := newFakeAdminServer(t)
 			fake.deleteStatus = status
-			server := httptest.NewServer(fake.mux)
-			t.Cleanup(server.Close)
-
-			client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+			client, _ := newClient(fake, t)
 
 			if err := client.DeleteUser(context.Background(), testUserID); err != nil {
 				t.Fatalf("DeleteUser() error = %v", err)
@@ -301,66 +304,62 @@ func TestAdminClientDeleteUserSurfacesUnexpectedStatus(t *testing.T) {
 
 	fake := newFakeAdminServer(t)
 	fake.deleteStatus = http.StatusInternalServerError
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client, _ := newClient(fake, t)
 
 	if err := client.DeleteUser(context.Background(), testUserID); err == nil {
 		t.Error("DeleteUser() error = nil, want error on unexpected status")
 	}
 }
 
-func TestAdminClientResetTemporaryPassword(t *testing.T) {
+func TestAdminClientGenerateInviteLink(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
+	client, _ := newClient(fake, t)
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
-
-	temporaryPassword, err := client.ResetTemporaryPassword(context.Background(), testUserID)
+	inviteURL, err := client.GenerateInviteLink(context.Background(), "ana@example.com")
 	if err != nil {
-		t.Fatalf("ResetTemporaryPassword() error = %v", err)
+		t.Fatalf("GenerateInviteLink() error = %v", err)
 	}
-	if len(temporaryPassword) < 16 {
-		t.Errorf("ResetTemporaryPassword() password too short: %q", temporaryPassword)
+	if fake.lastGenerateLink.Type != "invite" || fake.lastGenerateLink.Email != "ana@example.com" {
+		t.Errorf("generate_link payload = %+v", fake.lastGenerateLink)
 	}
-	if fake.resetPasswordCalls != 1 {
-		t.Errorf("ResetTemporaryPassword() calls = %d, want 1", fake.resetPasswordCalls)
+	if fake.putCalls != 0 {
+		t.Error("GenerateInviteLink() should not touch app_metadata for an existing account")
 	}
-	if !fake.sawAuthHeaders {
-		t.Error("ResetTemporaryPassword() never sent apikey/Authorization headers")
+
+	parsed, err := url.Parse(inviteURL)
+	if err != nil {
+		t.Fatalf("GenerateInviteLink() invite URL is not a valid URL: %v", err)
+	}
+	if parsed.Query().Get("token_hash") != testHashedToken {
+		t.Errorf("GenerateInviteLink() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
 	}
 }
 
-func TestAdminClientResetTemporaryPasswordSurfacesUnexpectedStatus(t *testing.T) {
+func TestAdminClientGenerateInviteLinkSurfacesUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.resetPasswordStatus = http.StatusInternalServerError
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
+	fake.generateLinkStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
-
-	if _, err := client.ResetTemporaryPassword(context.Background(), testUserID); err == nil {
-		t.Error("ResetTemporaryPassword() error = nil, want error on unexpected status")
+	if _, err := client.GenerateInviteLink(context.Background(), "ana@example.com"); err == nil {
+		t.Error("GenerateInviteLink() error = nil, want error on unexpected status")
 	}
 }
 
-func TestAdminClientResetTemporaryPasswordPropagatesTransportError(t *testing.T) {
+func TestAdminClientGenerateInviteLinkPropagatesTransportError(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
 	server := httptest.NewServer(fake.mux)
 	server.Close()
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
 
-	if _, err := client.ResetTemporaryPassword(context.Background(), testUserID); err == nil {
-		t.Error("ResetTemporaryPassword() error = nil, want error when the server is unreachable")
+	if _, err := client.GenerateInviteLink(context.Background(), "ana@example.com"); err == nil {
+		t.Error("GenerateInviteLink() error = nil, want error when the server is unreachable")
 	}
 }
 
@@ -368,16 +367,13 @@ func TestAdminClientSetPassword(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client, _ := newClient(fake, t)
 
 	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err != nil {
 		t.Fatalf("SetPassword() error = %v", err)
 	}
-	if fake.resetPasswordCalls != 1 {
-		t.Errorf("SetPassword() calls = %d, want 1", fake.resetPasswordCalls)
+	if fake.putCalls != 1 {
+		t.Errorf("SetPassword() calls = %d, want 1", fake.putCalls)
 	}
 	if !fake.sawAuthHeaders {
 		t.Error("SetPassword() never sent apikey/Authorization headers")
@@ -388,12 +384,9 @@ func TestAdminClientSetPasswordRejectsWeakPassword(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.resetPasswordStatus = http.StatusUnprocessableEntity
-	fake.resetPasswordBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	fake.putStatus = http.StatusUnprocessableEntity
+	fake.putBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
+	client, _ := newClient(fake, t)
 
 	err := client.SetPassword(context.Background(), testUserID, "123")
 
@@ -406,11 +399,8 @@ func TestAdminClientSetPasswordSurfacesUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeAdminServer(t)
-	fake.resetPasswordStatus = http.StatusInternalServerError
-	server := httptest.NewServer(fake.mux)
-	t.Cleanup(server.Close)
-
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	fake.putStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
 
 	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
 		t.Error("SetPassword() error = nil, want error on unexpected status")
@@ -424,7 +414,7 @@ func TestAdminClientSetPasswordPropagatesTransportError(t *testing.T) {
 	server := httptest.NewServer(fake.mux)
 	server.Close()
 
-	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
 
 	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
 		t.Error("SetPassword() error = nil, want error when the server is unreachable")
