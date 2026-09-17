@@ -54,26 +54,26 @@ guardarlas ahí evita que terminen en el historial de capas de la imagen.
 El backend no exige auth en `GET /health` (agregado en este cambio —
 [route.go](../apps/backend/internal/infrastructure/delivery/webapp/route/route.go)
 — justo porque todas las demás rutas la exigen y Dokploy necesita algo que
-pueda probar sin credenciales). En **Advanced → Swarm Settings → Health
-Check** de la Application:
+pueda probar sin credenciales).
 
-```json
-{
-  "Test": ["CMD", "wget", "-qO-", "http://localhost:8080/health"],
-  "Interval": 30000000000,
-  "Timeout": 10000000000,
-  "StartPeriod": 30000000000,
-  "Retries": 3
-}
+Ninguna imagen `distroless` (ni siquiera `base-debian12`) trae `wget` ni
+`curl` — solo las variantes `:debug` agregan un shell busybox limitado, y no
+las usamos en producción porque pierden buena parte de las garantías de
+`distroless` (superficie de ataque mínima, sin shell). En vez de depender de
+una herramienta externa dentro del contenedor, el propio binario del server
+expone un subcomando `healthcheck`
+([cmd/server/main.go](../apps/backend/cmd/server/main.go)) que hace un
+`GET http://127.0.0.1:$PORT/health` y sale con código `0`/`1` según el
+resultado. El `Dockerfile` ya declara el `HEALTHCHECK` con ese `CMD`:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["/app/server", "healthcheck"]
 ```
 
-La imagen distroless no trae `curl`; `wget` tampoco, en rigor — distroless
-`static` no incluye ningún binario extra. Si Dokploy exige un `CMD` que
-corra dentro del contenedor (no un healthcheck HTTP externo vía Traefik),
-hay que resolverlo de otra forma: o Dokploy soporta un healthcheck a nivel
-Traefik/externo (revisar la versión instalada), o cambiar el runtime stage a
-`gcr.io/distroless/base-debian12:nonroot`, que si trae herramientas básicas.
-Confirmar cuál aplica antes de depender del healthcheck en producción.
+Dokploy respeta el `HEALTHCHECK` de la imagen sin configuración adicional en
+**Advanced → Swarm Settings**; solo hace falta tocar algo ahí si se quiere
+sobrescribir el intervalo/reintentos definidos en el Dockerfile.
 
 ## Frontend (`apps/frontend/Dockerfile`)
 
@@ -202,10 +202,10 @@ Desktop:
   del `nginx.conf` presentes, corriendo como `uid=101(nginx)` (no root).
 
 No se probó el arranque completo del backend contra una base real (necesita
-credenciales de Supabase/R2 de verdad) ni el healthcheck HTTP dentro del
-contenedor — la imagen `distroless:static` no trae `curl` ni `wget`, así que
-antes de confiar en el JSON de Health Check de la sección anterior conviene
-confirmarlo contra la versión de Dokploy instalada, como ya se advierte ahí.
+credenciales de Supabase/R2 de verdad). El subcomando `healthcheck` sí tiene
+cobertura de tests (`cmd/server/main_test.go`), pero conviene verificar una
+vez en Dokploy que el `HEALTHCHECK` del Dockerfile efectivamente marca el
+contenedor como sano antes de depender de él en producción.
 
 Repetir los builds después de cualquier cambio a los Dockerfiles:
 

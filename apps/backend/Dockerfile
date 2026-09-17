@@ -31,4 +31,9 @@ FROM gcr.io/distroless/static-debian12:nonroot AS server
 WORKDIR /app
 COPY --from=builder /out/server ./server
 EXPOSE 8080
+# distroless:static ships no shell and no wget/curl, so the healthcheck runs
+# through the binary's own "healthcheck" subcommand instead of an external
+# tool (see docs/deployment.md).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["/app/server", "healthcheck"]
 ENTRYPOINT ["/app/server"]
