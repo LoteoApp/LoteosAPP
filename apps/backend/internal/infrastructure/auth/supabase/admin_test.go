@@ -363,3 +363,70 @@ func TestAdminClientResetTemporaryPasswordPropagatesTransportError(t *testing.T)
 		t.Error("ResetTemporaryPassword() error = nil, want error when the server is unreachable")
 	}
 }
+
+func TestAdminClientSetPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err != nil {
+		t.Fatalf("SetPassword() error = %v", err)
+	}
+	if fake.resetPasswordCalls != 1 {
+		t.Errorf("SetPassword() calls = %d, want 1", fake.resetPasswordCalls)
+	}
+	if !fake.sawAuthHeaders {
+		t.Error("SetPassword() never sent apikey/Authorization headers")
+	}
+}
+
+func TestAdminClientSetPasswordRejectsWeakPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.resetPasswordStatus = http.StatusUnprocessableEntity
+	fake.resetPasswordBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	err := client.SetPassword(context.Background(), testUserID, "123")
+
+	if !errors.Is(err, domain.ErrPasswordInvalido) {
+		t.Fatalf("SetPassword() error = %v, want %v", err, domain.ErrPasswordInvalido)
+	}
+}
+
+func TestAdminClientSetPasswordSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.resetPasswordStatus = http.StatusInternalServerError
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientSetPasswordPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error when the server is unreachable")
+	}
+}

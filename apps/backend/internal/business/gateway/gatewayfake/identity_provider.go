@@ -17,6 +17,11 @@ type IdentityProvider struct {
 	ResetPasswordErr    error
 	ResetPasswordUserID string
 	ResetPasswordResult string
+
+	SetPasswordCalls    int
+	SetPasswordErr      error
+	SetPasswordUserID   string
+	SetPasswordPassword string
 }
 
 func (fake *IdentityProvider) CreateUser(_ context.Context, email, rol string) (string, string, error) {
@@ -40,4 +45,11 @@ func (fake *IdentityProvider) ResetTemporaryPassword(_ context.Context, authProv
 		return "", fake.ResetPasswordErr
 	}
 	return fake.ResetPasswordResult, nil
+}
+
+func (fake *IdentityProvider) SetPassword(_ context.Context, authProviderID, newPassword string) error {
+	fake.SetPasswordCalls++
+	fake.SetPasswordUserID = authProviderID
+	fake.SetPasswordPassword = newPassword
+	return fake.SetPasswordErr
 }

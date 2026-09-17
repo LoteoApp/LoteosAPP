@@ -26,6 +26,11 @@ type UserRepository struct {
 	FoundByID     domain.Usuario
 	FindByIDInput string
 
+	FindByEmailCalls int
+	FindByEmailErr   error
+	FoundByEmail     domain.Usuario
+	FindByEmailInput string
+
 	ListByRolesCalls    int
 	ListByRolesErr      error
 	ListByRolesResult   []domain.Usuario
@@ -76,6 +81,15 @@ func (fake *UserRepository) FindByID(_ context.Context, id string) (domain.Usuar
 		return domain.Usuario{}, fake.FindByIDErr
 	}
 	return fake.FoundByID, nil
+}
+
+func (fake *UserRepository) FindByEmail(_ context.Context, email string) (domain.Usuario, error) {
+	fake.FindByEmailCalls++
+	fake.FindByEmailInput = email
+	if fake.FindByEmailErr != nil {
+		return domain.Usuario{}, fake.FindByEmailErr
+	}
+	return fake.FoundByEmail, nil
 }
 
 func (fake *UserRepository) UpdateProfile(_ context.Context, authProviderID, nombre, apellido string) (domain.Usuario, error) {

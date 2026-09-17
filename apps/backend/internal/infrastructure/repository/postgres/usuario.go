@@ -82,6 +82,24 @@ func (repository *UserRepository) FindByID(ctx context.Context, id string) (doma
 	return usuario, nil
 }
 
+func (repository *UserRepository) FindByEmail(ctx context.Context, email string) (domain.Usuario, error) {
+	var usuario domain.Usuario
+
+	err := repository.pool.QueryRow(ctx, `
+		SELECT `+usuarioColumns+`
+		FROM usuarios
+		WHERE email = $1
+	`, email).Scan(scanTargets(&usuario)...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
+	}
+	if err != nil {
+		return domain.Usuario{}, err
+	}
+
+	return usuario, nil
+}
+
 func (repository *UserRepository) UpdateProfile(ctx context.Context, authProviderID, nombre, apellido string) (domain.Usuario, error) {
 	var usuario domain.Usuario
 

@@ -19,4 +19,10 @@ type IdentityProvider interface {
 	// temporary password is never persisted, so a retry mints a new one
 	// instead of resending a password that only ever lived in memory.
 	ResetTemporaryPassword(ctx context.Context, authProviderID string) (temporaryPassword string, err error)
+
+	// SetPassword sets newPassword on an existing account, chosen by the
+	// account's own owner (unlike ResetTemporaryPassword, which mints a
+	// random one). Used to confirm a "forgot password" request once its
+	// token has been verified.
+	SetPassword(ctx context.Context, authProviderID, newPassword string) error
 }

@@ -94,6 +94,36 @@ func TestUserRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("find by email", func(t *testing.T) {
+		authProviderID := newUUID(t)
+		email := newEmail(t)
+
+		_, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: authProviderID,
+			Email:          email,
+			Rol:            domain.RolAdministrativo,
+		})
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		found, err := repository.FindByEmail(context.Background(), email)
+		if err != nil {
+			t.Fatalf("FindByEmail() error = %v", err)
+		}
+		if found.AuthProviderID != authProviderID {
+			t.Errorf("FindByEmail() = %#v", found)
+		}
+	})
+
+	t.Run("find by email not found", func(t *testing.T) {
+		_, err := repository.FindByEmail(context.Background(), newEmail(t))
+		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+			t.Fatalf("FindByEmail() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		}
+	})
+
 	t.Run("update profile", func(t *testing.T) {
 		authProviderID := newUUID(t)
 

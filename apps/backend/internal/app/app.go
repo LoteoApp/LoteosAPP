@@ -44,6 +44,8 @@ func New(ctx context.Context) (*App, error) {
 		DeactivateUser:             container.DeactivateUserHandler,
 		ReactivateUser:             container.ReactivateUserHandler,
 		ResendInviteEmail:          container.ResendInviteEmailHandler,
+		RequestPasswordReset:       container.RequestPasswordResetHandler,
+		ResetPassword:              container.ResetPasswordHandler,
 		CreateClient:               container.CreateClientHandler,
 		UpdateClient:               container.UpdateClientHandler,
 		DeleteClient:               container.DeleteClientHandler,

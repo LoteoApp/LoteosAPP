@@ -79,6 +79,16 @@ Endpoints operativos del backend:
   devuelve como error (`invite_email_unavailable`).
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
+- `POST /api/v1/auth/recuperar-contrasena` (sin autenticación): pide un link
+  de recupero de contraseña por mail. Responde 204 siempre, exista o no el
+  email, para no filtrar qué correos están registrados; solo un email mal
+  formado (`invalid_email`) o repetir el pedido antes de 60s
+  (`password_reset_rate_limited`, 429) devuelven error.
+- `POST /api/v1/auth/restablecer-contrasena` (sin autenticación): confirma el
+  cambio de contraseña con el token del mail. El token es de un solo uso y
+  vence en 1 hora (`password_reset_token_invalid` si es inválido, ya se usó o
+  venció); la contraseña nueva exige al menos 8 caracteres
+  (`invalid_password`).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una
   inmobiliaria con razón social, CUIT, teléfono y email.
 - `GET /api/v1/inmobiliarias` (requiere rol `administrador` o
@@ -203,7 +213,10 @@ tokens mal configurada.
 `features/auth/hooks/use-auth.ts`. Como Supabase no tiene pantalla de login
 hosteada, el ingreso es un formulario propio de email y contraseña en `/login`;
 `RequireAuth` manda ahí a quien no tenga sesión y recuerda la ruta pedida para
-volver después del ingreso.
+volver después del ingreso. El recupero de contraseña tampoco pasa por
+Supabase: `/olvide-contrasena` pide el mail (`features/auth/api/auth.ts` →
+`POST /api/v1/auth/recuperar-contrasena`) y `/restablecer-contrasena?token=…`
+confirma la contraseña nueva con el token del mail recibido.
 
 ### Crear un usuario de Supabase para probar el login
 

@@ -14,6 +14,10 @@ type Mailer struct {
 	SendUserInviteErr    error
 	SendUserInviteErrs   []error
 	SendUserInviteInputs []gateway.UserInviteEmail
+
+	SendPasswordResetCalls  int
+	SendPasswordResetErr    error
+	SendPasswordResetInputs []gateway.PasswordResetEmail
 }
 
 func (fake *Mailer) SendUserInvite(_ context.Context, invite gateway.UserInviteEmail) error {
@@ -25,4 +29,10 @@ func (fake *Mailer) SendUserInvite(_ context.Context, invite gateway.UserInviteE
 		return fake.SendUserInviteErrs[index]
 	}
 	return fake.SendUserInviteErr
+}
+
+func (fake *Mailer) SendPasswordReset(_ context.Context, reset gateway.PasswordResetEmail) error {
+	fake.SendPasswordResetCalls++
+	fake.SendPasswordResetInputs = append(fake.SendPasswordResetInputs, reset)
+	return fake.SendPasswordResetErr
 }
