@@ -39,6 +39,22 @@ describe('DxfViewer', () => {
     expect(svg.querySelector('[aria-label="Manzana"]')).toBeNull()
   })
 
+  it('draws lotes above manzanas regardless of the source order', () => {
+    render(
+      <DxfViewer
+        polygons={[polygons[2], polygons[1]]}
+        visibleLayers={new Set(['MANZANA', 'LOTES'])}
+      />,
+    )
+
+    const svg = screen.getByRole('img', { name: 'Plano del loteo' })
+    const drawOrder = [...svg.querySelectorAll('path[aria-label]')].map(
+      (path) => path.getAttribute('aria-label'),
+    )
+
+    expect(drawOrder).toEqual(['Manzana', 'Lotes'])
+  })
+
   it.each([
     ['disponible', 'available'],
     ['reservado', 'reserved'],
