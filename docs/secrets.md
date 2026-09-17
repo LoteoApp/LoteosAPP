@@ -136,10 +136,13 @@ de altas de usuario. Si falta `RESEND_API_KEY`, `environments.LoadServer`
 corta el arranque igual que con las otras credenciales obligatorias.
 
 Sin verificar un dominio propio en Resend, solo se puede mandar a la casilla
-dueña de la cuenta — suficiente para desarrollo. Por eso en el config `dev` de
-Doppler `MAIL_FROM_EMAIL` está en `onboarding@resend.dev` (el remitente de
-prueba que Resend habilita sin verificar nada): con `no-reply@loteosapp.com`
-sin verificar, todo envío devuelve 403 `domain is not verified`.
+dueña de la cuenta — el remitente de prueba `onboarding@resend.dev` devuelve
+403 `You can only send testing emails to your own email address` apenas el
+destinatario es otra persona. Por eso en el config `dev` de Doppler
+`MAIL_FROM_EMAIL` está en `no-reply@mutual-longvie.ar`, un dominio ya
+verificado en la cuenta de Resend del equipo (no el dominio propio de
+LoteosAPP): alcanza para mandar a cualquier destinatario durante el
+desarrollo sin depender de verificar `loteosapp.com` todavía.
 
 ### Pendiente antes de producción
 
@@ -151,5 +154,6 @@ sin verificar, todo envío devuelve 403 `domain is not verified`.
   real, y cargarla como `RESEND_API_KEY` en el config `prd` de Doppler.
 - [ ] Cargar `MAIL_FROM_EMAIL=no-reply@loteosapp.com` (o la dirección que se
   defina) en el config `prd` una vez verificado el dominio — si se despliega
-  sin esto, vuelve a fallar con `domain is not verified` porque
-  `onboarding@resend.dev` es solo para pruebas.
+  sin esto, vuelve a fallar con `domain is not verified`, sea cual sea el
+  remitente de prueba que haya quedado configurado (`mutual-longvie.ar` es
+  un dominio prestado para desarrollo, no el remitente final de producción).
