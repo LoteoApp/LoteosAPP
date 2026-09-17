@@ -49,9 +49,22 @@ func (store *PasswordResetTokens) Issue(usuarioID string, now time.Time, ttl tim
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	store.sweepLocked(now)
+	store.invalidateLocked(usuarioID)
 	store.tokens[token] = passwordResetEntry{usuarioID: usuarioID, expiresAt: now.Add(ttl)}
 
 	return token, nil
+}
+
+// invalidateLocked drops every still-pending token for usuarioID, so at most
+// one reset link is ever redeemable per user: issuing a new one retires
+// whatever was sent before, so an intercepted old link can't be used after
+// the user requests (or completes) a newer reset. Caller must hold mu.
+func (store *PasswordResetTokens) invalidateLocked(usuarioID string) {
+	for token, entry := range store.tokens {
+		if entry.usuarioID == usuarioID {
+			delete(store.tokens, token)
+		}
+	}
 }
 
 // sweepLocked drops every token that has already expired, so the store stays
