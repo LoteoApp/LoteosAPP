@@ -76,7 +76,9 @@ Endpoints operativos del backend:
 - `POST /api/v1/usuarios/{id}/reenviar-invitacion` (requiere rol
   `administrador`): genera una contraseña temporal nueva y vuelve a mandar el
   mail de invitación. A diferencia del alta, acá un fallo de envío sí se
-  devuelve como error (`invite_email_unavailable`).
+  devuelve como error (`invite_email_unavailable`). Tiene un cooldown de 60s
+  por usuario (en memoria, sin tabla): un reenvío dentro de esa ventana
+  devuelve 429 (`invite_email_rate_limited`).
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una

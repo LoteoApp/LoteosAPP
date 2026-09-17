@@ -2,6 +2,8 @@ package users
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/business/gateway"
@@ -16,15 +18,44 @@ type ResendInviteEmail interface {
 	Execute(ctx context.Context, actorRoles []string, id string) error
 }
 
+// resendInviteCooldown is how long a user has to wait before another resend
+// goes through. In-memory only, no migration: the backend runs as a single
+// instance, so there's nothing to coordinate across replicas, and losing the
+// cooldown on a restart is harmless (it just re-opens the window early).
+const resendInviteCooldown = 60 * time.Second
+
+type Clock interface {
+	Now() time.Time
+}
+
+type SystemClock struct{}
+
+func (SystemClock) Now() time.Time { return time.Now() }
+
 type resendInviteEmailUseCase struct {
 	repository gateway.UserRepository
 	identity   gateway.IdentityProvider
 	mailer     gateway.Mailer
 	loginURL   string
+	clock      Clock
+
+	mu       sync.Mutex
+	lastSent map[string]time.Time
 }
 
-func NewResendInviteEmail(repository gateway.UserRepository, identity gateway.IdentityProvider, mailer gateway.Mailer, loginURL string) ResendInviteEmail {
-	return &resendInviteEmailUseCase{repository: repository, identity: identity, mailer: mailer, loginURL: loginURL}
+func NewResendInviteEmail(repository gateway.UserRepository, identity gateway.IdentityProvider, mailer gateway.Mailer, loginURL string, clocks ...Clock) ResendInviteEmail {
+	clock := Clock(SystemClock{})
+	if len(clocks) > 0 && clocks[0] != nil {
+		clock = clocks[0]
+	}
+	return &resendInviteEmailUseCase{
+		repository: repository,
+		identity:   identity,
+		mailer:     mailer,
+		loginURL:   loginURL,
+		clock:      clock,
+		lastSent:   make(map[string]time.Time),
+	}
 }
 
 func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles []string, id string) error {
@@ -41,6 +72,9 @@ func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles
 	}
 	if !target.Activo() {
 		return domain.ErrUsuarioDadoDeBaja
+	}
+	if !useCase.reserve(target.ID) {
+		return domain.ErrInviteEmailRateLimited
 	}
 
 	temporaryPassword, err := useCase.identity.ResetTemporaryPassword(ctx, target.AuthProviderID)
@@ -60,4 +94,19 @@ func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles
 	}
 
 	return nil
+}
+
+// reserve reports whether a resend for usuarioID is allowed right now, and
+// if it is, records the attempt immediately — before the mail actually goes
+// out — so two requests racing each other can't both slip through.
+func (useCase *resendInviteEmailUseCase) reserve(usuarioID string) bool {
+	useCase.mu.Lock()
+	defer useCase.mu.Unlock()
+
+	now := useCase.clock.Now()
+	if last, ok := useCase.lastSent[usuarioID]; ok && now.Sub(last) < resendInviteCooldown {
+		return false
+	}
+	useCase.lastSent[usuarioID] = now
+	return true
 }

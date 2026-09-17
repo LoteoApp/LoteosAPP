@@ -149,7 +149,11 @@ a mano. Si el envío falla no bloquea el alta — el admin ya tiene la
 contraseña igual — y se puede reenviar bajo demanda
 (`POST /api/v1/usuarios/{id}/reenviar-invitacion`); el reenvío pide una
 contraseña temporal nueva (la original nunca se guarda en ningún lado, solo
-vive en memoria durante un intento de envío).
+vive en memoria durante un intento de envío). El reenvío tiene un cooldown de
+60 segundos por usuario, guardado en memoria (no en la base): protege la
+cuota del proveedor de mail ante un doble click, un reintento de red o varias
+pestañas de admin abiertas a la vez. Un intento rechazado por el cooldown no
+cuenta como un intento real — no reinicia la ventana ni consume el envío.
 
 La baja bloquea el acceso de inmediato, no solo la visibilidad en el
 listado: `middleware.RequireActiveAccount` corre en cada request autenticado

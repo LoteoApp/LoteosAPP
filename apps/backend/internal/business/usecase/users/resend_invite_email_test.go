@@ -133,3 +133,104 @@ func TestResendInviteEmailSurfacesSendFailure(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInviteEmailUnavailable)
 	}
 }
+
+type fixedClock struct{ now time.Time }
+
+func (clock fixedClock) Now() time.Time { return clock.now }
+
+type mutableClock struct{ now time.Time }
+
+func (clock *mutableClock) Now() time.Time { return clock.now }
+
+func TestResendInviteEmailRejectsWithinCooldown(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
+	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	mailer := &gatewayfake.Mailer{}
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
+		t.Fatalf("Execute() first call error = %v", err)
+	}
+
+	err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1")
+
+	if !errors.Is(err, domain.ErrInviteEmailRateLimited) {
+		t.Fatalf("Execute() second call error = %v, want %v", err, domain.ErrInviteEmailRateLimited)
+	}
+	if mailer.SendUserInviteCalls != 1 {
+		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 1", mailer.SendUserInviteCalls)
+	}
+	if identity.ResetPasswordCalls != 1 {
+		t.Errorf("Execute() identity.ResetTemporaryPassword calls = %d, want 1", identity.ResetPasswordCalls)
+	}
+}
+
+func TestResendInviteEmailAllowsAfterCooldownElapses(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
+	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	mailer := &gatewayfake.Mailer{}
+	clock := &mutableClock{now: time.Now()}
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, clock)
+
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
+		t.Fatalf("Execute() first call error = %v", err)
+	}
+
+	clock.now = clock.now.Add(resendInviteCooldown)
+
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
+		t.Fatalf("Execute() call after cooldown error = %v", err)
+	}
+	if mailer.SendUserInviteCalls != 2 {
+		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 2", mailer.SendUserInviteCalls)
+	}
+}
+
+func TestResendInviteEmailCooldownIsPerUser(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
+	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	mailer := &gatewayfake.Mailer{}
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
+		t.Fatalf("Execute() first user error = %v", err)
+	}
+
+	repository.FoundByID.ID = "user-2"
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-2"); err != nil {
+		t.Fatalf("Execute() second user error = %v", err)
+	}
+	if mailer.SendUserInviteCalls != 2 {
+		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 2", mailer.SendUserInviteCalls)
+	}
+}
+
+func TestResendInviteEmailDoesNotCountRejectedAttemptsAgainstCooldown(t *testing.T) {
+	t.Parallel()
+
+	baja := time.Now()
+	inactive := activeManagedUserWithContact()
+	inactive.FechaBaja = &baja
+	repository := &gatewayfake.UserRepository{FoundByID: inactive}
+	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	mailer := &gatewayfake.Mailer{}
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); !errors.Is(err, domain.ErrUsuarioDadoDeBaja) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioDadoDeBaja)
+	}
+
+	repository.FoundByID.FechaBaja = nil
+	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
+		t.Fatalf("Execute() after reactivation error = %v", err)
+	}
+	if mailer.SendUserInviteCalls != 1 {
+		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 1", mailer.SendUserInviteCalls)
+	}
+}

@@ -34,6 +34,11 @@ var (
 	// explicitly asking for the mail to go out, so it's surfaced instead of
 	// logged and dropped.
 	ErrInviteEmailUnavailable = &Error{Kind: KindUnavailable, Code: "invite_email_unavailable", Message: "No se pudo enviar el mail de invitación"}
+	// ErrInviteEmailRateLimited: ResendInviteEmail was called again for the
+	// same user before its in-memory cooldown elapsed. Protects the mail
+	// provider's quota from a double click, a network retry, or several
+	// admin tabs open at once.
+	ErrInviteEmailRateLimited = &Error{Kind: KindRateLimited, Code: "invite_email_rate_limited", Message: "Esperá un momento antes de volver a reenviar la invitación"}
 )
 
 type Usuario struct {
