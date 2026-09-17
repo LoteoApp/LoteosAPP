@@ -69,14 +69,14 @@ con cuidado, para retroceder cambios.
 Endpoints operativos del backend:
 
 - `POST /api/v1/usuarios` (requiere rol `administrador`): da de alta un
-  usuario nuevo en Supabase Auth y en Postgres, devuelve una contraseña
-  temporal de un solo uso y le manda un mail de invitación con esos datos y
-  el link de login. Si el envío falla no bloquea el alta (la respuesta indica
+  usuario nuevo en Supabase Auth y en Postgres, sin contraseña, y le manda un
+  mail de invitación con un link de un solo uso para que elija la suya. Si el
+  envío falla no bloquea el alta (la respuesta indica
   `invitacionEnviada: false`); se puede reintentar con el endpoint de abajo.
 - `POST /api/v1/usuarios/{id}/reenviar-invitacion` (requiere rol
-  `administrador`): genera una contraseña temporal nueva y vuelve a mandar el
-  mail de invitación. A diferencia del alta, acá un fallo de envío sí se
-  devuelve como error (`invite_email_unavailable`).
+  `administrador`): genera un link de invitación nuevo y vuelve a mandar el
+  mail. A diferencia del alta, acá un fallo de envío sí se devuelve como
+  error (`invite_email_unavailable`).
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una
@@ -209,8 +209,9 @@ volver después del ingreso.
 
 Dashboard de Supabase → **Authentication > Users** → **Add user > Create new
 user**, con **Auto Confirm User** activado. Ese usuario ya puede ingresar por
-`/login`. El alta desde el backend (`AdminClient.CreateUser`) genera además una
-contraseña temporal y guarda el rol de dominio en `app_metadata.role`.
+`/login` con la contraseña que le hayas puesto ahí. El alta desde el backend
+(`AdminClient.CreateUser`) en cambio no pone contraseña: manda un link de
+invitación y guarda el rol de dominio en `app_metadata.role`.
 
 ## Proyecto de Supabase
 

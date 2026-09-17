@@ -9,7 +9,6 @@ function messageOf(error: unknown): string {
 
 export type CreatedCredentials = {
   id: string
-  temporaryPassword: string
   invitacionEnviada: boolean
 }
 
@@ -78,10 +77,10 @@ export function useUsers(token: string): UseUsers {
     async (values: UsuarioFormValues): Promise<CreatedCredentials | null> => {
       setIsSubmitting(true)
       try {
-        const { usuario, temporaryPassword, invitacionEnviada } = await createUser(token, values)
+        const { usuario, invitacionEnviada } = await createUser(token, values)
         setUsuarios((current) => [...current, usuario])
         setMutationError(null)
-        return { id: usuario.id, temporaryPassword, invitacionEnviada }
+        return { id: usuario.id, invitacionEnviada }
       } catch (createError) {
         setMutationError(messageOf(createError))
         return null

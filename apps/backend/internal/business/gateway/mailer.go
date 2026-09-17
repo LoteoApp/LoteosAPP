@@ -7,14 +7,14 @@ import (
 )
 
 // UserInviteEmail is the invite sent to a user right after their account is
-// created (or, on retry, after a fresh temporary password is minted for
-// them). LoginURL points at the frontend's login page.
+// created (or, on retry, after a fresh invite link is minted for them).
+// InviteURL is a one-time link the recipient opens to choose their own
+// password; no password ever travels in this email.
 type UserInviteEmail struct {
-	To                string
-	Nombre, Apellido  string
-	Rol               domain.Rol
-	TemporaryPassword string
-	LoginURL          string
+	To               string
+	Nombre, Apellido string
+	Rol              domain.Rol
+	InviteURL        string
 }
 
 // Mailer abstracts the outbound email provider so the business layer sends

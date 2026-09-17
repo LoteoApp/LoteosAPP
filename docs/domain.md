@@ -142,14 +142,13 @@ agrimensor es un usuario con `rol = 'agrimensor'` como cualquier otro, sin
 necesidad de un módulo aparte, así que quedó unificado en esta misma
 pantalla.
 
-Al dar de alta un usuario, además de devolver la contraseña temporal en la
-respuesta, se le manda un mail de invitación (nombre, rol, la contraseña
-temporal y el link de login) por si el administrador no llega a comunicársela
-a mano. Si el envío falla no bloquea el alta — el admin ya tiene la
-contraseña igual — y se puede reenviar bajo demanda
-(`POST /api/v1/usuarios/{id}/reenviar-invitacion`); el reenvío pide una
-contraseña temporal nueva (la original nunca se guarda en ningún lado, solo
-vive en memoria durante un intento de envío).
+Al dar de alta un usuario no se le asigna ninguna contraseña: se le manda un
+mail de invitación (nombre, rol y un link de un solo uso) para que elija la
+suya al aceptarla. Si el envío falla no bloquea el alta — no hay contraseña
+que comunicar por otra vía, así que la única recuperación es reintentar el
+envío bajo demanda (`POST /api/v1/usuarios/{id}/reenviar-invitacion`), que
+genera un link nuevo (el original nunca se guarda en ningún lado, solo vive
+en memoria durante un intento de envío).
 
 La baja bloquea el acceso de inmediato, no solo la visibilidad en el
 listado: `middleware.RequireActiveAccount` corre en cada request autenticado

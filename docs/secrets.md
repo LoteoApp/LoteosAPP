@@ -119,8 +119,9 @@ vigilar el uso y el límite de tamaño por archivo del lado de la aplicación.
 ## Resend
 
 El backend manda el mail de invitación al dar de alta un usuario, y al
-reenviarla (nombre, rol, contraseña temporal y link de login) a través de
-[Resend](https://resend.com), con un cliente HTTP propio en
+reenviarla (nombre, rol y un link de invitación de un solo uso, nunca una
+contraseña) a través de [Resend](https://resend.com), con un cliente HTTP
+propio en
 `internal/infrastructure/email/resend` (sin el SDK: la API es un único POST
 JSON).
 

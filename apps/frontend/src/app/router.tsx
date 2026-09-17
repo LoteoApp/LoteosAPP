@@ -4,6 +4,7 @@ import RequireAuth from '../features/auth/components/RequireAuth'
 import RequireRole from '../features/auth/components/RequireRole'
 import { RESERVATION_ROLES, ROLE } from '../shared/auth/roles'
 import LoginPage from '../features/auth/pages/LoginPage'
+import AcceptInvitePage from '../features/auth/pages/AcceptInvitePage'
 import LotsRoute from './LotsRoute'
 import LoteosRoute from './LoteosRoute'
 import LoteoDetailRoute from './LoteoDetailRoute'
@@ -30,6 +31,10 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/aceptar-invitacion',
+    element: <AcceptInvitePage />,
   },
   {
     element: (

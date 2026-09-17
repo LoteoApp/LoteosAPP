@@ -144,7 +144,7 @@ describe('listUsers', () => {
 })
 
 describe('createUser', () => {
-  it('posts the form values and returns the user with its temporary password', async () => {
+  it('posts the form values and returns the created user', async () => {
     const fetchMock = stubFetch(
       jsonResponse(201, {
         id: 'usuario-1',
@@ -155,7 +155,6 @@ describe('createUser', () => {
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
-        temporaryPassword: 'temp-pass-123',
         invitacionEnviada: true,
       })
     )
@@ -168,7 +167,6 @@ describe('createUser', () => {
     })
 
     expect(created.usuario.id).toBe('usuario-1')
-    expect(created.temporaryPassword).toBe('temp-pass-123')
     expect(created.invitacionEnviada).toBe(true)
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
@@ -193,7 +191,6 @@ describe('createUser', () => {
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
-        temporaryPassword: 'temp-pass-123',
         invitacionEnviada: false,
       })
     )
@@ -208,31 +205,6 @@ describe('createUser', () => {
     expect(created.invitacionEnviada).toBe(false)
   })
 
-  it('rejects a created user with no temporary password', async () => {
-    stubFetch(
-      jsonResponse(201, {
-        id: 'usuario-1',
-        email: 'ana@example.com',
-        nombre: 'Ana',
-        apellido: 'Pérez',
-        rol: 'administrativo',
-        perfilCompleto: true,
-        fechaBaja: null,
-        createdAt: '2026-01-01T00:00:00Z',
-        invitacionEnviada: true,
-      })
-    )
-
-    await expect(
-      createUser('token-123', {
-        nombre: 'Ana',
-        apellido: 'Pérez',
-        email: 'ana@example.com',
-        rol: 'administrativo',
-      })
-    ).rejects.toThrow('No se pudo completar la operación, intentá nuevamente.')
-  })
-
   it('rejects a created user with no invitacionEnviada flag', async () => {
     stubFetch(
       jsonResponse(201, {
@@ -244,7 +216,6 @@ describe('createUser', () => {
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
-        temporaryPassword: 'temp-pass-123',
       })
     )
 
