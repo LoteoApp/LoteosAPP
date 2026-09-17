@@ -355,8 +355,9 @@ Ningún usuario nuevo tiene contraseña hasta que la elige: `usecase/users.
 CreateUser` crea la cuenta en Supabase sin password vía
 `POST /auth/v1/admin/generate_link` (`type: invite`), que la deja sin
 confirmar y devuelve un token de un solo uso. `gateway.IdentityProvider.
-CreateUser` arma con ese token un link propio (`token_hash` + `type` como
-query params de `/aceptar-invitacion` en el frontend, nunca el `action_link`
+CreateUser` arma con ese token un link propio (`token_hash` + `type` en el
+fragmento de `/aceptar-invitacion` en el frontend, no como query param —así
+el proxy y los logs de acceso nunca ven el token — y nunca el `action_link`
 de Supabase — ver más abajo) y hace un segundo llamado
 (`PUT /auth/v1/admin/users/{id}`) para setear `app_metadata.role`, porque
 `generate_link` no acepta `app_metadata`; si ese segundo llamado falla, borra

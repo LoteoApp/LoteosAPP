@@ -215,8 +215,10 @@ hosteada, el ingreso es un formulario propio de email y contraseña en `/login`;
 `RequireAuth` manda ahí a quien no tenga sesión y recuerda la ruta pedida para
 volver después del ingreso. El recupero de contraseña tampoco pasa por
 Supabase: `/olvide-contrasena` pide el mail (`features/auth/api/auth.ts` →
-`POST /api/v1/auth/recuperar-contrasena`) y `/restablecer-contrasena?token=…`
-confirma la contraseña nueva con el token del mail recibido.
+`POST /api/v1/auth/recuperar-contrasena`) y `/restablecer-contrasena#token=…`
+confirma la contraseña nueva con el token del mail recibido — el token va en
+el fragmento, no en el query string, para que no quede en logs de proxy ni
+en el historial del navegador.
 
 ### Crear un usuario de Supabase para probar el login
 
