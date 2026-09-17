@@ -17,10 +17,6 @@ type ResendInviteEmail interface {
 	Execute(ctx context.Context, actorRoles []string, id string) error
 }
 
-// resendInviteCooldown is how long a user has to wait before another resend
-// goes through. In-memory only, no migration: the backend runs as a single
-// instance, so there's nothing to coordinate across replicas, and losing the
-// cooldown on a restart is harmless (it just re-opens the window early).
 const resendInviteCooldown = 60 * time.Second
 
 type Clock interface {
@@ -92,9 +88,6 @@ func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles
 	return nil
 }
 
-// reserve reports whether a resend for usuarioID is allowed right now, and
-// if it is, records the attempt immediately — before the mail actually goes
-// out — so two requests racing each other can't both slip through.
 func (useCase *resendInviteEmailUseCase) reserve(usuarioID string) bool {
 	useCase.mu.Lock()
 	defer useCase.mu.Unlock()
