@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,11 @@ import (
 // input, not on whether it matched an account, keeps the cooldown itself
 // from becoming a way to tell registered emails apart from made-up ones.
 const passwordResetRequestCooldown = 60 * time.Second
+
+// maxTrackedResetEmails caps lastSent so a burst of distinct made-up emails
+// within a single cooldown window can't grow it without bound — the sweep
+// alone only reclaims entries once they age out.
+const maxTrackedResetEmails = 10_000
 
 // RequestPasswordReset sends a password reset link to email if it belongs to
 // an active account. It always succeeds from the caller's point of view
@@ -34,6 +40,10 @@ type requestPasswordResetUseCase struct {
 	tokens     *PasswordResetTokens
 	resetURL   string
 	clock      Clock
+	// dispatch runs the lookup-and-send work. Defaults to a real goroutine;
+	// tests overwrite it to run inline so assertions after Execute returns
+	// see its effects deterministically.
+	dispatch func(func())
 
 	mu       sync.Mutex
 	lastSent map[string]time.Time
@@ -56,10 +66,17 @@ func NewRequestPasswordReset(
 		tokens:     tokens,
 		resetURL:   resetURL,
 		clock:      clock,
+		dispatch:   func(work func()) { go work() },
 		lastSent:   make(map[string]time.Time),
 	}
 }
 
+// Execute never waits on the lookup or the send: for an existing, active
+// account those cost a token generation and a call to the mail provider,
+// while a made-up or inactive email returns right after the lookup. Awaiting
+// that work here would make the response measurably slower for a real
+// account than for a fake one, letting a caller enumerate accounts by
+// timing alone even though both eventually reply 204.
 func (useCase *requestPasswordResetUseCase) Execute(ctx context.Context, email string) error {
 	email = strings.TrimSpace(email)
 	if !domain.EmailValido(email) {
@@ -69,33 +86,41 @@ func (useCase *requestPasswordResetUseCase) Execute(ctx context.Context, email s
 		return domain.ErrPasswordResetRateLimited
 	}
 
+	detached := context.WithoutCancel(ctx)
+	useCase.dispatch(func() { useCase.sendResetLink(detached, email) })
+
+	return nil
+}
+
+func (useCase *requestPasswordResetUseCase) sendResetLink(ctx context.Context, email string) {
 	usuario, err := useCase.repository.FindByEmail(ctx, email)
 	if err != nil {
 		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
 			slog.ErrorContext(ctx, "password reset lookup failed", "error", err)
 		}
-		return nil
+		return
 	}
 	if !usuario.Activo() {
-		return nil
+		return
 	}
 
 	token, err := useCase.tokens.Issue(usuario.ID, useCase.clock.Now(), PasswordResetTokenTTL)
 	if err != nil {
 		slog.ErrorContext(ctx, "password reset token generation failed", "error", err)
-		return nil
+		return
 	}
 
+	// The token travels in the URL fragment, not the query string: a
+	// fragment never leaves the browser, so it's absent from proxy/nginx
+	// access logs and from browser history synced elsewhere.
 	if err := useCase.mailer.SendPasswordReset(ctx, gateway.PasswordResetEmail{
 		To:       usuario.Email,
 		Nombre:   usuario.Nombre,
 		Apellido: usuario.Apellido,
-		ResetURL: useCase.resetURL + "?token=" + token,
+		ResetURL: useCase.resetURL + "#token=" + url.QueryEscape(token),
 	}); err != nil {
 		slog.ErrorContext(ctx, "password reset email send failed", "usuario_id", usuario.ID, "error", err)
 	}
-
-	return nil
 }
 
 func (useCase *requestPasswordResetUseCase) reserve(email string) bool {
@@ -107,8 +132,23 @@ func (useCase *requestPasswordResetUseCase) reserve(email string) bool {
 	if last, ok := useCase.lastSent[email]; ok && now.Sub(last) < passwordResetRequestCooldown {
 		return false
 	}
+	if len(useCase.lastSent) >= maxTrackedResetEmails {
+		useCase.evictOneLocked()
+	}
 	useCase.lastSent[email] = now
 	return true
+}
+
+// evictOneLocked drops a single entry so a new one can be tracked once
+// lastSent is at capacity. Go's map iteration order is randomized per run,
+// so this evicts an effectively arbitrary entry rather than the oldest one
+// — acceptable here since the cap only exists to bound memory, not to keep
+// the cooldown precise under sustained abuse. Caller must hold mu.
+func (useCase *requestPasswordResetUseCase) evictOneLocked() {
+	for email := range useCase.lastSent {
+		delete(useCase.lastSent, email)
+		return
+	}
 }
 
 // sweepLocked drops cooldown entries older than the window, so lastSent

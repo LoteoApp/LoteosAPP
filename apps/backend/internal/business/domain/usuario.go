@@ -81,6 +81,13 @@ type UsuarioUpdate struct {
 	UsuarioModificacion string
 }
 
+// maxEmailLength follows RFC 5321's 254-character limit on the reverse-path,
+// which in practice bounds a full email address. Enforcing it here also
+// keeps an unauthenticated caller (password reset) from making the JSON
+// decoder and every downstream string operation work on an arbitrarily
+// large value.
+const maxEmailLength = 254
+
 func EmailValido(email string) bool {
-	return email != "" && strings.Contains(email, "@")
+	return email != "" && len(email) <= maxEmailLength && strings.Contains(email, "@")
 }

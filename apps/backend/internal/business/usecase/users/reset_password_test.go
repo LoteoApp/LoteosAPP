@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,40 @@ func TestResetPasswordRejectsShortPassword(t *testing.T) {
 	}
 	if identity.SetPasswordCalls != 0 {
 		t.Error("Execute() should not touch the token or the identity provider for an invalid password")
+	}
+}
+
+func TestResetPasswordRejectsOverlongPassword(t *testing.T) {
+	t.Parallel()
+
+	identity := &gatewayfake.IdentityProvider{}
+	resetPassword := NewResetPassword(&gatewayfake.UserRepository{}, identity, NewPasswordResetTokens())
+
+	overlong := strings.Repeat("a", maxPasswordLength+1)
+	err := resetPassword.Execute(context.Background(), "any-token", overlong)
+
+	if !errors.Is(err, domain.ErrPasswordInvalido) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrPasswordInvalido)
+	}
+	if identity.SetPasswordCalls != 0 {
+		t.Error("Execute() should not touch the token or the identity provider for an invalid password")
+	}
+}
+
+func TestResetPasswordRejectsOverlongToken(t *testing.T) {
+	t.Parallel()
+
+	identity := &gatewayfake.IdentityProvider{}
+	resetPassword := NewResetPassword(&gatewayfake.UserRepository{}, identity, NewPasswordResetTokens())
+
+	overlong := strings.Repeat("a", maxPasswordResetTokenLength+1)
+	err := resetPassword.Execute(context.Background(), overlong, "a-new-password")
+
+	if !errors.Is(err, domain.ErrPasswordResetTokenInvalido) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrPasswordResetTokenInvalido)
+	}
+	if identity.SetPasswordCalls != 0 {
+		t.Error("Execute() should not call the identity provider for an oversized token")
 	}
 }
 

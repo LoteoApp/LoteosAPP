@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/gateway/gatewayfake"
 )
 
@@ -26,13 +27,28 @@ func registeredActiveUser() domain.Usuario {
 	return usuario
 }
 
+// newSyncRequestPasswordReset builds a RequestPasswordReset whose dispatched
+// work runs inline instead of in a goroutine, so a test can assert its
+// effects right after Execute returns without racing a background send.
+func newSyncRequestPasswordReset(
+	repository gateway.UserRepository,
+	mailer gateway.Mailer,
+	tokens *PasswordResetTokens,
+	resetURL string,
+	clocks ...Clock,
+) *requestPasswordResetUseCase {
+	useCase := NewRequestPasswordReset(repository, mailer, tokens, resetURL, clocks...).(*requestPasswordResetUseCase)
+	useCase.dispatch = func(work func()) { work() }
+	return useCase
+}
+
 func TestRequestPasswordResetSendsEmailForRegisteredUser(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{FoundByEmail: registeredActiveUser()}
 	mailer := &gatewayfake.Mailer{}
 	tokens := NewPasswordResetTokens()
-	requestReset := NewRequestPasswordReset(repository, mailer, tokens, testResetURL, fixedClock{now: time.Now()})
+	requestReset := newSyncRequestPasswordReset(repository, mailer, tokens, testResetURL, fixedClock{now: time.Now()})
 
 	if err := requestReset.Execute(context.Background(), "ana@example.com"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -55,7 +71,7 @@ func TestRequestPasswordResetSucceedsSilentlyForUnknownEmail(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado}
 	mailer := &gatewayfake.Mailer{}
-	requestReset := NewRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
+	requestReset := newSyncRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
 
 	if err := requestReset.Execute(context.Background(), "unknown@example.com"); err != nil {
 		t.Fatalf("Execute() error = %v, want nil so the response can't be used to tell registered emails apart", err)
@@ -73,7 +89,7 @@ func TestRequestPasswordResetSucceedsSilentlyForInactiveUser(t *testing.T) {
 	inactive.FechaBaja = &baja
 	repository := &gatewayfake.UserRepository{FoundByEmail: inactive}
 	mailer := &gatewayfake.Mailer{}
-	requestReset := NewRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
+	requestReset := newSyncRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
 
 	if err := requestReset.Execute(context.Background(), "ana@example.com"); err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
@@ -86,7 +102,7 @@ func TestRequestPasswordResetSucceedsSilentlyForInactiveUser(t *testing.T) {
 func TestRequestPasswordResetRejectsInvalidEmail(t *testing.T) {
 	t.Parallel()
 
-	requestReset := NewRequestPasswordReset(&gatewayfake.UserRepository{}, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL)
+	requestReset := newSyncRequestPasswordReset(&gatewayfake.UserRepository{}, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL)
 
 	err := requestReset.Execute(context.Background(), "not-an-email")
 
@@ -100,7 +116,7 @@ func TestRequestPasswordResetRejectsWithinCooldown(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{FoundByEmail: registeredActiveUser()}
 	mailer := &gatewayfake.Mailer{}
-	requestReset := NewRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
+	requestReset := newSyncRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
 
 	if err := requestReset.Execute(context.Background(), "ana@example.com"); err != nil {
 		t.Fatalf("Execute() first call error = %v", err)
@@ -120,7 +136,7 @@ func TestRequestPasswordResetCooldownAppliesEvenForUnknownEmail(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado}
-	requestReset := NewRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
+	requestReset := newSyncRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
 
 	if err := requestReset.Execute(context.Background(), "unknown@example.com"); err != nil {
 		t.Fatalf("Execute() first call error = %v", err)
@@ -143,12 +159,11 @@ func TestRequestPasswordResetSweepsExpiredCooldownEntries(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado}
 	clock := &mutableClock{now: time.Now()}
-	requestReset := NewRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, clock)
-	useCase := requestReset.(*requestPasswordResetUseCase)
+	useCase := newSyncRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, clock)
 
 	for i := 0; i < 5; i++ {
 		email := fmt.Sprintf("made-up-%d@example.com", i)
-		if err := requestReset.Execute(context.Background(), email); err != nil {
+		if err := useCase.Execute(context.Background(), email); err != nil {
 			t.Fatalf("Execute() error = %v", err)
 		}
 	}
@@ -157,12 +172,35 @@ func TestRequestPasswordResetSweepsExpiredCooldownEntries(t *testing.T) {
 	}
 
 	clock.now = clock.now.Add(passwordResetRequestCooldown)
-	if err := requestReset.Execute(context.Background(), "yet-another@example.com"); err != nil {
+	if err := useCase.Execute(context.Background(), "yet-another@example.com"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
 	if len(useCase.lastSent) != 1 {
 		t.Errorf("len(lastSent) = %d, want 1 — the sweep should have dropped the 5 stale entries", len(useCase.lastSent))
+	}
+}
+
+// TestRequestPasswordResetBoundsCooldownEntries guards against unbounded
+// memory growth within a single cooldown window: even before any entry is
+// old enough to sweep, the map must not grow past a hard cap no matter how
+// many distinct made-up emails an attacker sends.
+func TestRequestPasswordResetBoundsCooldownEntries(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado}
+	clock := &mutableClock{now: time.Now()}
+	useCase := newSyncRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, clock)
+
+	for i := 0; i < maxTrackedResetEmails+10; i++ {
+		email := fmt.Sprintf("made-up-%d@example.com", i)
+		if err := useCase.Execute(context.Background(), email); err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+	}
+
+	if len(useCase.lastSent) > maxTrackedResetEmails {
+		t.Errorf("len(lastSent) = %d, want at most %d", len(useCase.lastSent), maxTrackedResetEmails)
 	}
 }
 
@@ -172,7 +210,7 @@ func TestRequestPasswordResetAllowsAfterCooldownElapses(t *testing.T) {
 	repository := &gatewayfake.UserRepository{FoundByEmail: registeredActiveUser()}
 	mailer := &gatewayfake.Mailer{}
 	clock := &mutableClock{now: time.Now()}
-	requestReset := NewRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, clock)
+	requestReset := newSyncRequestPasswordReset(repository, mailer, NewPasswordResetTokens(), testResetURL, clock)
 
 	if err := requestReset.Execute(context.Background(), "ana@example.com"); err != nil {
 		t.Fatalf("Execute() first call error = %v", err)
