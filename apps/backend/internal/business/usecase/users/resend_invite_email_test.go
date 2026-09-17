@@ -146,9 +146,9 @@ func TestResendInviteEmailRejectsWithinCooldown(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
-	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	identity := &gatewayfake.IdentityProvider{GenerateInviteLinkURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=fresh"}
 	mailer := &gatewayfake.Mailer{}
-	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, fixedClock{now: time.Now()})
 
 	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
 		t.Fatalf("Execute() first call error = %v", err)
@@ -162,8 +162,8 @@ func TestResendInviteEmailRejectsWithinCooldown(t *testing.T) {
 	if mailer.SendUserInviteCalls != 1 {
 		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 1", mailer.SendUserInviteCalls)
 	}
-	if identity.ResetPasswordCalls != 1 {
-		t.Errorf("Execute() identity.ResetTemporaryPassword calls = %d, want 1", identity.ResetPasswordCalls)
+	if identity.GenerateInviteLinkCalls != 1 {
+		t.Errorf("Execute() identity.GenerateInviteLink calls = %d, want 1", identity.GenerateInviteLinkCalls)
 	}
 }
 
@@ -171,10 +171,10 @@ func TestResendInviteEmailAllowsAfterCooldownElapses(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
-	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	identity := &gatewayfake.IdentityProvider{GenerateInviteLinkURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=fresh"}
 	mailer := &gatewayfake.Mailer{}
 	clock := &mutableClock{now: time.Now()}
-	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, clock)
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, clock)
 
 	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
 		t.Fatalf("Execute() first call error = %v", err)
@@ -194,9 +194,9 @@ func TestResendInviteEmailCooldownIsPerUser(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
-	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	identity := &gatewayfake.IdentityProvider{GenerateInviteLinkURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=fresh"}
 	mailer := &gatewayfake.Mailer{}
-	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, fixedClock{now: time.Now()})
 
 	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); err != nil {
 		t.Fatalf("Execute() first user error = %v", err)
@@ -218,9 +218,9 @@ func TestResendInviteEmailDoesNotCountRejectedAttemptsAgainstCooldown(t *testing
 	inactive := activeManagedUserWithContact()
 	inactive.FechaBaja = &baja
 	repository := &gatewayfake.UserRepository{FoundByID: inactive}
-	identity := &gatewayfake.IdentityProvider{ResetPasswordResult: "fresh-temp-pass"}
+	identity := &gatewayfake.IdentityProvider{GenerateInviteLinkURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=fresh"}
 	mailer := &gatewayfake.Mailer{}
-	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, testLoginURL, fixedClock{now: time.Now()})
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer, fixedClock{now: time.Now()})
 
 	if err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1"); !errors.Is(err, domain.ErrUsuarioDadoDeBaja) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrUsuarioDadoDeBaja)
