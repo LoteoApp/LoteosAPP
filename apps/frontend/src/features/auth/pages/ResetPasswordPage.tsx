@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { messageFromError } from '../../../shared/api/client'
+import { clearURLFragment, readFragmentParams } from '../../../shared/lib/urlFragment'
 import { Button } from '../../../shared/ui/button'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
@@ -9,8 +10,10 @@ import { confirmPasswordReset } from '../api/auth'
 const MIN_PASSWORD_LENGTH = 8
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams()
-  const token = searchParams.get('token') ?? ''
+  const [token] = useState(() => readFragmentParams().get('token') ?? '')
+  useEffect(() => {
+    clearURLFragment()
+  }, [])
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)

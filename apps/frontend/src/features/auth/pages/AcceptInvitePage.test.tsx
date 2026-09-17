@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type { AuthError, User } from '@supabase/supabase-js'
 import AcceptInvitePage from './AcceptInvitePage'
@@ -22,13 +22,15 @@ function authError(code: string, message: string): AuthError {
   return Object.assign(new Error(message), { code }) as unknown as AuthError
 }
 
-function renderAcceptInvitePage(initialEntry: string) {
+function renderAcceptInvitePage(fragment = '') {
+  window.history.pushState(null, '', '/aceptar-invitacion' + (fragment ? `#${fragment}` : ''))
+
   const router = createMemoryRouter(
     [
       { path: '/aceptar-invitacion', element: <AcceptInvitePage /> },
       { path: '/login', element: <p>Iniciar sesión</p> },
     ],
-    { initialEntries: [initialEntry] },
+    { initialEntries: ['/aceptar-invitacion'] },
   )
 
   render(<RouterProvider router={router} />)
@@ -47,15 +49,25 @@ beforeEach(() => {
 })
 
 describe('AcceptInvitePage', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
   it('shows an invalid link message when the url has no token_hash', () => {
-    renderAcceptInvitePage('/aceptar-invitacion')
+    renderAcceptInvitePage()
 
     expect(screen.getByText('El link de invitación es inválido o venció.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Elegí tu contraseña')).not.toBeInTheDocument()
   })
 
+  it('clears the token from the url once it has been read', () => {
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
+
+    expect(window.location.hash).toBe('')
+  })
+
   it('rejects a password shorter than 8 characters without calling supabase', async () => {
-    renderAcceptInvitePage('/aceptar-invitacion?token_hash=abc123&type=invite')
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
 
     await fillPasswords('short', 'short')
 
@@ -66,7 +78,7 @@ describe('AcceptInvitePage', () => {
   })
 
   it('rejects mismatched passwords without calling supabase', async () => {
-    renderAcceptInvitePage('/aceptar-invitacion?token_hash=abc123&type=invite')
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
 
     await fillPasswords('a-chosen-password', 'a-different-password')
 
@@ -85,7 +97,7 @@ describe('AcceptInvitePage', () => {
     })
     vi.mocked(supabaseClient.auth.signOut).mockResolvedValue({ error: null })
 
-    renderAcceptInvitePage('/aceptar-invitacion?token_hash=abc123&type=invite')
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
     await fillPasswords('a-chosen-password', 'a-chosen-password')
 
     expect(supabaseClient.auth.verifyOtp).toHaveBeenCalledWith({
@@ -104,7 +116,7 @@ describe('AcceptInvitePage', () => {
       error: authError('otp_expired', 'Token has expired or is invalid'),
     })
 
-    renderAcceptInvitePage('/aceptar-invitacion?token_hash=abc123&type=invite')
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
     await fillPasswords('a-chosen-password', 'a-chosen-password')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -123,7 +135,7 @@ describe('AcceptInvitePage', () => {
       error: authError('weak_password', 'Password should be at least 6 characters'),
     })
 
-    renderAcceptInvitePage('/aceptar-invitacion?token_hash=abc123&type=invite')
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
     await fillPasswords('a-chosen-password', 'a-chosen-password')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

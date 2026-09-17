@@ -25,8 +25,8 @@ type AdminClient struct {
 }
 
 // NewAdminClient builds an AdminClient. inviteRedirectURL is the frontend
-// page that consumes an invite link (its token_hash and type query params);
-// it's appended by this client, not by Supabase, so Supabase's own
+// page that consumes an invite link (its token_hash and type fragment
+// params); it's appended by this client, not by Supabase, so Supabase's own
 // "Redirect URLs" allow list never needs to know about it.
 func NewAdminClient(baseURL, serviceRoleKey, inviteRedirectURL string) *AdminClient {
 	return &AdminClient{
@@ -115,15 +115,19 @@ func (client *AdminClient) generateLink(ctx context.Context, linkType, email str
 	return created.ID, inviteURL, nil
 }
 
+// buildInviteURL puts token_hash and type in the URL fragment, not the
+// query string: a fragment never leaves the browser, so it's absent from
+// proxy/nginx access logs and from browser history synced elsewhere,
+// unlike a query param.
 func (client *AdminClient) buildInviteURL(linkType, tokenHash string) (string, error) {
 	parsed, err := url.Parse(client.inviteRedirectURL)
 	if err != nil {
 		return "", fmt.Errorf("parse invite redirect URL: %w", err)
 	}
-	query := parsed.Query()
-	query.Set("token_hash", tokenHash)
-	query.Set("type", linkType)
-	parsed.RawQuery = query.Encode()
+	fragment := url.Values{}
+	fragment.Set("token_hash", tokenHash)
+	fragment.Set("type", linkType)
+	parsed.Fragment = fragment.Encode()
 	return parsed.String(), nil
 }
 

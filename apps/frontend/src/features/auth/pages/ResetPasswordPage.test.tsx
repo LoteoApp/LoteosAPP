@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import ResetPasswordPage from './ResetPasswordPage'
 import { confirmPasswordReset } from '../api/auth'
@@ -10,14 +10,16 @@ vi.mock('../api/auth', () => ({
   confirmPasswordReset: vi.fn(),
 }))
 
-function renderResetPasswordPage(initialEntry: string) {
+function renderResetPasswordPage(fragment = '') {
+  window.history.pushState(null, '', '/restablecer-contrasena' + (fragment ? `#${fragment}` : ''))
+
   const router = createMemoryRouter(
     [
       { path: '/restablecer-contrasena', element: <ResetPasswordPage /> },
       { path: '/login', element: <p>Iniciar sesión</p> },
       { path: '/olvide-contrasena', element: <p>Olvidé mi contraseña</p> },
     ],
-    { initialEntries: [initialEntry] },
+    { initialEntries: ['/restablecer-contrasena'] },
   )
 
   render(<RouterProvider router={router} />)
@@ -30,8 +32,12 @@ async function fillPasswords(password: string, confirmPassword: string) {
 }
 
 describe('ResetPasswordPage', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
   it('shows an invalid link message when the url has no token', () => {
-    renderResetPasswordPage('/restablecer-contrasena')
+    renderResetPasswordPage()
 
     expect(
       screen.getByText('El link para restablecer la contraseña es inválido o venció.'),
@@ -43,8 +49,14 @@ describe('ResetPasswordPage', () => {
     )
   })
 
+  it('clears the token from the url once it has been read', () => {
+    renderResetPasswordPage('token=abc123')
+
+    expect(window.location.hash).toBe('')
+  })
+
   it('rejects a password shorter than 8 characters without calling the backend', async () => {
-    renderResetPasswordPage('/restablecer-contrasena?token=abc123')
+    renderResetPasswordPage('token=abc123')
 
     await fillPasswords('short', 'short')
 
@@ -55,7 +67,7 @@ describe('ResetPasswordPage', () => {
   })
 
   it('rejects mismatched passwords without calling the backend', async () => {
-    renderResetPasswordPage('/restablecer-contrasena?token=abc123')
+    renderResetPasswordPage('token=abc123')
 
     await fillPasswords('a-new-password', 'a-different-password')
 
@@ -66,7 +78,7 @@ describe('ResetPasswordPage', () => {
   it('confirms the reset with the token from the url and shows success', async () => {
     vi.mocked(confirmPasswordReset).mockResolvedValue(undefined)
 
-    renderResetPasswordPage('/restablecer-contrasena?token=abc123')
+    renderResetPasswordPage('token=abc123')
     await fillPasswords('a-new-password', 'a-new-password')
 
     expect(confirmPasswordReset).toHaveBeenCalledWith('abc123', 'a-new-password')
@@ -83,7 +95,7 @@ describe('ResetPasswordPage', () => {
       ),
     )
 
-    renderResetPasswordPage('/restablecer-contrasena?token=abc123')
+    renderResetPasswordPage('token=abc123')
     await fillPasswords('a-new-password', 'a-new-password')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

@@ -148,11 +148,18 @@ func TestAdminClientCreateUserHappyPath(t *testing.T) {
 	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != testInviteRedirectURL {
 		t.Errorf("CreateUser() invite URL base = %q, want %q", got, testInviteRedirectURL)
 	}
-	if parsed.Query().Get("token_hash") != testHashedToken {
-		t.Errorf("CreateUser() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
+	if parsed.RawQuery != "" {
+		t.Errorf("CreateUser() invite URL query = %q, want empty — the token must travel in the fragment", parsed.RawQuery)
 	}
-	if parsed.Query().Get("type") != "invite" {
-		t.Errorf("CreateUser() invite URL type = %q, want %q", parsed.Query().Get("type"), "invite")
+	fragment, err := url.ParseQuery(parsed.Fragment)
+	if err != nil {
+		t.Fatalf("CreateUser() invite URL fragment is not valid: %v", err)
+	}
+	if fragment.Get("token_hash") != testHashedToken {
+		t.Errorf("CreateUser() invite URL token_hash = %q, want %q", fragment.Get("token_hash"), testHashedToken)
+	}
+	if fragment.Get("type") != "invite" {
+		t.Errorf("CreateUser() invite URL type = %q, want %q", fragment.Get("type"), "invite")
 	}
 
 	if fake.putCalls != 1 {
@@ -332,8 +339,12 @@ func TestAdminClientGenerateInviteLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateInviteLink() invite URL is not a valid URL: %v", err)
 	}
-	if parsed.Query().Get("token_hash") != testHashedToken {
-		t.Errorf("GenerateInviteLink() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
+	fragment, err := url.ParseQuery(parsed.Fragment)
+	if err != nil {
+		t.Fatalf("GenerateInviteLink() invite URL fragment is not valid: %v", err)
+	}
+	if fragment.Get("token_hash") != testHashedToken {
+		t.Errorf("GenerateInviteLink() invite URL token_hash = %q, want %q", fragment.Get("token_hash"), testHashedToken)
 	}
 }
 
