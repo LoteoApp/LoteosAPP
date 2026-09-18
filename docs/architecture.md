@@ -381,6 +381,19 @@ invitación, Supabase rechaza generar otro link (`email_exists`) y el reenvío
 devuelve `domain.ErrInviteAlreadyAccepted` (409, `invite_already_accepted`)
 en vez de mandar nada.
 
+`usecase/users.ListUsers` le agrega a cada usuario `invitacionAceptada`, que
+sale de `gateway.IdentityProvider.ConfirmedAccountIDs`: una consulta paginada
+a `GET /auth/v1/admin/users` que se queda con las cuentas que ya tienen
+`email_confirmed_at`, es decir, las que canjearon la invitación. El dato vive
+solo en Supabase (el backend no se entera cuando la persona acepta, porque
+`verifyOtp` corre en el navegador), por eso no se persiste ni se confunde con
+`perfilCompleto`, que solo dice si el usuario tiene nombre y apellido. Si la
+consulta falla, el listado igual responde y omite el campo: ausente significa
+"desconocido", no "pendiente". Solo el listado y el alta lo informan; el
+frontend conserva el valor al editar o reactivar. Con él, la lista muestra
+"Invitación pendiente" y solo ofrece "Reenviar invitación" a quien todavía no
+aceptó.
+
 **Por qué el link no es el `action_link` de Supabase**: ese link apunta
 primero a `/auth/v1/verify` de Supabase, que consume el token apenas se
 abre — antes de que la persona elija una contraseña — y deja una sesión
