@@ -60,6 +60,24 @@ func TestResendInviteEmailHappyPath(t *testing.T) {
 	}
 }
 
+func TestResendInviteEmailReportsAnAlreadyAcceptedInvite(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{FoundByID: activeManagedUserWithContact()}
+	identity := &gatewayfake.IdentityProvider{GenerateInviteLinkErr: domain.ErrEmailEnUso}
+	mailer := &gatewayfake.Mailer{}
+	resendInviteEmail := NewResendInviteEmail(repository, identity, mailer)
+
+	err := resendInviteEmail.Execute(context.Background(), []string{domain.RolAdministrador}, "user-1")
+
+	if !errors.Is(err, domain.ErrInviteAlreadyAccepted) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrInviteAlreadyAccepted)
+	}
+	if mailer.SendUserInviteCalls != 0 {
+		t.Errorf("Execute() mailer.SendUserInvite calls = %d, want 0 when there is no link to send", mailer.SendUserInviteCalls)
+	}
+}
+
 func TestResendInviteEmailRejectsUnknownID(t *testing.T) {
 	t.Parallel()
 

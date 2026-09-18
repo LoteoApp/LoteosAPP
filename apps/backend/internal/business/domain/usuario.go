@@ -34,6 +34,10 @@ var (
 	// explicitly asking for the mail to go out, so it's surfaced instead of
 	// logged and dropped.
 	ErrInviteEmailUnavailable = &Error{Kind: KindUnavailable, Code: "invite_email_unavailable", Message: "No se pudo enviar el mail de invitación"}
+	// ErrInviteAlreadyAccepted: ResendInviteEmail targeted an account that
+	// already confirmed itself, for which the identity provider refuses to
+	// mint another invite link.
+	ErrInviteAlreadyAccepted = &Error{Kind: KindConflict, Code: "invite_already_accepted", Message: "El usuario ya activó su cuenta, no necesita otra invitación"}
 )
 
 type Usuario struct {
