@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { supabaseClient } from '../../../shared/config/supabase-client'
+import { clearURLFragment, readFragmentParams } from '../../../shared/lib/urlFragment'
 import { Button } from '../../../shared/ui/button'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
@@ -20,9 +21,12 @@ function describeInviteError(error: unknown): string {
 }
 
 export default function AcceptInvitePage() {
-  const [searchParams] = useSearchParams()
-  const tokenHash = searchParams.get('token_hash') ?? ''
-  const type = (searchParams.get('type') ?? 'invite') as EmailOtpType
+  const [fragmentParams] = useState(() => readFragmentParams())
+  useEffect(() => {
+    clearURLFragment()
+  }, [])
+  const tokenHash = fragmentParams.get('token_hash') ?? ''
+  const type = (fragmentParams.get('type') ?? 'invite') as EmailOtpType
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
