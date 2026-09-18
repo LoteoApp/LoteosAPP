@@ -309,7 +309,7 @@ El backend también manda el mail de invitación de usuarios a través de
 Resend. `RESEND_API_KEY` es obligatoria y sin ella el proceso no arranca;
 `MAIL_FROM_EMAIL` y `MAIL_FROM_NAME` tienen default. En `dev`, sin el dominio
 propio de LoteosAPP verificado en Resend todavía, `MAIL_FROM_EMAIL` se pisa a
-un dominio ya verificado en la cuenta del equipo (`no-reply@mutual-longvie.ar`)
+un dominio ya verificado en la cuenta del equipo (`no-reply@mail.mutual-longvie.ar`)
 en vez del remitente de prueba `onboarding@resend.dev`, que solo puede mandar
 a la casilla dueña de la cuenta (ver [secrets.md](secrets.md#resend) para el
 porqué y lo que falta para producción).
