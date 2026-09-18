@@ -22,4 +22,9 @@ type IdentityProvider interface {
 	// rather than authProviderID because that's what the identity provider's
 	// link-generation call takes.
 	GenerateInviteLink(ctx context.Context, email string) (inviteURL string, err error)
+
+	// ConfirmedAccountIDs returns the identity provider IDs of the accounts
+	// whose owner already confirmed their email, that is, accepted the
+	// invitation and chose a password.
+	ConfirmedAccountIDs(ctx context.Context) (map[string]bool, error)
 }

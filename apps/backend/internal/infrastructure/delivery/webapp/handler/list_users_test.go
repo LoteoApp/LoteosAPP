@@ -75,6 +75,35 @@ func TestListUsersRoute(t *testing.T) {
 		}
 	})
 
+	t.Run("exposes whether the invitation was accepted only when it is known", func(t *testing.T) {
+		t.Parallel()
+
+		accepted, pending := true, false
+		listUsers := &listUsersStub{usuarios: []domain.Usuario{
+			{ID: "user-1", Rol: domain.RolEscribano, InvitacionAceptada: &accepted},
+			{ID: "user-2", Rol: domain.RolEscribano, InvitacionAceptada: &pending},
+			{ID: "user-3", Rol: domain.RolEscribano},
+		}}
+
+		recorder := performListUsersRequest(t, listUsers, administradorVerifier(), "valid-token", "/api/v1/usuarios")
+
+		var got struct {
+			Usuarios []map[string]any `json:"usuarios"`
+		}
+		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got.Usuarios[0]["invitacionAceptada"] != true {
+			t.Errorf("accepted user invitacionAceptada = %v, want true", got.Usuarios[0]["invitacionAceptada"])
+		}
+		if got.Usuarios[1]["invitacionAceptada"] != false {
+			t.Errorf("pending user invitacionAceptada = %v, want false", got.Usuarios[1]["invitacionAceptada"])
+		}
+		if _, present := got.Usuarios[2]["invitacionAceptada"]; present {
+			t.Error("a user whose invitation state is unknown should omit invitacionAceptada")
+		}
+	})
+
 	t.Run("serializes an empty list as an array", func(t *testing.T) {
 		t.Parallel()
 

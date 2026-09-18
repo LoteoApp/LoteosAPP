@@ -53,6 +53,9 @@ type Usuario struct {
 	PerfilCompleto bool       `json:"perfilCompleto"`
 	FechaBaja      *time.Time `json:"fechaBaja"`
 	CreatedAt      time.Time  `json:"createdAt"`
+	// InvitacionAceptada is only set where the identity provider was asked:
+	// nil means unknown, not "pending".
+	InvitacionAceptada *bool `json:"invitacionAceptada,omitempty"`
 }
 
 // Activo reports whether the user may still operate. A user given de baja
