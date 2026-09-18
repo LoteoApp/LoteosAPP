@@ -10,14 +10,6 @@ import (
 // PasswordResetTokenTTL is how long a password reset link stays valid.
 const PasswordResetTokenTTL = time.Hour
 
-type Clock interface {
-	Now() time.Time
-}
-
-type SystemClock struct{}
-
-func (SystemClock) Now() time.Time { return time.Now() }
-
 // PasswordResetTokens issues and consumes single-use password reset tokens,
 // in memory only (no migration): the backend runs as a single instance, so
 // there's nothing to coordinate across replicas, and losing pending tokens
