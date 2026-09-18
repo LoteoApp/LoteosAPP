@@ -69,7 +69,7 @@ func testInvite() gateway.UserInviteEmail {
 		Nombre:    "Ana",
 		Apellido:  "Gómez",
 		Rol:       domain.RolAdministrativo,
-		InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc123&type=invite",
+		InviteURL: "https://app.loteosapp.com/aceptar-invitacion#token_hash=abc123&type=invite",
 	}
 }
 
@@ -108,7 +108,7 @@ func TestClientSendUserInviteHappyPath(t *testing.T) {
 	if fake.receivedSubj == "" {
 		t.Error("SendUserInvite() sent an empty subject")
 	}
-	for _, want := range []string{"Ana", "Gómez", "administrativo", "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc123&amp;type=invite"} {
+	for _, want := range []string{"Ana", "Gómez", "administrativo", "https://app.loteosapp.com/aceptar-invitacion#token_hash=abc123&amp;type=invite", "un solo uso"} {
 		if !strings.Contains(fake.receivedHTML, want) {
 			t.Errorf("SendUserInvite() html missing %q, got %q", want, fake.receivedHTML)
 		}
