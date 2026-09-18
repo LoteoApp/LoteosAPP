@@ -32,6 +32,7 @@ export default function AcceptInvitePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [tokenVerified, setTokenVerified] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -48,9 +49,12 @@ export default function AcceptInvitePage() {
 
     setIsSubmitting(true)
     try {
-      const { error: verifyError } = await supabaseClient.auth.verifyOtp({ token_hash: tokenHash, type })
-      if (verifyError) {
-        throw verifyError
+      if (!tokenVerified) {
+        const { error: verifyError } = await supabaseClient.auth.verifyOtp({ token_hash: tokenHash, type })
+        if (verifyError) {
+          throw verifyError
+        }
+        setTokenVerified(true)
       }
 
       const { error: updateError } = await supabaseClient.auth.updateUser({ password })

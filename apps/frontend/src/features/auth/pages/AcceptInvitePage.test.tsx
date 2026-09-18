@@ -142,4 +142,28 @@ describe('AcceptInvitePage', () => {
       'No se pudo activar la cuenta: Password should be at least 6 characters',
     )
   })
+
+  it('retries only updateUser after the token was already verified', async () => {
+    vi.mocked(supabaseClient.auth.verifyOtp).mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    })
+    vi.mocked(supabaseClient.auth.updateUser)
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: authError('network_error', 'Failed to fetch'),
+      })
+      .mockResolvedValueOnce({ data: { user: fakeUser }, error: null })
+    vi.mocked(supabaseClient.auth.signOut).mockResolvedValue({ error: null })
+
+    renderAcceptInvitePage('token_hash=abc123&type=invite')
+    await fillPasswords('a-chosen-password', 'a-chosen-password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo activar la cuenta: Failed to fetch')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Activar cuenta' }))
+
+    expect(await screen.findByText(/Tu cuenta quedó activada/)).toBeInTheDocument()
+    expect(supabaseClient.auth.verifyOtp).toHaveBeenCalledTimes(1)
+    expect(supabaseClient.auth.updateUser).toHaveBeenCalledTimes(2)
+  })
 })
