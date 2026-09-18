@@ -19,14 +19,6 @@ type ResendInviteEmail interface {
 
 const resendInviteCooldown = 60 * time.Second
 
-type Clock interface {
-	Now() time.Time
-}
-
-type SystemClock struct{}
-
-func (SystemClock) Now() time.Time { return time.Now() }
-
 type resendInviteEmailUseCase struct {
 	repository gateway.UserRepository
 	identity   gateway.IdentityProvider
