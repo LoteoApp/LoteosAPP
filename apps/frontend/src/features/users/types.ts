@@ -18,6 +18,9 @@ export type Usuario = {
   // Only set for rol inmobiliaria: the agency this user operates on behalf of.
   inmobiliariaId?: string
   perfilCompleto: boolean
+  // Only present in the list (and right after creating a user): the other
+  // endpoints do not ask the identity provider. Absent means unknown.
+  invitacionAceptada?: boolean
   fechaBaja: string | null
   createdAt: string
 }

@@ -37,6 +37,8 @@ export default function UserCard({
   onResendInvite,
 }: UserCardProps) {
   const activo = isActivo(usuario)
+  const invitacionPendiente = activo && usuario.invitacionAceptada === false
+  const puedeReenviarInvitacion = usuario.invitacionAceptada !== true
 
   return (
     <li>
@@ -52,6 +54,7 @@ export default function UserCard({
               <Badge variant={activo ? 'default' : 'secondary'}>
                 {activo ? 'Activo' : 'Dado de baja'}
               </Badge>
+              {invitacionPendiente && <Badge variant="outline">Invitación pendiente</Badge>}
             </div>
           </div>
           {activo ? (
@@ -59,7 +62,7 @@ export default function UserCard({
               <Button variant="outline" size="sm" onClick={onEdit}>
                 Editar
               </Button>
-              {!isConfirmingBaja && (
+              {!isConfirmingBaja && puedeReenviarInvitacion && (
                 <Button
                   variant={resendStatus === 'error' ? 'destructive' : 'outline'}
                   size="sm"
