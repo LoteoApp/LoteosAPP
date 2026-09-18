@@ -565,7 +565,44 @@ describe('UsersPage', () => {
     const pendingCard = screen.getByText('Ana Pérez').closest('li') as HTMLElement
     const acceptedCard = screen.getByText('Luis Gómez').closest('li') as HTMLElement
     expect(within(pendingCard).getByText('Invitación pendiente')).toBeInTheDocument()
+    expect(within(pendingCard).queryByText('Activo')).not.toBeInTheDocument()
+    expect(within(acceptedCard).getByText('Activo')).toBeInTheDocument()
     expect(within(acceptedCard).queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('shows a user given de baja as such even if the invitation was never accepted', async () => {
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false, fechaBaja: '2026-01-15T00:00:00Z' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    const card = screen.getByText('Ana Pérez').closest('li') as HTMLElement
+    expect(within(card).getByText('Dado de baja')).toBeInTheDocument()
+    expect(within(card).queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('filters the users with a pending invitation apart from the active ones', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', invitacionAceptada: true }),
+      usuario({ nombre: 'Marta', apellido: 'Ruiz', fechaBaja: '2026-01-15T00:00:00Z' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await selectOption(user, 'Estado', 'Invitación pendiente')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
+    expect(screen.queryByText('Marta Ruiz')).not.toBeInTheDocument()
+
+    await selectOption(user, 'Estado', 'Activos')
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
+    expect(screen.queryByText('Marta Ruiz')).not.toBeInTheDocument()
   })
 
   it('offers the resend only to users who have not accepted their invitation', async () => {

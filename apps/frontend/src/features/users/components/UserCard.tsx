@@ -2,7 +2,13 @@ import { CircleCheck, CircleX } from 'lucide-react'
 import { Badge } from '../../../shared/ui/badge'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent } from '../../../shared/ui/card'
-import { ROLE_LABELS, isActivo, type Usuario } from '../types'
+import { ESTADO_LABELS, ROLE_LABELS, estadoOf, isActivo, type Usuario, type UsuarioEstado } from '../types'
+
+const ESTADO_BADGE_VARIANT: Record<UsuarioEstado, 'default' | 'outline' | 'secondary'> = {
+  activo: 'default',
+  pendiente: 'outline',
+  baja: 'secondary',
+}
 
 export type ResendStatus = 'success' | 'error' | undefined
 
@@ -37,7 +43,7 @@ export default function UserCard({
   onResendInvite,
 }: UserCardProps) {
   const activo = isActivo(usuario)
-  const invitacionPendiente = activo && usuario.invitacionAceptada === false
+  const estado = estadoOf(usuario)
   const puedeReenviarInvitacion = usuario.invitacionAceptada !== true
 
   return (
@@ -51,10 +57,7 @@ export default function UserCard({
             <p className="text-sm text-muted-foreground">{usuario.email}</p>
             <div className="mt-1 flex gap-1.5">
               <Badge variant="outline">{ROLE_LABELS[usuario.rol]}</Badge>
-              <Badge variant={activo ? 'default' : 'secondary'}>
-                {activo ? 'Activo' : 'Dado de baja'}
-              </Badge>
-              {invitacionPendiente && <Badge variant="outline">Invitación pendiente</Badge>}
+              <Badge variant={ESTADO_BADGE_VARIANT[estado]}>{ESTADO_LABELS[estado]}</Badge>
             </div>
           </div>
           {activo ? (

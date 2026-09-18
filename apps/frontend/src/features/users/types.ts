@@ -29,6 +29,21 @@ export function isActivo(usuario: Usuario): boolean {
   return usuario.fechaBaja === null
 }
 
+export type UsuarioEstado = 'activo' | 'pendiente' | 'baja'
+
+export const ESTADO_LABELS: Record<UsuarioEstado, string> = {
+  activo: 'Activo',
+  pendiente: 'Invitación pendiente',
+  baja: 'Dado de baja',
+}
+
+export function estadoOf(usuario: Usuario): UsuarioEstado {
+  if (!isActivo(usuario)) {
+    return 'baja'
+  }
+  return usuario.invitacionAceptada === false ? 'pendiente' : 'activo'
+}
+
 export type UsuarioFormValues = {
   nombre: string
   apellido: string

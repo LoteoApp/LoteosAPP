@@ -390,9 +390,10 @@ solo en Supabase (el backend no se entera cuando la persona acepta, porque
 `perfilCompleto`, que solo dice si el usuario tiene nombre y apellido. Si la
 consulta falla, el listado igual responde y omite el campo: ausente significa
 "desconocido", no "pendiente". Solo el listado y el alta lo informan; el
-frontend conserva el valor al editar o reactivar. Con él, la lista muestra
-"Invitación pendiente" y solo ofrece "Reenviar invitación" a quien todavía no
-aceptó.
+frontend conserva el valor al editar o reactivar. Con él, la lista suma
+"Invitación pendiente" como un estado más, junto a "Activo" y "Dado de baja"
+(la baja tiene prioridad), lo puede filtrar y solo ofrece "Reenviar
+invitación" a quien todavía no aceptó.
 
 **Por qué el link no es el `action_link` de Supabase**: ese link apunta
 primero a `/auth/v1/verify` de Supabase, que consume el token apenas se
