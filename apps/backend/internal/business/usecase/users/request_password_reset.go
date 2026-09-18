@@ -19,6 +19,12 @@ import (
 // from becoming a way to tell registered emails apart from made-up ones.
 const passwordResetRequestCooldown = 60 * time.Second
 
+// maxConcurrentPasswordResets caps how many lookup-and-send jobs can be in
+// flight at once. The endpoint is unauthenticated and each accepted request
+// spawns background work, so without a cap a burst of distinct emails would
+// spawn goroutines and database lookups without limit.
+const maxConcurrentPasswordResets = 16
+
 // maxTrackedResetEmails caps lastSent so a burst of distinct made-up emails
 // within a single cooldown window can't grow it without bound — the sweep
 // alone only reclaims entries once they age out.
@@ -44,6 +50,7 @@ type requestPasswordResetUseCase struct {
 	// tests overwrite it to run inline so assertions after Execute returns
 	// see its effects deterministically.
 	dispatch func(func())
+	inFlight chan struct{}
 
 	mu       sync.Mutex
 	lastSent map[string]time.Time
@@ -67,6 +74,7 @@ func NewRequestPasswordReset(
 		resetURL:   resetURL,
 		clock:      clock,
 		dispatch:   func(work func()) { go work() },
+		inFlight:   make(chan struct{}, maxConcurrentPasswordResets),
 		lastSent:   make(map[string]time.Time),
 	}
 }
@@ -78,16 +86,26 @@ func NewRequestPasswordReset(
 // account than for a fake one, letting a caller enumerate accounts by
 // timing alone even though both eventually reply 204.
 func (useCase *requestPasswordResetUseCase) Execute(ctx context.Context, email string) error {
-	email = strings.TrimSpace(email)
+	email = strings.ToLower(strings.TrimSpace(email))
 	if !domain.EmailValido(email) {
 		return domain.ErrEmailInvalido
 	}
+
+	select {
+	case useCase.inFlight <- struct{}{}:
+	default:
+		return domain.ErrPasswordResetBusy
+	}
 	if !useCase.reserve(email) {
+		<-useCase.inFlight
 		return domain.ErrPasswordResetRateLimited
 	}
 
 	detached := context.WithoutCancel(ctx)
-	useCase.dispatch(func() { useCase.sendResetLink(detached, email) })
+	useCase.dispatch(func() {
+		defer func() { <-useCase.inFlight }()
+		useCase.sendResetLink(detached, email)
+	})
 
 	return nil
 }

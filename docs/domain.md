@@ -163,7 +163,14 @@ Supabase, nunca al pedir el link — así, alguien que solo conoce el mail de
 otro usuario puede, como mucho, hacer que le lleguen mails de recupero, pero
 no puede invalidarle la contraseña actual sin acceso a esa casilla. El token
 vive en memoria del proceso (sin tabla ni migración), es de un solo uso, y se
-invalida al primer intento de canje aunque falle.
+invalida al primer intento de canje aunque falle. El cooldown de 60 segundos
+se aplica por email normalizado (minúsculas y sin espacios), así que
+`ana@x.com` y `ANA@x.com` comparten la misma ventana, y se chequea antes de
+buscar la cuenta. Además, el trabajo en segundo plano de cada pedido (buscar y
+mandar el mail) tiene un tope de 16 en curso a la vez: por encima de eso el
+endpoint responde 503 `password_reset_busy`, sin importar el email, para que
+un volumen de pedidos con emails distintos no genere goroutines ni consultas
+sin límite.
 
 La baja bloquea el acceso de inmediato, no solo la visibilidad en el
 listado: `middleware.RequireActiveAccount` corre en cada request autenticado

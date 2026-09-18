@@ -40,6 +40,10 @@ var (
 	// email belongs to a real account — that's what keeps the cooldown from
 	// doubling as an existence check.
 	ErrPasswordResetRateLimited = &Error{Kind: KindRateLimited, Code: "password_reset_rate_limited", Message: "Ya te enviamos un mail. Esperá un momento antes de pedir otro"}
+	// ErrPasswordResetBusy: RequestPasswordReset already has its maximum of
+	// background jobs in flight. Depends only on load, never on the email, so
+	// it can't be used to tell registered emails apart.
+	ErrPasswordResetBusy = &Error{Kind: KindUnavailable, Code: "password_reset_busy", Message: "Estamos recibiendo muchos pedidos. Probá de nuevo en unos minutos"}
 	// ErrPasswordResetTokenInvalido: ResetPassword got a token that's
 	// unknown, expired, or already used. All three collapse into the same
 	// error and message — telling them apart would let a caller probe for

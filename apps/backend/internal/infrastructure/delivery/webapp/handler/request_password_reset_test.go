@@ -80,6 +80,7 @@ func TestRequestPasswordResetRoute(t *testing.T) {
 		}{
 			{name: "invalid email", err: domain.ErrEmailInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_email"},
 			{name: "rate limited", err: domain.ErrPasswordResetRateLimited, wantStatus: http.StatusTooManyRequests, wantCode: "password_reset_rate_limited"},
+			{name: "busy", err: domain.ErrPasswordResetBusy, wantStatus: http.StatusServiceUnavailable, wantCode: "password_reset_busy"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 

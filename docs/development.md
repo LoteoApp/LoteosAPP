@@ -82,8 +82,10 @@ Endpoints operativos del backend:
 - `POST /api/v1/auth/recuperar-contrasena` (sin autenticación): pide un link
   de recupero de contraseña por mail. Responde 204 siempre, exista o no el
   email, para no filtrar qué correos están registrados; solo un email mal
-  formado (`invalid_email`) o repetir el pedido antes de 60s
-  (`password_reset_rate_limited`, 429) devuelven error.
+  formado (`invalid_email`), repetir el pedido antes de 60s para el mismo email
+  sin distinguir mayúsculas (`password_reset_rate_limited`, 429) o que el
+  backend ya tenga el máximo de pedidos en curso (`password_reset_busy`, 503,
+  que depende de la carga y no del email) devuelven error.
 - `POST /api/v1/auth/restablecer-contrasena` (sin autenticación): confirma el
   cambio de contraseña con el token del mail. El token es de un solo uso y
   vence en 1 hora (`password_reset_token_invalid` si es inválido, ya se usó o
