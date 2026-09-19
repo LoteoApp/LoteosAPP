@@ -18,6 +18,11 @@ type IdentityProvider struct {
 	GenerateInviteLinkEmail string
 	GenerateInviteLinkURL   string
 
+	SetPasswordCalls    int
+	SetPasswordErr      error
+	SetPasswordUserID   string
+	SetPasswordPassword string
+
 	ConfirmedAccountIDsCalls  int
 	ConfirmedAccountIDsErr    error
 	ConfirmedAccountIDsResult map[string]bool
@@ -44,6 +49,13 @@ func (fake *IdentityProvider) GenerateInviteLink(_ context.Context, email string
 		return "", fake.GenerateInviteLinkErr
 	}
 	return fake.GenerateInviteLinkURL, nil
+}
+
+func (fake *IdentityProvider) SetPassword(_ context.Context, authProviderID, newPassword string) error {
+	fake.SetPasswordCalls++
+	fake.SetPasswordUserID = authProviderID
+	fake.SetPasswordPassword = newPassword
+	return fake.SetPasswordErr
 }
 
 func (fake *IdentityProvider) ConfirmedAccountIDs(_ context.Context) (map[string]bool, error) {

@@ -944,6 +944,8 @@ apps/frontend/src/
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
 │   ├── auth/
+│   │   ├── api/
+│   │   │   └── auth.ts         # Cliente de /api/v1/auth (recupero de contraseña)
 │   │   ├── components/
 │   │   │   ├── AppAuthProvider.tsx
 │   │   │   ├── AuthStatus.tsx
@@ -956,7 +958,9 @@ apps/frontend/src/
 │   │   │   ├── describeAuthError.ts  # Traduce el error de Supabase al usuario
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
-│   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
+│   │       ├── LoginPage.tsx          # Formulario de email y contraseña, en /login
+│   │       ├── ForgotPasswordPage.tsx # Pide el link de recupero, en /olvide-contrasena
+│   │       └── ResetPasswordPage.tsx  # Confirma la contraseña nueva, en /restablecer-contrasena
 │   ├── agencies/
 │   │   ├── api/
 │   │   │   └── agencies.ts        # Cliente de /api/v1/inmobiliarias

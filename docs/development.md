@@ -80,6 +80,18 @@ Endpoints operativos del backend:
   responde 409 `invite_already_accepted`.
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
+- `POST /api/v1/auth/recuperar-contrasena` (sin autenticación): pide un link
+  de recupero de contraseña por mail. Responde 204 siempre, exista o no el
+  email, para no filtrar qué correos están registrados; solo un email mal
+  formado (`invalid_email`), repetir el pedido antes de 60s para el mismo email
+  sin distinguir mayúsculas (`password_reset_rate_limited`, 429) o que el
+  backend ya tenga el máximo de pedidos en curso (`password_reset_busy`, 503,
+  que depende de la carga y no del email) devuelven error.
+- `POST /api/v1/auth/restablecer-contrasena` (sin autenticación): confirma el
+  cambio de contraseña con el token del mail. El token es de un solo uso y
+  vence en 1 hora (`password_reset_token_invalid` si es inválido, ya se usó o
+  venció); la contraseña nueva exige al menos 8 caracteres
+  (`invalid_password`).
 - `POST /api/v1/inmobiliarias` (requiere rol `administrador`): da de alta una
   inmobiliaria con razón social, CUIT, teléfono y email.
 - `GET /api/v1/inmobiliarias` (requiere rol `administrador` o
@@ -204,7 +216,12 @@ tokens mal configurada.
 `features/auth/hooks/use-auth.ts`. Como Supabase no tiene pantalla de login
 hosteada, el ingreso es un formulario propio de email y contraseña en `/login`;
 `RequireAuth` manda ahí a quien no tenga sesión y recuerda la ruta pedida para
-volver después del ingreso.
+volver después del ingreso. El recupero de contraseña tampoco pasa por
+Supabase: `/olvide-contrasena` pide el mail (`features/auth/api/auth.ts` →
+`POST /api/v1/auth/recuperar-contrasena`) y `/restablecer-contrasena#token=…`
+confirma la contraseña nueva con el token del mail recibido — el token va en
+el fragmento, no en el query string, para que no quede en logs de proxy ni
+en el historial del navegador.
 
 ### Crear un usuario de Supabase para probar el login
 
@@ -293,10 +310,12 @@ CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
 
 El backend también manda el mail de invitación de usuarios a través de
 Resend. `RESEND_API_KEY` es obligatoria y sin ella el proceso no arranca;
-`MAIL_FROM_EMAIL` y `MAIL_FROM_NAME` tienen default. En `dev`, sin un dominio
-propio verificado en Resend, `MAIL_FROM_EMAIL` se pisa a
-`onboarding@resend.dev` (ver [secrets.md](secrets.md#resend) para el porqué y
-lo que falta para producción).
+`MAIL_FROM_EMAIL` y `MAIL_FROM_NAME` tienen default. En `dev`, sin el dominio
+propio de LoteosAPP verificado en Resend todavía, `MAIL_FROM_EMAIL` se pisa a
+un dominio ya verificado en la cuenta del equipo (`no-reply@mail.mutual-longvie.ar`)
+en vez del remitente de prueba `onboarding@resend.dev`, que solo puede mandar
+a la casilla dueña de la cuenta (ver [secrets.md](secrets.md#resend) para el
+porqué y lo que falta para producción).
 
 ```text
 RESEND_API_KEY=re_...

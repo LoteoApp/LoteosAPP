@@ -23,6 +23,10 @@ type IdentityProvider interface {
 	// link-generation call takes.
 	GenerateInviteLink(ctx context.Context, email string) (inviteURL string, err error)
 
+	// SetPassword sets newPassword on an existing account, chosen by the
+	// account's own owner. Used to confirm a "forgot password" request once
+	// its token has been verified.
+	SetPassword(ctx context.Context, authProviderID, newPassword string) error
 	// ConfirmedAccountIDs returns the identity provider IDs of the accounts
 	// whose owner already confirmed their email, that is, accepted the
 	// invitation and chose a password.

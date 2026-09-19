@@ -33,6 +33,7 @@ type fakeAdminServer struct {
 	}
 
 	putStatus   int
+	putBody     string
 	putCalls    int
 	lastPutBody map[string]any
 
@@ -106,9 +107,13 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(fake.putStatus)
-		if fake.putStatus == http.StatusOK {
-			_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
+		if fake.putStatus != http.StatusOK {
+			if fake.putBody != "" {
+				_, _ = w.Write([]byte(fake.putBody))
+			}
+			return
 		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
 	})
 
 	fake.mux.HandleFunc("DELETE /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
@@ -385,6 +390,64 @@ func TestAdminClientGenerateInviteLinkPropagatesTransportError(t *testing.T) {
 
 	if _, err := client.GenerateInviteLink(context.Background(), "ana@example.com"); err == nil {
 		t.Error("GenerateInviteLink() error = nil, want error when the server is unreachable")
+	}
+}
+
+func TestAdminClientSetPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	client, _ := newClient(fake, t)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err != nil {
+		t.Fatalf("SetPassword() error = %v", err)
+	}
+	if fake.putCalls != 1 {
+		t.Errorf("SetPassword() calls = %d, want 1", fake.putCalls)
+	}
+	if !fake.sawAuthHeaders {
+		t.Error("SetPassword() never sent apikey/Authorization headers")
+	}
+}
+
+func TestAdminClientSetPasswordRejectsWeakPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.putStatus = http.StatusUnprocessableEntity
+	fake.putBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
+	client, _ := newClient(fake, t)
+
+	err := client.SetPassword(context.Background(), testUserID, "123")
+
+	if !errors.Is(err, domain.ErrPasswordInvalido) {
+		t.Fatalf("SetPassword() error = %v, want %v", err, domain.ErrPasswordInvalido)
+	}
+}
+
+func TestAdminClientSetPasswordSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.putStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientSetPasswordPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error when the server is unreachable")
 	}
 }
 

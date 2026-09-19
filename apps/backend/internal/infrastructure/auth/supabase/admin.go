@@ -243,6 +243,54 @@ func (client *AdminClient) DeleteUser(ctx context.Context, supabaseID string) er
 	return nil
 }
 
+// SetPassword implements gateway.IdentityProvider.
+func (client *AdminClient) SetPassword(ctx context.Context, supabaseID, newPassword string) error {
+	if err := client.putPassword(ctx, supabaseID, newPassword); err != nil {
+		return fmt.Errorf("set supabase user password: %w", err)
+	}
+
+	return nil
+}
+
+func (client *AdminClient) putPassword(ctx context.Context, supabaseID, password string) error {
+	body, err := json.Marshal(map[string]any{"password": password})
+	if err != nil {
+		return fmt.Errorf("encode password payload: %w", err)
+	}
+
+	request, err := client.newRequest(ctx, http.MethodPut, client.adminURL("/users/"+supabaseID), body)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		if isWeakPasswordError(response) {
+			return domain.ErrPasswordInvalido
+		}
+		return unexpectedStatus(response)
+	}
+
+	return nil
+}
+
+// isWeakPasswordError reports whether response rejected the password for
+// being too weak, the one failure of this call a caller can act on instead
+// of treating as an opaque unavailable error.
+func isWeakPasswordError(response *http.Response) bool {
+	var apiError struct {
+		ErrorCode string `json:"error_code"`
+	}
+	_ = json.NewDecoder(response.Body).Decode(&apiError)
+
+	return apiError.ErrorCode == "weak_password"
+}
+
 func (client *AdminClient) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {
 	var reader io.Reader
 	if body != nil {

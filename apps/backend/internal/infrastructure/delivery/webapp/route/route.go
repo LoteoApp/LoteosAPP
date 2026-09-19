@@ -12,6 +12,7 @@ import (
 
 const (
 	usersTimeout        = 5 * time.Second
+	authTimeout         = 5 * time.Second
 	clientsTimeout      = 5 * time.Second
 	agenciesTimeout     = 5 * time.Second
 	lotesTimeout        = 10 * time.Second
@@ -55,6 +56,8 @@ type Handlers struct {
 	DeactivateUser             *handler.DeactivateUserHandler
 	ReactivateUser             *handler.ReactivateUserHandler
 	ResendInviteEmail          *handler.ResendInviteEmailHandler
+	RequestPasswordReset       *handler.RequestPasswordResetHandler
+	ResetPassword              *handler.ResetPasswordHandler
 	CreateClient               *handler.CreateClientHandler
 	UpdateClient               *handler.UpdateClientHandler
 	DeleteClient               *handler.DeleteClientHandler
@@ -108,6 +111,10 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("DELETE /api/v1/usuarios/{id}", protected(handler.Adapt(handlers.DeactivateUser, usersTimeout)))
 	mux.Handle("POST /api/v1/usuarios/{id}/reactivar", protected(handler.Adapt(handlers.ReactivateUser, usersTimeout)))
 	mux.Handle("POST /api/v1/usuarios/{id}/reenviar-invitacion", protected(handler.Adapt(handlers.ResendInviteEmail, usersTimeout)))
+
+	// Unauthenticated by design: the caller doesn't have a session yet.
+	mux.Handle("POST /api/v1/auth/recuperar-contrasena", handler.Adapt(handlers.RequestPasswordReset, authTimeout))
+	mux.Handle("POST /api/v1/auth/restablecer-contrasena", handler.Adapt(handlers.ResetPassword, authTimeout))
 
 	mux.Handle("POST /api/v1/clientes", protected(handler.Adapt(handlers.CreateClient, clientsTimeout)))
 	mux.Handle("PATCH /api/v1/clientes/{id}", protected(handler.Adapt(handlers.UpdateClient, clientsTimeout)))

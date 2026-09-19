@@ -150,6 +150,28 @@ envío bajo demanda (`POST /api/v1/usuarios/{id}/reenviar-invitacion`), que
 genera un link nuevo (el original nunca se guarda en ningún lado, solo vive
 en memoria durante un intento de envío).
 
+Cualquier usuario (no solo los recién creados) puede recuperar su contraseña
+sin estar logueado, desde "¿Olvidaste tu contraseña?" en el login:
+`POST /api/v1/auth/recuperar-contrasena` con el email, y si corresponde a una
+cuenta activa, se manda un mail con un link de un solo uso que vence al cabo
+de una hora (`PasswordResetTokenTTL`) — nunca una contraseña por mail. La
+respuesta es siempre la misma (204), exista o no el email, para no revelar
+qué correos están registrados. El link lleva a un formulario donde se elige
+la contraseña nueva, que confirma `POST /api/v1/auth/restablecer-contrasena`
+con el token y la contraseña; recién ahí cambia la contraseña real en
+Supabase, nunca al pedir el link — así, alguien que solo conoce el mail de
+otro usuario puede, como mucho, hacer que le lleguen mails de recupero, pero
+no puede invalidarle la contraseña actual sin acceso a esa casilla. El token
+vive en memoria del proceso (sin tabla ni migración), es de un solo uso, y se
+invalida al primer intento de canje aunque falle. El cooldown de 60 segundos
+se aplica por email normalizado (minúsculas y sin espacios), así que
+`ana@x.com` y `ANA@x.com` comparten la misma ventana, y se chequea antes de
+buscar la cuenta. Además, el trabajo en segundo plano de cada pedido (buscar y
+mandar el mail) tiene un tope de 16 en curso a la vez: por encima de eso el
+endpoint responde 503 `password_reset_busy`, sin importar el email, para que
+un volumen de pedidos con emails distintos no genere goroutines ni consultas
+sin límite.
+
 La baja bloquea el acceso de inmediato, no solo la visibilidad en el
 listado: `middleware.RequireActiveAccount` corre en cada request autenticado
 (detrás de `RequireAuth`, en toda la API, no solo en `/usuarios`) y rechaza

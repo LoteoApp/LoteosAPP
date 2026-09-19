@@ -43,6 +43,8 @@ func statusForKind(kind domain.Kind) int {
 		return http.StatusNotFound
 	case domain.KindUnavailable:
 		return http.StatusServiceUnavailable
+	case domain.KindRateLimited:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}

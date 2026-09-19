@@ -100,4 +100,13 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Listado de lotes')).toBeInTheDocument()
     expect(screen.queryByLabelText('Correo electrónico')).not.toBeInTheDocument()
   })
+
+  it('links to the forgot-password page', () => {
+    renderLoginPage()
+
+    expect(screen.getByRole('link', { name: '¿Olvidaste tu contraseña?' })).toHaveAttribute(
+      'href',
+      '/olvide-contrasena',
+    )
+  })
 })

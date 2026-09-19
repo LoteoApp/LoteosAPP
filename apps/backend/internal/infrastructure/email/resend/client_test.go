@@ -151,6 +151,87 @@ func TestClientSendUserInvitePropagatesTransportError(t *testing.T) {
 	}
 }
 
+func testPasswordReset() gateway.PasswordResetEmail {
+	return gateway.PasswordResetEmail{
+		To:       "ana@example.com",
+		Nombre:   "Ana",
+		Apellido: "Gómez",
+		ResetURL: "https://app.loteosapp.com/restablecer-contrasena?token=abc123",
+	}
+}
+
+func TestClientSendPasswordResetHappyPath(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeResendServer(t)
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client, err := resend.NewClient(resend.Config{
+		APIKey:    testAPIKey,
+		FromEmail: "no-reply@loteosapp.com",
+		FromName:  "LoteosAPP",
+		BaseURL:   server.URL,
+	})
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if err := client.SendPasswordReset(context.Background(), testPasswordReset()); err != nil {
+		t.Fatalf("SendPasswordReset() error = %v", err)
+	}
+	if fake.calls != 1 {
+		t.Errorf("SendPasswordReset() calls = %d, want 1", fake.calls)
+	}
+	if len(fake.receivedTo) != 1 || fake.receivedTo[0] != "ana@example.com" {
+		t.Errorf("SendPasswordReset() to = %v", fake.receivedTo)
+	}
+	for _, want := range []string{"Ana", "Gómez", "https://app.loteosapp.com/restablecer-contrasena?token=abc123"} {
+		if !strings.Contains(fake.receivedHTML, want) {
+			t.Errorf("SendPasswordReset() html missing %q, got %q", want, fake.receivedHTML)
+		}
+	}
+	if strings.Contains(fake.receivedHTML, "Contraseña temporal") {
+		t.Error("SendPasswordReset() html should not mention a temporary password")
+	}
+}
+
+func TestClientSendPasswordResetSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeResendServer(t)
+	fake.status = http.StatusUnprocessableEntity
+	fake.body = `{"statusCode":422,"message":"invalid from address","name":"validation_error"}`
+	server := httptest.NewServer(fake.mux)
+	t.Cleanup(server.Close)
+
+	client, err := resend.NewClient(resend.Config{APIKey: testAPIKey, FromEmail: "no-reply@loteosapp.com", BaseURL: server.URL})
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if err := client.SendPasswordReset(context.Background(), testPasswordReset()); err == nil {
+		t.Fatal("SendPasswordReset() error = nil, want error on unexpected status")
+	}
+}
+
+func TestClientSendPasswordResetPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeResendServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client, err := resend.NewClient(resend.Config{APIKey: testAPIKey, FromEmail: "no-reply@loteosapp.com", BaseURL: server.URL})
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if err := client.SendPasswordReset(context.Background(), testPasswordReset()); err == nil {
+		t.Error("SendPasswordReset() error = nil, want error when the server is unreachable")
+	}
+}
+
 func TestNewClientRequiresApiKeyAndFromEmail(t *testing.T) {
 	t.Parallel()
 
