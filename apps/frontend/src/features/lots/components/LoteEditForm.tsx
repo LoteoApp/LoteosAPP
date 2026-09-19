@@ -3,7 +3,6 @@ import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
-import { SaveNotice, useSaveNotice } from '../../../shared/ui/save-notice'
 import { Textarea } from '../../../shared/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/toggle-group'
 import type { UpdateLoteState } from '../hooks/use-update-lote'
@@ -24,19 +23,18 @@ type LoteEditFormProps = {
   lote: LoteoLote
   updateState: UpdateLoteState
   onSave: (payload: UpdateLotePayload) => Promise<boolean>
+  onCancel: () => void
 }
 
-export default function LoteEditForm({ lote, updateState, onSave }: LoteEditFormProps) {
+export default function LoteEditForm({ lote, updateState, onSave, onCancel }: LoteEditFormProps) {
   const [values, setValues] = useState<LoteFormValues>(() => toLoteFormValues(lote))
   const [errors, setErrors] = useState<LoteFormErrors>({})
-  const notice = useSaveNotice()
   const [trackedLoteId, setTrackedLoteId] = useState(lote.id)
 
   if (lote.id !== trackedLoteId) {
     setTrackedLoteId(lote.id)
     setValues(toLoteFormValues(lote))
     setErrors({})
-    notice.clear()
   }
 
   const saving = updateState.status === 'saving'
@@ -46,7 +44,6 @@ export default function LoteEditForm({ lote, updateState, onSave }: LoteEditForm
 
   function update<Key extends keyof LoteFormValues>(key: Key, value: LoteFormValues[Key]) {
     setValues((current) => ({ ...current, [key]: value }))
-    notice.clear()
   }
 
   function handlePrecioChange(event: ChangeEvent<HTMLInputElement>) {
@@ -73,17 +70,11 @@ export default function LoteEditForm({ lote, updateState, onSave }: LoteEditForm
     const result = validateLoteForm(values)
     if (!result.ok) {
       setErrors(result.errors)
-      notice.clear()
       return
     }
 
     setErrors({})
-    const ok = await onSave(result.payload)
-    if (ok) {
-      notice.show()
-    } else {
-      notice.clear()
-    }
+    await onSave(result.payload)
   }
 
   function fieldError(field: keyof LoteFormValues): string | undefined {
@@ -99,7 +90,6 @@ export default function LoteEditForm({ lote, updateState, onSave }: LoteEditForm
 
   return (
     <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-      <SaveNotice token={notice.token}>Lote guardado</SaveNotice>
       {bannerMessage && (
         <Alert variant="destructive">
           <AlertDescription>{bannerMessage}</AlertDescription>
@@ -194,9 +184,20 @@ export default function LoteEditForm({ lote, updateState, onSave }: LoteEditForm
         <FieldError>{caracteristicasError}</FieldError>
       </Field>
 
-      <Button type="submit" className="min-h-11 md:min-h-8" disabled={saving}>
-        {saving ? 'Guardando…' : 'Guardar'}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 flex-1 md:min-h-8"
+          disabled={saving}
+          onClick={onCancel}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" className="min-h-11 flex-1 md:min-h-8" disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </div>
     </form>
   )
 }

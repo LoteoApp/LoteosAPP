@@ -69,6 +69,14 @@ export default function PlanSelectionPanel({
     setEditingSelectionKey(null)
   }
 
+  async function handleLoteSave(loteId: string, payload: UpdateLotePayload) {
+    const saved = await onSave(loteId, payload)
+    if (saved) {
+      setEditingSelectionKey(null)
+    }
+    return saved
+  }
+
   if (selected === null || selected.kind === 'loteo') {
     return (
       <Card size="sm">
@@ -119,7 +127,8 @@ export default function PlanSelectionPanel({
             <LoteEditForm
               lote={lote}
               updateState={updateState}
-              onSave={(payload) => onSave(lote.id, payload)}
+              onSave={(payload) => handleLoteSave(lote.id, payload)}
+              onCancel={() => setEditingSelectionKey(null)}
             />
           ) : (
             lote.caracteristicas && <p className="text-sm">{lote.caracteristicas}</p>

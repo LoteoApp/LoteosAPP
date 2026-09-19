@@ -75,6 +75,7 @@ export default function LoteoDetailPage({
   const [manzanaFilter, setManzanaFilter] = useState(ALL_MANZANAS)
   const [stateFilter, setStateFilter] = useState<ReadonlySet<LotState>>(new Set())
   const [tab, setTab] = useState(SUMMARY_TAB)
+  const loteNotice = useSaveNotice()
   const reservationNotice = useSaveNotice()
   const reservationCancelNotice = useSaveNotice()
 
@@ -182,6 +183,7 @@ export default function LoteoDetailPage({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
       <LoteoDetailHeader loteo={state.loteo} hasPlan={plan.length > 0} />
+      <SaveNotice token={loteNotice.token}>Lote guardado</SaveNotice>
       <SaveNotice token={reservationNotice.token}>Reserva creada</SaveNotice>
       <SaveNotice token={reservationCancelNotice.token}>Reserva cancelada</SaveNotice>
 
@@ -273,6 +275,7 @@ export default function LoteoDetailPage({
                 const updated = await loteUpdate.update(state.loteo.id, loteId, payload)
                 if (updated) {
                   replaceLote(updated)
+                  loteNotice.show()
                 }
                 return updated !== null
               }}

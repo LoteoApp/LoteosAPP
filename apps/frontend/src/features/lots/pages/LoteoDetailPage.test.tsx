@@ -428,7 +428,32 @@ describe('LoteoDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(await screen.findByText('Lote guardado')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Habilitar edición' })).toBeInTheDocument()
+    expect(planButton('Lote 12')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Lote 12 · Mz 1 · Disponible' })).toBeInTheDocument()
+  })
+
+  it('cancels a lote edit and discards the draft without saving', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(screen.getByRole('button', { name: 'Lote 7' }))
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    await user.clear(screen.getByLabelText('Número'))
+    await user.type(screen.getByLabelText('Número'), '99')
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByLabelText('Número')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Habilitar edición' })).toBeInTheDocument()
+    expect(planButton('Lote 7')).toHaveAttribute('aria-pressed', 'true')
+    expect(updateLoteMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    expect(screen.getByLabelText('Número')).toHaveValue('7')
   })
 
   it('selects a lote from the list and shows its data without opening edit mode', async () => {
@@ -509,6 +534,7 @@ describe('LoteoDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Número')).toBeInTheDocument()
 
     await user.click(planButton('Lote 8'))
 
