@@ -10,7 +10,7 @@ import type { ResendStatus } from '../components/UserCard'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { normalizeText } from '../../../shared/lib/normalizeText'
-import { isActivo, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
+import { estadoOf, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
 
 function matchesRol(usuario: Usuario, filter: RolFilter): boolean {
   return filter === 'todos' || usuario.rol === filter
@@ -20,7 +20,11 @@ function matchesEstado(usuario: Usuario, filter: EstadoFilter): boolean {
   if (filter === 'todos') {
     return true
   }
-  return filter === 'activos' ? isActivo(usuario) : !isActivo(usuario)
+  const estado = estadoOf(usuario)
+  if (filter === 'activos') {
+    return estado === 'activo'
+  }
+  return filter === 'pendientes' ? estado === 'pendiente' : estado === 'baja'
 }
 
 function matchesSearch(user: Usuario, search: string): boolean {

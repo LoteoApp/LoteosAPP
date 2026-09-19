@@ -1,38 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import type { EmailOtpType } from '@supabase/supabase-js'
-import { supabaseClient } from '../../../shared/config/supabase-client'
+import { messageFromError } from '../../../shared/api/client'
 import { clearURLFragment, readFragmentParams } from '../../../shared/lib/urlFragment'
 import { Button } from '../../../shared/ui/button'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
+import { confirmPasswordReset } from '../api/auth'
 
 const MIN_PASSWORD_LENGTH = 8
 
-function describeInviteError(error: unknown): string {
-  const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
-  if (code === 'otp_expired') {
-    return 'El link de invitación venció. Pedile a un administrador que te reenvíe uno nuevo.'
-  }
-  if (error instanceof Error && error.message !== '') {
-    return `No se pudo activar la cuenta: ${error.message}`
-  }
-  return 'No se pudo activar la cuenta. Probá de nuevo en unos minutos.'
-}
-
-export default function AcceptInvitePage() {
-  const [fragmentParams] = useState(() => readFragmentParams())
+export default function ResetPasswordPage() {
+  const [token] = useState(() => readFragmentParams().get('token') ?? '')
   useEffect(() => {
     clearURLFragment()
   }, [])
-  const tokenHash = fragmentParams.get('token_hash') ?? ''
-  const type = (fragmentParams.get('type') ?? 'invite') as EmailOtpType
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
-  const [tokenVerified, setTokenVerified] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -49,23 +35,10 @@ export default function AcceptInvitePage() {
 
     setIsSubmitting(true)
     try {
-      if (!tokenVerified) {
-        const { error: verifyError } = await supabaseClient.auth.verifyOtp({ token_hash: tokenHash, type })
-        if (verifyError) {
-          throw verifyError
-        }
-        setTokenVerified(true)
-      }
-
-      const { error: updateError } = await supabaseClient.auth.updateUser({ password })
-      if (updateError) {
-        throw updateError
-      }
-
-      await supabaseClient.auth.signOut()
+      await confirmPasswordReset(token, password)
       setDone(true)
-    } catch (acceptError) {
-      setError(describeInviteError(acceptError))
+    } catch (confirmError) {
+      setError(messageFromError(confirmError))
     } finally {
       setIsSubmitting(false)
     }
@@ -75,16 +48,24 @@ export default function AcceptInvitePage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-card-foreground md:p-8">
         <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">LoteosAPP</p>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Activar cuenta</h1>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Restablecer contraseña</h1>
 
-        {!tokenHash ? (
+        {!token ? (
           <div className="mt-6 flex flex-col gap-4">
-            <p className="text-sm text-destructive">El link de invitación es inválido o venció.</p>
+            <p className="text-sm text-destructive">
+              El link para restablecer la contraseña es inválido o venció.
+            </p>
+            <Link
+              to="/olvide-contrasena"
+              className="text-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Pedir un link nuevo
+            </Link>
           </div>
         ) : done ? (
           <div className="mt-6 flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-              Tu cuenta quedó activada. Ya podés iniciar sesión con la contraseña que elegiste.
+              Tu contraseña se actualizó. Ya podés iniciar sesión con la contraseña nueva.
             </p>
             <Link
               to="/login"
@@ -96,7 +77,7 @@ export default function AcceptInvitePage() {
         ) : (
           <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
             <Field>
-              <FieldLabel htmlFor="password">Elegí tu contraseña</FieldLabel>
+              <FieldLabel htmlFor="password">Contraseña nueva</FieldLabel>
               <Input
                 id="password"
                 type="password"
@@ -124,7 +105,7 @@ export default function AcceptInvitePage() {
             <FieldError>{error}</FieldError>
 
             <Button type="submit" size="lg" disabled={isSubmitting} className="mt-2 w-full">
-              {isSubmitting ? 'Activando...' : 'Activar cuenta'}
+              {isSubmitting ? 'Guardando...' : 'Guardar contraseña'}
             </Button>
           </form>
         )}

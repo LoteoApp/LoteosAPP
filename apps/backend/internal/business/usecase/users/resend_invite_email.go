@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -64,6 +65,9 @@ func (useCase *resendInviteEmailUseCase) Execute(ctx context.Context, actorRoles
 
 	inviteURL, err := useCase.identity.GenerateInviteLink(ctx, target.Email)
 	if err != nil {
+		if errors.Is(err, domain.ErrEmailEnUso) {
+			return domain.ErrInviteAlreadyAccepted.WithCause(err)
+		}
 		return fromRepository(err)
 	}
 

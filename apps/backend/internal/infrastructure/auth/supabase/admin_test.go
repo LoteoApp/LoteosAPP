@@ -33,11 +33,17 @@ type fakeAdminServer struct {
 	}
 
 	putStatus   int
+	putBody     string
 	putCalls    int
 	lastPutBody map[string]any
 
 	deleteStatus int
 	deleteCalls  int
+
+	listUsersStatus int
+	listUsersPages  map[string][]map[string]any
+	listUsersCalls  int
+	listUsersQuery  []string
 
 	sawAuthHeaders bool
 }
@@ -77,6 +83,20 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID, "hashed_token": testHashedToken})
 	})
 
+	fake.mux.HandleFunc("GET /auth/v1/admin/users", func(w http.ResponseWriter, r *http.Request) {
+		fake.requireAuthHeaders(t, r)
+		fake.listUsersCalls++
+		fake.listUsersQuery = append(fake.listUsersQuery, r.URL.RawQuery)
+
+		if fake.listUsersStatus != 0 {
+			w.WriteHeader(fake.listUsersStatus)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"users": fake.listUsersPages[r.URL.Query().Get("page")]})
+	})
+
 	fake.mux.HandleFunc("PUT /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
 		fake.requireAuthHeaders(t, r)
 		fake.putCalls++
@@ -87,9 +107,13 @@ func newFakeAdminServer(t *testing.T) *fakeAdminServer {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(fake.putStatus)
-		if fake.putStatus == http.StatusOK {
-			_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
+		if fake.putStatus != http.StatusOK {
+			if fake.putBody != "" {
+				_, _ = w.Write([]byte(fake.putBody))
+			}
+			return
 		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": testUserID})
 	})
 
 	fake.mux.HandleFunc("DELETE /auth/v1/admin/users/"+testUserID, func(w http.ResponseWriter, r *http.Request) {
@@ -143,11 +167,18 @@ func TestAdminClientCreateUserHappyPath(t *testing.T) {
 	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != testInviteRedirectURL {
 		t.Errorf("CreateUser() invite URL base = %q, want %q", got, testInviteRedirectURL)
 	}
-	if parsed.Query().Get("token_hash") != testHashedToken {
-		t.Errorf("CreateUser() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
+	if parsed.RawQuery != "" {
+		t.Errorf("CreateUser() invite URL query = %q, want empty — the token must travel in the fragment", parsed.RawQuery)
 	}
-	if parsed.Query().Get("type") != "invite" {
-		t.Errorf("CreateUser() invite URL type = %q, want %q", parsed.Query().Get("type"), "invite")
+	fragment, err := url.ParseQuery(parsed.Fragment)
+	if err != nil {
+		t.Fatalf("CreateUser() invite URL fragment is not valid: %v", err)
+	}
+	if fragment.Get("token_hash") != testHashedToken {
+		t.Errorf("CreateUser() invite URL token_hash = %q, want %q", fragment.Get("token_hash"), testHashedToken)
+	}
+	if fragment.Get("type") != "invite" {
+		t.Errorf("CreateUser() invite URL type = %q, want %q", fragment.Get("type"), "invite")
 	}
 
 	if fake.putCalls != 1 {
@@ -327,8 +358,12 @@ func TestAdminClientGenerateInviteLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateInviteLink() invite URL is not a valid URL: %v", err)
 	}
-	if parsed.Query().Get("token_hash") != testHashedToken {
-		t.Errorf("GenerateInviteLink() invite URL token_hash = %q, want %q", parsed.Query().Get("token_hash"), testHashedToken)
+	fragment, err := url.ParseQuery(parsed.Fragment)
+	if err != nil {
+		t.Fatalf("GenerateInviteLink() invite URL fragment is not valid: %v", err)
+	}
+	if fragment.Get("token_hash") != testHashedToken {
+		t.Errorf("GenerateInviteLink() invite URL token_hash = %q, want %q", fragment.Get("token_hash"), testHashedToken)
 	}
 }
 
@@ -355,5 +390,164 @@ func TestAdminClientGenerateInviteLinkPropagatesTransportError(t *testing.T) {
 
 	if _, err := client.GenerateInviteLink(context.Background(), "ana@example.com"); err == nil {
 		t.Error("GenerateInviteLink() error = nil, want error when the server is unreachable")
+	}
+}
+
+func TestAdminClientSetPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	client, _ := newClient(fake, t)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err != nil {
+		t.Fatalf("SetPassword() error = %v", err)
+	}
+	if fake.putCalls != 1 {
+		t.Errorf("SetPassword() calls = %d, want 1", fake.putCalls)
+	}
+	if !fake.sawAuthHeaders {
+		t.Error("SetPassword() never sent apikey/Authorization headers")
+	}
+}
+
+func TestAdminClientSetPasswordRejectsWeakPassword(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.putStatus = http.StatusUnprocessableEntity
+	fake.putBody = `{"code":422,"error_code":"weak_password","msg":"Password should be at least 6 characters"}`
+	client, _ := newClient(fake, t)
+
+	err := client.SetPassword(context.Background(), testUserID, "123")
+
+	if !errors.Is(err, domain.ErrPasswordInvalido) {
+		t.Fatalf("SetPassword() error = %v, want %v", err, domain.ErrPasswordInvalido)
+	}
+}
+
+func TestAdminClientSetPasswordSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.putStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientSetPasswordPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
+
+	if err := client.SetPassword(context.Background(), testUserID, "a-chosen-password"); err == nil {
+		t.Error("SetPassword() error = nil, want error when the server is unreachable")
+	}
+}
+
+func TestAdminClientConfirmedAccountIDsKeepsOnlyConfirmedAccounts(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.listUsersPages = map[string][]map[string]any{
+		"1": {
+			{"id": "confirmed-1", "email_confirmed_at": "2026-09-18T19:00:00Z"},
+			{"id": "invited-1", "email_confirmed_at": nil},
+			{"id": "confirmed-2", "email_confirmed_at": "2026-09-18T20:00:00Z"},
+		},
+	}
+	client, _ := newClient(fake, t)
+
+	confirmed, err := client.ConfirmedAccountIDs(context.Background())
+	if err != nil {
+		t.Fatalf("ConfirmedAccountIDs() error = %v", err)
+	}
+
+	if len(confirmed) != 2 || !confirmed["confirmed-1"] || !confirmed["confirmed-2"] || confirmed["invited-1"] {
+		t.Errorf("ConfirmedAccountIDs() = %v, want only confirmed-1 and confirmed-2", confirmed)
+	}
+	if fake.listUsersCalls != 1 || fake.listUsersQuery[0] != "page=1&per_page=1000" {
+		t.Errorf("ConfirmedAccountIDs() requests = %v, want a single page=1&per_page=1000", fake.listUsersQuery)
+	}
+}
+
+func TestAdminClientConfirmedAccountIDsFollowsPagination(t *testing.T) {
+	t.Parallel()
+
+	fullPage := make([]map[string]any, 1000)
+	for index := range fullPage {
+		fullPage[index] = map[string]any{"id": fmt.Sprintf("bulk-%d", index), "email_confirmed_at": nil}
+	}
+	fullPage[0] = map[string]any{"id": "first-page", "email_confirmed_at": "2026-09-18T19:00:00Z"}
+
+	fake := newFakeAdminServer(t)
+	fake.listUsersPages = map[string][]map[string]any{
+		"1": fullPage,
+		"2": {{"id": "second-page", "email_confirmed_at": "2026-09-18T20:00:00Z"}},
+	}
+	client, _ := newClient(fake, t)
+
+	confirmed, err := client.ConfirmedAccountIDs(context.Background())
+	if err != nil {
+		t.Fatalf("ConfirmedAccountIDs() error = %v", err)
+	}
+
+	if !confirmed["first-page"] || !confirmed["second-page"] {
+		t.Errorf("ConfirmedAccountIDs() = %v, want accounts from both pages", confirmed)
+	}
+	if fake.listUsersCalls != 2 {
+		t.Errorf("ConfirmedAccountIDs() calls = %d, want 2", fake.listUsersCalls)
+	}
+}
+
+func TestAdminClientConfirmedAccountIDsGivesUpAfterTooManyPages(t *testing.T) {
+	t.Parallel()
+
+	fullPage := make([]map[string]any, 1000)
+	for index := range fullPage {
+		fullPage[index] = map[string]any{"id": fmt.Sprintf("bulk-%d", index), "email_confirmed_at": nil}
+	}
+
+	fake := newFakeAdminServer(t)
+	fake.listUsersPages = map[string][]map[string]any{}
+	for page := 1; page <= 100; page++ {
+		fake.listUsersPages[fmt.Sprint(page)] = fullPage
+	}
+	client, _ := newClient(fake, t)
+
+	if _, err := client.ConfirmedAccountIDs(context.Background()); err == nil {
+		t.Error("ConfirmedAccountIDs() error = nil, want error when the listing never ends")
+	}
+}
+
+func TestAdminClientConfirmedAccountIDsSurfacesUnexpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	fake.listUsersStatus = http.StatusInternalServerError
+	client, _ := newClient(fake, t)
+
+	if _, err := client.ConfirmedAccountIDs(context.Background()); err == nil {
+		t.Error("ConfirmedAccountIDs() error = nil, want error on unexpected status")
+	}
+}
+
+func TestAdminClientConfirmedAccountIDsPropagatesTransportError(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAdminServer(t)
+	server := httptest.NewServer(fake.mux)
+	server.Close()
+
+	client := supabase.NewAdminClient(server.URL, testServiceRoleKey, testInviteRedirectURL)
+
+	if _, err := client.ConfirmedAccountIDs(context.Background()); err == nil {
+		t.Error("ConfirmedAccountIDs() error = nil, want error when the server is unreachable")
 	}
 }

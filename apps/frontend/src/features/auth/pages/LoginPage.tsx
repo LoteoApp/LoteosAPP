@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { Button } from '../../../shared/ui/button'
 import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
 import { Input } from '../../../shared/ui/input'
@@ -91,6 +91,13 @@ export default function LoginPage() {
           <Button type="submit" size="lg" disabled={isSubmitting} className="mt-2 w-full">
             {isSubmitting ? 'Ingresando...' : 'Ingresar'}
           </Button>
+
+          <Link
+            to="/olvide-contrasena"
+            className="text-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
         </form>
       </div>
     </main>

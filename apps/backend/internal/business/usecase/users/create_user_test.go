@@ -152,6 +152,9 @@ func TestCreateUserHappyPath(t *testing.T) {
 	if !inviteEmailSent {
 		t.Error("Execute() should report the invite email as sent when the mailer succeeds")
 	}
+	if usuario.InvitacionAceptada == nil || *usuario.InvitacionAceptada {
+		t.Errorf("Execute() InvitacionAceptada = %v, want a pending invitation", usuario.InvitacionAceptada)
+	}
 	if repository.CreateCalls != 1 {
 		t.Errorf("Execute() repository.Create calls = %d, want 1", repository.CreateCalls)
 	}

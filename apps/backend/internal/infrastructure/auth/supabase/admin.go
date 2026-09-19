@@ -25,8 +25,8 @@ type AdminClient struct {
 }
 
 // NewAdminClient builds an AdminClient. inviteRedirectURL is the frontend
-// page that consumes an invite link (its token_hash and type query params);
-// it's appended by this client, not by Supabase, so Supabase's own
+// page that consumes an invite link (its token_hash and type fragment
+// params); it's appended by this client, not by Supabase, so Supabase's own
 // "Redirect URLs" allow list never needs to know about it.
 func NewAdminClient(baseURL, serviceRoleKey, inviteRedirectURL string) *AdminClient {
 	return &AdminClient{
@@ -63,6 +63,67 @@ func (client *AdminClient) CreateUser(ctx context.Context, email, rol string) (s
 func (client *AdminClient) GenerateInviteLink(ctx context.Context, email string) (string, error) {
 	_, inviteURL, err := client.generateLink(ctx, "invite", email)
 	return inviteURL, err
+}
+
+const (
+	usersPageSize = 1000
+	maxUsersPages = 100
+)
+
+// ConfirmedAccountIDs implements gateway.IdentityProvider. It pages through
+// GET /admin/users and keeps the accounts whose email_confirmed_at is set,
+// which GoTrue fills in when an invite is redeemed with verifyOtp.
+func (client *AdminClient) ConfirmedAccountIDs(ctx context.Context) (map[string]bool, error) {
+	confirmed := map[string]bool{}
+
+	for page := 1; page <= maxUsersPages; page++ {
+		accounts, err := client.listUsersPage(ctx, page)
+		if err != nil {
+			return nil, err
+		}
+		for _, account := range accounts {
+			if account.EmailConfirmedAt != nil {
+				confirmed[account.ID] = true
+			}
+		}
+		if len(accounts) < usersPageSize {
+			return confirmed, nil
+		}
+	}
+
+	return nil, fmt.Errorf("list supabase users: more than %d pages", maxUsersPages)
+}
+
+type supabaseAccount struct {
+	ID               string  `json:"id"`
+	EmailConfirmedAt *string `json:"email_confirmed_at"`
+}
+
+func (client *AdminClient) listUsersPage(ctx context.Context, page int) ([]supabaseAccount, error) {
+	request, err := client.newRequest(ctx, http.MethodGet,
+		client.adminURL(fmt.Sprintf("/users?page=%d&per_page=%d", page, usersPageSize)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("list supabase users: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list supabase users: %w", unexpectedStatus(response))
+	}
+
+	var listed struct {
+		Users []supabaseAccount `json:"users"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&listed); err != nil {
+		return nil, fmt.Errorf("decode supabase users: %w", err)
+	}
+
+	return listed.Users, nil
 }
 
 // generateLink calls POST /admin/generate_link and returns the created (or
@@ -115,15 +176,19 @@ func (client *AdminClient) generateLink(ctx context.Context, linkType, email str
 	return created.ID, inviteURL, nil
 }
 
+// buildInviteURL puts token_hash and type in the URL fragment, not the
+// query string: a fragment never leaves the browser, so it's absent from
+// proxy/nginx access logs and from browser history synced elsewhere,
+// unlike a query param.
 func (client *AdminClient) buildInviteURL(linkType, tokenHash string) (string, error) {
 	parsed, err := url.Parse(client.inviteRedirectURL)
 	if err != nil {
 		return "", fmt.Errorf("parse invite redirect URL: %w", err)
 	}
-	query := parsed.Query()
-	query.Set("token_hash", tokenHash)
-	query.Set("type", linkType)
-	parsed.RawQuery = query.Encode()
+	fragment := url.Values{}
+	fragment.Set("token_hash", tokenHash)
+	fragment.Set("type", linkType)
+	parsed.Fragment = fragment.Encode()
 	return parsed.String(), nil
 }
 
@@ -176,6 +241,54 @@ func (client *AdminClient) DeleteUser(ctx context.Context, supabaseID string) er
 	}
 
 	return nil
+}
+
+// SetPassword implements gateway.IdentityProvider.
+func (client *AdminClient) SetPassword(ctx context.Context, supabaseID, newPassword string) error {
+	if err := client.putPassword(ctx, supabaseID, newPassword); err != nil {
+		return fmt.Errorf("set supabase user password: %w", err)
+	}
+
+	return nil
+}
+
+func (client *AdminClient) putPassword(ctx context.Context, supabaseID, password string) error {
+	body, err := json.Marshal(map[string]any{"password": password})
+	if err != nil {
+		return fmt.Errorf("encode password payload: %w", err)
+	}
+
+	request, err := client.newRequest(ctx, http.MethodPut, client.adminURL("/users/"+supabaseID), body)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		if isWeakPasswordError(response) {
+			return domain.ErrPasswordInvalido
+		}
+		return unexpectedStatus(response)
+	}
+
+	return nil
+}
+
+// isWeakPasswordError reports whether response rejected the password for
+// being too weak, the one failure of this call a caller can act on instead
+// of treating as an opaque unavailable error.
+func isWeakPasswordError(response *http.Response) bool {
+	var apiError struct {
+		ErrorCode string `json:"error_code"`
+	}
+	_ = json.NewDecoder(response.Body).Decode(&apiError)
+
+	return apiError.ErrorCode == "weak_password"
 }
 
 func (client *AdminClient) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {

@@ -4,6 +4,8 @@ import RequireAuth from '../features/auth/components/RequireAuth'
 import RequireRole from '../features/auth/components/RequireRole'
 import { RESERVATION_ROLES, ROLE } from '../shared/auth/roles'
 import LoginPage from '../features/auth/pages/LoginPage'
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage'
+import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage'
 import AcceptInvitePage from '../features/auth/pages/AcceptInvitePage'
 import LotsRoute from './LotsRoute'
 import LoteosRoute from './LoteosRoute'
@@ -31,6 +33,14 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/olvide-contrasena',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/restablecer-contrasena',
+    element: <ResetPasswordPage />,
   },
   {
     path: '/aceptar-invitacion',

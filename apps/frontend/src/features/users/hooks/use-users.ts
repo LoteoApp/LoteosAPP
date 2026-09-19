@@ -95,7 +95,7 @@ export function useUsers(token: string): UseUsers {
     (id: string, values: UsuarioUpdateValues) =>
       run(async () => {
         const updated = await updateUser(token, id, values)
-        setUsuarios((current) => current.map((usuario) => (usuario.id === id ? updated : usuario)))
+        setUsuarios((current) => current.map((usuario) => (usuario.id === id ? { ...usuario, ...updated } : usuario)))
       }),
     [run, token],
   )
@@ -129,7 +129,7 @@ export function useUsers(token: string): UseUsers {
       run(async () => {
         try {
           const updated = await reactivateUser(token, id)
-          setUsuarios((current) => current.map((usuario) => (usuario.id === id ? updated : usuario)))
+          setUsuarios((current) => current.map((usuario) => (usuario.id === id ? { ...usuario, ...updated } : usuario)))
         } catch (reactivateError) {
           if (!(reactivateError instanceof ApiError) || reactivateError.code !== 'user_already_active') {
             throw reactivateError

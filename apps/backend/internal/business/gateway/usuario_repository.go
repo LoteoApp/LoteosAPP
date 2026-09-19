@@ -10,6 +10,7 @@ type UserRepository interface {
 	Create(ctx context.Context, usuario domain.Usuario) (domain.Usuario, error)
 	FindByAuthProviderID(ctx context.Context, authProviderID string) (domain.Usuario, error)
 	FindByID(ctx context.Context, id string) (domain.Usuario, error)
+	FindByEmail(ctx context.Context, email string) (domain.Usuario, error)
 	UpdateProfile(ctx context.Context, authProviderID, nombre, apellido string) (domain.Usuario, error)
 	// ListByRoles returns the users holding any of roles, ordered by
 	// apellido and nombre. Users given de baja are only included when

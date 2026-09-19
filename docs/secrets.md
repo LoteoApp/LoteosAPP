@@ -136,20 +136,41 @@ de altas de usuario. Si falta `RESEND_API_KEY`, `environments.LoadServer`
 corta el arranque igual que con las otras credenciales obligatorias.
 
 Sin verificar un dominio propio en Resend, solo se puede mandar a la casilla
-dueña de la cuenta — suficiente para desarrollo. Por eso en el config `dev` de
-Doppler `MAIL_FROM_EMAIL` está en `onboarding@resend.dev` (el remitente de
-prueba que Resend habilita sin verificar nada): con `no-reply@loteosapp.com`
-sin verificar, todo envío devuelve 403 `domain is not verified`.
+dueña de la cuenta — el remitente de prueba `onboarding@resend.dev` devuelve
+403 `You can only send testing emails to your own email address` apenas el
+destinatario es otra persona. Por eso en el config `dev` de Doppler
+`MAIL_FROM_EMAIL` tiene que estar en `no-reply@mail.mutual-longvie.ar`, un
+subdominio ya verificado en la cuenta de Resend del equipo (no el dominio
+propio de LoteosAPP): alcanza para mandar a cualquier destinatario durante el
+desarrollo sin depender de verificar `loteosapp.com` todavía. Solo sirven
+direcciones `@mail.mutual-longvie.ar`: el dominio raíz `mutual-longvie.ar` no
+está verificado en esa cuenta.
+
+El subdominio quedó en estado `Verified` en Resend (región São Paulo,
+`sa-east-1`) con el DNS de `mutual-longvie.ar` en Cloudflare. Los registros
+que pide Resend son estos, todos en modo *DNS only* (sin proxy):
+
+| Tipo | Nombre | Contenido |
+| --- | --- | --- |
+| TXT | `resend._domainkey.mail` | Clave pública DKIM (`p=MIGf...`), se copia de Resend → Domains |
+| CNAME | `rsend.mail` | `rsend-sae1.forge.rmta.net` |
+| CNAME | `send.mail` | `send.forge.rmta.net` |
+
+Cloudflare agrega solo el sufijo `.mutual-longvie.ar` al nombre. La
+verificación puede demorar unas horas después de cargar los registros.
 
 ### Pendiente antes de producción
 
 - [ ] Verificar el dominio `loteosapp.com` en Resend (Domains → Add Domain) y
-  cargar los registros SPF/DKIM (y DMARC si se quiere) en el DNS del dominio.
-  Sin esto, ningún mail sale salvo a la casilla dueña de la cuenta.
+  cargar los registros que pida Resend (hoy, un TXT de DKIM y dos CNAME, como
+  en la tabla de arriba; y DMARC si se quiere) en el DNS del dominio. Sin
+  esto, ningún mail sale salvo a la casilla dueña de la cuenta.
 - [ ] Crear una API key de Resend separada de la de desarrollo (no reusar la
   de `dev`), para no mezclar tráfico de prueba con la reputación de envío
   real, y cargarla como `RESEND_API_KEY` en el config `prd` de Doppler.
 - [ ] Cargar `MAIL_FROM_EMAIL=no-reply@loteosapp.com` (o la dirección que se
   defina) en el config `prd` una vez verificado el dominio — si se despliega
-  sin esto, vuelve a fallar con `domain is not verified` porque
-  `onboarding@resend.dev` es solo para pruebas.
+  sin esto, vuelve a fallar con `domain is not verified`, sea cual sea el
+  remitente de prueba que haya quedado configurado (`mail.mutual-longvie.ar`
+  es un dominio prestado para desarrollo, no el remitente final de
+  producción).

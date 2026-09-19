@@ -48,6 +48,102 @@ describe('listUsers', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token-123')
   })
 
+  it('keeps the invitation state the backend reports', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: false,
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    const usuarios = await listUsers('token-123')
+
+    expect(usuarios[0].invitacionAceptada).toBe(false)
+  })
+
+  it('rejects a user whose invitation state is not a boolean', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: 'yes',
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('keeps the invitation state the backend reports', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: false,
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    const usuarios = await listUsers('token-123')
+
+    expect(usuarios[0].invitacionAceptada).toBe(false)
+  })
+
+  it('rejects a user whose invitation state is not a boolean', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: 'yes',
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
   it('returns an empty list when usuarios is null', async () => {
     stubFetch(jsonResponse(200, { usuarios: null }))
 
