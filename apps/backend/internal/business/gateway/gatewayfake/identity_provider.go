@@ -22,6 +22,10 @@ type IdentityProvider struct {
 	SetPasswordErr      error
 	SetPasswordUserID   string
 	SetPasswordPassword string
+
+	ConfirmedAccountIDsCalls  int
+	ConfirmedAccountIDsErr    error
+	ConfirmedAccountIDsResult map[string]bool
 }
 
 func (fake *IdentityProvider) CreateUser(_ context.Context, email, rol string) (string, string, error) {
@@ -52,4 +56,12 @@ func (fake *IdentityProvider) SetPassword(_ context.Context, authProviderID, new
 	fake.SetPasswordUserID = authProviderID
 	fake.SetPasswordPassword = newPassword
 	return fake.SetPasswordErr
+}
+
+func (fake *IdentityProvider) ConfirmedAccountIDs(_ context.Context) (map[string]bool, error) {
+	fake.ConfirmedAccountIDsCalls++
+	if fake.ConfirmedAccountIDsErr != nil {
+		return nil, fake.ConfirmedAccountIDsErr
+	}
+	return fake.ConfirmedAccountIDsResult, nil
 }

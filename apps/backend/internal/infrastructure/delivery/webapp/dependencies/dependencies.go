@@ -108,7 +108,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
-	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
+	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo, adminClient))
 	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
 	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
 	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))

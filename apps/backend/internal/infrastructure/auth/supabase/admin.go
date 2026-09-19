@@ -65,6 +65,67 @@ func (client *AdminClient) GenerateInviteLink(ctx context.Context, email string)
 	return inviteURL, err
 }
 
+const (
+	usersPageSize = 1000
+	maxUsersPages = 100
+)
+
+// ConfirmedAccountIDs implements gateway.IdentityProvider. It pages through
+// GET /admin/users and keeps the accounts whose email_confirmed_at is set,
+// which GoTrue fills in when an invite is redeemed with verifyOtp.
+func (client *AdminClient) ConfirmedAccountIDs(ctx context.Context) (map[string]bool, error) {
+	confirmed := map[string]bool{}
+
+	for page := 1; page <= maxUsersPages; page++ {
+		accounts, err := client.listUsersPage(ctx, page)
+		if err != nil {
+			return nil, err
+		}
+		for _, account := range accounts {
+			if account.EmailConfirmedAt != nil {
+				confirmed[account.ID] = true
+			}
+		}
+		if len(accounts) < usersPageSize {
+			return confirmed, nil
+		}
+	}
+
+	return nil, fmt.Errorf("list supabase users: more than %d pages", maxUsersPages)
+}
+
+type supabaseAccount struct {
+	ID               string  `json:"id"`
+	EmailConfirmedAt *string `json:"email_confirmed_at"`
+}
+
+func (client *AdminClient) listUsersPage(ctx context.Context, page int) ([]supabaseAccount, error) {
+	request, err := client.newRequest(ctx, http.MethodGet,
+		client.adminURL(fmt.Sprintf("/users?page=%d&per_page=%d", page, usersPageSize)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("list supabase users: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list supabase users: %w", unexpectedStatus(response))
+	}
+
+	var listed struct {
+		Users []supabaseAccount `json:"users"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&listed); err != nil {
+		return nil, fmt.Errorf("decode supabase users: %w", err)
+	}
+
+	return listed.Users, nil
+}
+
 // generateLink calls POST /admin/generate_link and returns the created (or
 // existing, for a resend) user's id plus an invite URL for
 // client.inviteRedirectURL carrying that link's one-time token_hash. It

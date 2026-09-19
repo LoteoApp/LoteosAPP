@@ -50,6 +50,10 @@ var (
 	// which tokens once existed.
 	ErrPasswordResetTokenInvalido = &Error{Kind: KindInvalid, Code: "password_reset_token_invalid", Message: "El link para restablecer la contraseña es inválido o venció"}
 	ErrPasswordInvalido           = &Error{Kind: KindInvalid, Code: "invalid_password", Message: "La contraseña debe tener al menos 8 caracteres"}
+	// ErrInviteAlreadyAccepted: ResendInviteEmail targeted an account that
+	// already confirmed itself, for which the identity provider refuses to
+	// mint another invite link.
+	ErrInviteAlreadyAccepted = &Error{Kind: KindConflict, Code: "invite_already_accepted", Message: "El usuario ya activó su cuenta, no necesita otra invitación"}
 )
 
 type Usuario struct {
@@ -65,6 +69,9 @@ type Usuario struct {
 	PerfilCompleto bool       `json:"perfilCompleto"`
 	FechaBaja      *time.Time `json:"fechaBaja"`
 	CreatedAt      time.Time  `json:"createdAt"`
+	// InvitacionAceptada is only set where the identity provider was asked:
+	// nil means unknown, not "pending".
+	InvitacionAceptada *bool `json:"invitacionAceptada,omitempty"`
 }
 
 // Activo reports whether the user may still operate. A user given de baja

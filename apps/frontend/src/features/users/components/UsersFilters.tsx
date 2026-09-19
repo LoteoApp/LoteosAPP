@@ -4,7 +4,7 @@ import { SearchField } from '../../../shared/ui/search-field'
 import { GESTIONABLE_ROLES, ROLE_LABELS, type GestionableRol } from '../types'
 
 export type RolFilter = 'todos' | GestionableRol
-export type EstadoFilter = 'todos' | 'activos' | 'inactivos'
+export type EstadoFilter = 'todos' | 'activos' | 'pendientes' | 'inactivos'
 
 type UsersFiltersProps = {
   search: string
@@ -66,6 +66,7 @@ export default function UsersFilters({
             <SelectList>
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="activos">Activos</SelectItem>
+              <SelectItem value="pendientes">Invitación pendiente</SelectItem>
               <SelectItem value="inactivos">Dados de baja</SelectItem>
             </SelectList>
           </SelectContent>

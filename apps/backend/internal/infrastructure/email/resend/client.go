@@ -144,7 +144,7 @@ var userInviteTemplate = template.Must(template.New("user_invite").Parse(`
 <p>Hola {{.Nombre}} {{.Apellido}},</p>
 <p>Se creó tu cuenta en LoteosAPP con el rol <strong>{{.Rol}}</strong> ({{.To}}).</p>
 <p><a href="{{.InviteURL}}">Activá tu cuenta</a> para elegir tu contraseña y empezar a usarla.</p>
-<p>Este link es de un solo uso y vence a la hora de haberse generado.</p>
+<p>Este link es de un solo uso y vence pasado un tiempo. Si ya no funciona, pedile a un administrador que te reenvíe uno nuevo.</p>
 `))
 
 func renderUserInvite(invite gateway.UserInviteEmail) (string, error) {

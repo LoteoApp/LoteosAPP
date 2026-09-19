@@ -18,12 +18,30 @@ export type Usuario = {
   // Only set for rol inmobiliaria: the agency this user operates on behalf of.
   inmobiliariaId?: string
   perfilCompleto: boolean
+  // Only present in the list (and right after creating a user): the other
+  // endpoints do not ask the identity provider. Absent means unknown.
+  invitacionAceptada?: boolean
   fechaBaja: string | null
   createdAt: string
 }
 
 export function isActivo(usuario: Usuario): boolean {
   return usuario.fechaBaja === null
+}
+
+export type UsuarioEstado = 'activo' | 'pendiente' | 'baja'
+
+export const ESTADO_LABELS: Record<UsuarioEstado, string> = {
+  activo: 'Activo',
+  pendiente: 'Invitación pendiente',
+  baja: 'Dado de baja',
+}
+
+export function estadoOf(usuario: Usuario): UsuarioEstado {
+  if (!isActivo(usuario)) {
+    return 'baja'
+  }
+  return usuario.invitacionAceptada === false ? 'pendiente' : 'activo'
 }
 
 export type UsuarioFormValues = {

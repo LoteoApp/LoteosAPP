@@ -101,6 +101,9 @@ func (useCase *createUserUseCase) Execute(
 		return domain.Usuario{}, false, fromRepository(err)
 	}
 
+	pending := false
+	usuario.InvitacionAceptada = &pending
+
 	inviteEmailSent := useCase.sendInvite(ctx, usuario, inviteURL)
 
 	return usuario, inviteEmailSent, nil
