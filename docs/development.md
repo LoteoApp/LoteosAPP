@@ -77,7 +77,9 @@ Endpoints operativos del backend:
   `administrador`): genera un link de invitación nuevo y vuelve a mandar el
   mail. A diferencia del alta, acá un fallo de envío sí se devuelve como
   error (`invite_email_unavailable`). Si el usuario ya activó su cuenta
-  responde 409 `invite_already_accepted`.
+  responde 409 `invite_already_accepted`. Tiene un cooldown de 60s por usuario
+  (en memoria, sin tabla): un reenvío dentro de esa ventana devuelve 429
+  (`invite_email_rate_limited`).
 - `PATCH /api/v1/usuarios/me` (cualquier usuario autenticado): completa el
   propio perfil (nombre y apellido).
 - `POST /api/v1/auth/recuperar-contrasena` (sin autenticación): pide un link

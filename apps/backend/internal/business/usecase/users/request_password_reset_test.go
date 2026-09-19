@@ -14,14 +14,6 @@ import (
 
 const testResetURL = "https://app.loteosapp.com/restablecer-contrasena"
 
-type fixedClock struct{ now time.Time }
-
-func (clock fixedClock) Now() time.Time { return clock.now }
-
-type mutableClock struct{ now time.Time }
-
-func (clock *mutableClock) Now() time.Time { return clock.now }
-
 func registeredActiveUser() domain.Usuario {
 	usuario := activeManagedUserWithContact()
 	usuario.ID = "user-1"

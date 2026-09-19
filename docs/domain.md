@@ -148,7 +148,11 @@ suya al aceptarla. Si el envío falla no bloquea el alta — no hay contraseña
 que comunicar por otra vía, así que la única recuperación es reintentar el
 envío bajo demanda (`POST /api/v1/usuarios/{id}/reenviar-invitacion`), que
 genera un link nuevo (el original nunca se guarda en ningún lado, solo vive
-en memoria durante un intento de envío).
+en memoria durante un intento de envío). El reenvío tiene un cooldown de 60
+segundos por usuario, guardado en memoria (no en la base): protege la cuota
+del proveedor de mail ante un doble click, un reintento de red o varias
+pestañas de admin abiertas a la vez. Un intento rechazado por el cooldown no
+cuenta como un intento real — no reinicia la ventana ni consume el envío.
 
 Cualquier usuario (no solo los recién creados) puede recuperar su contraseña
 sin estar logueado, desde "¿Olvidaste tu contraseña?" en el login:

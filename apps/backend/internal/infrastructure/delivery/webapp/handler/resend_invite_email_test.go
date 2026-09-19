@@ -98,6 +98,7 @@ func TestResendInviteEmailRoute(t *testing.T) {
 			{name: "not found", err: domain.ErrUsuarioNoEncontrado, wantStatus: http.StatusNotFound, wantCode: "user_not_found"},
 			{name: "already inactive", err: domain.ErrUsuarioDadoDeBaja, wantStatus: http.StatusConflict, wantCode: "user_already_inactive"},
 			{name: "mail unavailable", err: domain.ErrInviteEmailUnavailable, wantStatus: http.StatusServiceUnavailable, wantCode: "invite_email_unavailable"},
+			{name: "rate limited", err: domain.ErrInviteEmailRateLimited, wantStatus: http.StatusTooManyRequests, wantCode: "invite_email_rate_limited"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 
