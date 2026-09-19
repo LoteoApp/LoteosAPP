@@ -28,6 +28,37 @@ var (
 	// (a write targeting an inactive user) — this one blocks every request
 	// from an inactive caller, checked once per request in middleware.
 	ErrCuentaInactiva = &Error{Kind: KindForbidden, Code: "account_inactive", Message: "Tu cuenta fue dada de baja"}
+	// ErrInviteEmailUnavailable: ResendInviteEmail's send failed. Unlike
+	// CreateUser (which swallows the same failure — the admin already has
+	// the temporary password to hand over another way), this is a caller
+	// explicitly asking for the mail to go out, so it's surfaced instead of
+	// logged and dropped.
+	ErrInviteEmailUnavailable = &Error{Kind: KindUnavailable, Code: "invite_email_unavailable", Message: "No se pudo enviar el mail de invitación"}
+	// ErrInviteEmailRateLimited: ResendInviteEmail was called again for the
+	// same user before its in-memory cooldown elapsed. Protects the mail
+	// provider's quota from a double click, a network retry, or several
+	// admin tabs open at once.
+	ErrInviteEmailRateLimited = &Error{Kind: KindRateLimited, Code: "invite_email_rate_limited", Message: "Esperá un momento antes de volver a reenviar la invitación"}
+	// ErrPasswordResetRateLimited: RequestPasswordReset was called again for
+	// the same email before its in-memory cooldown elapsed. Checked before
+	// looking the email up, so it applies the same way whether or not the
+	// email belongs to a real account — that's what keeps the cooldown from
+	// doubling as an existence check.
+	ErrPasswordResetRateLimited = &Error{Kind: KindRateLimited, Code: "password_reset_rate_limited", Message: "Ya te enviamos un mail. Esperá un momento antes de pedir otro"}
+	// ErrPasswordResetBusy: RequestPasswordReset already has its maximum of
+	// background jobs in flight. Depends only on load, never on the email, so
+	// it can't be used to tell registered emails apart.
+	ErrPasswordResetBusy = &Error{Kind: KindUnavailable, Code: "password_reset_busy", Message: "Estamos recibiendo muchos pedidos. Probá de nuevo en unos minutos"}
+	// ErrPasswordResetTokenInvalido: ResetPassword got a token that's
+	// unknown, expired, or already used. All three collapse into the same
+	// error and message — telling them apart would let a caller probe for
+	// which tokens once existed.
+	ErrPasswordResetTokenInvalido = &Error{Kind: KindInvalid, Code: "password_reset_token_invalid", Message: "El link para restablecer la contraseña es inválido o venció"}
+	ErrPasswordInvalido           = &Error{Kind: KindInvalid, Code: "invalid_password", Message: "La contraseña debe tener al menos 8 caracteres"}
+	// ErrInviteAlreadyAccepted: ResendInviteEmail targeted an account that
+	// already confirmed itself, for which the identity provider refuses to
+	// mint another invite link.
+	ErrInviteAlreadyAccepted = &Error{Kind: KindConflict, Code: "invite_already_accepted", Message: "El usuario ya activó su cuenta, no necesita otra invitación"}
 )
 
 type Usuario struct {
@@ -43,6 +74,9 @@ type Usuario struct {
 	PerfilCompleto bool       `json:"perfilCompleto"`
 	FechaBaja      *time.Time `json:"fechaBaja"`
 	CreatedAt      time.Time  `json:"createdAt"`
+	// InvitacionAceptada is only set where the identity provider was asked:
+	// nil means unknown, not "pending".
+	InvitacionAceptada *bool `json:"invitacionAceptada,omitempty"`
 }
 
 // Activo reports whether the user may still operate. A user given de baja
@@ -63,6 +97,13 @@ type UsuarioUpdate struct {
 	UsuarioModificacion string
 }
 
+// maxEmailLength follows RFC 5321's 254-character limit on the reverse-path,
+// which in practice bounds a full email address. Enforcing it here also
+// keeps an unauthenticated caller (password reset) from making the JSON
+// decoder and every downstream string operation work on an arbitrarily
+// large value.
+const maxEmailLength = 254
+
 func EmailValido(email string) bool {
-	return email != "" && strings.Contains(email, "@")
+	return email != "" && len(email) <= maxEmailLength && strings.Contains(email, "@")
 }

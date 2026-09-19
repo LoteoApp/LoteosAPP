@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from './users'
+import { createUser, deactivateUser, listUsers, reactivateUser, resendInviteEmail, updateUser } from './users'
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -46,6 +46,102 @@ describe('listUsers', () => {
     expect(url).toContain('/api/v1/usuarios')
     expect(url).toContain('incluirBajas=true')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token-123')
+  })
+
+  it('keeps the invitation state the backend reports', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: false,
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    const usuarios = await listUsers('token-123')
+
+    expect(usuarios[0].invitacionAceptada).toBe(false)
+  })
+
+  it('rejects a user whose invitation state is not a boolean', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: 'yes',
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
+  })
+
+  it('keeps the invitation state the backend reports', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: false,
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    const usuarios = await listUsers('token-123')
+
+    expect(usuarios[0].invitacionAceptada).toBe(false)
+  })
+
+  it('rejects a user whose invitation state is not a boolean', async () => {
+    stubFetch(
+      jsonResponse(200, {
+        usuarios: [
+          {
+            id: 'usuario-1',
+            email: 'ana@example.com',
+            nombre: 'Ana',
+            apellido: 'Pérez',
+            rol: 'administrativo',
+            perfilCompleto: true,
+            invitacionAceptada: 'yes',
+            fechaBaja: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
+    )
+
+    await expect(listUsers('token-123')).rejects.toThrow(
+      'No se pudo completar la operación, intentá nuevamente.'
+    )
   })
 
   it('returns an empty list when usuarios is null', async () => {
@@ -144,7 +240,7 @@ describe('listUsers', () => {
 })
 
 describe('createUser', () => {
-  it('posts the form values and returns the user with its temporary password', async () => {
+  it('posts the form values and returns the created user', async () => {
     const fetchMock = stubFetch(
       jsonResponse(201, {
         id: 'usuario-1',
@@ -155,7 +251,7 @@ describe('createUser', () => {
         perfilCompleto: true,
         fechaBaja: null,
         createdAt: '2026-01-01T00:00:00Z',
-        temporaryPassword: 'temp-pass-123',
+        invitacionEnviada: true,
       })
     )
 
@@ -167,7 +263,7 @@ describe('createUser', () => {
     })
 
     expect(created.usuario.id).toBe('usuario-1')
-    expect(created.temporaryPassword).toBe('temp-pass-123')
+    expect(created.invitacionEnviada).toBe(true)
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(init.method).toBe('POST')
@@ -180,7 +276,32 @@ describe('createUser', () => {
     })
   })
 
-  it('rejects a created user with no temporary password', async () => {
+  it('reports when the invite email failed to send', async () => {
+    stubFetch(
+      jsonResponse(201, {
+        id: 'usuario-1',
+        email: 'ana@example.com',
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        rol: 'administrativo',
+        perfilCompleto: true,
+        fechaBaja: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        invitacionEnviada: false,
+      })
+    )
+
+    const created = await createUser('token-123', {
+      nombre: 'Ana',
+      apellido: 'Pérez',
+      email: 'ana@example.com',
+      rol: 'administrativo',
+    })
+
+    expect(created.invitacionEnviada).toBe(false)
+  })
+
+  it('rejects a created user with no invitacionEnviada flag', async () => {
     stubFetch(
       jsonResponse(201, {
         id: 'usuario-1',
@@ -296,5 +417,27 @@ describe('reactivateUser', () => {
     stubFetch(jsonResponse(409, { code: 'user_already_active', message: 'El usuario ya está activo' }))
 
     await expect(reactivateUser('token-123', 'usuario-1')).rejects.toThrow('El usuario ya está activo')
+  })
+})
+
+describe('resendInviteEmail', () => {
+  it('posts to the reenviar-invitacion endpoint', async () => {
+    const fetchMock = stubFetch(new Response(null, { status: 204 }))
+
+    await resendInviteEmail('token-123', 'usuario-1')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toContain('/api/v1/usuarios/usuario-1/reenviar-invitacion')
+    expect(init.method).toBe('POST')
+  })
+
+  it('throws the message returned by the backend when the mail provider is unavailable', async () => {
+    stubFetch(
+      jsonResponse(503, { code: 'invite_email_unavailable', message: 'No se pudo enviar el mail de invitación' })
+    )
+
+    await expect(resendInviteEmail('token-123', 'usuario-1')).rejects.toThrow(
+      'No se pudo enviar el mail de invitación'
+    )
   })
 })

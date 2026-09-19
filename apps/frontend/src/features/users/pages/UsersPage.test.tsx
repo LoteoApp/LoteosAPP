@@ -17,6 +17,7 @@ type StoredUsuario = {
   rol: string
   inmobiliariaId?: string
   perfilCompleto: boolean
+  invitacionAceptada?: boolean
   fechaBaja: string | null
   createdAt: string
 }
@@ -26,6 +27,7 @@ let failure: { status: number; message: string; code?: string } | null = null
 let nextId = 0
 let getGate: Promise<void> | null = null
 let rejectWith: unknown = null
+let inviteEmailSent = true
 
 function usuario(overrides: Partial<StoredUsuario>): StoredUsuario {
   return {
@@ -39,6 +41,17 @@ function usuario(overrides: Partial<StoredUsuario>): StoredUsuario {
     createdAt: '2026-01-01T00:00:00Z',
     ...overrides,
   }
+}
+
+// The real PATCH and reactivation responses do not ask the identity
+// provider, so they carry no invitation state.
+function withoutInvitationState(candidate: StoredUsuario | undefined) {
+  if (!candidate) {
+    return candidate
+  }
+  const copy = { ...candidate }
+  delete copy.invitacionAceptada
+  return copy
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -79,7 +92,11 @@ function installFetch() {
         stored = stored.map((candidate) =>
           candidate.id === targetId ? { ...candidate, fechaBaja: null } : candidate
         )
-        return jsonResponse(200, stored.find((candidate) => candidate.id === targetId))
+        return jsonResponse(200, withoutInvitationState(stored.find((candidate) => candidate.id === targetId)))
+      }
+
+      if (method === 'POST' && url.endsWith('/reenviar-invitacion')) {
+        return new Response(null, { status: 204 })
       }
 
       if (method === 'POST') {
@@ -90,9 +107,9 @@ function installFetch() {
         if (stored.some((candidate) => candidate.email === values.email)) {
           return jsonResponse(409, { code: 'email_in_use', message: 'El email ya está en uso' })
         }
-        const created = usuario(values)
+        const created = usuario({ ...values, invitacionAceptada: false })
         stored = [...stored, created]
-        return jsonResponse(201, { ...created, temporaryPassword: 'temp-pass-123' })
+        return jsonResponse(201, { ...created, invitacionEnviada: inviteEmailSent })
       }
 
       const id = url.slice(url.lastIndexOf('/') + 1).split('?')[0]
@@ -102,7 +119,7 @@ function installFetch() {
         stored = stored.map((candidate) =>
           candidate.id === id ? { ...candidate, ...values } : candidate
         )
-        return jsonResponse(200, stored.find((candidate) => candidate.id === id))
+        return jsonResponse(200, withoutInvitationState(stored.find((candidate) => candidate.id === id)))
       }
 
       if (method === 'DELETE') {
@@ -148,6 +165,7 @@ beforeEach(() => {
   nextId = 0
   getGate = null
   rejectWith = null
+  inviteEmailSent = true
   installFetch()
 })
 
@@ -260,7 +278,7 @@ describe('UsersPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('creates a new user and shows its temporary password', async () => {
+  it('creates a new user and confirms the invite email went out', async () => {
     const user = userEvent.setup()
     renderUsersPage()
     await screen.findByText('No hay usuarios cargados todavía.')
@@ -276,7 +294,33 @@ describe('UsersPage', () => {
 
     const card = (await screen.findByText('Ana Pérez')).closest('li') as HTMLElement
     expect(within(card).getByText('Escribano')).toBeInTheDocument()
-    expect(screen.getByText('temp-pass-123')).toBeInTheDocument()
+    expect(screen.getByText(/se envió un mail de invitación/i)).toBeInTheDocument()
+  })
+
+  it('warns and offers a resend when the invite email fails to send on creation', async () => {
+    const user = userEvent.setup()
+    inviteEmailSent = false
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, {
+      nombre: 'Ana',
+      apellido: 'Pérez',
+      email: 'ana@example.com',
+      rol: 'escribano',
+    })
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    await screen.findByText(/no se pudo enviar el mail de invitación/i)
+    const alert = screen.getByRole('alert')
+    const resendButton = within(alert).getByRole('button', { name: 'Reenviar invitación' })
+
+    await user.click(resendButton)
+
+    expect(screen.queryByText(/no se pudo enviar el mail de invitación/i)).not.toBeInTheDocument()
+    expect(within(alert).queryByRole('button', { name: 'Reenviar invitación' })).not.toBeInTheDocument()
+    expect(within(alert).getByText(/se envió un mail de invitación/i)).toBeInTheDocument()
   })
 
   it('shows the agency selector only while rol is inmobiliaria', async () => {
@@ -497,6 +541,133 @@ describe('UsersPage', () => {
 
     expect(await screen.findByText('El usuario ya está activo')).toBeInTheDocument()
     expect(screen.getByText('Dado de baja')).toBeInTheDocument()
+  })
+
+  it('resends the invite email for an active user', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Reenviar invitación' }))
+
+    expect(screen.queryByText(/no se pudo completar la operación/i)).not.toBeInTheDocument()
+  })
+
+  it('flags the users who have not accepted their invitation yet', async () => {
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', invitacionAceptada: true }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    const pendingCard = screen.getByText('Ana Pérez').closest('li') as HTMLElement
+    const acceptedCard = screen.getByText('Luis Gómez').closest('li') as HTMLElement
+    expect(within(pendingCard).getByText('Invitación pendiente')).toBeInTheDocument()
+    expect(within(pendingCard).queryByText('Activo')).not.toBeInTheDocument()
+    expect(within(acceptedCard).getByText('Activo')).toBeInTheDocument()
+    expect(within(acceptedCard).queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('shows a user given de baja as such even if the invitation was never accepted', async () => {
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false, fechaBaja: '2026-01-15T00:00:00Z' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    const card = screen.getByText('Ana Pérez').closest('li') as HTMLElement
+    expect(within(card).getByText('Dado de baja')).toBeInTheDocument()
+    expect(within(card).queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('filters the users with a pending invitation apart from the active ones', async () => {
+    const user = userEvent.setup()
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', invitacionAceptada: true }),
+      usuario({ nombre: 'Marta', apellido: 'Ruiz', fechaBaja: '2026-01-15T00:00:00Z' }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await selectOption(user, 'Estado', 'Invitación pendiente')
+
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
+    expect(screen.queryByText('Marta Ruiz')).not.toBeInTheDocument()
+
+    await selectOption(user, 'Estado', 'Activos')
+
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
+    expect(screen.queryByText('Marta Ruiz')).not.toBeInTheDocument()
+  })
+
+  it('offers the resend only to users who have not accepted their invitation', async () => {
+    stored = [
+      usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: false }),
+      usuario({ nombre: 'Luis', apellido: 'Gómez', invitacionAceptada: true }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    const pendingCard = screen.getByText('Ana Pérez').closest('li') as HTMLElement
+    const acceptedCard = screen.getByText('Luis Gómez').closest('li') as HTMLElement
+    expect(within(pendingCard).getByRole('button', { name: 'Reenviar invitación' })).toBeInTheDocument()
+    expect(within(acceptedCard).queryByRole('button', { name: 'Reenviar invitación' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the resend and shows no pending flag when the invitation state is unknown', async () => {
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    expect(screen.getByRole('button', { name: 'Reenviar invitación' })).toBeInTheDocument()
+    expect(screen.queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('marks a just-created user as pending', async () => {
+    const user = userEvent.setup()
+    renderUsersPage()
+    await screen.findByText('No hay usuarios cargados todavía.')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    await fillUserForm(user, { nombre: 'Carla', apellido: 'Ruiz', email: 'carla@example.com', rol: 'escribano' })
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }))
+
+    const card = (await screen.findByText('Carla Ruiz')).closest('li') as HTMLElement
+    expect(within(card).getByText('Invitación pendiente')).toBeInTheDocument()
+  })
+
+  it('keeps the invitation state of a user after editing it', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez', invitacionAceptada: true })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    const nombreInput = screen.getByLabelText('Nombre')
+    await user.clear(nombreInput)
+    await user.type(nombreInput, 'Ana María')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    const card = (await screen.findByText('Ana María Pérez')).closest('li') as HTMLElement
+    expect(within(card).queryByRole('button', { name: 'Reenviar invitación' })).not.toBeInTheDocument()
+    expect(within(card).queryByText('Invitación pendiente')).not.toBeInTheDocument()
+  })
+
+  it('shows the backend error when resending the invite email fails', async () => {
+    const user = userEvent.setup()
+    stored = [usuario({ nombre: 'Ana', apellido: 'Pérez' })]
+    renderUsersPage()
+    await screen.findByText('Ana Pérez')
+
+    failure = { status: 503, code: 'invite_email_unavailable', message: 'No se pudo enviar el mail de invitación' }
+    await user.click(screen.getByRole('button', { name: 'Reenviar invitación' }))
+
+    expect(await screen.findByText('No se pudo enviar el mail de invitación')).toBeInTheDocument()
   })
 
   it('filters the list by rol', async () => {
