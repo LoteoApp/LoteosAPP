@@ -25,6 +25,10 @@ const passwordResetRequestCooldown = 60 * time.Second
 // spawn goroutines and database lookups without limit.
 const maxConcurrentPasswordResets = 16
 
+// passwordResetWorkTimeout bounds each background lookup-and-send job, which
+// no longer inherits the request's deadline.
+const passwordResetWorkTimeout = 15 * time.Second
+
 // maxTrackedResetEmails caps lastSent so a burst of distinct made-up emails
 // within a single cooldown window can't grow it without bound — the sweep
 // alone only reclaims entries once they age out.
@@ -49,8 +53,9 @@ type requestPasswordResetUseCase struct {
 	// dispatch runs the lookup-and-send work. Defaults to a real goroutine;
 	// tests overwrite it to run inline so assertions after Execute returns
 	// see its effects deterministically.
-	dispatch func(func())
-	inFlight chan struct{}
+	dispatch    func(func())
+	inFlight    chan struct{}
+	workTimeout time.Duration
 
 	mu       sync.Mutex
 	lastSent map[string]time.Time
@@ -68,14 +73,15 @@ func NewRequestPasswordReset(
 		clock = clocks[0]
 	}
 	return &requestPasswordResetUseCase{
-		repository: repository,
-		mailer:     mailer,
-		tokens:     tokens,
-		resetURL:   resetURL,
-		clock:      clock,
-		dispatch:   func(work func()) { go work() },
-		inFlight:   make(chan struct{}, maxConcurrentPasswordResets),
-		lastSent:   make(map[string]time.Time),
+		repository:  repository,
+		mailer:      mailer,
+		tokens:      tokens,
+		resetURL:    resetURL,
+		clock:       clock,
+		dispatch:    func(work func()) { go work() },
+		inFlight:    make(chan struct{}, maxConcurrentPasswordResets),
+		workTimeout: passwordResetWorkTimeout,
+		lastSent:    make(map[string]time.Time),
 	}
 }
 
@@ -101,10 +107,14 @@ func (useCase *requestPasswordResetUseCase) Execute(ctx context.Context, email s
 		return domain.ErrPasswordResetRateLimited
 	}
 
-	detached := context.WithoutCancel(ctx)
+	// WithoutCancel also drops the request's deadline, so the job needs its
+	// own: a hung lookup or send would otherwise hold its inFlight slot
+	// forever and, once all of them hang, keep the endpoint answering busy.
+	work, cancel := context.WithTimeout(context.WithoutCancel(ctx), useCase.workTimeout)
 	useCase.dispatch(func() {
+		defer cancel()
 		defer func() { <-useCase.inFlight }()
-		useCase.sendResetLink(detached, email)
+		useCase.sendResetLink(work, email)
 	})
 
 	return nil

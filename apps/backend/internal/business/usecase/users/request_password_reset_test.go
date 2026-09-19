@@ -297,3 +297,73 @@ func TestRequestPasswordResetCapsBackgroundJobsInFlight(t *testing.T) {
 		t.Errorf("Execute() after a job finished error = %v, want the rejected email to go through: being busy must not start its cooldown", err)
 	}
 }
+
+type lookupContextRepository struct {
+	*gatewayfake.UserRepository
+	onLookup func(context.Context)
+}
+
+func (repository *lookupContextRepository) FindByEmail(ctx context.Context, email string) (domain.Usuario, error) {
+	repository.onLookup(ctx)
+	return repository.UserRepository.FindByEmail(ctx, email)
+}
+
+func TestRequestPasswordResetJobSurvivesRequestCancellationWithItsOwnDeadline(t *testing.T) {
+	t.Parallel()
+
+	var lookupErr error
+	var hasDeadline bool
+	repository := &lookupContextRepository{
+		UserRepository: &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado},
+		onLookup: func(ctx context.Context) {
+			lookupErr = ctx.Err()
+			_, hasDeadline = ctx.Deadline()
+		},
+	}
+	requestReset := newSyncRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()})
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	cancelRequest()
+
+	if err := requestReset.Execute(requestCtx, "ana@example.com"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if lookupErr != nil {
+		t.Errorf("lookup context error = %v, want the job to outlive the cancelled request", lookupErr)
+	}
+	if !hasDeadline {
+		t.Error("lookup context has no deadline, want the job bounded by its own timeout")
+	}
+}
+
+func TestRequestPasswordResetReleasesTheSlotOfAHungJob(t *testing.T) {
+	t.Parallel()
+
+	repository := &lookupContextRepository{
+		UserRepository: &gatewayfake.UserRepository{FindByEmailErr: domain.ErrUsuarioNoEncontrado},
+		onLookup:       func(ctx context.Context) { <-ctx.Done() },
+	}
+	requestReset := NewRequestPasswordReset(repository, &gatewayfake.Mailer{}, NewPasswordResetTokens(), testResetURL, fixedClock{now: time.Now()}).(*requestPasswordResetUseCase)
+	requestReset.workTimeout = 20 * time.Millisecond
+
+	for index := 0; index < maxConcurrentPasswordResets; index++ {
+		if err := requestReset.Execute(context.Background(), fmt.Sprintf("user-%d@example.com", index)); err != nil {
+			t.Fatalf("Execute() call %d error = %v", index, err)
+		}
+	}
+	if err := requestReset.Execute(context.Background(), "waiting@example.com"); !errors.Is(err, domain.ErrPasswordResetBusy) {
+		t.Fatalf("Execute() with every slot hung error = %v, want %v", err, domain.ErrPasswordResetBusy)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err := requestReset.Execute(context.Background(), "waiting@example.com")
+		if err == nil {
+			return
+		}
+		if !errors.Is(err, domain.ErrPasswordResetBusy) || time.Now().After(deadline) {
+			t.Fatalf("Execute() after the hung jobs timed out error = %v, want a released slot", err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
