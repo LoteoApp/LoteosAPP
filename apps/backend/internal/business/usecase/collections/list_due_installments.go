@@ -1,0 +1,44 @@
+package collections
+
+import (
+	"context"
+
+	"loteosapp/backend/internal/business/domain"
+	"loteosapp/backend/internal/business/gateway"
+)
+
+type ListDueInstallmentsInput struct {
+	Actor  Actor
+	Filter domain.DueInstallmentFilter
+}
+
+// ListDueInstallments lists the cuotas of active financed ventas by
+// vencimiento, across every venta the actor can reach.
+type ListDueInstallments interface {
+	Execute(ctx context.Context, input ListDueInstallmentsInput) (domain.DueInstallmentPage, error)
+}
+
+type listDueInstallmentsUseCase struct {
+	repository gateway.CollectionRepository
+	clock      Clock
+}
+
+func NewListDueInstallments(repository gateway.CollectionRepository, clocks ...Clock) ListDueInstallments {
+	return &listDueInstallmentsUseCase{repository: repository, clock: clockOrSystem(clocks)}
+}
+
+func (useCase *listDueInstallmentsUseCase) Execute(ctx context.Context, input ListDueInstallmentsInput) (domain.DueInstallmentPage, error) {
+	scope, err := collectionScope(input.Actor)
+	if err != nil {
+		return domain.DueInstallmentPage{}, err
+	}
+	filter, err := input.Filter.Normalize()
+	if err != nil {
+		return domain.DueInstallmentPage{}, err
+	}
+	page, err := useCase.repository.ListDueInstallments(ctx, filter, scope, useCase.clock.Now().UTC())
+	if err != nil {
+		return domain.DueInstallmentPage{}, fromRepository(err)
+	}
+	return page, nil
+}

@@ -8,6 +8,7 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 	"loteosapp/backend/internal/business/usecase/agencies"
 	"loteosapp/backend/internal/business/usecase/clients"
+	"loteosapp/backend/internal/business/usecase/collections"
 	"loteosapp/backend/internal/business/usecase/loteos"
 	"loteosapp/backend/internal/business/usecase/reservations"
 	"loteosapp/backend/internal/business/usecase/sales"
@@ -57,6 +58,10 @@ type Container struct {
 	CreateSaleHandler           *handler.CreateSaleHandler
 	ListSalesHandler            *handler.ListSalesHandler
 	GetSaleHandler              *handler.GetSaleHandler
+	GetDebtStatementHandler     *handler.GetDebtStatementHandler
+	ListDueInstallmentsHandler  *handler.ListDueInstallmentsHandler
+	RegisterPaymentHandler      *handler.RegisterPaymentHandler
+	SettleSaleHandler           *handler.SettleSaleHandler
 	ListEligibleSellersHandler  *handler.ListEligibleSellersHandler
 	ResendInviteEmailHandler    *handler.ResendInviteEmailHandler
 	RequestPasswordResetHandler *handler.RequestPasswordResetHandler
@@ -159,6 +164,12 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createSaleHandler := handler.NewCreateSaleHandler(sales.NewCreateSale(saleRepo, userRepo))
 	listSalesHandler := handler.NewListSalesHandler(sales.NewListSales(saleRepo))
 	getSaleHandler := handler.NewGetSaleHandler(sales.NewGetSale(saleRepo))
+
+	collectionRepo := postgres.NewCollectionRepository(pool)
+	getDebtStatementHandler := handler.NewGetDebtStatementHandler(collections.NewGetDebtStatement(collectionRepo))
+	listDueInstallmentsHandler := handler.NewListDueInstallmentsHandler(collections.NewListDueInstallments(collectionRepo))
+	registerPaymentHandler := handler.NewRegisterPaymentHandler(collections.NewRegisterPayment(collectionRepo, userRepo))
+	settleSaleHandler := handler.NewSettleSaleHandler(collections.NewSettleSale(collectionRepo, userRepo))
 	var reservationExpiryWorker *worker.ReservationExpiryWorker
 	if cfg.ReservationExpiry.Enabled {
 		reservationExpiryWorker = worker.NewReservationExpiryWorker(
@@ -205,6 +216,10 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		CreateSaleHandler:           createSaleHandler,
 		ListSalesHandler:            listSalesHandler,
 		GetSaleHandler:              getSaleHandler,
+		GetDebtStatementHandler:     getDebtStatementHandler,
+		ListDueInstallmentsHandler:  listDueInstallmentsHandler,
+		RegisterPaymentHandler:      registerPaymentHandler,
+		SettleSaleHandler:           settleSaleHandler,
 		ListEligibleSellersHandler:  listEligibleSellersHandler,
 		ResendInviteEmailHandler:    resendInviteEmailHandler,
 		RequestPasswordResetHandler: requestPasswordResetHandler,
