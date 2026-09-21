@@ -207,6 +207,16 @@ para que `vendido → finalizado` acepte también el origen `venta`, además de
 en la misma transacción. El `Down` vuelve a exigir `cobranza` sin tocar el
 historial ya registrado.
 
+`00013_create_cobros.sql` crea `cobros` (un cobro por operación: `venta_id`,
+`tipo` `pago`/`cancelacion_total`, `monto`, `moneda`, `medio_pago`,
+`observacion`, `usuario_alta`, `fecha_pago`) y enlaza lo que cada cobro pagó:
+`cuotas.cobro_id` (con el check `cuotas_cobro_pagada_chk`: un cobro implica
+`estado = 'pagada'` y `fecha_pago`) y `planes_pago.cobro_entrega_id` junto al
+`fecha_entrega` que ya existía. Habilita RLS y revoca `anon`/`authenticated`
+como el resto. El `Down` elimina las columnas y la tabla, así que un rollback
+pierde el historial de cobros aunque las cuotas conservan `estado` y
+`fecha_pago`.
+
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
 ```sql

@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/reservas', label: 'Reservas', icon: CalendarCheck, roles: RESERVATION_ROLES },
   { to: '/ventas', label: 'Ventas', icon: Handshake, roles: RESERVATION_ROLES },
-  { to: '/cobranzas', label: 'Cobranzas', icon: Wallet },
+  { to: '/cobranzas', label: 'Cobranzas', icon: Wallet, roles: RESERVATION_ROLES },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog, roles: [ROLE.administrador] },
   { to: '/inmobiliarias', label: 'Inmobiliarias', icon: Building2 },
 ]

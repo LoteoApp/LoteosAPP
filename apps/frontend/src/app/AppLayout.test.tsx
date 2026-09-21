@@ -244,5 +244,7 @@ describe('AppLayout', () => {
     renderLayoutAt('/lotes', 'agrimensor')
 
     expect(screen.queryByRole('link', { name: 'Reservas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Ventas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Cobranzas' })).not.toBeInTheDocument()
   })
 })

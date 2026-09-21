@@ -151,6 +151,30 @@ Endpoints operativos del backend:
   inmobiliaria las vendidas por su agencia. El listado admite `estado`,
   `loteoId`, `loteId`, `q`, `pagina` y `porPagina` y trae el resumen del
   `planPago`; el detalle agrega sus `cuotas`.
+- `GET /api/v1/ventas/{id}/estado-deuda`: estado de deuda de una venta
+  financiada (`sale_not_financed` para una venta al contado): la venta, la
+  `entrega` (si la modalidad la tiene), las `cuotas` con su estado a la fecha
+  (`vencida` se deriva del vencimiento, no se persiste), el `resumen`
+  (totales, pagado, pendiente, vencido, próximo vencimiento) y los `cobros`
+  registrados con las cuotas que pagó cada uno.
+- `POST /api/v1/ventas/{id}/cobros`: registra un cobro con `cuotaIds` y/o
+  `incluirEntrega`, más `medioPago` (`efectivo`, `transferencia`, `cheque`,
+  `otro`), `fechaPago` (RFC 3339, opcional; no futura) y `observacion`
+  (opcional, hasta 500 caracteres). Las cuotas se cobran en orden: elegir la 3
+  con la 2 pendiente es `payment_installment_order`; repetir una pagada es
+  `payment_installment_paid`. Devuelve `201` con el cobro. Si no queda nada
+  pendiente, la venta pasa a `completada` y el lote a `finalizado`.
+- `POST /api/v1/ventas/{id}/cancelacion-total`: cobra todo el saldo en un
+  solo cobro (`tipo = cancelacion_total`). Acepta `montoEsperado`, el saldo
+  que vio el cliente: si ya no coincide responde `settlement_amount_mismatch`
+  (409) en lugar de cobrar otro total. Una venta que no está `activa` es
+  `sale_not_active`.
+- `GET /api/v1/cobranzas/vencimientos`: cuotas de todas las ventas del
+  alcance, ordenadas por vencimiento. Admite `estado` (`pendiente`,
+  `vencida`, `pagada`; sin filtro lista pendientes y vencidas), `loteoId`,
+  `q`, `desde`/`hasta` (fecha `YYYY-MM-DD` en hora argentina o RFC 3339),
+  `pagina` y `porPagina`, y trae un `resumen` con cuotas vencidas y a vencer
+  en 30 días sobre todo el alcance.
 
 El backend ejecuta el vencimiento automático al iniciar y cada minuto. Se
 puede deshabilitar o ajustar sin recompilar mediante las variables
