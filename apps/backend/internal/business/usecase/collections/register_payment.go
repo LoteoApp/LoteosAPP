@@ -9,11 +9,21 @@ import (
 	"loteosapp/backend/internal/business/gateway"
 )
 
+// ChargeInput is a cargo adicional as the request describes it. Currency is
+// optional: blank means the sale's.
+type ChargeInput struct {
+	Type     string
+	Amount   float64
+	Currency string
+	Detail   string
+}
+
 type RegisterPaymentInput struct {
 	Actor              Actor
 	SaleID             string
 	InstallmentIDs     []string
 	IncludeDownPayment bool
+	Charges            []ChargeInput
 	Medium             string
 	// PaidAt is when the client paid; nil means now.
 	PaidAt      *time.Time
@@ -58,6 +68,10 @@ func (useCase *registerPaymentUseCase) Execute(ctx context.Context, input Regist
 	if err != nil {
 		return domain.Payment{}, err
 	}
+	charges, err := paymentCharges(input.Charges)
+	if err != nil {
+		return domain.Payment{}, err
+	}
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
 	if err != nil {
 		return domain.Payment{}, fromRepository(err)
@@ -71,6 +85,7 @@ func (useCase *registerPaymentUseCase) Execute(ctx context.Context, input Regist
 		Type:               domain.PaymentTypeRegular,
 		InstallmentIDs:     installmentIDs,
 		IncludeDownPayment: input.IncludeDownPayment,
+		Charges:            charges,
 		Medium:             terms.Medium,
 		Observation:        terms.Observation,
 		PaidAt:             terms.PaidAt,
@@ -95,6 +110,22 @@ func paymentTerms(medium string, paidAt *time.Time, observation string, now time
 		return domain.PaymentTerms{}, err
 	}
 	return terms, nil
+}
+
+// paymentCharges maps and validates the cargos adicionales. The currency is
+// left as typed (blank included): the repository resolves a blank one to the
+// sale's currency, which only it knows.
+func paymentCharges(charges []ChargeInput) ([]domain.PaymentChargeInput, error) {
+	mapped := make([]domain.PaymentChargeInput, len(charges))
+	for i, charge := range charges {
+		mapped[i] = domain.PaymentChargeInput{
+			Tipo:    domain.ChargeType(strings.TrimSpace(charge.Type)),
+			Monto:   charge.Amount,
+			Moneda:  charge.Currency,
+			Detalle: charge.Detail,
+		}
+	}
+	return domain.NormalizePaymentCharges(mapped, "")
 }
 
 func nonBlank(values []string) []string {

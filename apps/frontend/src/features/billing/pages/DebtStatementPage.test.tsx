@@ -60,6 +60,7 @@ const statement: DebtStatement = {
     proximoVencimiento: '2026-07-15T12:00:00Z',
   },
   cobros: [],
+  cargosCobrados: [],
   emitidoEl: '2026-05-01T12:00:00Z',
 }
 
@@ -74,9 +75,25 @@ const payment: Payment = {
   incluyeEntrega: true,
   montoEntrega: 40000,
   cuotas: [{ id: 'c-1', numero: 1, monto: 20000, estado: 'pagada', fechaVencimiento: '2026-04-15T12:00:00Z', fechaPago: '2026-05-01T12:00:00Z', cobroId: 'cobro-1' }],
+  cargos: [],
+  totales: [{ moneda: 'USD', monto: 60000 }],
   usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
   fechaPago: '2026-05-01T12:00:00Z',
   fechaCreacion: '2026-05-01T12:05:00Z',
+}
+
+// The cuota is in USD and the services in ARS: two totals, nothing converted.
+const paymentWithCharges: Payment = {
+  ...payment,
+  id: 'cobro-2',
+  incluyeEntrega: false,
+  montoEntrega: 0,
+  monto: 20000,
+  cargos: [{ id: 'cargo-1', tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua' }],
+  totales: [
+    { moneda: 'USD', monto: 20000 },
+    { moneda: 'ARS', monto: 150000 },
+  ],
 }
 
 const paidStatement: DebtStatement = {
@@ -85,6 +102,13 @@ const paidStatement: DebtStatement = {
   cuotas: [{ ...statement.cuotas[0], estado: 'pagada', fechaPago: '2026-05-01T12:00:00Z', cobroId: 'cobro-1' }, statement.cuotas[1], statement.cuotas[2]],
   resumen: { ...statement.resumen, montoPagado: 60000, montoPendiente: 40000, montoVencido: 0, cuotasPagadas: 1, cuotasPendientes: 2, cuotasVencidas: 0 },
   cobros: [payment],
+  cargosCobrados: [],
+}
+
+const paidWithChargesStatement: DebtStatement = {
+  ...paidStatement,
+  cobros: [paymentWithCharges],
+  cargosCobrados: [{ moneda: 'ARS', monto: 150000 }],
 }
 
 function renderPage(token = 'token') {
@@ -166,13 +190,15 @@ describe('DebtStatementPage', () => {
     await user.click(await screen.findByRole('option', { name: 'Transferencia' }))
     await user.clear(within(dialog).getByLabelText('Fecha de pago'))
     await user.type(within(dialog).getByLabelText('Fecha de pago'), '2026-05-01')
-    await user.type(within(dialog).getByLabelText('Observación'), 'Transf. 123')
+    await user.click(within(dialog).getByLabelText('Observación'))
+    await user.paste('Transf. 123')
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar cobro' }))
 
     await waitFor(() =>
       expect(mocks.registerPayment).toHaveBeenCalledWith('token', 'sale-1', {
         cuotaIds: ['c-1'],
         incluirEntrega: true,
+        cargos: [],
         medioPago: 'transferencia',
         fechaPago: '2026-05-01',
         observacion: 'Transf. 123',
@@ -194,7 +220,85 @@ describe('DebtStatementPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Imprimir recibo del cobro del 01\/05\/2026/ }))
     expect(await screen.findByRole('dialog', { name: 'Recibo de cobro' })).toHaveTextContent('Cuota 1')
-  })
+  }, 15000)
+
+  it('collects extra charges in another currency without mixing them with the cuota', async () => {
+    mocks.getDebtStatement.mockResolvedValueOnce(statement).mockResolvedValueOnce(paidWithChargesStatement)
+    mocks.registerPayment.mockResolvedValue(paymentWithCharges)
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByText('Pérez, Ana')
+    await user.click(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' }))
+    await user.click(screen.getByRole('button', { name: /Registrar cobro/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' })
+
+    await user.click(within(dialog).getByRole('button', { name: 'Agregar cargo' }))
+    await user.click(within(dialog).getByLabelText('Monto'))
+    await user.paste('150000')
+    await user.clear(within(dialog).getByLabelText('Moneda'))
+    await user.paste('ars')
+    await user.click(within(dialog).getByLabelText('Detalle'))
+    await user.paste('Agua')
+
+    // es-AR renders ARS as a bare "$"; the currency each amount belongs to is
+    // the sr-only term next to it.
+    const totals = within(dialog).getByRole('group', { name: 'Total a cobrar' })
+    expect(totals).toHaveTextContent(/US\$\s?20\.000,00/)
+    expect(totals).toHaveTextContent(/ARS\$\s?150\.000,00/)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar cobro' }))
+
+    await waitFor(() =>
+      expect(mocks.registerPayment).toHaveBeenCalledWith(
+        'token',
+        'sale-1',
+        expect.objectContaining({
+          cuotaIds: ['c-1'],
+          cargos: [{ tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua' }],
+        }),
+      ),
+    )
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo de cobro' })
+    expect(receipt).toHaveTextContent('Servicios · Agua')
+    const collected = within(receipt).getByRole('group', { name: 'Importe cobrado' })
+    expect(collected).toHaveTextContent(/US\$\s?20\.000,00/)
+    expect(collected).toHaveTextContent(/ARS\$\s?150\.000,00/)
+    await user.click(within(receipt).getByRole('button', { name: 'Cerrar' }))
+
+    expect(await screen.findByText(/Cargos adicionales cobrados: \$\s?150\.000,00/)).toBeInTheDocument()
+    expect(screen.getByText(/Servicios · Agua: \$\s?150\.000,00/)).toBeInTheDocument()
+  }, 15000)
+
+  it('rejects a charge without an amount before sending the cobro', async () => {
+    mocks.getDebtStatement.mockResolvedValue(statement)
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByText('Pérez, Ana')
+    await user.click(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' }))
+    await user.click(screen.getByRole('button', { name: /Registrar cobro/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' })
+
+    await user.click(within(dialog).getByRole('button', { name: 'Agregar cargo' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Agregar cargo' }))
+    // Typing in the second row leaves the first one as it was.
+    await user.click(within(dialog).getAllByLabelText('Monto')[1])
+    await user.paste('500')
+    expect(within(dialog).getAllByLabelText('Monto')[0]).toHaveValue('')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar cobro' }))
+    expect(
+      await within(dialog).findByText('Ingresá el monto de "Servicios", mayor a cero y con hasta 2 decimales.'),
+    ).toBeInTheDocument()
+    expect(mocks.registerPayment).not.toHaveBeenCalled()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Quitar el cargo 1' }))
+    expect(within(dialog).getAllByLabelText('Monto')).toHaveLength(1)
+    expect(within(dialog).getByLabelText('Monto')).toHaveValue('500')
+    await user.click(within(dialog).getByRole('button', { name: 'Quitar el cargo 1' }))
+    expect(within(dialog).queryByLabelText('Monto')).not.toBeInTheDocument()
+  }, 15000)
 
   it('validates the terms and shows the backend error without losing the dialog', async () => {
     mocks.getDebtStatement.mockResolvedValue(statement)
@@ -221,7 +325,7 @@ describe('DebtStatementPage', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  })
+  }, 15000)
 
   it('settles the whole balance in one cobro', async () => {
     const settled: DebtStatement = {
@@ -229,7 +333,21 @@ describe('DebtStatementPage', () => {
       venta: { ...statement.venta, estado: 'completada' },
       cuotas: paidStatement.cuotas.map((cuota) => ({ ...cuota, estado: 'pagada' as const, fechaPago: '2026-05-02T12:00:00Z' })),
       resumen: { ...paidStatement.resumen, montoPagado: 100000, montoPendiente: 0, cuotasPagadas: 3, cuotasPendientes: 0, proximoVencimiento: undefined },
-      cobros: [{ ...payment, id: 'cobro-2', tipo: 'cancelacion_total', monto: 40000, incluyeEntrega: false, montoEntrega: 0, observacion: undefined, cuotas: statement.cuotas.slice(1) }, payment],
+      cobros: [
+        {
+          ...payment,
+          id: 'cobro-2',
+          tipo: 'cancelacion_total',
+          monto: 40000,
+          incluyeEntrega: false,
+          montoEntrega: 0,
+          observacion: undefined,
+          cuotas: statement.cuotas.slice(1),
+          cargos: [],
+          totales: [{ moneda: 'USD', monto: 40000 }],
+        },
+        payment,
+      ],
     }
     mocks.getDebtStatement.mockResolvedValueOnce(paidStatement).mockResolvedValueOnce(settled)
     mocks.settleSale.mockResolvedValue(settled.cobros[0])

@@ -7,13 +7,18 @@ import { Input } from '../../../shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
 import { Textarea } from '../../../shared/ui/textarea'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
+import ChargesEditor from './ChargesEditor'
 import {
   EMPTY_PAYMENT_TERMS,
   MAX_OBSERVATION_LENGTH,
   PAYMENT_MEDIUMS,
   PAYMENT_MEDIUM_LABELS,
+  parseCharges,
+  paymentTotals,
   todayInputValue,
   validatePaymentTerms,
+  type ChargeInput,
+  type ChargeRow,
   type PaymentMedium,
   type PaymentTerms,
 } from '../types'
@@ -21,13 +26,14 @@ import {
 type PaymentDialogProps = {
   open: boolean
   mode: 'pago' | 'cancelacion_total'
+  // What goes to the plan (entrega and cuotas), in the sale's currency.
   amount: number
   currency: string
   // What the cobro covers, as the confirmation reads it ("Entrega + Cuota 1").
   itemsLabel: string
   isSubmitting: boolean
   error: string | null
-  onSubmit: (terms: PaymentTerms) => void
+  onSubmit: (terms: PaymentTerms, charges: ChargeInput[]) => void
   onClose: () => void
 }
 
@@ -57,16 +63,25 @@ export default function PaymentDialog({
   onClose,
 }: PaymentDialogProps) {
   const [terms, setTerms] = useState<PaymentTerms>({ ...EMPTY_PAYMENT_TERMS, fechaPago: todayInputValue() })
+  const [charges, setCharges] = useState<ChargeRow[]>([])
   const [validationError, setValidationError] = useState<string | null>(null)
   const copy = COPY[mode]
+  const parsed = parseCharges(charges, currency)
+  const totals = paymentTotals(amount, currency, parsed.ok ? parsed.charges : [])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const problem = validatePaymentTerms(terms)
-    setValidationError(problem)
-    if (problem === null) {
-      onSubmit(terms)
+    if (problem !== null) {
+      setValidationError(problem)
+      return
     }
+    if (!parsed.ok) {
+      setValidationError(parsed.error)
+      return
+    }
+    setValidationError(null)
+    onSubmit(terms, parsed.charges)
   }
 
   return (
@@ -84,7 +99,14 @@ export default function PaymentDialog({
         <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
             <p className="text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">Total a cobrar</p>
-            <p className="text-2xl font-semibold tabular-nums">{formatCurrency(amount, currency)}</p>
+            <dl role="group" aria-label="Total a cobrar" className="flex flex-col gap-0.5">
+              {totals.map((total) => (
+                <div key={total.moneda} className="flex items-baseline gap-2">
+                  <dt className="sr-only">{total.moneda}</dt>
+                  <dd className="text-2xl font-semibold tabular-nums">{formatCurrency(total.monto, total.moneda)}</dd>
+                </div>
+              ))}
+            </dl>
             <p className="text-sm text-muted-foreground">{itemsLabel}</p>
           </div>
           <Field>
@@ -118,6 +140,7 @@ export default function PaymentDialog({
             />
             <FieldDescription>Dejala vacía para registrar el cobro con la fecha de hoy.</FieldDescription>
           </Field>
+          <ChargesEditor rows={charges} currency={currency} onChange={setCharges} />
           <Field>
             <FieldLabel htmlFor="observacion-pago">Observación</FieldLabel>
             <Textarea

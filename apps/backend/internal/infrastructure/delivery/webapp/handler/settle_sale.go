@@ -31,6 +31,7 @@ func (handler *SettleSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 		Actor:          collections.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
 		SaleID:         request.PathValue("id"),
 		ExpectedAmount: body.MontoEsperado,
+		Charges:        paymentCharges(body.Cargos),
 		Medium:         body.MedioPago,
 		PaidAt:         paidAt,
 		Observation:    body.Observacion,

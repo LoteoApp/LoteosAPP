@@ -30,6 +30,35 @@ export function isPaymentMedium(value: unknown): value is PaymentMedium {
   return typeof value === 'string' && (PAYMENT_MEDIUMS as readonly string[]).includes(value)
 }
 
+// The cargos adicionales a cobro may carry besides the cuota: taxes, fees,
+// services. Each one has its own currency, so a cuota in USD can be
+// collected together with services in ARS; nothing is ever converted.
+export const CHARGE_TYPES = [
+  'impuesto_municipal',
+  'impuesto_provincial',
+  'gasto_administrativo',
+  'honorarios',
+  'servicios',
+  'cargo_inmobiliaria',
+  'otros',
+] as const
+
+export type ChargeType = (typeof CHARGE_TYPES)[number]
+
+export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
+  impuesto_municipal: 'Impuesto municipal',
+  impuesto_provincial: 'Impuesto provincial',
+  gasto_administrativo: 'Gasto administrativo',
+  honorarios: 'Honorarios',
+  servicios: 'Servicios',
+  cargo_inmobiliaria: 'Cargo de inmobiliaria',
+  otros: 'Otros',
+}
+
+export function isChargeType(value: unknown): value is ChargeType {
+  return typeof value === 'string' && (CHARGE_TYPES as readonly string[]).includes(value)
+}
+
 export const PAYMENT_TYPES = ['pago', 'cancelacion_total'] as const
 
 export type PaymentType = (typeof PAYMENT_TYPES)[number]
@@ -129,6 +158,23 @@ export type StatementSale = {
   }
 }
 
+export type PaymentCharge = {
+  id: string
+  tipo: ChargeType
+  monto: number
+  moneda: string
+  detalle?: string
+}
+
+// What a cobro adds up to in one currency. A cobro that mixes a cuota in USD
+// with services in ARS has one of these per currency.
+export type CurrencyTotal = {
+  moneda: string
+  monto: number
+}
+
+// `monto`/`moneda` are only what went to the plan, in the sale's currency;
+// `totales` is what the client actually handed over, per currency.
 export type Payment = {
   id: string
   ventaId: string
@@ -140,6 +186,8 @@ export type Payment = {
   incluyeEntrega: boolean
   montoEntrega: number
   cuotas: Installment[]
+  cargos: PaymentCharge[]
+  totales: CurrencyTotal[]
   usuarioAlta: Actor
   fechaPago: string
   fechaCreacion: string
@@ -162,6 +210,9 @@ export type DebtStatement = {
   cuotas: Installment[]
   resumen: DebtSummary
   cobros: Payment[]
+  // What the cobros charged beyond the plan, per currency. It isn't debt of
+  // the plan and may be in a currency the plan never uses.
+  cargosCobrados: CurrencyTotal[]
   emitidoEl: string
 }
 
@@ -239,16 +290,124 @@ export const EMPTY_PAYMENT_TERMS: PaymentTerms = {
   observacion: '',
 }
 
+// A cargo as the API receives it. An empty `moneda` means the sale's.
+export type ChargeInput = {
+  tipo: ChargeType
+  monto: number
+  moneda: string
+  detalle: string
+}
+
+// A charge row as the form holds it while the user types: strings, so a
+// half-typed number never snaps to something else under their cursor.
+export type ChargeRow = {
+  // Stable key for React; it never leaves the form.
+  key: string
+  tipo: ChargeType
+  monto: string
+  moneda: string
+  detalle: string
+}
+
 export type RegisterPaymentValues = PaymentTerms & {
   cuotaIds: string[]
   incluirEntrega: boolean
+  cargos: ChargeInput[]
 }
 
 export type SettleSaleValues = PaymentTerms & {
   montoEsperado: number
+  cargos: ChargeInput[]
 }
 
 export const MAX_OBSERVATION_LENGTH = 500
+export const MAX_PAYMENT_CHARGES = 20
+export const MAX_CHARGE_DETAIL_LENGTH = 200
+export const MAX_CURRENCY_CODE_LENGTH = 10
+const MONEY_DECIMALS = 2
+
+let chargeRowSequence = 0
+
+export function newChargeRow(currency: string): ChargeRow {
+  chargeRowSequence += 1
+  return { key: `cargo-${chargeRowSequence}`, tipo: 'servicios', monto: '', moneda: currency, detalle: '' }
+}
+
+// Accepts "1234.5", "1234,5" and "1.234,50": with a comma present the dots
+// are thousands separators, as people type prices here. More decimals than
+// `maxDecimals` is a typo, not something to round.
+function parseDecimal(value: string, maxDecimals: number): number | null {
+  const trimmed = value.trim()
+  const normalized = trimmed.includes(',') ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed
+  const match = /^\d+(?:\.(\d+))?$/.exec(normalized)
+  if (match === null || (match[1]?.length ?? 0) > maxDecimals) {
+    return null
+  }
+  return Number(normalized)
+}
+
+export function normalizeCurrency(currency: string, fallback: string): string {
+  const normalized = currency.trim().toUpperCase()
+  return normalized === '' ? fallback.trim().toUpperCase() : normalized
+}
+
+export type ChargesResult = { ok: true; charges: ChargeInput[] } | { ok: false; error: string }
+
+// Validates the typed charges with the same rules the backend applies, so
+// the confirm button explains what is missing before the request is sent.
+export function parseCharges(rows: readonly ChargeRow[], fallbackCurrency: string): ChargesResult {
+  if (rows.length > MAX_PAYMENT_CHARGES) {
+    return { ok: false, error: `No se pueden cargar más de ${MAX_PAYMENT_CHARGES} cargos adicionales.` }
+  }
+  const charges: ChargeInput[] = []
+  for (const row of rows) {
+    if (!isChargeType(row.tipo)) {
+      return { ok: false, error: 'Elegí el tipo de cada cargo adicional.' }
+    }
+    const amount = parseDecimal(row.monto, MONEY_DECIMALS)
+    if (amount === null || amount <= 0) {
+      return {
+        ok: false,
+        error: `Ingresá el monto de "${CHARGE_TYPE_LABELS[row.tipo]}", mayor a cero y con hasta 2 decimales.`,
+      }
+    }
+    const currency = normalizeCurrency(row.moneda, fallbackCurrency)
+    if (currency === '' || currency.length > MAX_CURRENCY_CODE_LENGTH) {
+      return { ok: false, error: `Ingresá la moneda de "${CHARGE_TYPE_LABELS[row.tipo]}".` }
+    }
+    if (row.detalle.trim().length > MAX_CHARGE_DETAIL_LENGTH) {
+      return { ok: false, error: `El detalle del cargo no puede superar los ${MAX_CHARGE_DETAIL_LENGTH} caracteres.` }
+    }
+    charges.push({ tipo: row.tipo, monto: amount, moneda: currency, detalle: row.detalle.trim() })
+  }
+  return { ok: true, charges }
+}
+
+// Mirrors domain.PaymentTotals on the backend: what a cobro adds up to per
+// currency, the plan's currency first and the rest alphabetically. Amounts
+// in different currencies are never added together.
+export function paymentTotals(
+  planAmount: number,
+  planCurrency: string,
+  charges: readonly { monto: number; moneda: string }[],
+): CurrencyTotal[] {
+  const plan = normalizeCurrency(planCurrency, '')
+  const amounts = new Map<string, number>()
+  if (planAmount > 0) {
+    amounts.set(plan, planAmount)
+  }
+  for (const charge of charges) {
+    const currency = normalizeCurrency(charge.moneda, plan)
+    amounts.set(currency, (amounts.get(currency) ?? 0) + charge.monto)
+  }
+  const others = [...amounts.keys()].filter((currency) => currency !== plan).sort()
+  const ordered = amounts.has(plan) ? [plan, ...others] : others
+  return ordered.map((moneda) => ({ moneda, monto: roundMoney(amounts.get(moneda) ?? 0) }))
+}
+
+export function chargeTotals(charges: readonly { monto: number; moneda: string }[]): CurrencyTotal[] {
+  return paymentTotals(0, '', charges)
+}
 
 // Turns the day typed in the date input into the instant sent to the API:
 // noon in the browser's zone, so the day survives the round trip to UTC
@@ -337,6 +496,11 @@ export function lotLabel(item: Pick<DueInstallment, 'loteoNombre' | 'manzanaNume
 
 export function clientLabel(client: Pick<Client, 'nombre' | 'apellido'>): string {
   return `${client.apellido}, ${client.nombre}`
+}
+
+export function chargeLabel(charge: Pick<PaymentCharge, 'tipo' | 'detalle'>): string {
+  const detail = charge.detalle?.trim() ?? ''
+  return detail === '' ? CHARGE_TYPE_LABELS[charge.tipo] : `${CHARGE_TYPE_LABELS[charge.tipo]} · ${detail}`
 }
 
 export function paymentItemsLabel(payment: Pick<Payment, 'incluyeEntrega' | 'cuotas'>): string {

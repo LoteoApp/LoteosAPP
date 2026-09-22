@@ -3,7 +3,14 @@ import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { formatCurrency } from '../../../shared/lib/formatCurrency'
 import { formatDate } from '../../../shared/lib/formatDate'
-import { PAYMENT_MEDIUM_LABELS, PAYMENT_TYPE_LABELS, clientLabel, paymentItemsLabel, type Payment } from '../types'
+import {
+  PAYMENT_MEDIUM_LABELS,
+  PAYMENT_TYPE_LABELS,
+  chargeLabel,
+  clientLabel,
+  paymentItemsLabel,
+  type Payment,
+} from '../types'
 
 type PaymentsHistoryProps = {
   cobros: Payment[]
@@ -30,8 +37,17 @@ export default function PaymentsHistory({ cobros, onPrint }: PaymentsHistoryProp
                 className="grid gap-2 rounded-lg border border-border px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
               >
                 <div className="grid gap-0.5">
-                  <p className="font-medium tabular-nums">{formatCurrency(cobro.monto, cobro.moneda)}</p>
+                  <p className="font-medium tabular-nums">
+                    {cobro.totales.map((total) => formatCurrency(total.monto, total.moneda)).join(' + ')}
+                  </p>
                   <p className="text-sm">{paymentItemsLabel(cobro)}</p>
+                  {cobro.cargos.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {cobro.cargos
+                        .map((cargo) => `${chargeLabel(cargo)}: ${formatCurrency(cargo.monto, cargo.moneda)}`)
+                        .join(' · ')}
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {formatDate(cobro.fechaPago)} · {PAYMENT_MEDIUM_LABELS[cobro.medioPago]} · {PAYMENT_TYPE_LABELS[cobro.tipo]} ·
                     Cobró {clientLabel(cobro.usuarioAlta)}

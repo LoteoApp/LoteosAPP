@@ -35,6 +35,7 @@ func (handler *RegisterPaymentHandler) Handle(w http.ResponseWriter, request *ht
 		SaleID:             request.PathValue("id"),
 		InstallmentIDs:     body.CuotaIDs,
 		IncludeDownPayment: body.IncluirEntrega,
+		Charges:            paymentCharges(body.Cargos),
 		Medium:             body.MedioPago,
 		PaidAt:             paidAt,
 		Observation:        body.Observacion,
@@ -44,6 +45,19 @@ func (handler *RegisterPaymentHandler) Handle(w http.ResponseWriter, request *ht
 	}
 	response.WriteJSON(w, http.StatusCreated, payment)
 	return nil
+}
+
+func paymentCharges(charges []dto.ChargeDTO) []collections.ChargeInput {
+	mapped := make([]collections.ChargeInput, len(charges))
+	for i, charge := range charges {
+		mapped[i] = collections.ChargeInput{
+			Type:     charge.Tipo,
+			Amount:   charge.Monto,
+			Currency: charge.Moneda,
+			Detail:   charge.Detalle,
+		}
+	}
+	return mapped
 }
 
 func parsePaymentDate(raw string) (*time.Time, error) {

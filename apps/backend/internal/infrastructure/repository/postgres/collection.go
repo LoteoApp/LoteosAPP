@@ -64,13 +64,18 @@ func (repository *CollectionRepository) GetDebtStatement(ctx context.Context, sa
 		return domain.DebtStatement{}, err
 	}
 	entrega := plan.entrega()
+	charges := make([]domain.PaymentCharge, 0)
+	for _, payment := range payments {
+		charges = append(charges, payment.Cargos...)
+	}
 	return domain.DebtStatement{
-		Venta:     sale,
-		Entrega:   entrega,
-		Cuotas:    installments,
-		Resumen:   domain.ComputeDebtSummary(entrega, installments),
-		Cobros:    payments,
-		EmitidoEl: now,
+		Venta:          sale,
+		Entrega:        entrega,
+		Cuotas:         installments,
+		Resumen:        domain.ComputeDebtSummary(entrega, installments),
+		Cobros:         payments,
+		CargosCobrados: domain.ChargeTotals(charges),
+		EmitidoEl:      now,
 	}, nil
 }
 
@@ -244,6 +249,9 @@ func (repository *CollectionRepository) RegisterPayment(ctx context.Context, com
 	if err != nil {
 		return domain.Payment{}, err
 	}
+	if err := insertPaymentCharges(ctx, tx, paymentID, currency, command); err != nil {
+		return domain.Payment{}, err
+	}
 	if len(selection.Installments) > 0 {
 		ids := make([]string, len(selection.Installments))
 		for i, installment := range selection.Installments {
@@ -337,6 +345,29 @@ func completeSale(ctx context.Context, tx pgx.Tx, saleID, developmentID, lotID, 
 	return err
 }
 
+// insertPaymentCharges writes the cargos adicionales of a cobro. A charge
+// without a currency takes the sale's; one in another currency is stored as
+// typed, so a cuota in USD can travel with services in ARS.
+func insertPaymentCharges(ctx context.Context, tx pgx.Tx, paymentID, currency string, command gateway.RegisterPaymentCommand) error {
+	charges, err := domain.NormalizePaymentCharges(command.Charges, currency)
+	if err != nil {
+		return err
+	}
+	for _, charge := range charges {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO cargos_adicionales (
+				cobro_id, monto, moneda, tipo, observacion,
+				usuario_modificacion, fecha_creacion, fecha_modificacion
+			)
+			VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''), $6::uuid, $7, $7)
+		`, paymentID, charge.Monto, charge.Moneda, string(charge.Tipo), charge.Detalle,
+			command.ActorID, command.Now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func loadPlanRow(ctx context.Context, queryer reservationQueryer, planID string) (planRow, error) {
 	var row planRow
 	err := queryer.QueryRow(ctx, `
@@ -418,6 +449,7 @@ func scanPayment(scanner reservationScanner) (domain.Payment, error) {
 		payment.MontoEntrega = downPayment
 	}
 	payment.Cuotas = []domain.Installment{}
+	payment.Cargos = []domain.PaymentCharge{}
 	return payment, nil
 }
 
@@ -443,11 +475,55 @@ func loadPayment(ctx context.Context, queryer reservationQueryer, paymentID stri
 		}
 		payment.Cuotas = append(payment.Cuotas, installment)
 	}
-	return payment, rows.Err()
+	if err := rows.Err(); err != nil {
+		return domain.Payment{}, err
+	}
+	chargeRows, err := queryer.Query(ctx, `
+		SELECT `+chargeColumns+chargeFromClause+`
+		WHERE c.cobro_id = $1::uuid AND c.fecha_baja IS NULL
+		ORDER BY `+chargeOrder, paymentID)
+	if err != nil {
+		return domain.Payment{}, err
+	}
+	defer chargeRows.Close()
+	for chargeRows.Next() {
+		charge, _, err := scanCharge(chargeRows)
+		if err != nil {
+			return domain.Payment{}, err
+		}
+		payment.Cargos = append(payment.Cargos, charge)
+	}
+	if err := chargeRows.Err(); err != nil {
+		return domain.Payment{}, err
+	}
+	payment.Totales = domain.PaymentTotals(payment.Monto, payment.Moneda, payment.Cargos)
+	return payment, nil
+}
+
+const chargeColumns = `c.id::text, c.tipo, c.monto::float8, c.moneda, COALESCE(c.observacion, ''), c.cobro_id::text`
+
+const chargeFromClause = `
+	FROM cargos_adicionales c
+	JOIN cobros p ON p.id = c.cobro_id`
+
+// chargeOrder reads the charges the way the totals do: first the ones in the
+// sale's currency, then the other currencies alphabetically. Charges entered
+// in one cobro share fecha_creacion, so ordering by it decides nothing.
+const chargeOrder = `(c.moneda <> p.moneda), c.moneda, c.tipo, c.id`
+
+func scanCharge(scanner reservationScanner) (domain.PaymentCharge, string, error) {
+	var (
+		charge    domain.PaymentCharge
+		paymentID string
+	)
+	if err := scanner.Scan(&charge.ID, &charge.Tipo, &charge.Monto, &charge.Moneda, &charge.Detalle, &paymentID); err != nil {
+		return domain.PaymentCharge{}, "", err
+	}
+	return charge, paymentID, nil
 }
 
 // loadPayments reads every cobro of a venta, newest first, each with the
-// cuotas it paid.
+// cuotas it paid and the cargos adicionales it collected.
 func loadPayments(ctx context.Context, queryer reservationQueryer, saleID string, plan planRow) ([]domain.Payment, error) {
 	rows, err := queryer.Query(ctx, `SELECT `+paymentColumns+paymentFromClause+`
 		WHERE p.venta_id = $1::uuid
@@ -491,5 +567,31 @@ func loadPayments(ctx context.Context, queryer reservationQueryer, saleID string
 			payments[position].Cuotas = append(payments[position].Cuotas, installment)
 		}
 	}
-	return payments, paidRows.Err()
+	if err := paidRows.Err(); err != nil {
+		return nil, err
+	}
+	chargeRows, err := queryer.Query(ctx, `
+		SELECT `+chargeColumns+chargeFromClause+`
+		WHERE p.venta_id = $1::uuid AND c.fecha_baja IS NULL
+		ORDER BY `+chargeOrder, saleID)
+	if err != nil {
+		return nil, err
+	}
+	defer chargeRows.Close()
+	for chargeRows.Next() {
+		charge, paymentID, err := scanCharge(chargeRows)
+		if err != nil {
+			return nil, err
+		}
+		if position, ok := index[paymentID]; ok {
+			payments[position].Cargos = append(payments[position].Cargos, charge)
+		}
+	}
+	if err := chargeRows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range payments {
+		payments[i].Totales = domain.PaymentTotals(payments[i].Monto, payments[i].Moneda, payments[i].Cargos)
+	}
+	return payments, nil
 }

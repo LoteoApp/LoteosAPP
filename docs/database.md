@@ -217,6 +217,17 @@ como el resto. El `Down` elimina las columnas y la tabla, así que un rollback
 pierde el historial de cobros aunque las cuotas conservan `estado` y
 `fecha_pago`.
 
+`00014_add_payment_charges.sql` habilita los cargos adicionales de un cobro:
+`cargos_adicionales` gana `cobro_id` y su `cuota_id` pasa a ser opcional (un
+cargo se ingresa al cobrar, no queda agendado en una cuota), con
+`cargos_adicionales_origen_chk` para que siempre cuelgue de uno de los dos.
+El CHECK de `tipo` suma `gasto_administrativo`, `honorarios` y `servicios` a
+los cuatro originales, y se agregan `monto > 0` y un formato mínimo para
+`moneda`. La moneda del cargo es la suya: puede diferir de la de la venta —
+una cuota en USD con servicios en ARS— y por eso nunca se suma con el monto
+del cobro. El `Down` borra los cargos sin `cuota_id` (los que este esquema
+hizo posibles) antes de volver a exigirla.
+
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
 ```sql

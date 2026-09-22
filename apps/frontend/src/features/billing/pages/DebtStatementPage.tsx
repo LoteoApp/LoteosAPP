@@ -24,6 +24,7 @@ import {
   paymentItemsLabel,
   selectionAmount,
   toggleInstallment,
+  type ChargeInput,
   type DebtStatement,
   type Payment,
   type PaymentTerms,
@@ -64,15 +65,22 @@ export default function DebtStatementPage({ accessToken = '' }: DebtStatementPag
     }
   }
 
-  function handlePayment(terms: PaymentTerms) {
+  function handlePayment(terms: PaymentTerms, charges: ChargeInput[]) {
     void submit(() =>
-      registerPayment(accessToken, ventaId, { ...terms, cuotaIds: selected, incluirEntrega: includeDownPayment }),
+      registerPayment(accessToken, ventaId, {
+        ...terms,
+        cuotaIds: selected,
+        incluirEntrega: includeDownPayment,
+        cargos: charges,
+      }),
     )
   }
 
-  function handleSettlement(terms: PaymentTerms) {
+  function handleSettlement(terms: PaymentTerms, charges: ChargeInput[]) {
     if (statement === null) return
-    void submit(() => settleSale(accessToken, ventaId, { ...terms, montoEsperado: statement.resumen.montoPendiente }))
+    void submit(() =>
+      settleSale(accessToken, ventaId, { ...terms, montoEsperado: statement.resumen.montoPendiente, cargos: charges }),
+    )
   }
 
   function closeDialog() {
@@ -100,6 +108,13 @@ export default function DebtStatementPage({ accessToken = '' }: DebtStatementPag
         <>
           <SaleCard sale={statement.venta} />
           <DebtSummaryCards summary={statement.resumen} currency={statement.venta.moneda} />
+          {statement.cargosCobrados.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Cargos adicionales cobrados:{' '}
+              {statement.cargosCobrados.map((total) => formatCurrency(total.monto, total.moneda)).join(' · ')}. No
+              forman parte del plan de pago.
+            </p>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Cuotas</CardTitle>

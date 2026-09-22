@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_PAYMENT_CHARGES,
+  chargeLabel,
+  chargeTotals,
   clientLabel,
   isDueFilter,
   isInstallmentState,
+  isChargeType,
   isPaymentMedium,
   isPaymentType,
   lotLabel,
+  newChargeRow,
+  parseCharges,
   paymentDateToISO,
   paymentItemsLabel,
+  paymentTotals,
   pendingInstallments,
   selectionAmount,
   todayInputValue,
   toggleInstallment,
   validatePaymentTerms,
+  type ChargeRow,
   type Installment,
 } from './types'
 
@@ -33,6 +41,8 @@ describe('type guards', () => {
     expect(isPaymentType('')).toBe(false)
     expect(isDueFilter('pendientes')).toBe(true)
     expect(isDueFilter('todas')).toBe(false)
+    expect(isChargeType('gasto_administrativo')).toBe(true)
+    expect(isChargeType('propina')).toBe(false)
   })
 })
 
@@ -102,6 +112,90 @@ describe('installment selection', () => {
   })
 })
 
+describe('parseCharges', () => {
+  function row(overrides: Partial<ChargeRow> = {}): ChargeRow {
+    return { ...newChargeRow('USD'), monto: '100', ...overrides }
+  }
+
+  it('parses the typed rows and defaults the currency to the sale\'s', () => {
+    const parsed = parseCharges(
+      [
+        row({ tipo: 'servicios', monto: '1.234,50', moneda: 'ars', detalle: '  Agua  ' }),
+        row({ tipo: 'gasto_administrativo', monto: '25', moneda: '  ' }),
+      ],
+      'usd',
+    )
+
+    expect(parsed).toEqual({
+      ok: true,
+      charges: [
+        { tipo: 'servicios', monto: 1234.5, moneda: 'ARS', detalle: 'Agua' },
+        { tipo: 'gasto_administrativo', monto: 25, moneda: 'USD', detalle: '' },
+      ],
+    })
+    expect(parseCharges([], 'USD')).toEqual({ ok: true, charges: [] })
+  })
+
+  it('explains what is wrong with a row', () => {
+    expect(parseCharges([row({ monto: '' })], 'USD')).toEqual({
+      ok: false,
+      error: 'Ingresá el monto de "Servicios", mayor a cero y con hasta 2 decimales.',
+    })
+    expect(parseCharges([row({ monto: '0' })], 'USD').ok).toBe(false)
+    expect(parseCharges([row({ monto: '10,555' })], 'USD').ok).toBe(false)
+    expect(parseCharges([row({ tipo: 'propina' as never })], 'USD')).toEqual({
+      ok: false,
+      error: 'Elegí el tipo de cada cargo adicional.',
+    })
+    expect(parseCharges([row({ moneda: '' })], '')).toEqual({
+      ok: false,
+      error: 'Ingresá la moneda de "Servicios".',
+    })
+    expect(parseCharges([row({ moneda: 'PESOS ARGENTINOS' })], 'USD').ok).toBe(false)
+    expect(parseCharges([row({ detalle: 'x'.repeat(201) })], 'USD')).toEqual({
+      ok: false,
+      error: 'El detalle del cargo no puede superar los 200 caracteres.',
+    })
+    const tooMany = Array.from({ length: MAX_PAYMENT_CHARGES + 1 }, () => row())
+    expect(parseCharges(tooMany, 'USD')).toEqual({
+      ok: false,
+      error: `No se pueden cargar más de ${MAX_PAYMENT_CHARGES} cargos adicionales.`,
+    })
+  })
+
+  it('gives every row its own key', () => {
+    expect(newChargeRow('USD').key).not.toBe(newChargeRow('USD').key)
+    expect(newChargeRow('ARS').moneda).toBe('ARS')
+  })
+})
+
+describe('paymentTotals', () => {
+  it('keeps each currency apart, the sale\'s first', () => {
+    const totals = paymentTotals(20000, 'usd', [
+      { monto: 150000, moneda: 'ARS' },
+      { monto: 12000.5, moneda: 'ARS' },
+      { monto: 300, moneda: 'USD' },
+      { monto: 40, moneda: 'EUR' },
+    ])
+
+    expect(totals).toEqual([
+      { moneda: 'USD', monto: 20300 },
+      { moneda: 'ARS', monto: 162000.5 },
+      { moneda: 'EUR', monto: 40 },
+    ])
+  })
+
+  it('handles a plan-only and a charges-only cobro', () => {
+    expect(paymentTotals(500, 'USD', [])).toEqual([{ moneda: 'USD', monto: 500 }])
+    expect(paymentTotals(0, 'USD', [{ monto: 10, moneda: 'ARS' }])).toEqual([{ moneda: 'ARS', monto: 10 }])
+    expect(paymentTotals(0, 'USD', [])).toEqual([])
+    expect(chargeTotals([{ monto: 1000, moneda: 'ARS' }, { monto: 20, moneda: 'USD' }])).toEqual([
+      { moneda: 'ARS', monto: 1000 },
+      { moneda: 'USD', monto: 20 },
+    ])
+  })
+})
+
 describe('labels', () => {
   it('describe the lote, the client and what a cobro covered', () => {
     expect(lotLabel({ loteoNombre: 'Las Acacias', manzanaNumero: '2', loteNumero: '7' })).toBe('Las Acacias · Mz 2 · Lote 7')
@@ -111,5 +205,8 @@ describe('labels', () => {
     expect(paymentItemsLabel({ incluyeEntrega: true, cuotas: [cuotas[1]] })).toBe('Entrega + Cuota 2')
     expect(paymentItemsLabel({ incluyeEntrega: false, cuotas: cuotas.slice(1) })).toBe('Cuotas 2 a 4')
     expect(paymentItemsLabel({ incluyeEntrega: false, cuotas: [] })).toBe('—')
+    expect(chargeLabel({ tipo: 'servicios', detalle: 'Agua y luz' })).toBe('Servicios · Agua y luz')
+    expect(chargeLabel({ tipo: 'honorarios' })).toBe('Honorarios')
+    expect(chargeLabel({ tipo: 'otros', detalle: '   ' })).toBe('Otros')
   })
 })

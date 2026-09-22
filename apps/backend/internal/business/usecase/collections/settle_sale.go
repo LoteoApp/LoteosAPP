@@ -14,6 +14,7 @@ type SettleSaleInput struct {
 	SaleID string
 	// ExpectedAmount is the saldo the caller saw; nil skips the check.
 	ExpectedAmount *float64
+	Charges        []ChargeInput
 	Medium         string
 	PaidAt         *time.Time
 	Observation    string
@@ -53,6 +54,10 @@ func (useCase *settleSaleUseCase) Execute(ctx context.Context, input SettleSaleI
 	if err != nil {
 		return domain.Payment{}, err
 	}
+	charges, err := paymentCharges(input.Charges)
+	if err != nil {
+		return domain.Payment{}, err
+	}
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
 	if err != nil {
 		return domain.Payment{}, fromRepository(err)
@@ -65,6 +70,7 @@ func (useCase *settleSaleUseCase) Execute(ctx context.Context, input SettleSaleI
 		ActorID:        actor.ID,
 		Type:           domain.PaymentTypeSettlement,
 		ExpectedAmount: input.ExpectedAmount,
+		Charges:        charges,
 		Medium:         terms.Medium,
 		Observation:    terms.Observation,
 		PaidAt:         terms.PaidAt,

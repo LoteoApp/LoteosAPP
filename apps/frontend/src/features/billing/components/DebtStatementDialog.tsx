@@ -68,6 +68,11 @@ export default function DebtStatementDialog({ open, statement, onClose }: DebtSt
         )}
         <PrintField term="Total del plan">{formatCurrency(resumen.montoTotal, currency)}</PrintField>
         <PrintField term="Pagado">{formatCurrency(resumen.montoPagado, currency)}</PrintField>
+        {statement.cargosCobrados.length > 0 && (
+          <PrintField term="Cargos adicionales cobrados" className="sm:col-span-2">
+            {statement.cargosCobrados.map((total) => formatCurrency(total.monto, total.moneda)).join(' · ')}
+          </PrintField>
+        )}
       </dl>
       <table className="w-full border-t border-border text-sm print:border-black">
         <caption className="sr-only">Detalle de cuotas</caption>

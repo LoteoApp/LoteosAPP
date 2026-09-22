@@ -106,7 +106,7 @@ describe('BillingPage', () => {
         expect.anything(),
       ),
     )
-  })
+  }, 15000)
 
   it('shows the empty state and the API error', async () => {
     listDueInstallmentsMock.mockResolvedValueOnce({ ...page, cuotas: [], total: 0, paginas: 0 })

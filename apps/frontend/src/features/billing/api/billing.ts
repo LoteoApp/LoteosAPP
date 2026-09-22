@@ -1,8 +1,10 @@
 import { apiFetch } from '../../../shared/api/client'
-import { isInstallmentState, isPaymentMedium, isPaymentType, paymentDateToISO } from '../types'
+import { isChargeType, isInstallmentState, isPaymentMedium, isPaymentType, paymentDateToISO } from '../types'
 import type {
   Actor,
+  ChargeInput,
   Client,
+  CurrencyTotal,
   DebtStatement,
   DownPayment,
   DueInstallment,
@@ -10,6 +12,7 @@ import type {
   DueInstallmentPage,
   Installment,
   Payment,
+  PaymentCharge,
   RegisterPaymentValues,
   SettleSaleValues,
   StatementSale,
@@ -107,6 +110,21 @@ function isStatementSale(value: unknown): value is StatementSale {
   )
 }
 
+function isCharge(value: unknown): value is PaymentCharge {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    isChargeType(value.tipo) &&
+    typeof value.monto === 'number' &&
+    typeof value.moneda === 'string' &&
+    isOptionalString(value.detalle)
+  )
+}
+
+function isCurrencyTotal(value: unknown): value is CurrencyTotal {
+  return isRecord(value) && typeof value.moneda === 'string' && typeof value.monto === 'number'
+}
+
 function isPayment(value: unknown): value is Payment {
   return (
     isRecord(value) &&
@@ -121,6 +139,10 @@ function isPayment(value: unknown): value is Payment {
     typeof value.montoEntrega === 'number' &&
     Array.isArray(value.cuotas) &&
     value.cuotas.every(isInstallment) &&
+    Array.isArray(value.cargos) &&
+    value.cargos.every(isCharge) &&
+    Array.isArray(value.totales) &&
+    value.totales.every(isCurrencyTotal) &&
     isActor(value.usuarioAlta) &&
     typeof value.fechaPago === 'string' &&
     typeof value.fechaCreacion === 'string'
@@ -145,6 +167,8 @@ function isStatement(value: unknown): value is DebtStatement {
     isOptionalString(resumen.proximoVencimiento) &&
     Array.isArray(value.cobros) &&
     value.cobros.every(isPayment) &&
+    Array.isArray(value.cargosCobrados) &&
+    value.cargosCobrados.every(isCurrencyTotal) &&
     typeof value.emitidoEl === 'string'
   )
 }
@@ -221,6 +245,20 @@ export async function getDebtStatement(token: string, saleId: string, signal?: A
   return readBody(body, isStatement)
 }
 
+function chargesBody(charges: readonly ChargeInput[]): Record<string, unknown> {
+  if (charges.length === 0) {
+    return {}
+  }
+  return {
+    cargos: charges.map((charge) => ({
+      tipo: charge.tipo,
+      monto: charge.monto,
+      moneda: charge.moneda,
+      ...(charge.detalle === '' ? {} : { detalle: charge.detalle }),
+    })),
+  }
+}
+
 export async function registerPayment(token: string, saleId: string, values: RegisterPaymentValues): Promise<Payment> {
   const fechaPago = paymentDateToISO(values.fechaPago)
   const body = await apiFetch<unknown>(`/api/v1/ventas/${encodeURIComponent(saleId)}/cobros`, {
@@ -230,6 +268,7 @@ export async function registerPayment(token: string, saleId: string, values: Reg
       cuotaIds: values.cuotaIds,
       incluirEntrega: values.incluirEntrega,
       medioPago: values.medioPago,
+      ...chargesBody(values.cargos),
       ...(fechaPago === '' ? {} : { fechaPago }),
       ...(values.observacion.trim() === '' ? {} : { observacion: values.observacion.trim() }),
     },
@@ -245,6 +284,7 @@ export async function settleSale(token: string, saleId: string, values: SettleSa
     body: {
       montoEsperado: values.montoEsperado,
       medioPago: values.medioPago,
+      ...chargesBody(values.cargos),
       ...(fechaPago === '' ? {} : { fechaPago }),
       ...(values.observacion.trim() === '' ? {} : { observacion: values.observacion.trim() }),
     },

@@ -366,6 +366,19 @@ venta; un usuario de inmobiliaria, las vendidas por su agencia.
   pendiente. La entrega no tiene vencimiento y se cobra cuando el cliente la
   paga. Cada cobro genera un recibo con el detalle de lo cobrado, los datos
   del lote y del cliente, que se vuelve a imprimir desde el historial.
+- **Cargos adicionales**: al cobrar se pueden sumar conceptos que no son
+  parte del plan de pago —impuesto municipal, impuesto provincial, gasto
+  administrativo, honorarios, servicios, cargo de inmobiliaria u otros—, cada
+  uno con su monto, su moneda y un detalle opcional (hasta 200 caracteres);
+  hasta 20 por cobro.
+  **La moneda de un cargo puede ser distinta de la de la cuota**: una cuota en
+  dólares se cobra junto con los servicios en pesos. Los importes nunca se
+  convierten ni se suman entre monedas: el cobro muestra un total por moneda
+  (USD 20.000 y $ 150.000, no un único número), y así se imprime en el recibo.
+  Los cargos no alteran el plan: no cancelan cuotas, no reducen el saldo y no
+  intervienen en el cierre de la venta; el estado de deuda los informa aparte,
+  totalizados por moneda, como «cargos adicionales cobrados». Si no se indica
+  moneda, el cargo toma la de la venta.
 - **Cancelar saldo total**: cobra en un solo pago todo lo adeudado (entrega
   pendiente y cuotas no pagadas). El total que se cobra es el que muestra la
   pantalla; si otro usuario cobró algo en el medio, la operación se rechaza
@@ -378,9 +391,9 @@ venta; un usuario de inmobiliaria, las vendidas por su agencia.
 
 No se gestionan comisiones ni reparto de dinero entre inmobiliaria y dueño del
 loteo; solo interesa que el cobro quede registrado. Pendiente para más
-adelante: los cargos adicionales por cuota (impuesto municipal, provincial,
-cargo de inmobiliaria, otros; la tabla `cargos_adicionales` ya existe), los
-pagos parciales de una cuota y los descuentos por cancelación anticipada.
+adelante: los pagos parciales de una cuota, los descuentos por cancelación
+anticipada y los cargos previstos por anticipado (hoy se ingresan al cobrar,
+no quedan agendados junto con la cuota).
 
 ### Reglas de mora
 

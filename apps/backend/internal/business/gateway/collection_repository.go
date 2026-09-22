@@ -18,9 +18,13 @@ type RegisterPaymentCommand struct {
 	InstallmentIDs     []string
 	IncludeDownPayment bool
 	ExpectedAmount     *float64
-	Medium             domain.PaymentMedium
-	Observation        string
-	PaidAt             time.Time
+	// Charges are the cargos adicionales collected with this cobro (taxes,
+	// administrative fees, services). A charge with no Moneda takes the
+	// sale's; one in another currency is kept apart, never converted.
+	Charges     []domain.PaymentChargeInput
+	Medium      domain.PaymentMedium
+	Observation string
+	PaidAt      time.Time
 	// Now is when the cobro is registered: it decides which cuotas are
 	// vencidas in the returned data and stamps the estado rows.
 	Now time.Time

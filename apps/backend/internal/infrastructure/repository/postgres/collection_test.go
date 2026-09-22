@@ -102,10 +102,31 @@ func TestCollectionRepositoryStatementPaymentsAndCompletion(t *testing.T) {
 	first, err := repository.RegisterPayment(context.Background(), gateway.RegisterPaymentCommand{
 		SaleID: sale.ID, ActorID: actorID, Type: domain.PaymentTypeRegular,
 		InstallmentIDs: []string{statement.Cuotas[0].ID}, IncludeDownPayment: true,
+		Charges: []domain.PaymentChargeInput{
+			{Tipo: domain.ChargeTypeServices, Monto: 150000, Moneda: "ars", Detalle: "Agua y luz"},
+			{Tipo: domain.ChargeTypeAdministrative, Monto: 250.5},
+		},
 		Medium: domain.PaymentMediumTransfer, Observation: "Transferencia 123", PaidAt: paidAt, Now: now,
 	}, scope)
 	if err != nil {
 		t.Fatalf("RegisterPayment() error = %v", err)
+	}
+	// The cobro's monto is only what went to the plan; the services in ARS
+	// travel with it without being converted.
+	if len(first.Cargos) != 2 {
+		t.Fatalf("charges = %#v", first.Cargos)
+	}
+	// Charges read back in the order the totals use: the sale's currency
+	// first, so the charge with no currency of its own leads.
+	if first.Cargos[0].ID == "" || first.Cargos[0].Tipo != domain.ChargeTypeAdministrative || first.Cargos[0].Monto != 250.5 || first.Cargos[0].Moneda != "USD" || first.Cargos[0].Detalle != "" {
+		t.Errorf("first charge = %#v", first.Cargos[0])
+	}
+	if first.Cargos[1].Tipo != domain.ChargeTypeServices || first.Cargos[1].Monto != 150000 || first.Cargos[1].Moneda != "ARS" || first.Cargos[1].Detalle != "Agua y luz" {
+		t.Errorf("second charge = %#v", first.Cargos[1])
+	}
+	wantTotals := []domain.CurrencyTotal{{Moneda: "USD", Monto: 60250.5}, {Moneda: "ARS", Monto: 150000}}
+	if len(first.Totales) != 2 || first.Totales[0] != wantTotals[0] || first.Totales[1] != wantTotals[1] {
+		t.Errorf("totals = %#v, want %#v", first.Totales, wantTotals)
 	}
 	if first.ID == "" || first.VentaID != sale.ID || first.Tipo != domain.PaymentTypeRegular || first.Monto != 60000 || first.Moneda != "USD" {
 		t.Errorf("first payment = %#v", first)
@@ -135,6 +156,34 @@ func TestCollectionRepositoryStatementPaymentsAndCompletion(t *testing.T) {
 	}
 	if len(afterFirst.Cobros) != 1 || afterFirst.Cobros[0].ID != first.ID || len(afterFirst.Cobros[0].Cuotas) != 1 || !afterFirst.Cobros[0].IncluyeEntrega {
 		t.Errorf("cobros after payment = %#v", afterFirst.Cobros)
+	}
+	if len(afterFirst.Cobros[0].Cargos) != 2 || len(afterFirst.Cobros[0].Totales) != 2 {
+		t.Errorf("charges of the cobro = %#v", afterFirst.Cobros[0])
+	}
+	// The statement totals the charges apart from the plan, per currency.
+	wantCharges := []domain.CurrencyTotal{{Moneda: "ARS", Monto: 150000}, {Moneda: "USD", Monto: 250.5}}
+	if len(afterFirst.CargosCobrados) != 2 || afterFirst.CargosCobrados[0] != wantCharges[0] || afterFirst.CargosCobrados[1] != wantCharges[1] {
+		t.Errorf("charges collected = %#v, want %#v", afterFirst.CargosCobrados, wantCharges)
+	}
+	if afterFirst.Resumen.MontoPagado != 60000 {
+		t.Errorf("charges must not count as plan payments: %#v", afterFirst.Resumen)
+	}
+
+	// An invalid charge rolls the whole cobro back.
+	before := afterFirst.Resumen.MontoPagado
+	if _, err := repository.RegisterPayment(context.Background(), gateway.RegisterPaymentCommand{
+		SaleID: sale.ID, ActorID: actorID, Type: domain.PaymentTypeRegular, InstallmentIDs: []string{statement.Cuotas[1].ID},
+		Charges: []domain.PaymentChargeInput{{Tipo: "propina", Monto: 10}},
+		Medium:  domain.PaymentMediumCash, PaidAt: now, Now: now,
+	}, scope); !errors.Is(err, domain.ErrChargeInvalidType) {
+		t.Fatalf("invalid charge error = %v, want %v", err, domain.ErrChargeInvalidType)
+	}
+	rolledBack, err := repository.GetDebtStatement(context.Background(), sale.ID, scope, now)
+	if err != nil {
+		t.Fatalf("GetDebtStatement() after the rejected cobro error = %v", err)
+	}
+	if rolledBack.Resumen.MontoPagado != before || len(rolledBack.Cobros) != 1 {
+		t.Errorf("a rejected charge left something behind: %#v", rolledBack.Resumen)
 	}
 
 	// Paying the same cuota or the entrega again is a conflict.

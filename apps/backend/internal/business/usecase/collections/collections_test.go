@@ -148,6 +148,10 @@ func TestRegisterPayment(t *testing.T) {
 		t.Errorf("dates = %s / %s", command.PaidAt, command.Now)
 	}
 
+	if len(command.Charges) != 0 {
+		t.Errorf("charges = %#v, want none", command.Charges)
+	}
+
 	withoutDate, err := useCase.Execute(context.Background(), collections.RegisterPaymentInput{
 		Actor: adminActor(), SaleID: "sale-1", InstallmentIDs: []string{"c-1"}, Medium: "efectivo",
 	})
@@ -156,6 +160,88 @@ func TestRegisterPayment(t *testing.T) {
 	}
 	if !repository.RegisterPaymentCommand.PaidAt.Equal(now) {
 		t.Errorf("default paid at = %s, want now", repository.RegisterPaymentCommand.PaidAt)
+	}
+}
+
+func TestRegisterPaymentNormalizesTheCharges(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.CollectionRepository{RegisterPaymentResult: domain.Payment{ID: "cobro-1"}}
+	useCase := collections.NewRegisterPayment(repository, users, fixedClock{now: now})
+
+	if _, err := useCase.Execute(context.Background(), collections.RegisterPaymentInput{
+		Actor: adminActor(), SaleID: "sale-1", InstallmentIDs: []string{"c-1"}, Medium: "efectivo",
+		Charges: []collections.ChargeInput{
+			{Type: " servicios ", Amount: 150000, Currency: " ars ", Detail: "  Agua  "},
+			{Type: "gasto_administrativo", Amount: 25.5},
+		},
+	}); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	charges := repository.RegisterPaymentCommand.Charges
+	if len(charges) != 2 {
+		t.Fatalf("charges = %#v", charges)
+	}
+	if charges[0].Tipo != domain.ChargeTypeServices || charges[0].Monto != 150000 || charges[0].Moneda != "ARS" || charges[0].Detalle != "Agua" {
+		t.Errorf("first charge = %#v", charges[0])
+	}
+	// A charge with no currency keeps it blank here: only the repository
+	// knows the sale's currency to fall back to.
+	if charges[1].Tipo != domain.ChargeTypeAdministrative || charges[1].Monto != 25.5 || charges[1].Moneda != "" {
+		t.Errorf("second charge = %#v", charges[1])
+	}
+
+	invalid := []struct {
+		name   string
+		charge collections.ChargeInput
+		want   error
+	}{
+		{"unknown type", collections.ChargeInput{Type: "propina", Amount: 10}, domain.ErrChargeInvalidType},
+		{"zero amount", collections.ChargeInput{Type: "servicios", Amount: 0}, domain.ErrChargeInvalidAmount},
+		{"detail too long", collections.ChargeInput{Type: "servicios", Amount: 10, Detail: strings.Repeat("x", 201)}, domain.ErrChargeDetailTooLong},
+	}
+	for _, tc := range invalid {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := repository.RegisterPaymentCalls
+			_, err := useCase.Execute(context.Background(), collections.RegisterPaymentInput{
+				Actor: adminActor(), SaleID: "sale-1", InstallmentIDs: []string{"c-1"}, Medium: "efectivo",
+				Charges: []collections.ChargeInput{tc.charge},
+			})
+			if !errors.Is(err, tc.want) {
+				t.Errorf("Execute() error = %v, want %v", err, tc.want)
+			}
+			if repository.RegisterPaymentCalls != calls {
+				t.Error("an invalid charge should not reach the repository")
+			}
+		})
+	}
+}
+
+func TestSettleSaleCarriesTheCharges(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.CollectionRepository{RegisterPaymentResult: domain.Payment{ID: "cobro-9"}}
+	useCase := collections.NewSettleSale(repository, users, fixedClock{now: now})
+
+	if _, err := useCase.Execute(context.Background(), collections.SettleSaleInput{
+		Actor: adminActor(), SaleID: "sale-1", Medium: "efectivo",
+		Charges: []collections.ChargeInput{{Type: "honorarios", Amount: 900, Currency: "ars"}},
+	}); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	charges := repository.RegisterPaymentCommand.Charges
+	if len(charges) != 1 || charges[0].Tipo != domain.ChargeTypeFees || charges[0].Moneda != "ARS" || charges[0].Monto != 900 {
+		t.Errorf("charges = %#v", charges)
+	}
+
+	calls := repository.RegisterPaymentCalls
+	_, err := useCase.Execute(context.Background(), collections.SettleSaleInput{
+		Actor: adminActor(), SaleID: "sale-1", Medium: "efectivo",
+		Charges: []collections.ChargeInput{{Type: "servicios", Amount: 1.555}},
+	})
+	if !errors.Is(err, domain.ErrChargeInvalidAmount) {
+		t.Errorf("invalid charge error = %v, want %v", err, domain.ErrChargeInvalidAmount)
+	}
+	if repository.RegisterPaymentCalls != calls {
+		t.Error("an invalid charge should not reach the repository")
 	}
 }
 

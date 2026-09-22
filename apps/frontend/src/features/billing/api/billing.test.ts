@@ -33,6 +33,8 @@ const payment = {
   incluyeEntrega: true,
   montoEntrega: 40000,
   cuotas: [{ id: 'c-1', numero: 1, monto: 20000, estado: 'pagada', fechaVencimiento: '2026-04-15T12:00:00Z', fechaPago: '2026-05-01T12:00:00Z', cobroId: 'cobro-1' }],
+  cargos: [],
+  totales: [{ moneda: 'USD', monto: 60000 }],
   usuarioAlta: { id: 'actor-1', nombre: 'Carla', apellido: 'López', rol: 'administrativo' },
   fechaPago: '2026-05-01T12:00:00Z',
   fechaCreacion: '2026-05-01T12:00:00Z',
@@ -84,6 +86,7 @@ const statement = {
     proximoVencimiento: '2026-07-15T12:00:00Z',
   },
   cobros: [],
+  cargosCobrados: [],
   emitidoEl: '2026-05-01T12:00:00Z',
 }
 
@@ -152,12 +155,26 @@ describe('getDebtStatement', () => {
   })
 
   it('accepts a statement without entrega and with cobros', async () => {
-    stubFetch(jsonResponse(200, { ...statement, entrega: undefined, cobros: [payment] }))
+    stubFetch(
+      jsonResponse(200, {
+        ...statement,
+        entrega: undefined,
+        cobros: [payment],
+        cargosCobrados: [{ moneda: 'ARS', monto: 150000 }],
+      }),
+    )
 
     const loaded = await getDebtStatement('token', 'sale-1')
 
     expect(loaded.entrega).toBeUndefined()
     expect(loaded.cobros[0].incluyeEntrega).toBe(true)
+    expect(loaded.cargosCobrados).toEqual([{ moneda: 'ARS', monto: 150000 }])
+  })
+
+  it('rejects a statement whose charge totals do not match the contract', async () => {
+    stubFetch(jsonResponse(200, { ...statement, cargosCobrados: [{ moneda: 'ARS' }] }))
+
+    await expect(getDebtStatement('token', 'sale-1')).rejects.toThrow(GENERIC_ERROR)
   })
 
   it('rejects malformed statements', async () => {
@@ -178,7 +195,7 @@ describe('registerPayment', () => {
     const fetchMock = stubFetch(jsonResponse(201, payment))
 
     const created = await registerPayment('token', 'sale-1', {
-      cuotaIds: ['c-1'], incluirEntrega: true, medioPago: 'transferencia', fechaPago: '2026-05-01', observacion: '  Transf. 123  ',
+      cuotaIds: ['c-1'], incluirEntrega: true, cargos: [], medioPago: 'transferencia', fechaPago: '2026-05-01', observacion: '  Transf. 123  ',
     })
 
     expect(created.id).toBe('cobro-1')
@@ -193,20 +210,60 @@ describe('registerPayment', () => {
     expect(new Date(body.fechaPago as string).getDate()).toBe(1)
   })
 
-  it('omits the date and the observation when empty', async () => {
+  it('omits the date, the observation and the charges when empty', async () => {
     const fetchMock = stubFetch(jsonResponse(201, payment))
 
-    await registerPayment('token', 'sale-1', { cuotaIds: ['c-1'], incluirEntrega: false, medioPago: 'efectivo', fechaPago: '', observacion: ' ' })
+    await registerPayment('token', 'sale-1', { cuotaIds: ['c-1'], incluirEntrega: false, cargos: [], medioPago: 'efectivo', fechaPago: '', observacion: ' ' })
 
     const body = JSON.parse(requestOf(fetchMock)[1].body as string) as Record<string, unknown>
     expect(body).toEqual({ cuotaIds: ['c-1'], incluirEntrega: false, medioPago: 'efectivo' })
+  })
+
+  it('posts the charges with their own currency', async () => {
+    const withCharges = {
+      ...payment,
+      cargos: [{ id: 'cargo-1', tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua y luz' }],
+      totales: [
+        { moneda: 'USD', monto: 60000 },
+        { moneda: 'ARS', monto: 150000 },
+      ],
+    }
+    const fetchMock = stubFetch(jsonResponse(201, withCharges))
+
+    const created = await registerPayment('token', 'sale-1', {
+      cuotaIds: ['c-1'],
+      incluirEntrega: false,
+      cargos: [
+        { tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua y luz' },
+        { tipo: 'gasto_administrativo', monto: 25.5, moneda: 'USD', detalle: '' },
+      ],
+      medioPago: 'efectivo',
+      fechaPago: '',
+      observacion: '',
+    })
+
+    expect(created.cargos[0].moneda).toBe('ARS')
+    expect(created.totales).toHaveLength(2)
+    const body = JSON.parse(requestOf(fetchMock)[1].body as string) as Record<string, unknown>
+    expect(body.cargos).toEqual([
+      { tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua y luz' },
+      { tipo: 'gasto_administrativo', monto: 25.5, moneda: 'USD' },
+    ])
+  })
+
+  it('rejects a payment whose charges do not match the contract', async () => {
+    stubFetch(jsonResponse(201, { ...payment, cargos: [{ id: 'cargo-1', tipo: 'propina', monto: 10, moneda: 'ARS' }] }))
+
+    await expect(
+      registerPayment('token', 'sale-1', { cuotaIds: ['c-1'], incluirEntrega: false, cargos: [], medioPago: 'efectivo', fechaPago: '', observacion: '' }),
+    ).rejects.toThrow(GENERIC_ERROR)
   })
 
   it('rejects a malformed payment', async () => {
     stubFetch(jsonResponse(201, { ...payment, cuotas: 'ninguna' }))
 
     await expect(
-      registerPayment('token', 'sale-1', { cuotaIds: ['c-1'], incluirEntrega: false, medioPago: 'efectivo', fechaPago: '', observacion: '' }),
+      registerPayment('token', 'sale-1', { cuotaIds: ['c-1'], incluirEntrega: false, cargos: [], medioPago: 'efectivo', fechaPago: '', observacion: '' }),
     ).rejects.toThrow(GENERIC_ERROR)
   })
 })
@@ -215,7 +272,13 @@ describe('settleSale', () => {
   it('posts the expected balance with the terms', async () => {
     const fetchMock = stubFetch(jsonResponse(201, { ...payment, tipo: 'cancelacion_total' }))
 
-    const created = await settleSale('token', 'sale-1', { montoEsperado: 100000, medioPago: 'cheque', fechaPago: '2026-05-01', observacion: 'Cheque 9' })
+    const created = await settleSale('token', 'sale-1', {
+      montoEsperado: 100000,
+      cargos: [{ tipo: 'honorarios', monto: 900, moneda: 'ARS', detalle: '' }],
+      medioPago: 'cheque',
+      fechaPago: '2026-05-01',
+      observacion: 'Cheque 9',
+    })
 
     expect(created.tipo).toBe('cancelacion_total')
     const [url, init] = requestOf(fetchMock)
@@ -224,13 +287,14 @@ describe('settleSale', () => {
     expect(body.montoEsperado).toBe(100000)
     expect(body.medioPago).toBe('cheque')
     expect(body.observacion).toBe('Cheque 9')
+    expect(body.cargos).toEqual([{ tipo: 'honorarios', monto: 900, moneda: 'ARS' }])
     expect(typeof body.fechaPago).toBe('string')
   })
 
   it('omits the optional fields when empty', async () => {
     const fetchMock = stubFetch(jsonResponse(201, { ...payment, tipo: 'cancelacion_total' }))
 
-    await settleSale('token', 'sale-1', { montoEsperado: 100000, medioPago: 'efectivo', fechaPago: '', observacion: '' })
+    await settleSale('token', 'sale-1', { montoEsperado: 100000, cargos: [], medioPago: 'efectivo', fechaPago: '', observacion: '' })
 
     expect(JSON.parse(requestOf(fetchMock)[1].body as string)).toEqual({ montoEsperado: 100000, medioPago: 'efectivo' })
   })

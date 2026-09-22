@@ -718,6 +718,22 @@ Decisiones de este recorte:
   `resumen` de conteos (vencidas y a vencer en 30 días) sobre todo el
   alcance, no sobre la página; no totaliza montos porque cada venta está en
   la moneda de su lote.
+- **Un cobro puede mezclar monedas, y por eso no tiene un único total.**
+  Los cargos adicionales viven en `cargos_adicionales`, ahora colgados del
+  cobro por `cobro_id` y con `cuota_id` opcional
+  (`00014_add_payment_charges.sql`), y llevan su propia moneda:
+  `cobros.monto`/`moneda` son solo lo imputado al plan, siempre en la moneda
+  de la venta, y `domain.PaymentTotals` arma un total por moneda (la de la
+  venta primero, el resto alfabético) que es lo que el cliente entregó. Nada
+  se convierte: no hay tipo de cambio en el sistema.
+  `domain.NormalizePaymentCharges` valida tipo, monto (mayor a cero, 2
+  decimales), moneda y detalle, y corre en el caso de uso y otra vez en el
+  repositorio, que es el primero que conoce la moneda de la venta y la usa
+  para los cargos que no traen una. Los cargos no tocan cuotas ni saldo: el
+  cierre de la venta sigue dependiendo solo del plan y el estado de deuda los
+  publica aparte en `cargosCobrados`. Se leen en el mismo orden que los
+  totales (`chargeOrder`), porque los cargos de un cobro comparten
+  `fecha_creacion` y ordenar por ella no decide nada.
 - **La UI de cobranzas vive en `features/billing`.** `/cobranzas`
   (`BillingPage`, `useDueInstallments`) es el tablero de vencimientos con
   búsqueda, estado (`pendientes` = pendiente + vencida, el default del API),
@@ -726,8 +742,12 @@ Decisiones de este recorte:
   resumen, tabla de entrega y cuotas con casillas para elegir qué se cobra
   (`toggleInstallment` marca en orden: tildar la cuota 3 tilda también 1 y
   2), «Registrar cobro» y «Cancelar saldo total» abren `PaymentDialog`
-  (medio de pago, fecha y observación, validados con las mismas reglas del
-  backend), y el cobro registrado abre `PaymentReceiptDialog`. «Imprimir
+  (medio de pago, fecha, observación y los cargos adicionales de
+  `ChargesEditor`, validados con las mismas reglas del backend: `parseCharges`
+  y `paymentTotals` son el espejo de `NormalizePaymentCharges` y
+  `PaymentTotals`, así el diálogo previsualiza un total por moneda antes de
+  enviar), y el cobro registrado abre `PaymentReceiptDialog`, que imprime los
+  cargos y un importe por moneda. «Imprimir
   estado de deuda» (`DebtStatementDialog`) y el recibo usan `PrintDialog`,
   el mismo mecanismo `data-print-area` + `window.print()` del recibo de
   venta. `billing` no importa `sales`: declara sus propios tipos del

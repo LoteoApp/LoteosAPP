@@ -3,6 +3,7 @@ import { formatDate } from '../../../shared/lib/formatDate'
 import {
   PAYMENT_MEDIUM_LABELS,
   PAYMENT_TYPE_LABELS,
+  chargeLabel,
   clientLabel,
   lotLabel,
   paymentItemsLabel,
@@ -37,9 +38,16 @@ export default function PaymentReceiptDialog({ open, payment, sale, onClose }: P
           <p className="text-[0.6875rem] font-medium tracking-[0.12em] text-muted-foreground uppercase print:text-black">
             Importe cobrado
           </p>
-          <p className="text-3xl font-semibold tracking-tight text-foreground tabular-nums print:text-black">
-            {formatCurrency(payment.monto, payment.moneda)}
-          </p>
+          <dl role="group" aria-label="Importe cobrado" className="flex flex-col gap-0.5">
+            {payment.totales.map((total) => (
+              <div key={total.moneda}>
+                <dt className="sr-only">{total.moneda}</dt>
+                <dd className="text-3xl font-semibold tracking-tight text-foreground tabular-nums print:text-black">
+                  {formatCurrency(total.monto, total.moneda)}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
         <p className="text-sm font-medium text-foreground print:text-black">{PAYMENT_TYPE_LABELS[payment.tipo]}</p>
       </div>
@@ -59,7 +67,7 @@ export default function PaymentReceiptDialog({ open, payment, sale, onClose }: P
           </PrintField>
         )}
       </dl>
-      {payment.cuotas.length > 0 && (
+      {(payment.cuotas.length > 0 || payment.incluyeEntrega) && (
         <table className="w-full border-t border-border text-sm print:border-black">
           <caption className="sr-only">Cuotas cobradas</caption>
           <thead>
@@ -82,6 +90,27 @@ export default function PaymentReceiptDialog({ open, payment, sale, onClose }: P
                 <td className="px-4 py-2 sm:px-6">Cuota {cuota.numero}</td>
                 <td className="px-4 py-2">{formatDate(cuota.fechaVencimiento)}</td>
                 <td className="px-4 py-2 text-right tabular-nums sm:px-6">{formatCurrency(cuota.monto, payment.moneda)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {payment.cargos.length > 0 && (
+        <table className="w-full border-t border-border text-sm print:border-black">
+          <caption className="px-4 pt-3 text-left text-[0.6875rem] font-medium tracking-[0.12em] text-muted-foreground uppercase sm:px-6 print:text-black">
+            Cargos adicionales
+          </caption>
+          <thead>
+            <tr className="text-left text-[0.6875rem] tracking-[0.12em] text-muted-foreground uppercase print:text-black">
+              <th className="px-4 py-2 font-medium sm:px-6">Concepto</th>
+              <th className="px-4 py-2 text-right font-medium sm:px-6">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payment.cargos.map((cargo) => (
+              <tr key={cargo.id} className="border-t border-border print:border-black">
+                <td className="px-4 py-2 sm:px-6">{chargeLabel(cargo)}</td>
+                <td className="px-4 py-2 text-right tabular-nums sm:px-6">{formatCurrency(cargo.monto, cargo.moneda)}</td>
               </tr>
             ))}
           </tbody>

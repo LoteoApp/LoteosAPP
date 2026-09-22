@@ -119,7 +119,12 @@ type DownPayment struct {
 }
 
 // Payment is a cobro as the API publishes it: what was collected, over which
-// cuotas (and the entrega, when it was included), by whom and when.
+// cuotas (and the entrega, when it was included), with which extra charges,
+// by whom and when.
+//
+// Monto and Moneda are only what was applied to the plan, always in the
+// sale's currency. A charge may be in another currency, so what the client
+// handed over is Totales, one amount per currency; nothing is converted.
 type Payment struct {
 	ID             string           `json:"id"`
 	VentaID        string           `json:"ventaId"`
@@ -131,6 +136,8 @@ type Payment struct {
 	IncluyeEntrega bool             `json:"incluyeEntrega"`
 	MontoEntrega   float64          `json:"montoEntrega"`
 	Cuotas         []Installment    `json:"cuotas"`
+	Cargos         []PaymentCharge  `json:"cargos"`
+	Totales        []CurrencyTotal  `json:"totales"`
 	UsuarioAlta    ReservationActor `json:"usuarioAlta"`
 	FechaPago      time.Time        `json:"fechaPago"`
 	FechaCreacion  time.Time        `json:"fechaCreacion"`
@@ -153,13 +160,18 @@ type DebtSummary struct {
 // DebtStatement is the estado de deuda of a financed sale: the sale, its
 // entrega and cuotas with their current state, the totals and every cobro
 // registered so far.
+//
+// Resumen covers the plan only. CargosCobrados is what the cobros added on
+// top of it, per currency, since those charges aren't debt of the plan and
+// may be in a currency the plan never uses.
 type DebtStatement struct {
-	Venta     Sale          `json:"venta"`
-	Entrega   *DownPayment  `json:"entrega,omitempty"`
-	Cuotas    []Installment `json:"cuotas"`
-	Resumen   DebtSummary   `json:"resumen"`
-	Cobros    []Payment     `json:"cobros"`
-	EmitidoEl time.Time     `json:"emitidoEl"`
+	Venta          Sale            `json:"venta"`
+	Entrega        *DownPayment    `json:"entrega,omitempty"`
+	Cuotas         []Installment   `json:"cuotas"`
+	Resumen        DebtSummary     `json:"resumen"`
+	Cobros         []Payment       `json:"cobros"`
+	CargosCobrados []CurrencyTotal `json:"cargosCobrados"`
+	EmitidoEl      time.Time       `json:"emitidoEl"`
 }
 
 // Saldada reports whether nothing is left to collect: every cuota paid and
