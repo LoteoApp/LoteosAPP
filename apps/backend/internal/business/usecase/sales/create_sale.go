@@ -57,15 +57,23 @@ type CreateSale interface {
 type createSaleUseCase struct {
 	repository gateway.SaleRepository
 	users      gateway.UserRepository
+	dueDay     int
 	clock      Clock
 }
 
-func NewCreateSale(repository gateway.SaleRepository, users gateway.UserRepository, clocks ...Clock) CreateSale {
+// NewCreateSale takes the day of the month every cuota falls due on, which
+// the composition root reads from the environment; an out-of-range day falls
+// back to domain.DefaultInstallmentDueDay, and configuration is what rejects
+// it loudly at startup.
+func NewCreateSale(repository gateway.SaleRepository, users gateway.UserRepository, dueDay int, clocks ...Clock) CreateSale {
 	clock := Clock(SystemClock{})
 	if len(clocks) > 0 && clocks[0] != nil {
 		clock = clocks[0]
 	}
-	return &createSaleUseCase{repository: repository, users: users, clock: clock}
+	if !domain.IsValidInstallmentDueDay(dueDay) {
+		dueDay = domain.DefaultInstallmentDueDay
+	}
+	return &createSaleUseCase{repository: repository, users: users, dueDay: dueDay, clock: clock}
 }
 
 func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleInput) (domain.Sale, error) {
@@ -127,6 +135,7 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 		IdempotencyKey:         key,
 		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method, plan),
 		PaymentPlan:            plan,
+		InstallmentDueDay:      useCase.dueDay,
 		CreatedAt:              useCase.clock.Now().UTC(),
 	})
 	if err != nil {

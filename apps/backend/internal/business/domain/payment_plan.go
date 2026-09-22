@@ -17,8 +17,13 @@ const (
 const (
 	MaxSaleInstallments = 360
 	MaxSaleInterestRate = 1000
-	// InstallmentDueDay is the day of the month every cuota falls due on.
-	InstallmentDueDay    = 10
+	// DefaultInstallmentDueDay is the day of the month cuotas fall due on
+	// when the deployment doesn't choose another one.
+	DefaultInstallmentDueDay = 10
+	MinInstallmentDueDay     = 1
+	// MaxInstallmentDueDay is 28 because every month has it: a later day
+	// would not exist in February and the cuota would land on another month.
+	MaxInstallmentDueDay = 28
 	installmentAmountMin = 0.01
 	interestRateDecimals = 4
 	moneyDecimals        = 2
@@ -41,7 +46,14 @@ var (
 	ErrSaleInvalidDownPayment       = &Error{Kind: KindInvalid, Code: "invalid_sale_down_payment", Message: "La entrega tiene que ser mayor a cero y menor al precio del lote"}
 	ErrSaleDownPaymentNotApplicable = &Error{Kind: KindInvalid, Code: "sale_down_payment_not_applicable", Message: "Solo entrega + financiación lleva un monto de entrega"}
 	ErrSaleInstallmentTooSmall      = &Error{Kind: KindInvalid, Code: "sale_installment_too_small", Message: "El monto financiado no alcanza para esa cantidad de cuotas"}
+	ErrInvalidInstallmentDueDay     = &Error{Kind: KindInvalid, Code: "invalid_installment_due_day", Message: "El día de vencimiento de las cuotas no es válido"}
 )
+
+// IsValidInstallmentDueDay reports whether a day of the month can be used as
+// the due day of every cuota.
+func IsValidInstallmentDueDay(day int) bool {
+	return day >= MinInstallmentDueDay && day <= MaxInstallmentDueDay
+}
 
 func (period PaymentPeriod) IsValid() bool {
 	_, ok := paymentPeriodMonths[period]
@@ -178,10 +190,14 @@ func RoundMoney(value float64) float64 {
 //
 // Every cuota is the same amount, so the total is what the cuotas add up to
 // and may differ from the exact interest by a few cents. Due dates:
-// installment k (1-based) is due on day 10 of the month k periods after the
-// sale month, whatever day the sale happened on (a sale on Jan 5 and one on
-// Jan 31 are both due Feb 10, Mar 10...), keeping the sale date's clock.
-func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
+// installment k (1-based) is due on dueDay of the month k periods after the
+// sale month, whatever day the sale happened on (with dueDay 10, a sale on
+// Jan 5 and one on Jan 31 are both due Feb 10, Mar 10...), keeping the sale
+// date's clock. dueDay is a deployment-wide setting, not a per-sale one.
+func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time, dueDay int) (PaymentSchedule, error) {
+	if !IsValidInstallmentDueDay(dueDay) {
+		return PaymentSchedule{}, ErrInvalidInstallmentDueDay
+	}
 	if plan.DownPayment >= amount {
 		return PaymentSchedule{}, ErrSaleInvalidDownPayment
 	}
@@ -201,7 +217,7 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 			Numero:           number,
 			Monto:            installment,
 			Estado:           InstallmentStatePending,
-			FechaVencimiento: dueDateAfter(saleDate, months*number),
+			FechaVencimiento: dueDateAfter(saleDate, months*number, dueDay),
 		}
 	}
 	return PaymentSchedule{
@@ -212,8 +228,8 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 	}, nil
 }
 
-func dueDateAfter(date time.Time, months int) time.Time {
+func dueDateAfter(date time.Time, months, dueDay int) time.Time {
 	year, month, _ := date.Date()
 	hour, minute, second := date.Clock()
-	return time.Date(year, month+time.Month(months), InstallmentDueDay, hour, minute, second, date.Nanosecond(), date.Location())
+	return time.Date(year, month+time.Month(months), dueDay, hour, minute, second, date.Nanosecond(), date.Location())
 }

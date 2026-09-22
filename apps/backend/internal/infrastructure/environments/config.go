@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"loteosapp/backend/internal/business/domain"
 )
 
 type Server struct {
@@ -17,6 +19,9 @@ type Server struct {
 	Storage                Storage
 	ReservationExpiry      ReservationExpiry
 	Mailer                 Mailer
+	// InstallmentDueDay is the day of the month every cuota of a financed
+	// sale falls due on.
+	InstallmentDueDay int
 }
 
 type ReservationExpiry struct {
@@ -59,6 +64,10 @@ func LoadServer() (Server, error) {
 	if err != nil {
 		return Server{}, err
 	}
+	installmentDueDay, err := loadInstallmentDueDay()
+	if err != nil {
+		return Server{}, err
+	}
 
 	cfg := Server{
 		DatabaseURL:            env.required("DATABASE_URL"),
@@ -78,6 +87,7 @@ func LoadServer() (Server, error) {
 			FromEmail: envOrDefault("MAIL_FROM_EMAIL", "no-reply@loteosapp.com"),
 			FromName:  envOrDefault("MAIL_FROM_NAME", "LoteosAPP"),
 		},
+		InstallmentDueDay: installmentDueDay,
 	}
 
 	if err := env.err(); err != nil {
@@ -105,6 +115,19 @@ func loadReservationExpiry() (ReservationExpiry, error) {
 		return ReservationExpiry{}, fmt.Errorf("RESERVATION_EXPIRY_TIMEOUT must be a positive duration")
 	}
 	return ReservationExpiry{Enabled: enabled, Interval: interval, Batch: batch, Timeout: timeout}, nil
+}
+
+// loadInstallmentDueDay reads the day of the month every cuota falls due on.
+// It is a business rule that changes per deployment, not per sale, so it is
+// rejected here at startup instead of failing when a sale is registered.
+func loadInstallmentDueDay() (int, error) {
+	raw := envOrDefault("INSTALLMENT_DUE_DAY", strconv.Itoa(domain.DefaultInstallmentDueDay))
+	day, err := strconv.Atoi(raw)
+	if err != nil || !domain.IsValidInstallmentDueDay(day) {
+		return 0, fmt.Errorf("INSTALLMENT_DUE_DAY must be an integer between %d and %d",
+			domain.MinInstallmentDueDay, domain.MaxInstallmentDueDay)
+	}
+	return day, nil
 }
 
 func LoadMigration() (Migration, error) {

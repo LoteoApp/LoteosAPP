@@ -233,8 +233,8 @@ export default function PaymentConditions({
             </Field>
           </div>
           <FieldDescription>
-            La tasa se aplica una sola vez sobre el monto financiado. La primera cuota vence el día
-            10, un período después del mes de la venta.
+            La tasa se aplica una sola vez sobre el monto financiado. La primera cuota vence un
+            período después del mes de la venta, el día fijado para los vencimientos.
           </FieldDescription>
 
           {lot !== null && <PlanPreview method={method} plan={plan} lot={lot} />}

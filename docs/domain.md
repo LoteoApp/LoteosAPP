@@ -336,12 +336,19 @@ cuotas y puede diferir del interés exacto en unos centavos (4.600 en 12
 cuotas son 12 de 383,33 = 4.599,96). Si la cuota queda por debajo de un
 centavo, la venta se rechaza.
 
-Vencimientos: toda cuota vence el **día 10**. La cuota `k` vence el 10 del
-mes que resulta de sumar `k` períodos al mes de la venta, sin importar qué
-día del mes se vendió: una venta del 5 de enero y una del 31 de enero, ambas
-con cuotas mensuales, vencen el 10 de febrero, el 10 de marzo, el 10 de
-abril… Con cuotas trimestrales, una venta del 15 de enero vence el 10 de
-abril, el 10 de julio, etc. No se ingresa una fecha de primer vencimiento.
+Vencimientos: toda cuota vence el **mismo día de cada mes**, hoy el **10**.
+La cuota `k` vence ese día del mes que resulta de sumar `k` períodos al mes
+de la venta, sin importar qué día del mes se vendió: una venta del 5 de enero
+y una del 31 de enero, ambas con cuotas mensuales, vencen el 10 de febrero,
+el 10 de marzo, el 10 de abril… Con cuotas trimestrales, una venta del 15 de
+enero vence el 10 de abril, el 10 de julio, etc. No se ingresa una fecha de
+primer vencimiento.
+
+El día no está fijo en el código: lo define `INSTALLMENT_DUE_DAY` por
+instalación (ver [development.md](development.md#variables-de-entorno)),
+entre el 1 y el 28 —del 29 al 31 no existen en todos los meses—. Cambiarlo
+afecta solo a los planes que se creen después; las cuotas ya generadas
+conservan su vencimiento.
 
 ## Cobranza
 

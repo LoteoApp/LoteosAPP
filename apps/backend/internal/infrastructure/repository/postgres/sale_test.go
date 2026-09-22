@@ -357,9 +357,10 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 	command := gateway.CreateSaleCommand{
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
-		PaymentMethod: domain.PaymentMethodFinanced,
-		PaymentPlan:   &domain.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
-		CreatedAt:     now,
+		PaymentMethod:     domain.PaymentMethodFinanced,
+		PaymentPlan:       &domain.PaymentPlanInput{Installments: 12, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
+		InstallmentDueDay: domain.DefaultInstallmentDueDay,
+		CreatedAt:         now,
 	}
 
 	created, err := repository.Create(context.Background(), command)
@@ -457,9 +458,10 @@ func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
 	command := gateway.CreateSaleCommand{
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
-		PaymentMethod: domain.PaymentMethodDownAndFi,
-		PaymentPlan:   &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
-		CreatedAt:     now,
+		PaymentMethod:     domain.PaymentMethodDownAndFi,
+		PaymentPlan:       &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
+		InstallmentDueDay: domain.DefaultInstallmentDueDay,
+		CreatedAt:         now,
 	}
 
 	// The lote price bounds the down payment; the repository is the first
