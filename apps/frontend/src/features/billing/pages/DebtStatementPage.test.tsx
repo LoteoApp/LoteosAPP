@@ -236,8 +236,11 @@ describe('DebtStatementPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Agregar cargo' }))
     await user.click(within(dialog).getByLabelText('Monto'))
     await user.paste('150000')
-    await user.clear(within(dialog).getByLabelText('Moneda'))
-    await user.paste('ars')
+    // The currency starts on the sale's and the list offers the usual ones.
+    const currency = within(dialog).getByRole('combobox', { name: 'Moneda' })
+    expect(currency).toHaveTextContent('USD')
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'ARS' }))
     await user.click(within(dialog).getByLabelText('Detalle'))
     await user.paste('Agua')
 

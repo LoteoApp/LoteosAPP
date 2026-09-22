@@ -4,6 +4,7 @@ import {
   chargeLabel,
   chargeTotals,
   clientLabel,
+  currencyOptions,
   isDueFilter,
   isInstallmentState,
   isChargeType,
@@ -13,6 +14,7 @@ import {
   newChargeRow,
   parseCharges,
   paymentDateToISO,
+  paymentInstant,
   paymentItemsLabel,
   paymentTotals,
   pendingInstallments,
@@ -60,6 +62,21 @@ describe('paymentDateToISO', () => {
 
   it('formats today for the date input', () => {
     expect(todayInputValue(new Date(2026, 0, 5))).toBe('2026-01-05')
+  })
+
+  // Anchoring today at noon is a future instant all morning, and the backend
+  // rejects a payment dated in the future (payment_date_in_future).
+  it('sends nothing for today so the backend stamps its own now', () => {
+    expect(paymentInstant('2026-09-22', '2026-09-22')).toBe('')
+    expect(paymentInstant(' 2026-09-22 ', '2026-09-22')).toBe('')
+    expect(paymentInstant('', '2026-09-22')).toBe('')
+    expect(paymentInstant(todayInputValue())).toBe('')
+  })
+
+  it('sends a past day as its local noon', () => {
+    const iso = paymentInstant('2026-09-20', '2026-09-22')
+    expect(new Date(iso).getDate()).toBe(20)
+    expect(new Date(iso).getHours()).toBe(12)
   })
 })
 
@@ -166,6 +183,14 @@ describe('parseCharges', () => {
   it('gives every row its own key', () => {
     expect(newChargeRow('USD').key).not.toBe(newChargeRow('USD').key)
     expect(newChargeRow('ARS').moneda).toBe('ARS')
+  })
+
+  it('offers the sale currency first and never repeats it', () => {
+    expect(currencyOptions('usd')).toEqual(['USD', 'ARS'])
+    expect(currencyOptions('ARS')).toEqual(['ARS', 'USD'])
+    // A lote priced in something else keeps its currency available.
+    expect(currencyOptions('EUR')).toEqual(['EUR', 'ARS', 'USD'])
+    expect(currencyOptions(' ')).toEqual(['ARS', 'USD'])
   })
 })
 

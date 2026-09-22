@@ -7,8 +7,8 @@ import {
   CHARGE_TYPES,
   CHARGE_TYPE_LABELS,
   MAX_CHARGE_DETAIL_LENGTH,
-  MAX_CURRENCY_CODE_LENGTH,
   MAX_PAYMENT_CHARGES,
+  currencyOptions,
   newChargeRow,
   type ChargeRow,
   type ChargeType,
@@ -23,6 +23,8 @@ type ChargesEditorProps = {
 }
 
 export default function ChargesEditor({ rows, currency, onChange }: ChargesEditorProps) {
+  const currencies = currencyOptions(currency)
+
   function update(key: string, changes: Partial<ChargeRow>) {
     onChange(rows.map((row) => (row.key === key ? { ...row, ...changes } : row)))
   }
@@ -35,7 +37,7 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
         estar en otra moneda: se cobra aparte, no se convierte.
       </FieldDescription>
       {rows.map((row, index) => (
-        <div key={row.key} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_5.5rem_auto] sm:items-end">
+        <div key={row.key} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto] sm:items-end">
           <Field>
             <FieldLabel htmlFor={`cargo-tipo-${row.key}`}>Tipo</FieldLabel>
             <Select
@@ -68,13 +70,20 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
           </Field>
           <Field>
             <FieldLabel htmlFor={`cargo-moneda-${row.key}`}>Moneda</FieldLabel>
-            <Input
-              id={`cargo-moneda-${row.key}`}
-              maxLength={MAX_CURRENCY_CODE_LENGTH}
-              placeholder={currency}
-              value={row.moneda}
-              onChange={(event) => update(row.key, { moneda: event.target.value.toUpperCase() })}
-            />
+            <Select value={row.moneda} onValueChange={(value) => update(row.key, { moneda: value as string })}>
+              <SelectTrigger id={`cargo-moneda-${row.key}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectList>
+                  {currencies.map((candidate) => (
+                    <SelectItem key={candidate} value={candidate}>
+                      {candidate}
+                    </SelectItem>
+                  ))}
+                </SelectList>
+              </SelectContent>
+            </Select>
           </Field>
           <Button
             type="button"

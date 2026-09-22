@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../shared/api/client'
-import { isChargeType, isInstallmentState, isPaymentMedium, isPaymentType, paymentDateToISO } from '../types'
+import { isChargeType, isInstallmentState, isPaymentMedium, isPaymentType, paymentInstant } from '../types'
 import type {
   Actor,
   ChargeInput,
@@ -260,7 +260,7 @@ function chargesBody(charges: readonly ChargeInput[]): Record<string, unknown> {
 }
 
 export async function registerPayment(token: string, saleId: string, values: RegisterPaymentValues): Promise<Payment> {
-  const fechaPago = paymentDateToISO(values.fechaPago)
+  const fechaPago = paymentInstant(values.fechaPago)
   const body = await apiFetch<unknown>(`/api/v1/ventas/${encodeURIComponent(saleId)}/cobros`, {
     method: 'POST',
     token,
@@ -277,7 +277,7 @@ export async function registerPayment(token: string, saleId: string, values: Reg
 }
 
 export async function settleSale(token: string, saleId: string, values: SettleSaleValues): Promise<Payment> {
-  const fechaPago = paymentDateToISO(values.fechaPago)
+  const fechaPago = paymentInstant(values.fechaPago)
   const body = await apiFetch<unknown>(`/api/v1/ventas/${encodeURIComponent(saleId)}/cancelacion-total`, {
     method: 'POST',
     token,

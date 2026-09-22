@@ -351,6 +351,16 @@ export function normalizeCurrency(currency: string, fallback: string): string {
   return normalized === '' ? fallback.trim().toUpperCase() : normalized
 }
 
+// The currencies a charge may be in. `lotes.moneda` is free text, so the
+// sale's own currency leads the list even when it isn't one of these.
+const COMMON_CURRENCIES = ['ARS', 'USD'] as const
+
+export function currencyOptions(saleCurrency: string): string[] {
+  const sale = normalizeCurrency(saleCurrency, '')
+  const options = COMMON_CURRENCIES.filter((currency) => currency !== sale)
+  return sale === '' ? [...options] : [sale, ...options]
+}
+
 export type ChargesResult = { ok: true; charges: ChargeInput[] } | { ok: false; error: string }
 
 // Validates the typed charges with the same rules the backend applies, so
@@ -407,6 +417,14 @@ export function paymentTotals(
 
 export function chargeTotals(charges: readonly { monto: number; moneda: string }[]): CurrencyTotal[] {
   return paymentTotals(0, '', charges)
+}
+
+// The instant the API receives for the chosen day. Today is sent as nothing
+// at all, so the backend stamps its own "now": anchoring today at noon would
+// be a future instant all morning and the backend rejects a payment dated in
+// the future. A past day keeps its noon anchor.
+export function paymentInstant(day: string, today = todayInputValue()): string {
+  return day.trim() === today ? '' : paymentDateToISO(day)
 }
 
 // Turns the day typed in the date input into the instant sent to the API:
