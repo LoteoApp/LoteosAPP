@@ -234,6 +234,9 @@ describe('DebtStatementPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' })
 
     await user.click(within(dialog).getByRole('button', { name: 'Agregar cargo' }))
+    // A cargo is typed fresh every time: the browser must not offer what was
+    // saved for another one.
+    expect(within(dialog).getByLabelText('Detalle')).toHaveAttribute('autocomplete', 'off')
     await user.click(within(dialog).getByLabelText('Monto'))
     await user.paste('150000')
     // The currency starts on the sale's and the list offers the usual ones.

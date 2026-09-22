@@ -64,6 +64,7 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
               id={`cargo-monto-${row.key}`}
               inputMode="decimal"
               placeholder="0,00"
+              autoComplete="off"
               value={row.monto}
               onChange={(event) => update(row.key, { monto: event.target.value })}
             />
@@ -101,6 +102,7 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
               id={`cargo-detalle-${row.key}`}
               maxLength={MAX_CHARGE_DETAIL_LENGTH}
               placeholder="Período, comprobante, etc."
+              autoComplete="off"
               value={row.detalle}
               onChange={(event) => update(row.key, { detalle: event.target.value })}
             />
