@@ -15,8 +15,10 @@ const (
 )
 
 const (
-	MaxSaleInstallments  = 360
-	MaxSaleInterestRate  = 1000
+	MaxSaleInstallments = 360
+	MaxSaleInterestRate = 1000
+	// InstallmentDueDay is the day of the month every cuota falls due on.
+	InstallmentDueDay    = 10
 	installmentAmountMin = 0.01
 	interestRateDecimals = 4
 	moneyDecimals        = 2
@@ -176,9 +178,9 @@ func RoundMoney(value float64) float64 {
 //
 // Every cuota is the same amount, so the total is what the cuotas add up to
 // and may differ from the exact interest by a few cents. Due dates:
-// installment k (1-based) falls k periods after the sale date, on the same
-// day of the month, clamped to the last day when the target month is
-// shorter (a sale on Jan 31 is due Feb 28/29, Mar 31...).
+// installment k (1-based) is due on day 10 of the month k periods after the
+// sale month, whatever day the sale happened on (a sale on Jan 5 and one on
+// Jan 31 are both due Feb 10, Mar 10...), keeping the sale date's clock.
 func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
 	if plan.DownPayment >= amount {
 		return PaymentSchedule{}, ErrSaleInvalidDownPayment
@@ -199,7 +201,7 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 			Numero:           number,
 			Monto:            installment,
 			Estado:           InstallmentStatePending,
-			FechaVencimiento: addMonthsClamped(saleDate, months*number),
+			FechaVencimiento: dueDateAfter(saleDate, months*number),
 		}
 	}
 	return PaymentSchedule{
@@ -210,13 +212,8 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 	}, nil
 }
 
-func addMonthsClamped(date time.Time, months int) time.Time {
-	year, month, day := date.Date()
-	first := time.Date(year, month+time.Month(months), 1, 0, 0, 0, 0, date.Location())
-	lastDay := first.AddDate(0, 1, -1).Day()
-	if day > lastDay {
-		day = lastDay
-	}
+func dueDateAfter(date time.Time, months int) time.Time {
+	year, month, _ := date.Date()
 	hour, minute, second := date.Clock()
-	return time.Date(first.Year(), first.Month(), day, hour, minute, second, date.Nanosecond(), date.Location())
+	return time.Date(year, month+time.Month(months), InstallmentDueDay, hour, minute, second, date.Nanosecond(), date.Location())
 }

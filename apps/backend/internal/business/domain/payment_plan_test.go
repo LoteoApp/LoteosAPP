@@ -174,7 +174,7 @@ func TestBuildPaymentScheduleWithoutInterest(t *testing.T) {
 		t.Errorf("sum of installments = %v, want %v", got, schedule.TotalAmount)
 	}
 	for i, installment := range schedule.Installments {
-		want := time.Date(2026, time.Month(10+i), 15, 12, 30, 0, 0, time.UTC)
+		want := time.Date(2026, time.Month(10+i), 10, 12, 30, 0, 0, time.UTC)
 		if !installment.FechaVencimiento.Equal(want) {
 			t.Errorf("installment %d due = %s, want %s", i+1, installment.FechaVencimiento, want)
 		}
@@ -198,11 +198,11 @@ func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 			break
 		}
 	}
-	// Due dates clamp to the end of shorter months instead of spilling over.
+	// A sale late in the month still falls due on the 10th.
 	wantDue := []time.Time{
-		time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
 	}
 	for i, installment := range schedule.Installments {
 		if !installment.FechaVencimiento.Equal(wantDue[i]) {
@@ -219,13 +219,123 @@ func TestBuildPaymentScheduleSpacesInstallmentsByPeriod(t *testing.T) {
 		t.Fatalf("BuildPaymentSchedule() error = %v", err)
 	}
 	wantDue := []time.Time{
-		time.Date(2027, 2, 28, 9, 0, 0, 0, time.UTC),
-		time.Date(2027, 5, 30, 9, 0, 0, 0, time.UTC),
+		time.Date(2027, 2, 10, 9, 0, 0, 0, time.UTC),
+		time.Date(2027, 5, 10, 9, 0, 0, 0, time.UTC),
 	}
 	for i, installment := range schedule.Installments {
 		if !installment.FechaVencimiento.Equal(wantDue[i]) || installment.Monto != 25 {
 			t.Errorf("installment %d = %#v, want due %s", i+1, installment, wantDue[i])
 		}
+	}
+}
+
+func TestBuildPaymentScheduleDueDatesAlwaysFallOnDayTen(t *testing.T) {
+	cases := []struct {
+		name     string
+		saleDate time.Time
+		period   domain.PaymentPeriod
+		count    int
+		wantDue  []time.Time
+	}{
+		{
+			name:     "sale before the 10th",
+			saleDate: time.Date(2026, 1, 5, 8, 45, 30, 0, time.UTC),
+			period:   domain.PaymentPeriodMonthly,
+			count:    3,
+			wantDue: []time.Time{
+				time.Date(2026, 2, 10, 8, 45, 30, 0, time.UTC),
+				time.Date(2026, 3, 10, 8, 45, 30, 0, time.UTC),
+				time.Date(2026, 4, 10, 8, 45, 30, 0, time.UTC),
+			},
+		},
+		{
+			name:     "sale on the 10th",
+			saleDate: time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC),
+			period:   domain.PaymentPeriodMonthly,
+			count:    2,
+			wantDue: []time.Time{
+				time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC),
+				time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name:     "sale after the 10th",
+			saleDate: time.Date(2026, 1, 31, 23, 59, 59, 0, time.UTC),
+			period:   domain.PaymentPeriodMonthly,
+			count:    2,
+			wantDue: []time.Time{
+				time.Date(2026, 2, 10, 23, 59, 59, 0, time.UTC),
+				time.Date(2026, 3, 10, 23, 59, 59, 0, time.UTC),
+			},
+		},
+		{
+			name:     "quarterly rolls into the next year",
+			saleDate: time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC),
+			period:   domain.PaymentPeriodQuarterly,
+			count:    4,
+			wantDue: []time.Time{
+				time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC),
+				time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+				time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC),
+				time.Date(2027, 1, 10, 12, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name:     "bimonthly from a 31-day month into February",
+			saleDate: time.Date(2026, 12, 31, 6, 0, 0, 0, time.UTC),
+			period:   domain.PaymentPeriodBimonthly,
+			count:    2,
+			wantDue: []time.Time{
+				time.Date(2027, 2, 10, 6, 0, 0, 0, time.UTC),
+				time.Date(2027, 4, 10, 6, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name:     "semiannual",
+			saleDate: time.Date(2028, 2, 29, 10, 15, 0, 0, time.UTC),
+			period:   domain.PaymentPeriodSemiannual,
+			count:    2,
+			wantDue: []time.Time{
+				time.Date(2028, 8, 10, 10, 15, 0, 0, time.UTC),
+				time.Date(2029, 2, 10, 10, 15, 0, 0, time.UTC),
+			},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			plan := domain.PaymentPlanInput{Installments: testCase.count, Period: testCase.period}
+			schedule, err := domain.BuildPaymentSchedule(1200, plan, testCase.saleDate)
+			if err != nil {
+				t.Fatalf("BuildPaymentSchedule() error = %v", err)
+			}
+			if len(schedule.Installments) != len(testCase.wantDue) {
+				t.Fatalf("installments = %d, want %d", len(schedule.Installments), len(testCase.wantDue))
+			}
+			for i, installment := range schedule.Installments {
+				if !installment.FechaVencimiento.Equal(testCase.wantDue[i]) {
+					t.Errorf("installment %d due = %s, want %s", i+1, installment.FechaVencimiento, testCase.wantDue[i])
+				}
+				if installment.FechaVencimiento.Day() != domain.InstallmentDueDay {
+					t.Errorf("installment %d due day = %d, want %d", i+1, installment.FechaVencimiento.Day(), domain.InstallmentDueDay)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildPaymentScheduleDueDatesKeepTheSaleLocation(t *testing.T) {
+	buenosAires := time.FixedZone("ART", -3*60*60)
+	saleDate := time.Date(2026, 1, 25, 18, 0, 0, 0, buenosAires)
+	schedule, err := domain.BuildPaymentSchedule(500, monthlyPlan(1, 0), saleDate)
+	if err != nil {
+		t.Fatalf("BuildPaymentSchedule() error = %v", err)
+	}
+	due := schedule.Installments[0].FechaVencimiento
+	if !due.Equal(time.Date(2026, 2, 10, 18, 0, 0, 0, buenosAires)) {
+		t.Errorf("due = %s, want 2026-02-10 18:00 -03:00", due)
+	}
+	if _, offset := due.Zone(); offset != -3*60*60 {
+		t.Errorf("due offset = %d, want the sale date's offset", offset)
 	}
 }
 

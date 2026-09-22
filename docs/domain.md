@@ -336,11 +336,12 @@ cuotas y puede diferir del interés exacto en unos centavos (4.600 en 12
 cuotas son 12 de 383,33 = 4.599,96). Si la cuota queda por debajo de un
 centavo, la venta se rechaza.
 
-Vencimientos: la cuota `k` vence `k` períodos después de la fecha de la
-venta, el mismo día del mes; si el mes destino es más corto, vence el último
-día (una venta del 31 de enero con cuotas mensuales vence el 28/29 de
-febrero, el 31 de marzo, el 30 de abril…). No se ingresa una fecha de primer
-vencimiento.
+Vencimientos: toda cuota vence el **día 10**. La cuota `k` vence el 10 del
+mes que resulta de sumar `k` períodos al mes de la venta, sin importar qué
+día del mes se vendió: una venta del 5 de enero y una del 31 de enero, ambas
+con cuotas mensuales, vencen el 10 de febrero, el 10 de marzo, el 10 de
+abril… Con cuotas trimestrales, una venta del 15 de enero vence el 10 de
+abril, el 10 de julio, etc. No se ingresa una fecha de primer vencimiento.
 
 ## Cobranza
 

@@ -402,9 +402,9 @@ func TestSaleRepositoryFinancedPersistsThePlanAndItsInstallments(t *testing.T) {
 	if domain.RoundMoney(sum) != 110000.04 || plan.Cuotas[11].Monto != 9166.67 {
 		t.Errorf("cuotas sum = %v, last = %v", sum, plan.Cuotas[11].Monto)
 	}
-	// Due dates: one month apart from the sale date, clamped to month end.
-	if !plan.Cuotas[0].FechaVencimiento.Equal(time.Date(2026, 2, 28, 15, 0, 0, 0, time.UTC)) ||
-		!plan.Cuotas[11].FechaVencimiento.Equal(time.Date(2027, 1, 31, 15, 0, 0, 0, time.UTC)) {
+	// Due dates: one month apart from the sale month, always on the 10th.
+	if !plan.Cuotas[0].FechaVencimiento.Equal(time.Date(2026, 2, 10, 15, 0, 0, 0, time.UTC)) ||
+		!plan.Cuotas[11].FechaVencimiento.Equal(time.Date(2027, 1, 10, 15, 0, 0, 0, time.UTC)) {
 		t.Errorf("due dates = %s .. %s", plan.Cuotas[0].FechaVencimiento, plan.Cuotas[11].FechaVencimiento)
 	}
 
@@ -493,7 +493,9 @@ func TestSaleRepositoryDownPaymentPersistsTheDelivery(t *testing.T) {
 	if plan.MontoEntrega != 40000 || plan.MontoFinanciado != 60000 || plan.MontoTotal != 60000 || plan.MontoCuota != 20000 || plan.Periodicidad != domain.PaymentPeriodQuarterly {
 		t.Errorf("plan = %#v", plan)
 	}
-	if len(plan.Cuotas) != 3 || !plan.Cuotas[0].FechaVencimiento.Equal(now.AddDate(0, 3, 0)) || !plan.Cuotas[2].FechaVencimiento.Equal(now.AddDate(0, 9, 0)) {
+	if len(plan.Cuotas) != 3 ||
+		!plan.Cuotas[0].FechaVencimiento.Equal(time.Date(2026, 12, 10, 12, 0, 0, 0, time.UTC)) ||
+		!plan.Cuotas[2].FechaVencimiento.Equal(time.Date(2027, 6, 10, 12, 0, 0, 0, time.UTC)) {
 		t.Errorf("cuotas = %#v", plan.Cuotas)
 	}
 	var downPayment *float64

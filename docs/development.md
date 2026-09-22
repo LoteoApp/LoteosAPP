@@ -138,8 +138,9 @@ Endpoints operativos del backend:
   decimales, opcional), `periodicidad` (`mensual`, `bimestral`, `trimestral`,
   `semestral`) y, solo en `entrega_financiada`, `montoEntrega` (mayor a 0,
   hasta 2 decimales y menor al precio del lote); `contado` no admite
-  `planPago`. Los vencimientos se derivan de la
-  fecha de la venta. El monto y la moneda salen del precio del lote. La
+  `planPago`. Los vencimientos se derivan de la fecha de la venta: toda
+  cuota vence el día 10 del mes correspondiente. El monto y la moneda salen
+  del precio del lote. La
   respuesta incluye `planPago` con el resumen (`montoFinanciado`,
   `montoCuota`, `montoTotal`) y las `cuotas`. Un usuario de inmobiliaria
   solo puede vender en un loteo al que su agencia está asignada
