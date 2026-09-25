@@ -18,7 +18,7 @@ import (
 
 type createUserStub struct {
 	usuario         domain.Usuario
-	tempPassword    string
+	inviteEmailSent bool
 	err             error
 	called          bool
 	gotActorRoles   []string
@@ -29,7 +29,7 @@ type createUserStub struct {
 	gotInmobiliaria string
 }
 
-func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nombre, apellido, email, rol, inmobiliariaID string) (domain.Usuario, string, error) {
+func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nombre, apellido, email, rol, inmobiliariaID string) (domain.Usuario, bool, error) {
 	stub.called = true
 	stub.gotActorRoles = actorRoles
 	stub.gotNombre = nombre
@@ -37,7 +37,7 @@ func (stub *createUserStub) Execute(_ context.Context, actorRoles []string, nomb
 	stub.gotEmail = email
 	stub.gotRol = rol
 	stub.gotInmobiliaria = inmobiliariaID
-	return stub.usuario, stub.tempPassword, stub.err
+	return stub.usuario, stub.inviteEmailSent, stub.err
 }
 
 func performCreateUserRequest(t *testing.T, createUser *createUserStub, verifier userVerifierStub, token string, body any) *httptest.ResponseRecorder {
@@ -59,8 +59,8 @@ func TestCreateUserRoute(t *testing.T) {
 		t.Parallel()
 
 		createUser := &createUserStub{
-			usuario:      domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolAdministrativo},
-			tempPassword: "temp-pass-123",
+			usuario:         domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolAdministrativo},
+			inviteEmailSent: true,
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 
@@ -72,13 +72,13 @@ func TestCreateUserRoute(t *testing.T) {
 		}
 
 		var got struct {
-			Email             string `json:"email"`
-			TemporaryPassword string `json:"temporaryPassword"`
+			Email           string `json:"email"`
+			InviteEmailSent bool   `json:"invitacionEnviada"`
 		}
 		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if got.Email != "ana@example.com" || got.TemporaryPassword != "temp-pass-123" {
+		if got.Email != "ana@example.com" || !got.InviteEmailSent {
 			t.Errorf("response = %#v", got)
 		}
 		if len(createUser.gotActorRoles) != 1 || createUser.gotActorRoles[0] != domain.RolAdministrador {
@@ -96,8 +96,7 @@ func TestCreateUserRoute(t *testing.T) {
 		t.Parallel()
 
 		createUser := &createUserStub{
-			usuario:      domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolInmobiliaria},
-			tempPassword: "temp-pass-123",
+			usuario: domain.Usuario{ID: "u-1", Email: "ana@example.com", Rol: domain.RolInmobiliaria},
 		}
 		verifier := userVerifierStub{principal: supabase.Principal{Subject: "admin-1", Roles: []string{domain.RolAdministrador}}}
 

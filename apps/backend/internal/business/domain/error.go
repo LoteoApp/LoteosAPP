@@ -11,6 +11,7 @@ const (
 	KindConflict    Kind = "conflict"
 	KindNotFound    Kind = "not_found"
 	KindUnavailable Kind = "unavailable"
+	KindRateLimited Kind = "rate_limited"
 )
 
 // ErrDatabaseUnavailable is what a use case returns when persistence failed

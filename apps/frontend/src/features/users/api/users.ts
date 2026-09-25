@@ -20,6 +20,7 @@ function isUsuarioResponse(value: unknown): value is Usuario {
     (GESTIONABLE_ROLES as readonly string[]).includes(candidate.rol) &&
     (candidate.inmobiliariaId === undefined || typeof candidate.inmobiliariaId === 'string') &&
     typeof candidate.perfilCompleto === 'boolean' &&
+    (candidate.invitacionAceptada === undefined || typeof candidate.invitacionAceptada === 'boolean') &&
     (candidate.fechaBaja === null || typeof candidate.fechaBaja === 'string') &&
     typeof candidate.createdAt === 'string'
   )
@@ -45,7 +46,7 @@ export async function listUsers(token: string, signal?: AbortSignal): Promise<Us
 
 export type CreatedUsuario = {
   usuario: Usuario
-  temporaryPassword: string
+  invitacionEnviada: boolean
 }
 
 export async function createUser(token: string, values: UsuarioFormValues): Promise<CreatedUsuario> {
@@ -54,12 +55,12 @@ export async function createUser(token: string, values: UsuarioFormValues): Prom
   if (!isUsuarioResponse(body)) {
     throw new Error(GENERIC_ERROR)
   }
-  const { temporaryPassword } = body as { temporaryPassword?: unknown }
-  if (typeof temporaryPassword !== 'string' || temporaryPassword === '') {
+  const { invitacionEnviada } = body as { invitacionEnviada?: unknown }
+  if (typeof invitacionEnviada !== 'boolean') {
     throw new Error(GENERIC_ERROR)
   }
 
-  return { usuario: body, temporaryPassword }
+  return { usuario: body, invitacionEnviada }
 }
 
 export async function updateUser(
@@ -92,4 +93,8 @@ export async function reactivateUser(token: string, id: string): Promise<Usuario
   }
 
   return body
+}
+
+export async function resendInviteEmail(token: string, id: string): Promise<void> {
+  await apiFetch(`${USERS_PATH}/${id}/reenviar-invitacion`, { method: 'POST', token })
 }

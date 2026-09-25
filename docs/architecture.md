@@ -225,6 +225,10 @@ vacíos antes de que exista una funcionalidad que los necesite.
   contra Cloudflare R2 a través de su API S3, con el SDK de AWS v2. Guarda,
   lee y borra los archivos que sube el usuario (el DXF original del alta de
   loteo, fotos y planos). Ver [almacenamiento de archivos](#almacenamiento-de-archivos).
+- `internal/infrastructure/email/resend`: implementa `gateway.Mailer` contra
+  la API REST de Resend con `net/http` plano (sin SDK: es un único POST
+  JSON). Manda el mail de invitación al dar de alta un usuario y al
+  reenviarla. Ver [invitación de usuarios por mail](#invitación-de-usuarios-por-mail).
 - `internal/infrastructure/delivery/webapp/dto`: structs de request/response
   HTTP, agrupados por feature (`dto/users`, `dto/clients`, `dto/loteos`)
   igual que `usecase`. Cada subpaquete declara `package dto`; como el
@@ -344,6 +348,68 @@ iniciar y periódicamente; cada vencimiento usa una transacción independiente,
 revalida estado y plazo después de los locks y tolera varias instancias sin
 un mutex en memoria. `internal/app` inicia y detiene el worker antes de cerrar
 el pool.
+
+### Invitación de usuarios por mail
+
+Ningún usuario nuevo tiene contraseña hasta que la elige: `usecase/users.
+CreateUser` crea la cuenta en Supabase sin password vía
+`POST /auth/v1/admin/generate_link` (`type: invite`), que la deja sin
+confirmar y devuelve un token de un solo uso. `gateway.IdentityProvider.
+CreateUser` arma con ese token un link propio (`token_hash` + `type` en el
+fragmento de `/aceptar-invitacion` en el frontend, no en el query string, así
+el token no queda en logs de proxy ni en el historial; nunca el `action_link`
+de Supabase — ver más abajo) y hace un segundo llamado
+(`PUT /auth/v1/admin/users/{id}`) para setear `app_metadata.role`, porque
+`generate_link` no acepta `app_metadata`; si ese segundo llamado falla, borra
+la cuenta recién creada para no dejar una sin rol.
+
+`CreateUser.Execute` manda ese link por mejor esfuerzo (nombre, rol y el
+link) vía `gateway.Mailer`: si falla, se loguea y `Execute` devuelve
+`inviteEmailSent = false` junto con el usuario ya creado — nunca falla el
+alta por esto. Como no hay contraseña que entregar por otro canal, la única
+recuperación es reintentar el envío.
+
+`usecase/users.ResendInviteEmail` (`POST /api/v1/usuarios/{id}/reenviar-invitacion`,
+solo administrador) cubre el caso en que el mail no salió: pide un link
+nuevo vía `gateway.IdentityProvider.GenerateInviteLink` (el original nunca se
+persiste, solo vive en memoria durante un intento) y vuelve a mandar el
+mail. A diferencia de `CreateUser`, acá un fallo de envío sí se devuelve como
+error (`domain.ErrInviteEmailUnavailable`): es una acción explícita del
+admin, no un efecto colateral de otra operación, así que conviene que sepa
+si no funcionó. Si la cuenta ya activó su
+invitación, Supabase rechaza generar otro link (`email_exists`) y el reenvío
+devuelve `domain.ErrInviteAlreadyAccepted` (409, `invite_already_accepted`)
+en vez de mandar nada.
+
+`usecase/users.ListUsers` le agrega a cada usuario `invitacionAceptada`, que
+sale de `gateway.IdentityProvider.ConfirmedAccountIDs`: una consulta paginada
+a `GET /auth/v1/admin/users` que se queda con las cuentas que ya tienen
+`email_confirmed_at`, es decir, las que canjearon la invitación. El dato vive
+solo en Supabase (el backend no se entera cuando la persona acepta, porque
+`verifyOtp` corre en el navegador), por eso no se persiste ni se confunde con
+`perfilCompleto`, que solo dice si el usuario tiene nombre y apellido. Si la
+consulta falla, el listado igual responde y omite el campo: ausente significa
+"desconocido", no "pendiente". Solo el listado y el alta lo informan; el
+frontend conserva el valor al editar o reactivar. Con él, la lista suma
+"Invitación pendiente" como un estado más, junto a "Activo" y "Dado de baja"
+(la baja tiene prioridad), lo puede filtrar y solo ofrece "Reenviar
+invitación" a quien todavía no aceptó.
+
+**Por qué el link no es el `action_link` de Supabase**: ese link apunta
+primero a `/auth/v1/verify` de Supabase, que consume el token apenas se
+abre — antes de que la persona elija una contraseña — y deja una sesión
+activa en ese navegador aunque abandone el formulario. En cambio,
+`/aceptar-invitacion` (`features/auth/pages/AcceptInvitePage.tsx`) recibe el
+`token_hash` crudo (lo lee del fragmento y lo borra de la barra de direcciones) y
+recién llama `supabase.auth.verifyOtp` al enviar el formulario, junto con
+`updateUser({ password })`; si `updateUser` falla, el reintento no repite
+`verifyOtp` (el token ya está consumido) y solo vuelve a llamar a `updateUser`
+con la sesión que dejó la verificación; así abrir el mail (incluido
+un escaneo automático de un cliente de correo corporativo) no quema el link,
+y reabrirlo después de completar el formulario sí falla, porque el token es
+de un solo uso. No hace falta configurar nada en el dashboard de Supabase
+(ni SMTP propio ni la lista de Redirect URLs): el mail lo sigue mandando
+`internal/infrastructure/email/resend` como siempre.
 
 ### ABM de inmobiliarias
 
@@ -878,6 +944,8 @@ apps/frontend/src/
 │   └── providers.tsx           # Cuando existan providers globales
 ├── features/
 │   ├── auth/
+│   │   ├── api/
+│   │   │   └── auth.ts         # Cliente de /api/v1/auth (recupero de contraseña)
 │   │   ├── components/
 │   │   │   ├── AppAuthProvider.tsx
 │   │   │   ├── AuthStatus.tsx
@@ -890,7 +958,9 @@ apps/frontend/src/
 │   │   │   ├── describeAuthError.ts  # Traduce el error de Supabase al usuario
 │   │   │   └── resolveDisplayName.ts
 │   │   └── pages/
-│   │       └── LoginPage.tsx   # Formulario de email y contraseña, en /login
+│   │       ├── LoginPage.tsx          # Formulario de email y contraseña, en /login
+│   │       ├── ForgotPasswordPage.tsx # Pide el link de recupero, en /olvide-contrasena
+│   │       └── ResetPasswordPage.tsx  # Confirma la contraseña nueva, en /restablecer-contrasena
 │   ├── agencies/
 │   │   ├── api/
 │   │   │   └── agencies.ts        # Cliente de /api/v1/inmobiliarias
