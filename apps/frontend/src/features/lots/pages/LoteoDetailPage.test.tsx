@@ -456,6 +456,33 @@ describe('LoteoDetailPage', () => {
     expect(screen.getByLabelText('Número')).toHaveValue('7')
   })
 
+  it('clears a failed save error when canceling and reopening the same lote', async () => {
+    const user = userEvent.setup()
+    getLoteoMock.mockResolvedValue(detail())
+    updateLoteMock.mockRejectedValueOnce(
+      new ApiError('El número ya está en uso.', 'lote_numero_in_use', 409),
+    )
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Las Acacias' })
+    await user.click(planButton('Lote 7'))
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    await user.clear(screen.getByLabelText('Número'))
+    await user.type(screen.getByLabelText('Número'), '99')
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByText('El número ya está en uso.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Número')).toHaveAttribute('aria-invalid', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+
+    expect(screen.getByLabelText('Número')).toHaveValue('7')
+    expect(screen.getByLabelText('Número')).not.toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByText('El número ya está en uso.')).not.toBeInTheDocument()
+  })
+
   it('selects a lote from the list and shows its data without opening edit mode', async () => {
     const user = userEvent.setup()
     getLoteoMock.mockResolvedValue(detail())

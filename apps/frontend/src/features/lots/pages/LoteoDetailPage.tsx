@@ -271,6 +271,7 @@ export default function LoteoDetailPage({
               polygonLabels={polygonLabels}
               selectedPolygonId={selection.selectedPolygonId}
               updateState={loteUpdate}
+              onCancel={loteUpdate.reset}
               onSave={async (loteId, payload) => {
                 const updated = await loteUpdate.update(state.loteo.id, loteId, payload)
                 if (updated) {
