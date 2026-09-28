@@ -46,6 +46,13 @@ const LAYER_STROKE_WIDTH: Record<DxfLayer, number> = {
   CALLE: 0.6,
 }
 
+const LAYER_RENDER_PRIORITY: Record<DxfLayer, number> = {
+  LOTEO: 0,
+  MANZANA: 0,
+  CALLE: 0,
+  LOTES: 1,
+}
+
 const ZOOM_IN = 1 / 1.2
 const ZOOM_OUT = 1.2
 const DRAG_THRESHOLD_PX = 8
@@ -100,7 +107,9 @@ export default function DxfViewer({
   polygonLabels,
 }: DxfViewerProps) {
   const visiblePolygons = useMemo(
-    () => polygons.filter((polygon) => visibleLayers.has(polygon.layer)),
+    () => polygons
+      .filter((polygon) => visibleLayers.has(polygon.layer))
+      .sort((a, b) => LAYER_RENDER_PRIORITY[a.layer] - LAYER_RENDER_PRIORITY[b.layer]),
     [polygons, visibleLayers],
   )
   const polygonPaths = useMemo(
