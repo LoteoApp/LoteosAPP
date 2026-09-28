@@ -16,6 +16,7 @@ const (
 	testR2Bucket       = "loteos-files-dev"
 	testR2AccessKey    = "r2-access-key-id"
 	testR2SecretAccess = "r2-secret-access-key"
+	testResendAPIKey   = "resend-api-key"
 )
 
 // setRequiredServerEnv sets every variable LoadServer requires, so a test
@@ -30,6 +31,7 @@ func setRequiredServerEnv(t *testing.T) {
 	t.Setenv("CLOUDFLARE_R2_BUCKET_NAME", testR2Bucket)
 	t.Setenv("CLOUDFLARE_R2_ACCESS_KEY_ID", testR2AccessKey)
 	t.Setenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY", testR2SecretAccess)
+	t.Setenv("RESEND_API_KEY", testResendAPIKey)
 }
 
 func TestLoadServer(t *testing.T) {
@@ -58,6 +60,9 @@ func TestLoadServer(t *testing.T) {
 		}
 		if !cfg.ReservationExpiry.Enabled || cfg.ReservationExpiry.Interval != time.Minute || cfg.ReservationExpiry.Batch != 50 || cfg.ReservationExpiry.Timeout != 10*time.Second {
 			t.Errorf("ReservationExpiry = %+v, want enabled defaults", cfg.ReservationExpiry)
+		}
+		if cfg.Mailer.APIKey != testResendAPIKey || cfg.Mailer.FromEmail != "no-reply@loteosapp.com" || cfg.Mailer.FromName != "LoteosAPP" {
+			t.Errorf("Mailer = %+v, want the api key plus default from address", cfg.Mailer)
 		}
 	})
 
@@ -89,6 +94,8 @@ func TestLoadServer(t *testing.T) {
 		t.Setenv("RESERVATION_EXPIRY_INTERVAL", "2m")
 		t.Setenv("RESERVATION_EXPIRY_BATCH", "12")
 		t.Setenv("RESERVATION_EXPIRY_TIMEOUT", "25s")
+		t.Setenv("MAIL_FROM_EMAIL", "alertas@loteosapp.com")
+		t.Setenv("MAIL_FROM_NAME", "Alertas LoteosAPP")
 
 		cfg, err := environments.LoadServer()
 		if err != nil {
@@ -107,6 +114,9 @@ func TestLoadServer(t *testing.T) {
 		wantWorker := environments.ReservationExpiry{Enabled: false, Interval: 2 * time.Minute, Batch: 12, Timeout: 25 * time.Second}
 		if cfg.ReservationExpiry != wantWorker {
 			t.Errorf("ReservationExpiry = %+v, want %+v", cfg.ReservationExpiry, wantWorker)
+		}
+		if cfg.Mailer.FromEmail != "alertas@loteosapp.com" || cfg.Mailer.FromName != "Alertas LoteosAPP" {
+			t.Errorf("Mailer = %+v, want the overridden from address", cfg.Mailer)
 		}
 	})
 
@@ -137,6 +147,7 @@ func TestLoadServer(t *testing.T) {
 		"CLOUDFLARE_R2_BUCKET_NAME",
 		"CLOUDFLARE_R2_ACCESS_KEY_ID",
 		"CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+		"RESEND_API_KEY",
 	}
 
 	for _, name := range required {
@@ -222,6 +233,7 @@ func TestLoadServerDoesNotLeakCredentials(t *testing.T) {
 	secrets := map[string]string{
 		"SUPABASE_SERVICE_ROLE_KEY":       "super-secret-service-role-key",
 		"CLOUDFLARE_R2_SECRET_ACCESS_KEY": "super-secret-r2-key",
+		"RESEND_API_KEY":                  "super-secret-resend-key",
 	}
 
 	for name, secret := range secrets {

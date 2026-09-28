@@ -14,7 +14,7 @@ func TestCreateUserRejectsNonAdministrador(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{"administrativo"}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
@@ -48,7 +48,7 @@ func TestCreateUserRejectsIncompleteProfile(t *testing.T) {
 
 			repository := &gatewayfake.UserRepository{}
 			identity := &gatewayfake.IdentityProvider{}
-			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 			_, _, err := createUser.Execute(context.Background(),
 				[]string{domain.RolAdministrador}, test.nombre, test.apellido, "ana@example.com", domain.RolAdministrativo, "")
@@ -68,7 +68,7 @@ func TestCreateUserRejectsInvalidRol(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", "superadmin", "")
 
@@ -91,7 +91,7 @@ func TestCreateUserRejectsRolesThisABMDoesNotManage(t *testing.T) {
 
 			repository := &gatewayfake.UserRepository{}
 			identity := &gatewayfake.IdentityProvider{}
-			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+			createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 			_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", rol, "")
 
@@ -110,7 +110,7 @@ func TestCreateUserRejectsInvalidEmail(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "not-an-email", domain.RolAdministrativo, "")
 
@@ -126,10 +126,10 @@ func TestCreateUserHappyPath(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{}
-	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
-	usuario, tempPassword, err := createUser.Execute(context.Background(),
+	usuario, inviteEmailSent, err := createUser.Execute(context.Background(),
 		[]string{domain.RolAdministrador}, "  Ana  ", "  Gómez  ", "  ana@example.com  ", domain.RolAdministrativo, "")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -149,8 +149,11 @@ func TestCreateUserHappyPath(t *testing.T) {
 	if !usuario.Activo() {
 		t.Error("Execute() should create an active user")
 	}
-	if tempPassword != "temp-pass-123" {
-		t.Errorf("Execute() temporary password = %q, want %q", tempPassword, "temp-pass-123")
+	if !inviteEmailSent {
+		t.Error("Execute() should report the invite email as sent when the mailer succeeds")
+	}
+	if usuario.InvitacionAceptada == nil || *usuario.InvitacionAceptada {
+		t.Errorf("Execute() InvitacionAceptada = %v, want a pending invitation", usuario.InvitacionAceptada)
 	}
 	if repository.CreateCalls != 1 {
 		t.Errorf("Execute() repository.Create calls = %d, want 1", repository.CreateCalls)
@@ -165,7 +168,7 @@ func TestCreateUserPropagatesIdentityProviderError(t *testing.T) {
 
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{CreateErr: domain.ErrEmailEnUso}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
@@ -182,8 +185,8 @@ func TestCreateUserCompensatesWhenPersistenceFails(t *testing.T) {
 
 	persistErr := errors.New("insert failed")
 	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
-	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
@@ -202,11 +205,81 @@ func TestCreateUserReturnsOriginalErrorWhenCompensationAlsoFails(t *testing.T) {
 	persistErr := errors.New("insert failed")
 	repository := &gatewayfake.UserRepository{CreateErr: persistErr}
 	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", DeleteErr: errors.New("delete failed")}
-	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{})
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
 
 	assertDatabaseUnavailable(t, err, persistErr)
+}
+
+func TestCreateUserSendsInviteEmailOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
+	mailer := &gatewayfake.Mailer{}
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, mailer)
+
+	_, inviteEmailSent, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !inviteEmailSent {
+		t.Error("Execute() inviteEmailSent = false, want true")
+	}
+	if mailer.SendUserInviteCalls != 1 {
+		t.Fatalf("Execute() mailer.SendUserInvite calls = %d, want 1", mailer.SendUserInviteCalls)
+	}
+	sent := mailer.SendUserInviteInputs[0]
+	if sent.To != "ana@example.com" || sent.Nombre != "Ana" || sent.Apellido != "Gómez" ||
+		sent.Rol != domain.RolAdministrativo || sent.InviteURL != identity.InviteURL {
+		t.Errorf("Execute() sent invite = %#v", sent)
+	}
+}
+
+// TestCreateUserSurvivesInviteEmailFailure is the behavior a mail provider
+// outage must never turn into a failed user creation: the usuario already
+// exists with no password, and the admin can trigger ResendInviteEmail once
+// the mail provider is back.
+func TestCreateUserSurvivesInviteEmailFailure(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
+	mailer := &gatewayfake.Mailer{SendUserInviteErr: errors.New("resend unavailable")}
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, mailer)
+
+	usuario, inviteEmailSent, err := createUser.Execute(context.Background(),
+		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want the send failure to be swallowed", err)
+	}
+	if usuario.AuthProviderID == "" {
+		t.Error("Execute() should still create the usuario")
+	}
+	if inviteEmailSent {
+		t.Error("Execute() inviteEmailSent = true, want false when the mailer fails")
+	}
+}
+
+func TestCreateUserNeverSendsInviteWhenPersistenceFails(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{CreateErr: errors.New("insert failed")}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123"}
+	mailer := &gatewayfake.Mailer{}
+	createUser := NewCreateUser(repository, identity, &gatewayfake.AgencyRepository{}, mailer)
+
+	_, _, err := createUser.Execute(context.Background(), []string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "")
+
+	if err == nil {
+		t.Fatal("Execute() error = nil, want the persistence error")
+	}
+	if mailer.SendUserInviteCalls != 0 {
+		t.Error("Execute() should not send an invite when persistence fails")
+	}
 }
 
 func TestCreateUserRequiresAgencyForRolInmobiliaria(t *testing.T) {
@@ -215,7 +288,7 @@ func TestCreateUserRequiresAgencyForRolInmobiliaria(t *testing.T) {
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
 	agencies := &gatewayfake.AgencyRepository{}
-	createUser := NewCreateUser(repository, identity, agencies)
+	createUser := NewCreateUser(repository, identity, agencies, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(),
 		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "  ")
@@ -237,7 +310,7 @@ func TestCreateUserPropagatesAgencyNotFound(t *testing.T) {
 	repository := &gatewayfake.UserRepository{}
 	identity := &gatewayfake.IdentityProvider{}
 	agencies := &gatewayfake.AgencyRepository{FindByIDErr: domain.ErrAgencyNotFound}
-	createUser := NewCreateUser(repository, identity, agencies)
+	createUser := NewCreateUser(repository, identity, agencies, &gatewayfake.Mailer{})
 
 	_, _, err := createUser.Execute(context.Background(),
 		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "agency-1")
@@ -257,9 +330,9 @@ func TestCreateUserSetsAgencyForRolInmobiliaria(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{}
-	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
 	agencies := &gatewayfake.AgencyRepository{FoundByID: domain.Agency{ID: "agency-1"}}
-	createUser := NewCreateUser(repository, identity, agencies)
+	createUser := NewCreateUser(repository, identity, agencies, &gatewayfake.Mailer{})
 
 	usuario, _, err := createUser.Execute(context.Background(),
 		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolInmobiliaria, "agency-1")
@@ -278,9 +351,9 @@ func TestCreateUserIgnoresAgencyForOtherRoles(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{}
-	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", TempPassword: "temp-pass-123"}
+	identity := &gatewayfake.IdentityProvider{AuthProviderID: "sb-123", InviteURL: "https://app.loteosapp.com/aceptar-invitacion?token_hash=abc"}
 	agencies := &gatewayfake.AgencyRepository{}
-	createUser := NewCreateUser(repository, identity, agencies)
+	createUser := NewCreateUser(repository, identity, agencies, &gatewayfake.Mailer{})
 
 	usuario, _, err := createUser.Execute(context.Background(),
 		[]string{domain.RolAdministrador}, "Ana", "Gómez", "ana@example.com", domain.RolAdministrativo, "agency-1")

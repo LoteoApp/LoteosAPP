@@ -14,7 +14,7 @@ func TestListUsersRejectsNonAdministrador(t *testing.T) {
 	t.Parallel()
 
 	repository := &gatewayfake.UserRepository{}
-	listUsers := NewListUsers(repository)
+	listUsers := NewListUsers(repository, &gatewayfake.IdentityProvider{})
 
 	_, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrativo}, false)
 
@@ -32,7 +32,7 @@ func TestListUsersReturnsOnlyActiveByDefault(t *testing.T) {
 	repository := &gatewayfake.UserRepository{
 		ListByRolesResult: []domain.Usuario{{ID: "u-1", Rol: domain.RolAdministrativo}},
 	}
-	listUsers := NewListUsers(repository)
+	listUsers := NewListUsers(repository, &gatewayfake.IdentityProvider{})
 
 	usuarios, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, false)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestListUsersIncludesInactiveWhenAsked(t *testing.T) {
 			{ID: "u-2", Rol: domain.RolEscribano, FechaBaja: &baja},
 		},
 	}
-	listUsers := NewListUsers(repository)
+	listUsers := NewListUsers(repository, &gatewayfake.IdentityProvider{})
 
 	usuarios, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, true)
 	if err != nil {
@@ -94,9 +94,68 @@ func TestListUsersWrapsRepositoryFailure(t *testing.T) {
 
 	cause := errors.New("connection refused")
 	repository := &gatewayfake.UserRepository{ListByRolesErr: cause}
-	listUsers := NewListUsers(repository)
+	listUsers := NewListUsers(repository, &gatewayfake.IdentityProvider{})
 
 	_, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, false)
 
 	assertDatabaseUnavailable(t, err, cause)
+}
+
+func TestListUsersMarksWhichInvitationsWereAccepted(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{
+		ListByRolesResult: []domain.Usuario{
+			{ID: "u-1", AuthProviderID: "sb-1", Rol: domain.RolAdministrativo},
+			{ID: "u-2", AuthProviderID: "sb-2", Rol: domain.RolEscribano},
+			{ID: "u-3", Rol: domain.RolAgrimensor},
+		},
+	}
+	identity := &gatewayfake.IdentityProvider{ConfirmedAccountIDsResult: map[string]bool{"sb-1": true}}
+	listUsers := NewListUsers(repository, identity)
+
+	usuarios, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, false)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	want := map[string]bool{"u-1": true, "u-2": false, "u-3": false}
+	for _, usuario := range usuarios {
+		if usuario.InvitacionAceptada == nil || *usuario.InvitacionAceptada != want[usuario.ID] {
+			t.Errorf("Execute() %s InvitacionAceptada = %v, want %v", usuario.ID, usuario.InvitacionAceptada, want[usuario.ID])
+		}
+	}
+}
+
+func TestListUsersListsWithoutTheInvitationStateWhenTheIdentityProviderFails(t *testing.T) {
+	t.Parallel()
+
+	repository := &gatewayfake.UserRepository{
+		ListByRolesResult: []domain.Usuario{{ID: "u-1", AuthProviderID: "sb-1", Rol: domain.RolAdministrativo}},
+	}
+	identity := &gatewayfake.IdentityProvider{ConfirmedAccountIDsErr: errors.New("supabase unavailable")}
+	listUsers := NewListUsers(repository, identity)
+
+	usuarios, err := listUsers.Execute(context.Background(), []string{domain.RolAdministrador}, false)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want the list to survive an identity provider failure", err)
+	}
+
+	if len(usuarios) != 1 || usuarios[0].InvitacionAceptada != nil {
+		t.Errorf("Execute() = %#v, want one usuario with an unknown invitation state", usuarios)
+	}
+}
+
+func TestListUsersDoesNotAskTheIdentityProviderToNonAdministradores(t *testing.T) {
+	t.Parallel()
+
+	identity := &gatewayfake.IdentityProvider{}
+	listUsers := NewListUsers(&gatewayfake.UserRepository{}, identity)
+
+	if _, err := listUsers.Execute(context.Background(), []string{domain.RolEscribano}, false); !errors.Is(err, domain.ErrNoAutorizado) {
+		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
+	}
+	if identity.ConfirmedAccountIDsCalls != 0 {
+		t.Error("Execute() should not query the identity provider when actor is not administrador")
+	}
 }

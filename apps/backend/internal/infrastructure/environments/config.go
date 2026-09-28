@@ -16,6 +16,7 @@ type Server struct {
 	SupabaseServiceRoleKey string
 	Storage                Storage
 	ReservationExpiry      ReservationExpiry
+	Mailer                 Mailer
 }
 
 type ReservationExpiry struct {
@@ -23,6 +24,13 @@ type ReservationExpiry struct {
 	Interval time.Duration
 	Batch    int
 	Timeout  time.Duration
+}
+
+// Mailer is the Resend account that sends the user-invite email.
+type Mailer struct {
+	APIKey    string
+	FromEmail string
+	FromName  string
 }
 
 // Storage addresses the Cloudflare R2 bucket that holds uploaded files.
@@ -47,7 +55,7 @@ type Migration struct {
 // repository.
 func LoadServer() (Server, error) {
 	var env environment
-	worker, err := loadReservationExpiry()
+	reservationExpiry, err := loadReservationExpiry()
 	if err != nil {
 		return Server{}, err
 	}
@@ -64,7 +72,12 @@ func LoadServer() (Server, error) {
 			AccessKeyID:     env.required("CLOUDFLARE_R2_ACCESS_KEY_ID"),
 			SecretAccessKey: env.required("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
 		},
-		ReservationExpiry: worker,
+		ReservationExpiry: reservationExpiry,
+		Mailer: Mailer{
+			APIKey:    env.required("RESEND_API_KEY"),
+			FromEmail: envOrDefault("MAIL_FROM_EMAIL", "no-reply@loteosapp.com"),
+			FromName:  envOrDefault("MAIL_FROM_NAME", "LoteosAPP"),
+		},
 	}
 
 	if err := env.err(); err != nil {

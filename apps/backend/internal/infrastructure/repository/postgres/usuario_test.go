@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,6 +92,63 @@ func TestUserRepository(t *testing.T) {
 		_, err := repository.FindByAuthProviderID(context.Background(), newUUID(t))
 		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
 			t.Fatalf("FindByAuthProviderID() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		}
+	})
+
+	t.Run("find by email", func(t *testing.T) {
+		authProviderID := newUUID(t)
+		email := newEmail(t)
+
+		_, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: authProviderID,
+			Email:          email,
+			Rol:            domain.RolAdministrativo,
+		})
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		found, err := repository.FindByEmail(context.Background(), email)
+		if err != nil {
+			t.Fatalf("FindByEmail() error = %v", err)
+		}
+		if found.AuthProviderID != authProviderID {
+			t.Errorf("FindByEmail() = %#v", found)
+		}
+	})
+
+	t.Run("find by email not found", func(t *testing.T) {
+		_, err := repository.FindByEmail(context.Background(), newEmail(t))
+		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+			t.Fatalf("FindByEmail() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		}
+	})
+
+	// TestUserRepository/find_by_email_is_case_insensitive guards against a
+	// stored email whose casing differs from what the caller typed: Supabase
+	// Auth normalizes email casing, so the lookup used for password reset
+	// must not depend on matching it exactly.
+	t.Run("find by email is case-insensitive", func(t *testing.T) {
+		authProviderID := newUUID(t)
+		email := newEmail(t)
+
+		_, err := repository.Create(context.Background(), domain.Usuario{
+			AuthProviderID: authProviderID,
+			Email:          email,
+			Rol:            domain.RolAdministrativo,
+		})
+		t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+		if err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+
+		found, err := repository.FindByEmail(context.Background(), strings.ToUpper(email))
+		if err != nil {
+			t.Fatalf("FindByEmail() error = %v", err)
+		}
+		if found.AuthProviderID != authProviderID {
+			t.Errorf("FindByEmail() = %#v", found)
 		}
 	})
 

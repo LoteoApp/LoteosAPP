@@ -212,6 +212,7 @@ jobs:
           CLOUDFLARE_R2_BUCKET_NAME: loteos-files-ci
           CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-access-key-id
           CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-secret-access-key
+          RESEND_API_KEY: placeholder-resend-api-key
         run: docker compose config
 
   main-source-branch:

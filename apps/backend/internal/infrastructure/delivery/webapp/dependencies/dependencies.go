@@ -14,6 +14,7 @@ import (
 	"loteosapp/backend/internal/business/usecase/users"
 	"loteosapp/backend/internal/infrastructure/auth/supabase"
 	"loteosapp/backend/internal/infrastructure/delivery/webapp/handler"
+	"loteosapp/backend/internal/infrastructure/email/resend"
 	"loteosapp/backend/internal/infrastructure/environments"
 	"loteosapp/backend/internal/infrastructure/repository/postgres"
 	"loteosapp/backend/internal/infrastructure/storage/r2"
@@ -21,48 +22,51 @@ import (
 )
 
 type Container struct {
-	CreateUserHandler          *handler.CreateUserHandler
-	CompleteProfileHandler     *handler.CompleteProfileHandler
-	ListUsersHandler           *handler.ListUsersHandler
-	UpdateUserHandler          *handler.UpdateUserHandler
-	DeactivateUserHandler      *handler.DeactivateUserHandler
-	ReactivateUserHandler      *handler.ReactivateUserHandler
-	CreateClientHandler        *handler.CreateClientHandler
-	UpdateClientHandler        *handler.UpdateClientHandler
-	DeleteClientHandler        *handler.DeleteClientHandler
-	ListClientsHandler         *handler.ListClientsHandler
-	CreateAgencyHandler        *handler.CreateAgencyHandler
-	UpdateAgencyHandler        *handler.UpdateAgencyHandler
-	DeleteAgencyHandler        *handler.DeleteAgencyHandler
-	ListAgenciesHandler        *handler.ListAgenciesHandler
-	CreateLoteoHandler         *handler.CreateLoteoHandler
-	StoreLoteoDxfHandler       *handler.StoreLoteoDxfHandler
-	UpdateLoteHandler          *handler.UpdateLoteHandler
-	UpdateManzanaHandler       *handler.UpdateManzanaHandler
-	UpdateCalleHandler         *handler.UpdateCalleHandler
-	ListLoteosHandler          *handler.ListLoteosHandler
-	GetLoteoHandler            *handler.GetLoteoHandler
-	StoreLoteoFileHandler      *handler.StoreLoteoFileHandler
-	StoreLoteFileHandler       *handler.StoreLoteFileHandler
-	ListLoteoFilesHandler      *handler.ListLoteoFilesHandler
-	ListLoteFilesHandler       *handler.ListLoteFilesHandler
-	GetFileContentHandler      *handler.GetFileContentHandler
-	DeleteFileHandler          *handler.DeleteFileHandler
-	CreateReservationHandler   *handler.CreateReservationHandler
-	ListReservationsHandler    *handler.ListReservationsHandler
-	GetReservationHandler      *handler.GetReservationHandler
-	ReservationReceiptHandler  *handler.ReservationReceiptHandler
-	CancelReservationHandler   *handler.CancelReservationHandler
-	CreateSaleHandler          *handler.CreateSaleHandler
-	ListSalesHandler           *handler.ListSalesHandler
-	GetSaleHandler             *handler.GetSaleHandler
-	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
-	TransitionLotState         loteos.TransitionLotState
-	ReservationExpiryWorker    *worker.ReservationExpiryWorker
-	Pool                       *pgxpool.Pool
-	Verifier                   *supabase.Verifier
-	ObjectStorage              gateway.ObjectStorage
-	UserRepository             gateway.UserRepository
+	CreateUserHandler           *handler.CreateUserHandler
+	CompleteProfileHandler      *handler.CompleteProfileHandler
+	ListUsersHandler            *handler.ListUsersHandler
+	UpdateUserHandler           *handler.UpdateUserHandler
+	DeactivateUserHandler       *handler.DeactivateUserHandler
+	ReactivateUserHandler       *handler.ReactivateUserHandler
+	CreateClientHandler         *handler.CreateClientHandler
+	UpdateClientHandler         *handler.UpdateClientHandler
+	DeleteClientHandler         *handler.DeleteClientHandler
+	ListClientsHandler          *handler.ListClientsHandler
+	CreateAgencyHandler         *handler.CreateAgencyHandler
+	UpdateAgencyHandler         *handler.UpdateAgencyHandler
+	DeleteAgencyHandler         *handler.DeleteAgencyHandler
+	ListAgenciesHandler         *handler.ListAgenciesHandler
+	CreateLoteoHandler          *handler.CreateLoteoHandler
+	StoreLoteoDxfHandler        *handler.StoreLoteoDxfHandler
+	UpdateLoteHandler           *handler.UpdateLoteHandler
+	UpdateManzanaHandler        *handler.UpdateManzanaHandler
+	UpdateCalleHandler          *handler.UpdateCalleHandler
+	ListLoteosHandler           *handler.ListLoteosHandler
+	GetLoteoHandler             *handler.GetLoteoHandler
+	StoreLoteoFileHandler       *handler.StoreLoteoFileHandler
+	StoreLoteFileHandler        *handler.StoreLoteFileHandler
+	ListLoteoFilesHandler       *handler.ListLoteoFilesHandler
+	ListLoteFilesHandler        *handler.ListLoteFilesHandler
+	GetFileContentHandler       *handler.GetFileContentHandler
+	DeleteFileHandler           *handler.DeleteFileHandler
+	CreateReservationHandler    *handler.CreateReservationHandler
+	ListReservationsHandler     *handler.ListReservationsHandler
+	GetReservationHandler       *handler.GetReservationHandler
+	ReservationReceiptHandler   *handler.ReservationReceiptHandler
+	CancelReservationHandler    *handler.CancelReservationHandler
+	CreateSaleHandler           *handler.CreateSaleHandler
+	ListSalesHandler            *handler.ListSalesHandler
+	GetSaleHandler              *handler.GetSaleHandler
+	ListEligibleSellersHandler  *handler.ListEligibleSellersHandler
+	ResendInviteEmailHandler    *handler.ResendInviteEmailHandler
+	RequestPasswordResetHandler *handler.RequestPasswordResetHandler
+	ResetPasswordHandler        *handler.ResetPasswordHandler
+	TransitionLotState          loteos.TransitionLotState
+	ReservationExpiryWorker     *worker.ReservationExpiryWorker
+	Pool                        *pgxpool.Pool
+	Verifier                    *supabase.Verifier
+	ObjectStorage               gateway.ObjectStorage
+	UserRepository              gateway.UserRepository
 }
 
 func New(ctx context.Context, cfg environments.Server) (*Container, error) {
@@ -88,15 +92,31 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		return nil, err
 	}
 
-	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
+	mailer, err := resend.NewClient(resend.Config{
+		APIKey:    cfg.Mailer.APIKey,
+		FromEmail: cfg.Mailer.FromEmail,
+		FromName:  cfg.Mailer.FromName,
+	})
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	inviteRedirectURL := cfg.FrontendOrigin + "/aceptar-invitacion"
+	adminClient := supabase.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey, inviteRedirectURL)
 	userRepo := postgres.NewUserRepository(pool)
 	inmobiliariaRepo := postgres.NewAgencyRepository(pool)
-	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo))
+	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
-	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo))
+	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo, adminClient))
 	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
 	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
 	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
+	resendInviteEmailHandler := handler.NewResendInviteEmailHandler(users.NewResendInviteEmail(userRepo, adminClient, mailer))
+	resetURL := cfg.FrontendOrigin + "/restablecer-contrasena"
+	passwordResetTokens := users.NewPasswordResetTokens()
+	requestPasswordResetHandler := handler.NewRequestPasswordResetHandler(users.NewRequestPasswordReset(userRepo, mailer, passwordResetTokens, resetURL))
+	resetPasswordHandler := handler.NewResetPasswordHandler(users.NewResetPassword(userRepo, adminClient, passwordResetTokens))
 
 	clienteRepo := postgres.NewClienteRepository(pool)
 	createClientHandler := handler.NewCreateClientHandler(clients.NewCreateClient(clienteRepo, userRepo))
@@ -150,47 +170,50 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	}
 
 	return &Container{
-		CreateUserHandler:          createUserHandler,
-		CompleteProfileHandler:     completeProfileHandler,
-		ListUsersHandler:           listUsersHandler,
-		UpdateUserHandler:          updateUserHandler,
-		DeactivateUserHandler:      deactivateUserHandler,
-		ReactivateUserHandler:      reactivateUserHandler,
-		CreateClientHandler:        createClientHandler,
-		UpdateClientHandler:        updateClientHandler,
-		DeleteClientHandler:        deleteClientHandler,
-		ListClientsHandler:         listClientsHandler,
-		CreateAgencyHandler:        createAgencyHandler,
-		UpdateAgencyHandler:        updateAgencyHandler,
-		DeleteAgencyHandler:        deleteAgencyHandler,
-		ListAgenciesHandler:        listAgenciesHandler,
-		CreateLoteoHandler:         createLoteoHandler,
-		StoreLoteoDxfHandler:       storeLoteoDxfHandler,
-		UpdateLoteHandler:          updateLoteHandler,
-		UpdateManzanaHandler:       updateManzanaHandler,
-		UpdateCalleHandler:         updateCalleHandler,
-		ListLoteosHandler:          listLoteosHandler,
-		GetLoteoHandler:            getLoteoHandler,
-		StoreLoteoFileHandler:      storeLoteoFileHandler,
-		StoreLoteFileHandler:       storeLoteFileHandler,
-		ListLoteoFilesHandler:      listLoteoFilesHandler,
-		ListLoteFilesHandler:       listLoteFilesHandler,
-		GetFileContentHandler:      getFileContentHandler,
-		DeleteFileHandler:          deleteFileHandler,
-		CreateReservationHandler:   createReservationHandler,
-		ListReservationsHandler:    listReservationsHandler,
-		GetReservationHandler:      getReservationHandler,
-		ReservationReceiptHandler:  reservationReceiptHandler,
-		CancelReservationHandler:   cancelReservationHandler,
-		CreateSaleHandler:          createSaleHandler,
-		ListSalesHandler:           listSalesHandler,
-		GetSaleHandler:             getSaleHandler,
-		ListEligibleSellersHandler: listEligibleSellersHandler,
-		TransitionLotState:         transitionLotState,
-		ReservationExpiryWorker:    reservationExpiryWorker,
-		Pool:                       pool,
-		Verifier:                   verifier,
-		ObjectStorage:              objectStorage,
-		UserRepository:             userRepo,
+		CreateUserHandler:           createUserHandler,
+		CompleteProfileHandler:      completeProfileHandler,
+		ListUsersHandler:            listUsersHandler,
+		UpdateUserHandler:           updateUserHandler,
+		DeactivateUserHandler:       deactivateUserHandler,
+		ReactivateUserHandler:       reactivateUserHandler,
+		CreateClientHandler:         createClientHandler,
+		UpdateClientHandler:         updateClientHandler,
+		DeleteClientHandler:         deleteClientHandler,
+		ListClientsHandler:          listClientsHandler,
+		CreateAgencyHandler:         createAgencyHandler,
+		UpdateAgencyHandler:         updateAgencyHandler,
+		DeleteAgencyHandler:         deleteAgencyHandler,
+		ListAgenciesHandler:         listAgenciesHandler,
+		CreateLoteoHandler:          createLoteoHandler,
+		StoreLoteoDxfHandler:        storeLoteoDxfHandler,
+		UpdateLoteHandler:           updateLoteHandler,
+		UpdateManzanaHandler:        updateManzanaHandler,
+		UpdateCalleHandler:          updateCalleHandler,
+		ListLoteosHandler:           listLoteosHandler,
+		GetLoteoHandler:             getLoteoHandler,
+		StoreLoteoFileHandler:       storeLoteoFileHandler,
+		StoreLoteFileHandler:        storeLoteFileHandler,
+		ListLoteoFilesHandler:       listLoteoFilesHandler,
+		ListLoteFilesHandler:        listLoteFilesHandler,
+		GetFileContentHandler:       getFileContentHandler,
+		DeleteFileHandler:           deleteFileHandler,
+		CreateReservationHandler:    createReservationHandler,
+		ListReservationsHandler:     listReservationsHandler,
+		GetReservationHandler:       getReservationHandler,
+		ReservationReceiptHandler:   reservationReceiptHandler,
+		CancelReservationHandler:    cancelReservationHandler,
+		CreateSaleHandler:           createSaleHandler,
+		ListSalesHandler:            listSalesHandler,
+		GetSaleHandler:              getSaleHandler,
+		ListEligibleSellersHandler:  listEligibleSellersHandler,
+		ResendInviteEmailHandler:    resendInviteEmailHandler,
+		RequestPasswordResetHandler: requestPasswordResetHandler,
+		ResetPasswordHandler:        resetPasswordHandler,
+		TransitionLotState:          transitionLotState,
+		ReservationExpiryWorker:     reservationExpiryWorker,
+		Pool:                        pool,
+		Verifier:                    verifier,
+		ObjectStorage:               objectStorage,
+		UserRepository:              userRepo,
 	}, nil
 }
