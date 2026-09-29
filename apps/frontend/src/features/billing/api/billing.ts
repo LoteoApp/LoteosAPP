@@ -6,6 +6,7 @@ import type {
   Client,
   CurrencyTotal,
   DebtStatement,
+  DevelopmentOption,
   DownPayment,
   DueInstallment,
   DueInstallmentFilters,
@@ -290,4 +291,20 @@ export async function settleSale(token: string, saleId: string, values: SettleSa
     },
   })
   return readBody(body, isPayment)
+}
+
+function isDevelopmentList(value: unknown): value is { loteos: DevelopmentOption[] | null } {
+  return (
+    isRecord(value) &&
+    (value.loteos === null ||
+      (Array.isArray(value.loteos) &&
+        value.loteos.every((loteo) => isRecord(loteo) && typeof loteo.id === 'string' && typeof loteo.nombre === 'string')))
+  )
+}
+
+// listDevelopmentOptions reads the loteos the user can see, which the API
+// already bounds by rol, to offer them as a vencimientos filter.
+export async function listDevelopmentOptions(token: string, signal?: AbortSignal): Promise<DevelopmentOption[]> {
+  const body = readBody(await apiFetch<unknown>('/api/v1/loteos', { token, signal }), isDevelopmentList)
+  return (body.loteos ?? []).map(({ id, nombre }) => ({ id, nombre }))
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getDebtStatement, listDueInstallments, registerPayment, settleSale } from './billing'
+import { getDebtStatement, listDevelopmentOptions, listDueInstallments, registerPayment, settleSale } from './billing'
 
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
 
@@ -140,6 +140,31 @@ describe('listDueInstallments', () => {
     stubFetch(jsonResponse(200, { cuotas: [{ id: 'c-1' }], pagina: 1 }))
 
     await expect(listDueInstallments('token')).rejects.toThrow(GENERIC_ERROR)
+  })
+})
+
+describe('listDevelopmentOptions', () => {
+  it('reads the id and name of the loteos the user can see', async () => {
+    const fetchMock = stubFetch(
+      jsonResponse(200, { loteos: [{ id: 'loteo-1', nombre: 'Las Acacias', ubicacion: 'Paraná', cantidadLotes: 40 }] }),
+    )
+
+    await expect(listDevelopmentOptions('token-123')).resolves.toEqual([{ id: 'loteo-1', nombre: 'Las Acacias' }])
+    const [url, init] = requestOf(fetchMock)
+    expect(url).toMatch(/\/api\/v1\/loteos$/)
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token-123')
+  })
+
+  it('treats a null list as no loteos', async () => {
+    stubFetch(jsonResponse(200, { loteos: null }))
+
+    await expect(listDevelopmentOptions('token')).resolves.toEqual([])
+  })
+
+  it('rejects a body that does not match the contract', async () => {
+    stubFetch(jsonResponse(200, { loteos: [{ id: 'loteo-1' }] }))
+
+    await expect(listDevelopmentOptions('token')).rejects.toThrow(GENERIC_ERROR)
   })
 })
 

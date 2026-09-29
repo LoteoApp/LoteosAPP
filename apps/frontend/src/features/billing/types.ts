@@ -267,6 +267,12 @@ export function isDueFilter(value: unknown): value is DueFilter {
   return typeof value === 'string' && (DUE_FILTERS as readonly string[]).includes(value)
 }
 
+// DevelopmentOption is a loteo as the vencimientos filter lists it.
+export type DevelopmentOption = {
+  id: string
+  nombre: string
+}
+
 export type DueInstallmentFilters = {
   estado?: DueFilter
   loteoId?: string

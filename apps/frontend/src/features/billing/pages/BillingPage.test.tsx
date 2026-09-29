@@ -1,14 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../shared/api/client'
 import BillingPage from './BillingPage'
 import type { DueInstallment, DueInstallmentPage } from '../types'
 
 const listDueInstallmentsMock = vi.hoisted(() => vi.fn())
+const listDevelopmentOptionsMock = vi.hoisted(() => vi.fn())
 
-vi.mock('../api/billing', () => ({ listDueInstallments: listDueInstallmentsMock }))
+vi.mock('../api/billing', () => ({
+  listDueInstallments: listDueInstallmentsMock,
+  listDevelopmentOptions: listDevelopmentOptionsMock,
+}))
 
 const cuota: DueInstallment = {
   id: 'c-1',
@@ -45,6 +49,13 @@ function renderPage(token = 'token') {
     </MemoryRouter>,
   )
 }
+
+beforeEach(() => {
+  listDevelopmentOptionsMock.mockResolvedValue([
+    { id: 'loteo-1', nombre: 'Las Acacias' },
+    { id: 'loteo-2', nombre: 'Los Pinos' },
+  ])
+})
 
 afterEach(() => vi.clearAllMocks())
 
@@ -107,6 +118,47 @@ describe('BillingPage', () => {
       ),
     )
   }, 15000)
+
+  it('filters the vencimientos by loteo', async () => {
+    const user = userEvent.setup()
+    listDueInstallmentsMock.mockResolvedValue({ ...page, paginas: 3, total: 60 })
+
+    renderPage()
+    await screen.findByText('Vencida')
+    expect(listDevelopmentOptionsMock).toHaveBeenCalledWith('token', expect.anything())
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+
+    const loteo = screen.getByRole('combobox', { name: 'Loteo' })
+    expect(loteo).toHaveTextContent('Todos los loteos')
+    await user.click(loteo)
+    await user.click(await screen.findByRole('option', { name: 'Los Pinos' }))
+    await waitFor(() =>
+      expect(listDueInstallmentsMock).toHaveBeenLastCalledWith(
+        'token',
+        { estado: 'pendientes', loteoId: 'loteo-2', pagina: 1 },
+        expect.anything(),
+      ),
+    )
+    expect(screen.getByRole('combobox', { name: 'Loteo' })).toHaveTextContent('Los Pinos')
+
+    await user.click(screen.getByRole('combobox', { name: 'Loteo' }))
+    await user.click(await screen.findByRole('option', { name: 'Todos los loteos' }))
+    await waitFor(() =>
+      expect(listDueInstallmentsMock).toHaveBeenLastCalledWith('token', { estado: 'pendientes', pagina: 1 }, expect.anything()),
+    )
+  }, 15000)
+
+  it('still lists the vencimientos when the loteos cannot be loaded', async () => {
+    listDevelopmentOptionsMock.mockRejectedValue(new ApiError('Sin permiso', 'forbidden', 403))
+    listDueInstallmentsMock.mockResolvedValue(page)
+    const user = userEvent.setup()
+
+    renderPage()
+    expect(await screen.findByText('Vencida')).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Loteo' }))
+    expect(await screen.findByRole('option', { name: 'Todos los loteos' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Los Pinos' })).not.toBeInTheDocument()
+  })
 
   it('shows the empty state and the API error', async () => {
     listDueInstallmentsMock.mockResolvedValueOnce({ ...page, cuotas: [], total: 0, paginas: 0 })

@@ -3,19 +3,22 @@ import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Card, CardContent } from '../../../shared/ui/card'
 import DueInstallmentsFilters, { type DueFilterValues } from '../components/DueInstallmentsFilters'
 import { DueInstallmentsList, DueInstallmentsPagination } from '../components/DueInstallmentsList'
+import { useDevelopmentOptions } from '../hooks/use-development-options'
 import { useDueInstallments } from '../hooks/use-due-installments'
 import type { DueSummary } from '../types'
 
 type BillingPageProps = { accessToken?: string }
 
-const INITIAL_FILTERS: DueFilterValues = { search: '', state: 'pendientes', from: '', to: '' }
+const INITIAL_FILTERS: DueFilterValues = { search: '', developmentId: '', state: 'pendientes', from: '', to: '' }
 
 export default function BillingPage({ accessToken = '' }: BillingPageProps) {
   const [filters, setFilters] = useState<DueFilterValues>(INITIAL_FILTERS)
   const [pageNumber, setPageNumber] = useState(1)
+  const developments = useDevelopmentOptions(accessToken)
   const due = useDueInstallments(accessToken, {
     q: filters.search || undefined,
     estado: filters.state,
+    loteoId: filters.developmentId || undefined,
     desde: filters.from || undefined,
     hasta: filters.to || undefined,
     pagina: pageNumber,
@@ -35,6 +38,7 @@ export default function BillingPage({ accessToken = '' }: BillingPageProps) {
       <section className="grid gap-3">
         <DueInstallmentsFilters
           values={filters}
+          developments={developments}
           onChange={(next) => {
             setFilters(next)
             setPageNumber(1)
