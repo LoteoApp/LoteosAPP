@@ -211,7 +211,9 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 - Quién reserva: usuario activo con rol `administrador`, `administrativo` o
   `inmobiliaria` (`usuario_alta`). La inmobiliaria solo puede reservar en un
   loteo asignado a su agencia y siempre queda como vendedor responsable.
-- Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
+- Vendedor: usuario responsable comercial (`vendedor_id`) con rol
+  `administrador`, `administrativo` o `inmobiliaria`, activo y con el perfil
+  completo (`perfil_completo`), tanto en reservas como en ventas; si tiene rol
   `inmobiliaria`, debe pertenecer a una agencia activa asignada al loteo.
   Administrador y administrativo lo eligen desde el catálogo de vendedores
   elegibles; no se amplía por eso su acceso al ABM de usuarios.

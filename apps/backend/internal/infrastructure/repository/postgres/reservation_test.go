@@ -727,6 +727,57 @@ func TestReservationCreateRejectsInvalidReferences(t *testing.T) {
 	ineligibleSeller := base
 	ineligibleSeller.VendedorID = roleSellerID
 	attempt("ineligible-seller", ineligibleSeller, domain.ErrReservationSellerNotEligible)
+
+	incompleteSeller := base
+	incompleteSeller.VendedorID = incompleteProfileSellerFixture(t, pool)
+	attempt("incomplete-profile-seller", incompleteSeller, domain.ErrReservationSellerNotEligible)
+}
+
+func TestReservationEligibleSellersExcludeIncompleteProfiles(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set, skipping postgres integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	actorID, _, loteoID, _ := reservationFixture(t, pool)
+	incompleteID := incompleteProfileSellerFixture(t, pool)
+	repository := postgres.NewReservationRepository(pool, fixedReservationClock{now: time.Now().UTC()})
+
+	for _, forSale := range []bool{false, true} {
+		sellers, err := repository.ListEligibleSellers(context.Background(), loteoID, gateway.ReservationScope{ForSale: forSale})
+		if err != nil {
+			t.Fatalf("ListEligibleSellers(forSale=%v) error = %v", forSale, err)
+		}
+		if !containsSeller(sellers, actorID) {
+			t.Errorf("ListEligibleSellers(forSale=%v) should keep the administrator with a complete profile", forSale)
+		}
+		if containsSeller(sellers, incompleteID) {
+			t.Errorf("ListEligibleSellers(forSale=%v) should exclude a user with an incomplete profile", forSale)
+		}
+	}
+}
+
+// incompleteProfileSellerFixture creates an active administrador that never
+// completed its profile, like an account provisioned only in the identity
+// provider.
+func incompleteProfileSellerFixture(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	authProviderID := newUUID(t)
+	var id string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO usuarios (auth_provider_id, email, rol, perfil_completo)
+		VALUES ($1::uuid, $2, 'administrador', false) RETURNING id::text
+	`, authProviderID, newEmail(t)).Scan(&id); err != nil {
+		t.Fatalf("create incomplete profile seller: %v", err)
+	}
+	t.Cleanup(func() { deleteUsuario(t, pool, authProviderID) })
+	return id
 }
 
 func TestReservationCreateRegularizesExpiredActiveReservation(t *testing.T) {
