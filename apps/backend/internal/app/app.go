@@ -75,6 +75,10 @@ func New(ctx context.Context) (*App, error) {
 		CreateSaleHandler:          container.CreateSaleHandler,
 		ListSalesHandler:           container.ListSalesHandler,
 		GetSaleHandler:             container.GetSaleHandler,
+		GetDebtStatementHandler:    container.GetDebtStatementHandler,
+		ListDueInstallmentsHandler: container.ListDueInstallmentsHandler,
+		RegisterPaymentHandler:     container.RegisterPaymentHandler,
+		SettleSaleHandler:          container.SettleSaleHandler,
 		ListEligibleSellersHandler: container.ListEligibleSellersHandler,
 	}, container.Verifier, container.UserRepository)
 

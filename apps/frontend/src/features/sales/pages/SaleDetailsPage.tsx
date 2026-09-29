@@ -75,6 +75,11 @@ export default function SaleDetailsPage({ accessToken = '', renderPlan }: SaleDe
                 <Printer aria-hidden />
                 Imprimir recibo
               </Button>
+              {sale.planPago !== undefined && (
+                <Link className={buttonVariants({ variant: 'outline' })} to={`/cobranzas/${sale.id}`}>
+                  Estado de deuda
+                </Link>
+              )}
               <Link className={buttonVariants({ variant: 'ghost' })} to={`/lotes/${sale.loteoId}`}>
                 Ver loteo
               </Link>

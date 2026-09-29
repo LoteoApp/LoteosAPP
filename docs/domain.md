@@ -353,16 +353,58 @@ vencimiento.
 
 ## Cobranza
 
-Gestionada por administrador, administrativo o inmobiliaria asignada al
-loteo:
+Gestionada desde el módulo **Cobranzas** por administrador, administrativo o
+inmobiliaria, con el mismo alcance que Ventas: los internos cobran cualquier
+venta; un usuario de inmobiliaria, las vendidas por su agencia.
 
-- registro del monto abonado por cuota, más adicionales opcionales: impuesto
-  municipal, impuesto provincial, cargo de inmobiliaria, otros;
-- recibo por cada pago con detalle de cuota y datos del lote;
-- estado de deuda exportable en PDF (cuotas pagadas/pendientes).
+- **Vencimientos** (`/cobranzas`): tablero con las cuotas de todas las ventas
+  financiadas del alcance ordenadas por vencimiento, con búsqueda (cliente,
+  DNI, loteo, lote, vendedor), loteo, estado, rango de fechas y un resumen de
+  cuántas cuotas están vencidas y cuántas vencen en los próximos 30 días. Una
+  cuota `pendiente` pasa a mostrarse `vencida` desde el día siguiente a su
+  vencimiento (en hora de Argentina): el mismo día del vencimiento sigue
+  pendiente. Ese estado se deriva de la fecha, no se guarda ni lo cambia
+  ningún proceso.
+- **Estado de deuda** (`/cobranzas/{ventaId}`): la venta, la entrega (en
+  entrega + financiación) y cada cuota con su estado, los totales (plan,
+  pagado, pendiente, vencido, próximo vencimiento) y el historial de cobros.
+  Se imprime desde el navegador o se guarda como PDF, igual que el recibo de
+  venta.
+- **Registrar cobro**: se marcan la entrega y/o las cuotas que el cliente
+  paga y se indica medio de pago (efectivo, transferencia, cheque, otro),
+  fecha de pago (no futura; por defecto hoy) y una observación opcional. Las
+  cuotas se cobran completas y en orden: no se puede cobrar la 3 con la 2
+  pendiente. La entrega no tiene vencimiento y se cobra cuando el cliente la
+  paga. Cada cobro genera un recibo con el detalle de lo cobrado, los datos
+  del lote y del cliente, que se vuelve a imprimir desde el historial.
+- **Cargos adicionales**: al cobrar se pueden sumar conceptos que no son
+  parte del plan de pago —impuesto municipal, impuesto provincial, gasto
+  administrativo, honorarios, servicios, cargo de inmobiliaria u otros—, cada
+  uno con su monto, su moneda y un detalle opcional (hasta 200 caracteres);
+  hasta 20 por cobro.
+  **La moneda de un cargo puede ser distinta de la de la cuota**: una cuota en
+  dólares se cobra junto con los servicios en pesos. Los importes nunca se
+  convierten ni se suman entre monedas: el cobro muestra un total por moneda
+  (USD 20.000 y $ 150.000, no un único número), y así se imprime en el recibo.
+  Los cargos no alteran el plan: no cancelan cuotas, no reducen el saldo y no
+  intervienen en el cierre de la venta; el estado de deuda los informa aparte,
+  totalizados por moneda, como «cargos adicionales cobrados». Si no se indica
+  moneda, el cargo toma la de la venta.
+- **Cancelar saldo total**: cobra en un solo pago todo lo adeudado (entrega
+  pendiente y cuotas no pagadas). El total que se cobra es el que muestra la
+  pantalla; si otro usuario cobró algo en el medio, la operación se rechaza
+  y hay que volver a consultar el estado de deuda.
+- Cuando no queda nada pendiente —por el último cobro de cuotas o por la
+  cancelación total— la venta pasa a `completada` (razón «Plan de pago
+  completado» o «Cancelación anticipada del saldo») y el lote de `vendido` a
+  `finalizado`, con origen `cobranza`, en la misma transacción. Una venta que
+  no está `activa` no admite cobros.
 
 No se gestionan comisiones ni reparto de dinero entre inmobiliaria y dueño del
-loteo; solo interesa que el cobro quede registrado.
+loteo; solo interesa que el cobro quede registrado. Pendiente para más
+adelante: los pagos parciales de una cuota, los descuentos por cancelación
+anticipada y los cargos previstos por anticipado (hoy se ingresan al cobrar,
+no quedan agendados junto con la cuota).
 
 ### Reglas de mora
 
