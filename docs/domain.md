@@ -105,7 +105,12 @@ inmobiliaria de una [reserva](#reservas) o [venta](#venta) a través del
 vendedor. La agencia se elige al dar de alta el usuario
 (`usuarios.inmobiliaria_id`): es obligatoria para rol inmobiliaria y no se
 guarda para ningún otro rol; el alta rechaza una agencia inexistente o dada
-de baja. No se reasigna después del alta.
+de baja. No se reasigna después del alta. La única excepción es un usuario
+con rol inmobiliaria que quedó sin agencia (los primeros se dieron de alta
+antes de que fuera obligatoria): el administrador puede completarla una vez
+desde la edición, con las mismas validaciones que el alta. Si el usuario ya
+tiene una, el backend la rechaza (`agency_already_assigned`) aunque sea la
+misma.
 
 ## Usuarios y roles
 
@@ -124,7 +129,8 @@ Los clientes no son usuarios del sistema.
 
 ### ABM de administrativo, escribano, inmobiliaria y agrimensor
 
-El administrador da de alta, edita (nombre y apellido), da de baja y
+El administrador da de alta, edita (nombre y apellido, y la inmobiliaria
+faltante de un usuario con rol inmobiliaria), da de baja y
 reactiva usuarios con rol administrativo, escribano, inmobiliaria o
 agrimensor desde el módulo **Usuarios**. El email identifica la cuenta en
 el proveedor de identidad y no se edita desde acá; el rol se fija en el

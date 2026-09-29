@@ -442,6 +442,7 @@ describe('UsersPage', () => {
     expect(screen.getByText('ana@example.com · Administrativo')).toBeInTheDocument()
     expect(screen.queryByLabelText('Correo electrónico')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Rol')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
 
     const nombreInput = screen.getByLabelText('Nombre')
     await user.clear(nombreInput)
@@ -450,6 +451,89 @@ describe('UsersPage', () => {
 
     expect(await screen.findByText('Ana María Pérez')).toBeInTheDocument()
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
+  })
+
+  it('assigns the missing agency when editing a rol inmobiliaria user', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [
+      { id: 'agency-1', razonSocial: 'Lotes del Sur' },
+      { id: 'agency-2', razonSocial: 'Altamira Propiedades' },
+    ]
+    stored = [usuario({ nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria' })]
+    renderUsersPage()
+    await screen.findByText('Luis Paz')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(
+      screen.getByText('Este usuario todavía no tiene inmobiliaria. Una vez asignada, no se puede cambiar.')
+    ).toBeInTheDocument()
+    await selectOption(user, 'Inmobiliaria', 'Altamira Propiedades')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await screen.findByRole('button', { name: 'Editar' })
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(await screen.findByText('Inmobiliaria: Altamira Propiedades')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
+  })
+
+  it('keeps a rol inmobiliaria user without agency when only its name is edited', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [{ id: 'agency-1', razonSocial: 'Lotes del Sur' }]
+    stored = [usuario({ nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria' })]
+    renderUsersPage()
+    await screen.findByText('Luis Paz')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    const nombreInput = screen.getByLabelText('Nombre')
+    await user.clear(nombreInput)
+    await user.type(nombreInput, 'Luis Alberto')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await screen.findByText('Luis Alberto Paz')
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(await screen.findByLabelText('Inmobiliaria')).toBeInTheDocument()
+  })
+
+  it('shows the assigned agency of a rol inmobiliaria user as read-only', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [{ id: 'agency-1', razonSocial: 'Lotes del Sur' }]
+    stored = [
+      usuario({
+        nombre: 'Luis',
+        apellido: 'Paz',
+        email: 'luis@example.com',
+        rol: 'inmobiliaria',
+        inmobiliariaId: 'agency-1',
+      }),
+    ]
+    renderUsersPage()
+    await screen.findByText('Luis Paz')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+
+    expect(await screen.findByText('Inmobiliaria: Lotes del Sur')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
+  })
+
+  it('shows the backend error when the agency was already assigned', async () => {
+    const user = userEvent.setup()
+    storedAgencies = [{ id: 'agency-1', razonSocial: 'Lotes del Sur' }]
+    stored = [usuario({ nombre: 'Luis', apellido: 'Paz', email: 'luis@example.com', rol: 'inmobiliaria' })]
+    renderUsersPage()
+    await screen.findByText('Luis Paz')
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    await selectOption(user, 'Inmobiliaria', 'Lotes del Sur')
+    failure = {
+      status: 409,
+      code: 'agency_already_assigned',
+      message: 'El usuario ya pertenece a una inmobiliaria y no se puede cambiar',
+    }
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(
+      await screen.findByText('El usuario ya pertenece a una inmobiliaria y no se puede cambiar')
+    ).toBeInTheDocument()
   })
 
   it('deactivates a user after confirming the baja inline', async () => {

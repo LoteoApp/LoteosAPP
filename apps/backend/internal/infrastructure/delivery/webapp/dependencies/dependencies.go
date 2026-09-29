@@ -109,7 +109,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	createUserHandler := handler.NewCreateUserHandler(users.NewCreateUser(userRepo, adminClient, inmobiliariaRepo, mailer))
 	completeProfileHandler := handler.NewCompleteProfileHandler(users.NewCompleteProfile(userRepo))
 	listUsersHandler := handler.NewListUsersHandler(users.NewListUsers(userRepo, adminClient))
-	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo))
+	updateUserHandler := handler.NewUpdateUserHandler(users.NewUpdateUser(userRepo, inmobiliariaRepo))
 	deactivateUserHandler := handler.NewDeactivateUserHandler(users.NewDeactivateUser(userRepo))
 	reactivateUserHandler := handler.NewReactivateUserHandler(users.NewReactivateUser(userRepo))
 	resendInviteEmailHandler := handler.NewResendInviteEmailHandler(users.NewResendInviteEmail(userRepo, adminClient, mailer))

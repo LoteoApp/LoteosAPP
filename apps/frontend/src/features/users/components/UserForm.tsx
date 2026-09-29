@@ -4,6 +4,7 @@ import { Button } from '../../../shared/ui/button'
 import { Input } from '../../../shared/ui/input'
 import { Label } from '../../../shared/ui/label'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
+import type { AgencyOption } from '../api/agencies'
 import { useAgencyOptions } from '../hooks/use-agency-options'
 import { GESTIONABLE_ROLES, ROLE_LABELS } from '../types'
 import type { GestionableRol, UsuarioFormValues, UsuarioUpdateValues } from '../types'
@@ -20,8 +21,10 @@ type CreateUserFormProps = {
 
 type EditUserFormProps = {
   mode: 'edit'
+  accessToken: string
   email: string
   rol: GestionableRol
+  inmobiliariaId?: string
   initialValue: UsuarioUpdateValues
   submitLabel: string
   isSubmitting?: boolean
@@ -32,6 +35,62 @@ type EditUserFormProps = {
 
 type UserFormProps = CreateUserFormProps | EditUserFormProps
 
+type AgencySelectProps = {
+  value: string
+  agencies: AgencyOption[]
+  isLoading: boolean
+  error: string | null
+  hint?: string
+  onChange: (value: string) => void
+}
+
+function AgencySelect({ value, agencies, isLoading, error, hint, onChange }: AgencySelectProps) {
+  return (
+    <div className="flex flex-col gap-1.5 sm:col-span-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="inmobiliaria">Inmobiliaria</Label>
+        <Button type="button" variant="ghost" size="sm" render={<Link to="/inmobiliarias" />}>
+          Nueva inmobiliaria
+        </Button>
+      </div>
+      <Select
+        name="inmobiliaria"
+        value={value || 'inmobiliaria-empty'}
+        onValueChange={(selected) => onChange(!selected || selected === 'inmobiliaria-empty' ? '' : selected)}
+        disabled={isLoading}
+      >
+        <SelectTrigger id="inmobiliaria">
+          <SelectValue>
+            {value
+              ? agencies.find((agency) => agency.id === value)?.razonSocial
+              : isLoading
+                ? 'Cargando inmobiliarias…'
+                : 'Seleccioná una inmobiliaria'}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectList>
+            <SelectItem value="inmobiliaria-empty">
+              {agencies.length > 0 ? 'Seleccioná una inmobiliaria' : 'No hay inmobiliarias cargadas'}
+            </SelectItem>
+            {agencies.map((agency) => (
+              <SelectItem key={agency.id} value={agency.id}>
+                {agency.razonSocial}
+              </SelectItem>
+            ))}
+          </SelectList>
+        </SelectContent>
+      </Select>
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function UserForm(props: UserFormProps) {
   const { submitLabel, isSubmitting = false, onCancel } = props
   const [nombre, setNombre] = useState(props.mode === 'edit' ? props.initialValue.nombre : '')
@@ -40,12 +99,14 @@ export default function UserForm(props: UserFormProps) {
   const [rol, setRol] = useState<GestionableRol>(GESTIONABLE_ROLES[0])
   const [inmobiliariaId, setInmobiliariaId] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const isInmobiliaria = rol === 'inmobiliaria'
+  const isInmobiliaria = (props.mode === 'edit' ? props.rol : rol) === 'inmobiliaria'
+  const assignedAgencyId = props.mode === 'edit' ? props.inmobiliariaId : undefined
+  const canAssignAgency = props.mode === 'edit' && isInmobiliaria && !assignedAgencyId
   const {
     agencies,
     isLoading: isLoadingAgencies,
     error: agenciesError,
-  } = useAgencyOptions(props.mode === 'create' ? props.accessToken : '', props.mode === 'create' && isInmobiliaria)
+  } = useAgencyOptions(props.accessToken, isInmobiliaria)
 
   function handleRolChange(value: GestionableRol) {
     setRol(value)
@@ -83,6 +144,9 @@ export default function UserForm(props: UserFormProps) {
     }
 
     const values: UsuarioUpdateValues = { nombre: trimmedNombre, apellido: trimmedApellido }
+    if (canAssignAgency && inmobiliariaId) {
+      values.inmobiliariaId = inmobiliariaId
+    }
     const validationError = props.onValidate(values)
     if (validationError) {
       setError(validationError)
@@ -144,55 +208,41 @@ export default function UserForm(props: UserFormProps) {
             </div>
 
             {isInmobiliaria && (
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="inmobiliaria">Inmobiliaria</Label>
-                  <Button type="button" variant="ghost" size="sm" render={<Link to="/inmobiliarias" />}>
-                    Nueva inmobiliaria
-                  </Button>
-                </div>
-                <Select
-                  name="inmobiliaria"
-                  value={inmobiliariaId || 'inmobiliaria-empty'}
-                  onValueChange={(value) => setInmobiliariaId(!value || value === 'inmobiliaria-empty' ? '' : value)}
-                  disabled={isLoadingAgencies}
-                >
-                  <SelectTrigger id="inmobiliaria">
-                    <SelectValue>
-                      {inmobiliariaId
-                        ? agencies.find((agency) => agency.id === inmobiliariaId)?.razonSocial
-                        : isLoadingAgencies
-                          ? 'Cargando inmobiliarias…'
-                          : 'Seleccioná una inmobiliaria'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectList>
-                      <SelectItem value="inmobiliaria-empty">
-                        {agencies.length > 0 ? 'Seleccioná una inmobiliaria' : 'No hay inmobiliarias cargadas'}
-                      </SelectItem>
-                      {agencies.map((agency) => (
-                        <SelectItem key={agency.id} value={agency.id}>
-                          {agency.razonSocial}
-                        </SelectItem>
-                      ))}
-                    </SelectList>
-                  </SelectContent>
-                </Select>
-                {agenciesError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {agenciesError}
-                  </p>
-                )}
-              </div>
+              <AgencySelect
+                value={inmobiliariaId}
+                agencies={agencies}
+                isLoading={isLoadingAgencies}
+                error={agenciesError}
+                onChange={setInmobiliariaId}
+              />
             )}
           </>
         ) : (
-          <div className="flex flex-col justify-end gap-1.5 sm:col-span-2">
-            <p className="text-sm text-muted-foreground">
-              {props.email} · {ROLE_LABELS[props.rol]}
-            </p>
-          </div>
+          <>
+            <div className="flex flex-col justify-end gap-1.5 sm:col-span-2">
+              <p className="text-sm text-muted-foreground">
+                {props.email} · {ROLE_LABELS[props.rol]}
+              </p>
+              {assignedAgencyId && (
+                <p className="text-sm text-muted-foreground">
+                  Inmobiliaria:{' '}
+                  {agencies.find((agency) => agency.id === assignedAgencyId)?.razonSocial ??
+                    (isLoadingAgencies ? 'Cargando…' : 'No disponible')}
+                </p>
+              )}
+            </div>
+
+            {canAssignAgency && (
+              <AgencySelect
+                value={inmobiliariaId}
+                agencies={agencies}
+                isLoading={isLoadingAgencies}
+                error={agenciesError}
+                hint="Este usuario todavía no tiene inmobiliaria. Una vez asignada, no se puede cambiar."
+                onChange={setInmobiliariaId}
+              />
+            )}
+          </>
         )}
       </div>
 

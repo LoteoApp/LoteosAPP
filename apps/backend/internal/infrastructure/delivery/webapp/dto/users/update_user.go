@@ -7,6 +7,9 @@ import "loteosapp/backend/internal/business/domain"
 type UpdateUserRequest struct {
 	Nombre   *string `json:"nombre,omitempty"`
 	Apellido *string `json:"apellido,omitempty"`
+	// InmobiliariaID only fills in a missing agency for a rol inmobiliaria
+	// user; the backend rejects it for any other case.
+	InmobiliariaID *string `json:"inmobiliariaId,omitempty"`
 }
 
 type UserResponse struct {

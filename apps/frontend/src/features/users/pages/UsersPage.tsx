@@ -10,7 +10,13 @@ import type { ResendStatus } from '../components/UserCard'
 import { useUsers } from '../hooks/use-users'
 import { resolveFormView, type FormState } from '../lib/resolveFormView'
 import { normalizeText } from '../../../shared/lib/normalizeText'
-import { estadoOf, toUsuarioUpdateValues, type Usuario, type UsuarioFormValues } from '../types'
+import {
+  estadoOf,
+  toUsuarioUpdateValues,
+  type Usuario,
+  type UsuarioFormValues,
+  type UsuarioUpdateValues,
+} from '../types'
 
 function matchesRol(usuario: Usuario, filter: RolFilter): boolean {
   return filter === 'todos' || usuario.rol === filter
@@ -88,7 +94,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
     return null
   }
 
-  function validateEdit(values: { nombre: string; apellido: string }): string | null {
+  function validateEdit(values: UsuarioUpdateValues): string | null {
     if (!values.nombre || !values.apellido) {
       return 'Completá nombre y apellido.'
     }
@@ -117,7 +123,7 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
     }
   }
 
-  async function handleUpdate(id: string, values: { nombre: string; apellido: string }) {
+  async function handleUpdate(id: string, values: UsuarioUpdateValues) {
     if (await update(id, values)) {
       setFormState({ mode: 'closed' })
     }
@@ -196,8 +202,10 @@ export default function UsersPage({ accessToken }: UsersPageProps) {
               <UserForm
                 key={formView.usuario.id}
                 mode="edit"
+                accessToken={token}
                 email={formView.usuario.email}
                 rol={formView.usuario.rol}
+                inmobiliariaId={formView.usuario.inmobiliariaId}
                 initialValue={toUsuarioUpdateValues(formView.usuario)}
                 submitLabel="Guardar cambios"
                 isSubmitting={isSubmitting}

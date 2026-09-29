@@ -11,9 +11,9 @@ export type UseAgencyOptions = {
   error: string | null
 }
 
-// Fetches the agencies catalog for the inmobiliaria field on the user
-// creation form. enabled gates the request so it only fires while rol is
-// inmobiliaria, not on every form open.
+// Fetches the agencies catalog for the inmobiliaria field on the user form.
+// enabled gates the request so it only fires while rol is inmobiliaria, not
+// on every form open.
 export function useAgencyOptions(token: string, enabled: boolean): UseAgencyOptions {
   const [agencies, setAgencies] = useState<AgencyOption[]>([])
   const [isLoading, setIsLoading] = useState(enabled)

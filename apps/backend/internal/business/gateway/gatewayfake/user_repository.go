@@ -124,6 +124,7 @@ func (fake *UserRepository) Update(_ context.Context, update domain.UsuarioUpdat
 		if update.Apellido != nil {
 			usuario.Apellido = *update.Apellido
 		}
+		usuario.AgencyID = update.AgencyID
 		return usuario, nil
 	}
 	return fake.Updated, nil

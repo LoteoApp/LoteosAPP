@@ -56,6 +56,8 @@ export type UsuarioFormValues = {
 export type UsuarioUpdateValues = {
   nombre: string
   apellido: string
+  // Only sent to fill in the agency of a rol inmobiliaria user that has none.
+  inmobiliariaId?: string
 }
 
 export function toUsuarioUpdateValues(usuario: Usuario): UsuarioUpdateValues {

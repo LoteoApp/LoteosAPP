@@ -82,6 +82,38 @@ func TestUpdateUserRoute(t *testing.T) {
 		}
 	})
 
+	t.Run("passes the agency to the use case and returns it", func(t *testing.T) {
+		t.Parallel()
+
+		agencyID := "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+		updateUser := &updateUserStub{usuario: domain.Usuario{
+			ID: managedUserID, Nombre: "Luis", Apellido: "Pérez", Rol: domain.RolInmobiliaria, AgencyID: &agencyID,
+		}}
+
+		recorder := performUpdateUserRequest(t, updateUser, administradorVerifier(), "valid-token", managedUserID,
+			map[string]string{"inmobiliariaId": agencyID})
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+		}
+
+		var got struct {
+			InmobiliariaID string `json:"inmobiliariaId"`
+		}
+		if err := json.NewDecoder(recorder.Body).Decode(&got); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if got.InmobiliariaID != agencyID {
+			t.Errorf("response inmobiliariaId = %q, want %q", got.InmobiliariaID, agencyID)
+		}
+		if updateUser.gotInput.AgencyID == nil || *updateUser.gotInput.AgencyID != agencyID {
+			t.Errorf("agency passed to use case = %v", updateUser.gotInput.AgencyID)
+		}
+		if updateUser.gotInput.Nombre != nil || updateUser.gotInput.Apellido != nil {
+			t.Error("omitted profile fields should reach the use case as nil")
+		}
+	})
+
 	t.Run("rejects an id that is not a uuid", func(t *testing.T) {
 		t.Parallel()
 
@@ -147,6 +179,10 @@ func TestUpdateUserRoute(t *testing.T) {
 			{name: "invalid profile", err: domain.ErrPerfilInvalido, wantStatus: http.StatusBadRequest, wantCode: "invalid_profile"},
 			{name: "not found", err: domain.ErrUsuarioNoEncontrado, wantStatus: http.StatusNotFound, wantCode: "user_not_found"},
 			{name: "actor not provisioned", err: domain.ErrActorNoAprovisionado, wantStatus: http.StatusForbidden, wantCode: "actor_not_provisioned"},
+			{name: "agency required", err: domain.ErrAgenciaRequerida, wantStatus: http.StatusBadRequest, wantCode: "agency_required"},
+			{name: "agency not applicable", err: domain.ErrAgenciaNoAplica, wantStatus: http.StatusBadRequest, wantCode: "agency_not_applicable"},
+			{name: "agency already assigned", err: domain.ErrAgenciaYaAsignada, wantStatus: http.StatusConflict, wantCode: "agency_already_assigned"},
+			{name: "agency not found", err: domain.ErrAgencyNotFound, wantStatus: http.StatusNotFound, wantCode: "agency_not_found"},
 			{name: "unexpected error", err: errors.New("connection refused"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
 		}
 

@@ -22,6 +22,10 @@ var (
 	// ErrAgenciaRequerida: a user with rol inmobiliaria must belong to an
 	// agency, so this ABM requires one at creation time.
 	ErrAgenciaRequerida = &Error{Kind: KindInvalid, Code: "agency_required", Message: "Seleccioná la inmobiliaria a la que pertenece el usuario"}
+	ErrAgenciaNoAplica  = &Error{Kind: KindInvalid, Code: "agency_not_applicable", Message: "Solo los usuarios con rol inmobiliaria pertenecen a una inmobiliaria"}
+	// ErrAgenciaYaAsignada: an agency can only be filled in for a user that
+	// has none, never reassigned once set.
+	ErrAgenciaYaAsignada = &Error{Kind: KindConflict, Code: "agency_already_assigned", Message: "El usuario ya pertenece a una inmobiliaria y no se puede cambiar"}
 	// ErrCuentaInactiva: the caller's token is valid and its subject has a
 	// usuarios row, but that row is given de baja. Distinct from
 	// ErrActorNoAprovisionado (no row at all) and from ErrUsuarioDadoDeBaja
@@ -89,11 +93,13 @@ func (usuario Usuario) Activo() bool {
 // UsuarioUpdate is a partial change to a user: a nil field is left
 // unchanged. Email and Rol aren't part of it — email identifies the account
 // in the identity provider, and the role is fixed at creation; both are
-// separate operations this ABM doesn't support yet.
+// separate operations this ABM doesn't support yet. AgencyID only fills in
+// a missing agency: it never overwrites one the user already has.
 type UsuarioUpdate struct {
 	ID                  string
 	Nombre              *string
 	Apellido            *string
+	AgencyID            *string
 	UsuarioModificacion string
 }
 

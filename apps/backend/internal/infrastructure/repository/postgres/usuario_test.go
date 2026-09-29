@@ -414,6 +414,95 @@ func TestUserRepository(t *testing.T) {
 			t.Fatalf("Reactivate() error = %v, want %v", err, domain.ErrUsuarioYaActivo)
 		}
 	})
+
+	t.Run("update fills in a missing agency", func(t *testing.T) {
+		agency := createAgencyForUsuario(t, pool)
+		actor := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
+		target := createUsuarioConRol(t, pool, repository, domain.RolInmobiliaria, "Luis", "Pérez")
+
+		updated, err := repository.Update(context.Background(), domain.UsuarioUpdate{
+			ID: target.ID, AgencyID: &agency.ID, UsuarioModificacion: actor.ID,
+		})
+		if err != nil {
+			t.Fatalf("Update() error = %v", err)
+		}
+		if updated.AgencyID == nil || *updated.AgencyID != agency.ID {
+			t.Errorf("Update() agency id = %v, want %q", updated.AgencyID, agency.ID)
+		}
+		if updated.Nombre != "Luis" || updated.Apellido != "Pérez" {
+			t.Errorf("Update() should leave nombre and apellido unchanged, got %#v", updated)
+		}
+	})
+
+	t.Run("update never overwrites an assigned agency", func(t *testing.T) {
+		assigned := createAgencyForUsuario(t, pool)
+		other := createAgencyForUsuario(t, pool)
+		actor := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
+		target := createUsuarioConRol(t, pool, repository, domain.RolInmobiliaria, "Luis", "Pérez")
+		if _, err := repository.Update(context.Background(), domain.UsuarioUpdate{
+			ID: target.ID, AgencyID: &assigned.ID, UsuarioModificacion: actor.ID,
+		}); err != nil {
+			t.Fatalf("Update() first assignment error = %v", err)
+		}
+
+		nombre := "Luis Alberto"
+		_, err := repository.Update(context.Background(), domain.UsuarioUpdate{
+			ID: target.ID, Nombre: &nombre, AgencyID: &other.ID, UsuarioModificacion: actor.ID,
+		})
+		if !errors.Is(err, domain.ErrAgenciaYaAsignada) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrAgenciaYaAsignada)
+		}
+
+		found, err := repository.FindByID(context.Background(), target.ID)
+		if err != nil {
+			t.Fatalf("FindByID() error = %v", err)
+		}
+		if found.AgencyID == nil || *found.AgencyID != assigned.ID {
+			t.Errorf("agency id = %v, want it to stay %q", found.AgencyID, assigned.ID)
+		}
+		if found.Nombre != "Luis" {
+			t.Errorf("nombre = %q, a rejected update should change nothing", found.Nombre)
+		}
+	})
+
+	t.Run("update with an agency reports a missing user as not found", func(t *testing.T) {
+		agency := createAgencyForUsuario(t, pool)
+		actor := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
+
+		_, err := repository.Update(context.Background(), domain.UsuarioUpdate{
+			ID: newUUID(t), AgencyID: &agency.ID, UsuarioModificacion: actor.ID,
+		})
+		if !errors.Is(err, domain.ErrUsuarioNoEncontrado) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrUsuarioNoEncontrado)
+		}
+	})
+
+	t.Run("update rejects an agency that does not exist", func(t *testing.T) {
+		actor := createUsuarioConRol(t, pool, repository, domain.RolAdministrativo, "Zoe", "Vera")
+		target := createUsuarioConRol(t, pool, repository, domain.RolInmobiliaria, "Luis", "Pérez")
+		missing := newUUID(t)
+
+		_, err := repository.Update(context.Background(), domain.UsuarioUpdate{
+			ID: target.ID, AgencyID: &missing, UsuarioModificacion: actor.ID,
+		})
+		if !errors.Is(err, domain.ErrAgencyNotFound) {
+			t.Fatalf("Update() error = %v, want %v", err, domain.ErrAgencyNotFound)
+		}
+	})
+}
+
+func createAgencyForUsuario(t *testing.T, pool *pgxpool.Pool) domain.Agency {
+	t.Helper()
+
+	agency, err := postgres.NewAgencyRepository(pool).Create(context.Background(), domain.Agency{
+		BusinessName: "Lotes del Sur " + newUUID(t), ModifiedBy: seedUsuario(t, pool),
+	})
+	t.Cleanup(func() { deleteInmobiliaria(t, pool, agency.ID) })
+	if err != nil {
+		t.Fatalf("agencyRepository.Create() error = %v", err)
+	}
+
+	return agency
 }
 
 func createUsuarioConRol(

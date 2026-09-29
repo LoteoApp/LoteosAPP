@@ -40,6 +40,7 @@ func (handler *UpdateUserHandler) Handle(w http.ResponseWriter, request *http.Re
 		ID:         id,
 		Nombre:     body.Nombre,
 		Apellido:   body.Apellido,
+		AgencyID:   body.InmobiliariaID,
 	})
 	if err != nil {
 		return err

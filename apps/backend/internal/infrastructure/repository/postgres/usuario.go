@@ -171,23 +171,53 @@ func (repository *UserRepository) Update(ctx context.Context, update domain.Usua
 		UPDATE usuarios
 		SET nombre = COALESCE($2, nombre),
 			apellido = COALESCE($3, apellido),
+			inmobiliaria_id = COALESCE($5::uuid, inmobiliaria_id),
 			usuario_modificacion = $4::uuid,
 			updated_at = now()
 		WHERE id = $1::uuid AND fecha_baja IS NULL
-		RETURNING `+usuarioColumns, update.ID, update.Nombre, update.Apellido, update.UsuarioModificacion).
+			AND ($5::uuid IS NULL OR inmobiliaria_id IS NULL)
+		RETURNING `+usuarioColumns, update.ID, update.Nombre, update.Apellido, update.UsuarioModificacion, update.AgencyID).
 		Scan(scanTargets(&usuario)...)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
+		return domain.Usuario{}, repository.reconcileMissingProfileUpdate(ctx, update)
 	}
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == invalidTextRepresentationCode {
-			return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case invalidTextRepresentationCode:
+				return domain.Usuario{}, domain.ErrUsuarioNoEncontrado
+			case foreignKeyViolationCode:
+				return domain.Usuario{}, domain.ErrAgencyNotFound
+			}
 		}
 		return domain.Usuario{}, err
 	}
 
 	return usuario, nil
+}
+
+// reconcileMissingProfileUpdate runs when Update matched no row. Without an
+// agency in the update that can only mean the user doesn't exist or is
+// inactive; with one, an active user that still exists already had an
+// agency assigned by the time the UPDATE ran.
+func (repository *UserRepository) reconcileMissingProfileUpdate(ctx context.Context, update domain.UsuarioUpdate) error {
+	if update.AgencyID == nil {
+		return domain.ErrUsuarioNoEncontrado
+	}
+
+	var exists bool
+	err := repository.pool.QueryRow(ctx, `
+		SELECT true FROM usuarios WHERE id = $1::uuid AND fecha_baja IS NULL
+	`, update.ID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrUsuarioNoEncontrado
+	}
+	if err != nil {
+		return err
+	}
+
+	return domain.ErrAgenciaYaAsignada
 }
 
 // SoftDelete gives a user de baja. A retry after a lost response lands on a
