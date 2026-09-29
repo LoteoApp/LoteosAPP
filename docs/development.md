@@ -173,9 +173,10 @@ Endpoints operativos del backend:
   `payment_installment_paid`. Devuelve `201` con el cobro. Si no queda nada
   pendiente, la venta pasa a `completada` y el lote a `finalizado`.
 - `POST /api/v1/ventas/{id}/cancelacion-total`: cobra todo el saldo en un
-  solo cobro (`tipo = cancelacion_total`). Acepta `montoEsperado`, el saldo
-  que vio el cliente: si ya no coincide responde `settlement_amount_mismatch`
-  (409) en lugar de cobrar otro total. También acepta `cargos`, con las
+  solo cobro (`tipo = cancelacion_total`). Exige `montoEsperado`, el saldo
+  que vio el cliente: sin él responde `settlement_expected_amount_required`
+  (400), y si ya no coincide responde `settlement_amount_mismatch` (409) en
+  lugar de cobrar otro total. También acepta `cargos`, con las
   mismas reglas que el cobro de cuotas. Una venta que no está `activa` es
   `sale_not_active`.
 - `GET /api/v1/cobranzas/vencimientos`: cuotas de todas las ventas del

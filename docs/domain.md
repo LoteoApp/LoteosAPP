@@ -350,10 +350,12 @@ venta; un usuario de inmobiliaria, las vendidas por su agencia.
 
 - **Vencimientos** (`/cobranzas`): tablero con las cuotas de todas las ventas
   financiadas del alcance ordenadas por vencimiento, con búsqueda (cliente,
-  DNI, loteo, lote, vendedor), estado, rango de fechas y un resumen de
+  DNI, loteo, lote, vendedor), loteo, estado, rango de fechas y un resumen de
   cuántas cuotas están vencidas y cuántas vencen en los próximos 30 días. Una
-  cuota `pendiente` cuyo vencimiento ya pasó se muestra `vencida`; ese estado
-  se deriva de la fecha, no se guarda ni lo cambia ningún proceso.
+  cuota `pendiente` pasa a mostrarse `vencida` desde el día siguiente a su
+  vencimiento (en hora de Argentina): el mismo día del vencimiento sigue
+  pendiente. Ese estado se deriva de la fecha, no se guarda ni lo cambia
+  ningún proceso.
 - **Estado de deuda** (`/cobranzas/{ventaId}`): la venta, la entrega (en
   entrega + financiación) y cada cuota con su estado, los totales (plan,
   pagado, pendiente, vencido, próximo vencimiento) y el historial de cobros.
