@@ -74,6 +74,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -99,6 +100,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -123,6 +125,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -144,6 +147,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId={null}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -164,6 +168,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -189,6 +194,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="manzana-mz-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -211,6 +217,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="calle-ca-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -233,6 +240,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -257,6 +265,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="manzana-mz-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -277,6 +286,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="calle-ca-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -300,6 +310,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={onSave}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -315,6 +326,61 @@ describe('PlanSelectionPanel', () => {
     )
   })
 
+  it('keeps the current lote edit open when a previous save finishes', async () => {
+    const user = userEvent.setup()
+    const twoLotes = loteo({
+      lotes: [
+        loteo().lotes[0],
+        { ...loteo().lotes[0], id: 'lt-2', numero: '8' },
+      ],
+    })
+    let resolveSave: (saved: boolean) => void = () => {}
+    const onSave = vi.fn(() => new Promise<boolean>((resolve) => {
+      resolveSave = resolve
+    }))
+    const commonProps = {
+      loteo: twoLotes,
+      polygonLabels: labels,
+      updateState: { status: 'idle' } as const,
+      onSave,
+      onCancel: vi.fn(),
+      manzanaUpdateState: { status: 'idle' } as const,
+      onSaveManzana: vi.fn(),
+      calleUpdateState: { status: 'idle' } as const,
+      onSaveCalle: vi.fn(),
+    }
+
+    const { rerender } = render(
+      <PlanSelectionPanel
+        {...commonProps}
+        selected={{ kind: 'lote', id: 'lt-1' }}
+        selectedPolygonId="lote-lt-1"
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <PlanSelectionPanel
+        {...commonProps}
+        selected={{ kind: 'lote', id: 'lt-2' }}
+        selectedPolygonId="lote-lt-2"
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Habilitar edición' }))
+    await user.clear(screen.getByLabelText('Número'))
+    await user.type(screen.getByLabelText('Número'), '99')
+
+    await act(async () => {
+      resolveSave(true)
+    })
+
+    expect(screen.getByLabelText('Número')).toHaveValue('99')
+    expect(screen.queryByRole('button', { name: 'Habilitar edición' })).not.toBeInTheDocument()
+  })
+
   it('forwards a save from the calle form', async () => {
     const user = userEvent.setup()
     const onSaveCalle = vi.fn().mockResolvedValue(true)
@@ -327,6 +393,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="calle-ca-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -350,6 +417,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="loteo"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -369,6 +437,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId={null}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -406,6 +475,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="manzana-mz-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -425,6 +495,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="calle-ca-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -445,6 +516,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId={null}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -464,6 +536,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId={null}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -481,6 +554,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId={null}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -516,6 +590,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-1"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}
@@ -536,6 +611,7 @@ describe('PlanSelectionPanel', () => {
         selectedPolygonId="lote-lt-2"
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
         manzanaUpdateState={{ status: 'idle' }}
         onSaveManzana={vi.fn()}
         calleUpdateState={{ status: 'idle' }}

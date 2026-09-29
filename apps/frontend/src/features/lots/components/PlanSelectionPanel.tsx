@@ -33,6 +33,7 @@ type PlanSelectionPanelProps = {
   selectedPolygonId: string | null
   updateState: UpdateLoteState
   onSave: (loteId: string, payload: UpdateLotePayload) => Promise<boolean>
+  onCancel: () => void
   manzanaUpdateState: UpdateManzanaState
   onSaveManzana: (manzanaId: string, payload: UpdateManzanaPayload) => Promise<boolean>
   calleUpdateState: UpdateCalleState
@@ -51,6 +52,7 @@ export default function PlanSelectionPanel({
   selectedPolygonId,
   updateState,
   onSave,
+  onCancel,
   manzanaUpdateState,
   onSaveManzana,
   calleUpdateState,
@@ -67,6 +69,14 @@ export default function PlanSelectionPanel({
   if (selectedKey !== trackedSelectionKey) {
     setTrackedSelectionKey(selectedKey)
     setEditingSelectionKey(null)
+  }
+
+  async function handleLoteSave(loteId: string, payload: UpdateLotePayload) {
+    const saved = await onSave(loteId, payload)
+    if (saved) {
+      setEditingSelectionKey((current) => (current === selectedKey ? null : current))
+    }
+    return saved
   }
 
   if (selected === null || selected.kind === 'loteo') {
@@ -119,7 +129,11 @@ export default function PlanSelectionPanel({
             <LoteEditForm
               lote={lote}
               updateState={updateState}
-              onSave={(payload) => onSave(lote.id, payload)}
+              onSave={(payload) => handleLoteSave(lote.id, payload)}
+              onCancel={() => {
+                onCancel()
+                setEditingSelectionKey(null)
+              }}
             />
           ) : (
             lote.caracteristicas && <p className="text-sm">{lote.caracteristicas}</p>

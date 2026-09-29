@@ -25,7 +25,12 @@ describe('LoteEditForm', () => {
     const onSave = vi.fn().mockResolvedValue(true)
 
     render(
-      <LoteEditForm lote={lote()} updateState={{ status: 'idle' }} onSave={onSave} />,
+      <LoteEditForm
+        lote={lote()}
+        updateState={{ status: 'idle' }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
     )
 
     expect(screen.getByLabelText('Número')).toHaveValue('7')
@@ -52,7 +57,26 @@ describe('LoteEditForm', () => {
       superficie: 310.5,
       caracteristicas: 'Frente norte',
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent('Lote guardado')
+  })
+
+  it('reports cancellation without saving', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const onCancel = vi.fn()
+
+    render(
+      <LoteEditForm
+        lote={lote()}
+        updateState={{ status: 'idle' }}
+        onSave={onSave}
+        onCancel={onCancel}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(onCancel).toHaveBeenCalledOnce()
+    expect(onSave).not.toHaveBeenCalled()
   })
 
   it('shows a 409 on the numero field and keeps the typed value', async () => {
@@ -65,6 +89,7 @@ describe('LoteEditForm', () => {
           field: 'numero',
         }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
@@ -81,16 +106,23 @@ describe('LoteEditForm', () => {
         lote={lote()}
         updateState={{ status: 'saving' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
   })
 
   it('resets the draft when the lote changes', async () => {
     const user = userEvent.setup()
     const { rerender } = render(
-      <LoteEditForm lote={lote()} updateState={{ status: 'idle' }} onSave={vi.fn()} />,
+      <LoteEditForm
+        lote={lote()}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     )
 
     await user.clear(screen.getByLabelText('Número'))
@@ -101,6 +133,7 @@ describe('LoteEditForm', () => {
         lote={lote({ id: 'lt-2', numero: '8' })}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
@@ -112,7 +145,12 @@ describe('LoteEditForm', () => {
     const onSave = vi.fn()
 
     render(
-      <LoteEditForm lote={lote({ numero: '' })} updateState={{ status: 'idle' }} onSave={onSave} />,
+      <LoteEditForm
+        lote={lote({ numero: '' })}
+        updateState={{ status: 'idle' }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
     )
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -127,6 +165,7 @@ describe('LoteEditForm', () => {
         lote={lote()}
         updateState={{ status: 'error', message: 'No tenés permiso para editar este loteo.' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
@@ -139,6 +178,7 @@ describe('LoteEditForm', () => {
         lote={lote({ moneda: 'EUR' })}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
@@ -150,7 +190,12 @@ describe('LoteEditForm', () => {
     const user = userEvent.setup()
 
     render(
-      <LoteEditForm lote={lote({ precio: null })} updateState={{ status: 'idle' }} onSave={vi.fn()} />,
+      <LoteEditForm
+        lote={lote({ precio: null })}
+        updateState={{ status: 'idle' }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     )
 
     const precio = screen.getByLabelText('Precio')
@@ -164,7 +209,14 @@ describe('LoteEditForm', () => {
     const user = userEvent.setup()
     const onSave = vi.fn().mockResolvedValue(true)
 
-    render(<LoteEditForm lote={lote()} updateState={{ status: 'idle' }} onSave={onSave} />)
+    render(
+      <LoteEditForm
+        lote={lote()}
+        updateState={{ status: 'idle' }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
 
     await user.clear(screen.getByLabelText('Precio'))
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -192,6 +244,7 @@ describe('LoteEditForm', () => {
         lote={lote({ superficie: null, poligono: square })}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
@@ -218,6 +271,7 @@ describe('LoteEditForm', () => {
         })}
         updateState={{ status: 'idle' }}
         onSave={vi.fn()}
+        onCancel={vi.fn()}
       />,
     )
 
