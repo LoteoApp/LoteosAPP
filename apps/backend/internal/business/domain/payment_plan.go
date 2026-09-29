@@ -50,11 +50,6 @@ var (
 	ErrInvalidInstallmentDueDay     = &Error{Kind: KindInvalid, Code: "invalid_installment_due_day", Message: "El día de vencimiento de las cuotas no es válido"}
 )
 
-// BusinessLocation is the time zone installment due dates are computed in.
-// Argentina has no daylight saving time, so a fixed UTC-3 offset is exact and
-// doesn't depend on tzdata, which the distroless production image lacks.
-var BusinessLocation = time.FixedZone("UTC-3", -3*60*60)
-
 // IsValidInstallmentDueDay reports whether a day of the month can be used as
 // the due day of every installment.
 func IsValidInstallmentDueDay(day int) bool {
