@@ -209,6 +209,12 @@ describe('DebtStatementPage', () => {
     expect(receipt).toHaveTextContent('Transferencia')
     expect(receipt).toHaveTextContent('Transf. 123')
     expect(receipt).toHaveTextContent('López, Carla')
+    expect(within(receipt).getByRole('heading', { name: 'Datos del cobro' })).toBeInTheDocument()
+    const collectedItems = within(receipt).getByRole('table', { name: 'Cuotas cobradas' })
+    expect(within(collectedItems).getByRole('cell', { name: 'Entrega' })).toBeInTheDocument()
+    expect(within(collectedItems).getByRole('cell', { name: 'Cuota 1' })).toBeInTheDocument()
+    expect(within(receipt).queryByRole('table', { name: 'Cargos adicionales' })).not.toBeInTheDocument()
+    expect(receipt).toHaveTextContent('Firma de quien cobra')
     await user.click(within(receipt).getByRole('button', { name: 'Imprimir recibo' }))
     expect(print).toHaveBeenCalledTimes(1)
     await user.click(within(receipt).getByRole('button', { name: 'Cerrar' }))
@@ -266,7 +272,11 @@ describe('DebtStatementPage', () => {
       ),
     )
     const receipt = await screen.findByRole('dialog', { name: 'Recibo de cobro' })
-    expect(receipt).toHaveTextContent('Servicios · Agua')
+    expect(
+      within(within(receipt).getByRole('table', { name: 'Cargos adicionales' })).getByRole('cell', {
+        name: 'Servicios · Agua',
+      }),
+    ).toBeInTheDocument()
     const collected = within(receipt).getByRole('group', { name: 'Importe cobrado' })
     expect(collected).toHaveTextContent(/US\$\s?20\.000,00/)
     expect(collected).toHaveTextContent(/ARS\$\s?150\.000,00/)

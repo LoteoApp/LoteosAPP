@@ -768,9 +768,14 @@ Decisiones de este recorte:
   `PaymentTotals`, así el diálogo previsualiza un total por moneda antes de
   enviar), y el cobro registrado abre `PaymentReceiptDialog`, que imprime los
   cargos y un importe por moneda. «Imprimir
-  estado de deuda» (`DebtStatementDialog`) y el recibo usan `PrintDialog`,
-  el mismo mecanismo `data-print-area` + `window.print()` del recibo de
-  venta. `billing` no importa `sales`: declara sus propios tipos del
+  estado de deuda» (`DebtStatementDialog`), el recibo de cobro y el recibo de
+  venta (`SaleReceiptDialog`) se arman con los componentes de
+  `src/shared/ui/receipt.tsx` (`ReceiptDialog`, `ReceiptSummary`,
+  `ReceiptSection`, `ReceiptField`, `ReceiptTable`, `ReceiptSignatures`), que
+  replican el formato del comprobante de reserva en PDF (banda verde con la
+  marca, resumen destacado, secciones con fichas y pie) usando los tokens
+  `--receipt-*` de `index.css`, e imprimen con el mecanismo
+  `data-print-area` + `window.print()`. `billing` no importa `sales`: declara sus propios tipos del
   contrato y `SaleDetailsPage` solo enlaza por URL a `/cobranzas/{id}` en
   ventas financiadas.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
