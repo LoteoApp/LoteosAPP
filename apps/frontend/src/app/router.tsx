@@ -17,7 +17,8 @@ import ReservationCreateRoute from './ReservationCreateRoute'
 import SaleCreateRoute from './SaleCreateRoute'
 import SaleDetailsRoute from './SaleDetailsRoute'
 import SalesRoute from './SalesRoute'
-import BillingPage from '../features/billing/pages/BillingPage'
+import BillingRoute from './BillingRoute'
+import DebtStatementRoute from './DebtStatementRoute'
 import UsersRoute from './UsersRoute'
 import AgenciesRoute from './AgenciesRoute'
 
@@ -119,7 +120,19 @@ export const router = createBrowserRouter([
       },
       {
         path: '/cobranzas',
-        element: <BillingPage />,
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <BillingRoute />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/cobranzas/:ventaId',
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <DebtStatementRoute />
+          </RequireRole>
+        ),
       },
       {
         path: '/usuarios',

@@ -87,6 +87,10 @@ type Handlers struct {
 	CreateSaleHandler          *handler.CreateSaleHandler
 	ListSalesHandler           *handler.ListSalesHandler
 	GetSaleHandler             *handler.GetSaleHandler
+	GetDebtStatementHandler    *handler.GetDebtStatementHandler
+	ListDueInstallmentsHandler *handler.ListDueInstallmentsHandler
+	RegisterPaymentHandler     *handler.RegisterPaymentHandler
+	SettleSaleHandler          *handler.SettleSaleHandler
 	ListEligibleSellersHandler *handler.ListEligibleSellersHandler
 }
 
@@ -151,4 +155,8 @@ func RegisterRoutes(mux *http.ServeMux, handlers Handlers, verifier *supabase.Ve
 	mux.Handle("POST /api/v1/loteos/{loteoId}/lotes/{loteId}/ventas", protected(handler.Adapt(handlers.CreateSaleHandler, reservationsTimeout)))
 	mux.Handle("GET /api/v1/ventas", protected(handler.Adapt(handlers.ListSalesHandler, reservationsTimeout)))
 	mux.Handle("GET /api/v1/ventas/{id}", protected(handler.Adapt(handlers.GetSaleHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/ventas/{id}/estado-deuda", protected(handler.Adapt(handlers.GetDebtStatementHandler, reservationsTimeout)))
+	mux.Handle("POST /api/v1/ventas/{id}/cobros", protected(handler.Adapt(handlers.RegisterPaymentHandler, reservationsTimeout)))
+	mux.Handle("POST /api/v1/ventas/{id}/cancelacion-total", protected(handler.Adapt(handlers.SettleSaleHandler, reservationsTimeout)))
+	mux.Handle("GET /api/v1/cobranzas/vencimientos", protected(handler.Adapt(handlers.ListDueInstallmentsHandler, reservationsTimeout)))
 }
