@@ -48,13 +48,6 @@ func NewRegisterPayment(repository gateway.CollectionRepository, users gateway.U
 }
 
 func (useCase *registerPaymentUseCase) Execute(ctx context.Context, input RegisterPaymentInput) (domain.Payment, error) {
-	if !hasCollectionRole(input.Actor.Roles) {
-		return domain.Payment{}, domain.ErrNoAutorizado
-	}
-	scope, err := collectionScope(input.Actor)
-	if err != nil {
-		return domain.Payment{}, err
-	}
 	saleID := strings.TrimSpace(input.SaleID)
 	if saleID == "" {
 		return domain.Payment{}, domain.ErrSaleNotFound
@@ -72,12 +65,9 @@ func (useCase *registerPaymentUseCase) Execute(ctx context.Context, input Regist
 	if err != nil {
 		return domain.Payment{}, err
 	}
-	actor, err := resolveActor(ctx, useCase.users, input.Actor)
+	actor, scope, err := authorizeCollector(ctx, useCase.users, input.Actor)
 	if err != nil {
-		return domain.Payment{}, fromRepository(err)
-	}
-	if !hasCollectionRole([]string{string(actor.Rol)}) {
-		return domain.Payment{}, domain.ErrNoAutorizado
+		return domain.Payment{}, err
 	}
 	payment, err := useCase.repository.RegisterPayment(ctx, gateway.RegisterPaymentCommand{
 		SaleID:             saleID,
@@ -119,10 +109,10 @@ func paymentCharges(charges []ChargeInput) ([]domain.PaymentChargeInput, error) 
 	mapped := make([]domain.PaymentChargeInput, len(charges))
 	for i, charge := range charges {
 		mapped[i] = domain.PaymentChargeInput{
-			Tipo:    domain.ChargeType(strings.TrimSpace(charge.Type)),
-			Monto:   charge.Amount,
-			Moneda:  charge.Currency,
-			Detalle: charge.Detail,
+			Type:     domain.ChargeType(strings.TrimSpace(charge.Type)),
+			Amount:   charge.Amount,
+			Currency: charge.Currency,
+			Detail:   charge.Detail,
 		}
 	}
 	return domain.NormalizePaymentCharges(mapped, "")

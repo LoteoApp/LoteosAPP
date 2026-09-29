@@ -71,62 +71,88 @@ func TestEffectiveInstallmentState(t *testing.T) {
 	if got := domain.EffectiveInstallmentState(paid, collectionNow); got != domain.InstallmentStatePaid {
 		t.Errorf("paid = %q", got)
 	}
-	overdue := domain.Installment{Estado: domain.InstallmentStatePending, FechaVencimiento: collectionNow.Add(-time.Second)}
-	if got := domain.EffectiveInstallmentState(overdue, collectionNow); got != domain.InstallmentStateOverdue {
-		t.Errorf("overdue = %q", got)
-	}
-	pending := domain.Installment{Estado: domain.InstallmentStatePending, FechaVencimiento: collectionNow.Add(time.Second)}
+	pending := domain.Installment{Estado: domain.InstallmentStatePending, FechaVencimiento: collectionNow.AddDate(0, 0, 1)}
 	if got := domain.EffectiveInstallmentState(pending, collectionNow); got != domain.InstallmentStatePending {
 		t.Errorf("pending = %q", got)
+	}
+
+	// Due Sep 21 at 10:00 in Argentina (13:00 UTC). It is a date, so the cuota
+	// stays pendiente the whole day there and only turns vencida on Sep 22.
+	due := domain.Installment{Estado: domain.InstallmentStatePending, FechaVencimiento: time.Date(2026, 9, 21, 10, 0, 0, 0, domain.BusinessLocation)}
+	cases := []struct {
+		name string
+		now  time.Time
+		want domain.InstallmentState
+	}{
+		{"due day, before its clock", time.Date(2026, 9, 21, 0, 0, 0, 0, domain.BusinessLocation), domain.InstallmentStatePending},
+		{"due day, past its clock", time.Date(2026, 9, 21, 18, 0, 0, 0, domain.BusinessLocation), domain.InstallmentStatePending},
+		{"due day, already Sep 22 in UTC", time.Date(2026, 9, 22, 2, 59, 59, 0, time.UTC), domain.InstallmentStatePending},
+		{"the day after, at midnight", time.Date(2026, 9, 22, 0, 0, 0, 0, domain.BusinessLocation), domain.InstallmentStateOverdue},
+		{"the day before", time.Date(2026, 9, 20, 23, 59, 59, 0, domain.BusinessLocation), domain.InstallmentStatePending},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := domain.EffectiveInstallmentState(due, tc.now); got != tc.want {
+				t.Errorf("EffectiveInstallmentState() at %s = %q, want %q", tc.now, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStartOfBusinessDay(t *testing.T) {
+	got := domain.StartOfBusinessDay(time.Date(2026, 9, 22, 2, 30, 0, 0, time.UTC))
+	want := time.Date(2026, 9, 21, 0, 0, 0, 0, domain.BusinessLocation)
+	if !got.Equal(want) {
+		t.Errorf("StartOfBusinessDay() = %s, want %s", got, want)
 	}
 }
 
 func TestComputeDebtSummary(t *testing.T) {
-	entrega := &domain.DownPayment{Monto: 500.5, Estado: domain.InstallmentStatePending}
+	entrega := &domain.DownPayment{Amount: 500.5, State: domain.InstallmentStatePending}
 	summary := domain.ComputeDebtSummary(entrega, installmentsFixture())
-	if summary.MontoTotal != 4500.5 || summary.MontoPagado != 1000 || summary.MontoPendiente != 3500.5 || summary.MontoVencido != 1000 {
+	if summary.TotalAmount != 4500.5 || summary.PaidAmount != 1000 || summary.PendingAmount != 3500.5 || summary.OverdueAmount != 1000 {
 		t.Errorf("amounts = %#v", summary)
 	}
-	if summary.CuotasPagadas != 1 || summary.CuotasPendientes != 3 || summary.CuotasVencidas != 1 {
+	if summary.PaidInstallments != 1 || summary.PendingInstallments != 3 || summary.OverdueInstallments != 1 {
 		t.Errorf("counts = %#v", summary)
 	}
-	if summary.ProximoVencimiento == nil || !summary.ProximoVencimiento.Equal(collectionNow.AddDate(0, 1, 0)) {
-		t.Errorf("next due = %v", summary.ProximoVencimiento)
+	if summary.NextDueDate == nil || !summary.NextDueDate.Equal(collectionNow.AddDate(0, 1, 0)) {
+		t.Errorf("next due = %v", summary.NextDueDate)
 	}
 
-	paidEntrega := &domain.DownPayment{Monto: 500, Estado: domain.InstallmentStatePaid}
+	paidEntrega := &domain.DownPayment{Amount: 500, State: domain.InstallmentStatePaid}
 	allPaid := []domain.Installment{{Monto: 10, Estado: domain.InstallmentStatePaid}}
 	settled := domain.ComputeDebtSummary(paidEntrega, allPaid)
-	if settled.MontoPagado != 510 || settled.MontoPendiente != 0 || settled.ProximoVencimiento != nil {
+	if settled.PaidAmount != 510 || settled.PendingAmount != 0 || settled.NextDueDate != nil {
 		t.Errorf("settled = %#v", settled)
 	}
 	none := domain.ComputeDebtSummary(nil, nil)
-	if none.MontoTotal != 0 || none.CuotasPendientes != 0 {
+	if none.TotalAmount != 0 || none.PendingInstallments != 0 {
 		t.Errorf("empty = %#v", none)
 	}
 }
 
 func TestDebtStatementSaldada(t *testing.T) {
 	statement := domain.DebtStatement{
-		Entrega: &domain.DownPayment{Estado: domain.InstallmentStatePaid},
-		Cuotas:  []domain.Installment{{Estado: domain.InstallmentStatePaid}},
+		DownPayment:  &domain.DownPayment{State: domain.InstallmentStatePaid},
+		Installments: []domain.Installment{{Estado: domain.InstallmentStatePaid}},
 	}
 	if !statement.Saldada() {
 		t.Error("everything paid should be saldada")
 	}
-	statement.Entrega.Estado = domain.InstallmentStatePending
+	statement.DownPayment.State = domain.InstallmentStatePending
 	if statement.Saldada() {
 		t.Error("pending entrega should not be saldada")
 	}
-	statement.Entrega = nil
-	statement.Cuotas = append(statement.Cuotas, domain.Installment{Estado: domain.InstallmentStateOverdue})
+	statement.DownPayment = nil
+	statement.Installments = append(statement.Installments, domain.Installment{Estado: domain.InstallmentStateOverdue})
 	if statement.Saldada() {
 		t.Error("overdue cuota should not be saldada")
 	}
 }
 
 func TestSelectPaymentTakesTheFirstPendingInstallmentsInOrder(t *testing.T) {
-	entrega := &domain.DownPayment{Monto: 250, Estado: domain.InstallmentStatePending}
+	entrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePending}
 	selection, err := domain.SelectPayment(entrega, installmentsFixture(), []string{" c-3 ", "c-2", ""}, true)
 	if err != nil {
 		t.Fatalf("SelectPayment() error = %v", err)
@@ -149,8 +175,8 @@ func TestSelectPaymentTakesTheFirstPendingInstallmentsInOrder(t *testing.T) {
 
 func TestSelectPaymentRejections(t *testing.T) {
 	installments := installmentsFixture()
-	pendingEntrega := &domain.DownPayment{Monto: 250, Estado: domain.InstallmentStatePending}
-	paidEntrega := &domain.DownPayment{Monto: 250, Estado: domain.InstallmentStatePaid}
+	pendingEntrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePending}
+	paidEntrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePaid}
 	cases := []struct {
 		name    string
 		entrega *domain.DownPayment
@@ -177,9 +203,9 @@ func TestSelectPaymentRejections(t *testing.T) {
 }
 
 func TestSelectSettlement(t *testing.T) {
-	entrega := &domain.DownPayment{Monto: 250, Estado: domain.InstallmentStatePending}
+	entrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePending}
 	expected := 3250.0
-	selection, err := domain.SelectSettlement(entrega, installmentsFixture(), &expected)
+	selection, err := domain.SelectSettlement(entrega, installmentsFixture(), expected)
 	if err != nil {
 		t.Fatalf("SelectSettlement() error = %v", err)
 	}
@@ -187,22 +213,22 @@ func TestSelectSettlement(t *testing.T) {
 		t.Errorf("selection = %#v", selection)
 	}
 
-	withoutCheck, err := domain.SelectSettlement(nil, installmentsFixture(), nil)
-	if err != nil || withoutCheck.IncludeDownPayment || withoutCheck.Amount() != 3000 {
-		t.Errorf("without entrega = %#v, %v", withoutCheck, err)
+	withoutEntrega, err := domain.SelectSettlement(nil, installmentsFixture(), 3000)
+	if err != nil || withoutEntrega.IncludeDownPayment || withoutEntrega.Amount() != 3000 {
+		t.Errorf("without entrega = %#v, %v", withoutEntrega, err)
 	}
 
-	stale := 3000.0
-	if _, err := domain.SelectSettlement(entrega, installmentsFixture(), &stale); !errors.Is(err, domain.ErrSettlementAmountMismatch) {
-		t.Errorf("stale amount error = %v, want %v", err, domain.ErrSettlementAmountMismatch)
+	for _, stale := range []float64{3000, 0} {
+		if _, err := domain.SelectSettlement(entrega, installmentsFixture(), stale); !errors.Is(err, domain.ErrSettlementAmountMismatch) {
+			t.Errorf("stale amount %v error = %v, want %v", stale, err, domain.ErrSettlementAmountMismatch)
+		}
 	}
-	nearlyEqual := 3250.004
-	if _, err := domain.SelectSettlement(entrega, installmentsFixture(), &nearlyEqual); err != nil {
+	if _, err := domain.SelectSettlement(entrega, installmentsFixture(), 3250.004); err != nil {
 		t.Errorf("rounding noise error = %v, want none", err)
 	}
 
-	paid := &domain.DownPayment{Monto: 250, Estado: domain.InstallmentStatePaid}
-	if _, err := domain.SelectSettlement(paid, []domain.Installment{{Estado: domain.InstallmentStatePaid}}, nil); !errors.Is(err, domain.ErrSettlementNothingOwed) {
+	paid := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePaid}
+	if _, err := domain.SelectSettlement(paid, []domain.Installment{{Estado: domain.InstallmentStatePaid}}, 0); !errors.Is(err, domain.ErrSettlementNothingOwed) {
 		t.Errorf("nothing owed error = %v, want %v", err, domain.ErrSettlementNothingOwed)
 	}
 }

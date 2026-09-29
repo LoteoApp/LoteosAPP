@@ -17,9 +17,11 @@ type RegisterPaymentCommand struct {
 	Type               domain.PaymentType
 	InstallmentIDs     []string
 	IncludeDownPayment bool
-	ExpectedAmount     *float64
+	// ExpectedAmount is the saldo a settlement was confirmed for; regular
+	// payments ignore it.
+	ExpectedAmount float64
 	// Charges are the cargos adicionales collected with this cobro (taxes,
-	// administrative fees, services). A charge with no Moneda takes the
+	// administrative fees, services). A charge with no Currency takes the
 	// sale's; one in another currency is kept apart, never converted.
 	Charges     []domain.PaymentChargeInput
 	Medium      domain.PaymentMedium

@@ -1,34 +1,34 @@
 package dto
 
-// ChargeDTO is a cargo adicional collected with a cobro (impuestos, gastos
-// administrativos, honorarios, servicios...). Moneda es opcional: vacía
-// significa la moneda de la venta, y una distinta se cobra aparte sin
-// convertirse.
+// ChargeDTO is a cargo adicional collected with a cobro (taxes,
+// administrative fees, professional fees, services...). Currency is optional:
+// blank means the sale's currency, and a different one is collected apart
+// without being converted.
 type ChargeDTO struct {
-	Tipo    string  `json:"tipo"`
-	Monto   float64 `json:"monto"`
-	Moneda  string  `json:"moneda,omitempty"`
-	Detalle string  `json:"detalle,omitempty"`
+	Type     string  `json:"tipo"`
+	Amount   float64 `json:"monto"`
+	Currency string  `json:"moneda,omitempty"`
+	Detail   string  `json:"detalle,omitempty"`
 }
 
 // RegisterPaymentRequest collects the entrega and/or the next pending
-// cuotas of a venta. FechaPago is RFC 3339; empty means now.
+// cuotas of a venta. PaidAt is RFC 3339; empty means now.
 type RegisterPaymentRequest struct {
-	CuotaIDs       []string    `json:"cuotaIds"`
-	IncluirEntrega bool        `json:"incluirEntrega"`
-	Cargos         []ChargeDTO `json:"cargos,omitempty"`
-	MedioPago      string      `json:"medioPago"`
-	FechaPago      string      `json:"fechaPago,omitempty"`
-	Observacion    string      `json:"observacion,omitempty"`
+	InstallmentIDs     []string    `json:"cuotaIds"`
+	IncludeDownPayment bool        `json:"incluirEntrega"`
+	Charges            []ChargeDTO `json:"cargos,omitempty"`
+	Medium             string      `json:"medioPago"`
+	PaidAt             string      `json:"fechaPago,omitempty"`
+	Observation        string      `json:"observacion,omitempty"`
 }
 
-// SettleSaleRequest collects everything still owed. MontoEsperado is the
-// saldo the caller saw; the backend rejects the cobro when it no longer
-// matches. nil skips the check.
+// SettleSaleRequest collects everything still owed. ExpectedAmount is the
+// saldo the caller saw; it is required, and the backend rejects the cobro
+// when it no longer matches.
 type SettleSaleRequest struct {
-	MontoEsperado *float64    `json:"montoEsperado,omitempty"`
-	Cargos        []ChargeDTO `json:"cargos,omitempty"`
-	MedioPago     string      `json:"medioPago"`
-	FechaPago     string      `json:"fechaPago,omitempty"`
-	Observacion   string      `json:"observacion,omitempty"`
+	ExpectedAmount *float64    `json:"montoEsperado"`
+	Charges        []ChargeDTO `json:"cargos,omitempty"`
+	Medium         string      `json:"medioPago"`
+	PaidAt         string      `json:"fechaPago,omitempty"`
+	Observation    string      `json:"observacion,omitempty"`
 }

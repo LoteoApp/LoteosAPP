@@ -166,8 +166,8 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	getSaleHandler := handler.NewGetSaleHandler(sales.NewGetSale(saleRepo))
 
 	collectionRepo := postgres.NewCollectionRepository(pool)
-	getDebtStatementHandler := handler.NewGetDebtStatementHandler(collections.NewGetDebtStatement(collectionRepo))
-	listDueInstallmentsHandler := handler.NewListDueInstallmentsHandler(collections.NewListDueInstallments(collectionRepo))
+	getDebtStatementHandler := handler.NewGetDebtStatementHandler(collections.NewGetDebtStatement(collectionRepo, userRepo))
+	listDueInstallmentsHandler := handler.NewListDueInstallmentsHandler(collections.NewListDueInstallments(collectionRepo, userRepo))
 	registerPaymentHandler := handler.NewRegisterPaymentHandler(collections.NewRegisterPayment(collectionRepo, userRepo))
 	settleSaleHandler := handler.NewSettleSaleHandler(collections.NewSettleSale(collectionRepo, userRepo))
 	var reservationExpiryWorker *worker.ReservationExpiryWorker

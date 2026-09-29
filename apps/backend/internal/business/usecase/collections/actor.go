@@ -29,40 +29,38 @@ func clockOrSystem(clocks []Clock) Clock {
 	return SystemClock{}
 }
 
-func resolveActor(ctx context.Context, users gateway.UserRepository, actor Actor) (domain.Usuario, error) {
+// authorizeCollector reads the caller's usuarios row and derives what they
+// may reach from its current rol. The token's roles are not trusted here: a
+// token issued before a demotion keeps the old rol until it expires, and an
+// ex-administrador must not keep reading or collecting on every venta.
+func authorizeCollector(ctx context.Context, users gateway.UserRepository, actor Actor) (domain.Usuario, gateway.SaleScope, error) {
 	usuario, err := users.FindByAuthProviderID(ctx, actor.AuthProviderID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUsuarioNoEncontrado) {
-			return domain.Usuario{}, domain.ErrActorNoAprovisionado
+			return domain.Usuario{}, gateway.SaleScope{}, domain.ErrActorNoAprovisionado
 		}
-		return domain.Usuario{}, err
+		return domain.Usuario{}, gateway.SaleScope{}, fromRepository(err)
 	}
 	if !usuario.Activo() {
-		return domain.Usuario{}, domain.ErrCuentaInactiva
+		return domain.Usuario{}, gateway.SaleScope{}, domain.ErrCuentaInactiva
 	}
-	return usuario, nil
+	scope, err := collectionScope(usuario.Rol, actor.AuthProviderID)
+	if err != nil {
+		return domain.Usuario{}, gateway.SaleScope{}, err
+	}
+	return usuario, scope, nil
 }
 
 // collectionScope mirrors the ventas scope: internal users reach every
 // venta, an agency user only those sold by their own agency.
-func collectionScope(actor Actor) (gateway.SaleScope, error) {
-	if domain.HasRole(actor.Roles, domain.RolAdministrador) || domain.HasRole(actor.Roles, domain.RolAdministrativo) {
-		return gateway.SaleScope{}, nil
-	}
-	if !domain.HasRole(actor.Roles, domain.RolInmobiliaria) {
+func collectionScope(rol domain.Rol, authProviderID string) (gateway.SaleScope, error) {
+	if !domain.IsCollectionRole(rol) {
 		return gateway.SaleScope{}, domain.ErrNoAutorizado
 	}
-	id := actor.AuthProviderID
-	return gateway.SaleScope{AssigneeAuthProviderID: &id, ByAgency: true}, nil
-}
-
-func hasCollectionRole(roles []string) bool {
-	for _, role := range roles {
-		if domain.IsCollectionRole(domain.Rol(role)) {
-			return true
-		}
+	if rol != domain.RolInmobiliaria {
+		return gateway.SaleScope{}, nil
 	}
-	return false
+	return gateway.SaleScope{AssigneeAuthProviderID: &authProviderID, ByAgency: true}, nil
 }
 
 func fromRepository(err error) error {

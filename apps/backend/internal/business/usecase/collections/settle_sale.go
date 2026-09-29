@@ -12,7 +12,8 @@ import (
 type SettleSaleInput struct {
 	Actor  Actor
 	SaleID string
-	// ExpectedAmount is the saldo the caller saw; nil skips the check.
+	// ExpectedAmount is the saldo the caller saw and confirmed. It is required:
+	// it is the only guard against collecting a balance that changed since.
 	ExpectedAmount *float64
 	Charges        []ChargeInput
 	Medium         string
@@ -38,16 +39,12 @@ func NewSettleSale(repository gateway.CollectionRepository, users gateway.UserRe
 }
 
 func (useCase *settleSaleUseCase) Execute(ctx context.Context, input SettleSaleInput) (domain.Payment, error) {
-	if !hasCollectionRole(input.Actor.Roles) {
-		return domain.Payment{}, domain.ErrNoAutorizado
-	}
-	scope, err := collectionScope(input.Actor)
-	if err != nil {
-		return domain.Payment{}, err
-	}
 	saleID := strings.TrimSpace(input.SaleID)
 	if saleID == "" {
 		return domain.Payment{}, domain.ErrSaleNotFound
+	}
+	if input.ExpectedAmount == nil {
+		return domain.Payment{}, domain.ErrSettlementExpectedAmountRequired
 	}
 	now := useCase.clock.Now().UTC()
 	terms, err := paymentTerms(input.Medium, input.PaidAt, input.Observation, now)
@@ -58,18 +55,15 @@ func (useCase *settleSaleUseCase) Execute(ctx context.Context, input SettleSaleI
 	if err != nil {
 		return domain.Payment{}, err
 	}
-	actor, err := resolveActor(ctx, useCase.users, input.Actor)
+	actor, scope, err := authorizeCollector(ctx, useCase.users, input.Actor)
 	if err != nil {
-		return domain.Payment{}, fromRepository(err)
-	}
-	if !hasCollectionRole([]string{string(actor.Rol)}) {
-		return domain.Payment{}, domain.ErrNoAutorizado
+		return domain.Payment{}, err
 	}
 	payment, err := useCase.repository.RegisterPayment(ctx, gateway.RegisterPaymentCommand{
 		SaleID:         saleID,
 		ActorID:        actor.ID,
 		Type:           domain.PaymentTypeSettlement,
-		ExpectedAmount: input.ExpectedAmount,
+		ExpectedAmount: *input.ExpectedAmount,
 		Charges:        charges,
 		Medium:         terms.Medium,
 		Observation:    terms.Observation,

@@ -20,19 +20,20 @@ type ListDueInstallments interface {
 
 type listDueInstallmentsUseCase struct {
 	repository gateway.CollectionRepository
+	users      gateway.UserRepository
 	clock      Clock
 }
 
-func NewListDueInstallments(repository gateway.CollectionRepository, clocks ...Clock) ListDueInstallments {
-	return &listDueInstallmentsUseCase{repository: repository, clock: clockOrSystem(clocks)}
+func NewListDueInstallments(repository gateway.CollectionRepository, users gateway.UserRepository, clocks ...Clock) ListDueInstallments {
+	return &listDueInstallmentsUseCase{repository: repository, users: users, clock: clockOrSystem(clocks)}
 }
 
 func (useCase *listDueInstallmentsUseCase) Execute(ctx context.Context, input ListDueInstallmentsInput) (domain.DueInstallmentPage, error) {
-	scope, err := collectionScope(input.Actor)
+	filter, err := input.Filter.Normalize()
 	if err != nil {
 		return domain.DueInstallmentPage{}, err
 	}
-	filter, err := input.Filter.Normalize()
+	_, scope, err := authorizeCollector(ctx, useCase.users, input.Actor)
 	if err != nil {
 		return domain.DueInstallmentPage{}, err
 	}

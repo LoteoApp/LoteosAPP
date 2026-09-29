@@ -45,32 +45,32 @@ func (charge ChargeType) IsValid() bool {
 	}
 }
 
-// PaymentChargeInput is a cargo adicional as the caller describes it. Moneda
+// PaymentChargeInput is a cargo adicional as the caller describes it. Currency
 // is its own: a cuota in USD may be collected together with services in ARS,
 // so a charge is never converted, only listed under its currency. An empty
-// Moneda means the sale's currency.
+// Currency means the sale's currency.
 type PaymentChargeInput struct {
-	Tipo    ChargeType
-	Monto   float64
-	Moneda  string
-	Detalle string
+	Type     ChargeType
+	Amount   float64
+	Currency string
+	Detail   string
 }
 
 // PaymentCharge is a cargo adicional as the API publishes it.
 type PaymentCharge struct {
-	ID      string     `json:"id"`
-	Tipo    ChargeType `json:"tipo"`
-	Monto   float64    `json:"monto"`
-	Moneda  string     `json:"moneda"`
-	Detalle string     `json:"detalle,omitempty"`
+	ID       string     `json:"id"`
+	Type     ChargeType `json:"tipo"`
+	Amount   float64    `json:"monto"`
+	Currency string     `json:"moneda"`
+	Detail   string     `json:"detalle,omitempty"`
 }
 
 // CurrencyTotal is what a cobro adds up to in one currency. A cobro that
 // mixes a cuota in USD with services in ARS has one of these per currency,
 // because the two amounts are never added together.
 type CurrencyTotal struct {
-	Moneda string  `json:"moneda"`
-	Monto  float64 `json:"monto"`
+	Currency string  `json:"moneda"`
+	Amount   float64 `json:"monto"`
 }
 
 // NormalizeCurrency trims and upper-cases a currency code, falling back to
@@ -94,25 +94,25 @@ func NormalizePaymentCharges(charges []PaymentChargeInput, fallbackCurrency stri
 	}
 	normalized := make([]PaymentChargeInput, 0, len(charges))
 	for _, charge := range charges {
-		if !charge.Tipo.IsValid() {
+		if !charge.Type.IsValid() {
 			return nil, ErrChargeInvalidType
 		}
-		if !isFinite(charge.Monto) || charge.Monto < chargeAmountMin || !hasAtMostDecimals(charge.Monto, maxChargeAmountDecimal) {
+		if !isFinite(charge.Amount) || charge.Amount < chargeAmountMin || !hasAtMostDecimals(charge.Amount, maxChargeAmountDecimal) {
 			return nil, ErrChargeInvalidAmount
 		}
-		currency := NormalizeCurrency(charge.Moneda, fallbackCurrency)
+		currency := NormalizeCurrency(charge.Currency, fallbackCurrency)
 		if len([]rune(currency)) > MaxCurrencyCodeLength {
 			return nil, ErrChargeInvalidCurrency
 		}
-		detail := strings.TrimSpace(charge.Detalle)
+		detail := strings.TrimSpace(charge.Detail)
 		if len([]rune(detail)) > MaxChargeDetailLength {
 			return nil, ErrChargeDetailTooLong
 		}
 		normalized = append(normalized, PaymentChargeInput{
-			Tipo:    charge.Tipo,
-			Monto:   RoundMoney(charge.Monto),
-			Moneda:  currency,
-			Detalle: detail,
+			Type:     charge.Type,
+			Amount:   RoundMoney(charge.Amount),
+			Currency: currency,
+			Detail:   detail,
 		})
 	}
 	return normalized, nil
@@ -129,7 +129,7 @@ func PaymentTotals(planAmount float64, planCurrency string, charges []PaymentCha
 		amounts[planCurrency] = planAmount
 	}
 	for _, charge := range charges {
-		amounts[NormalizeCurrency(charge.Moneda, planCurrency)] += charge.Monto
+		amounts[NormalizeCurrency(charge.Currency, planCurrency)] += charge.Amount
 	}
 	currencies := make([]string, 0, len(amounts))
 	for currency := range amounts {
@@ -143,7 +143,7 @@ func PaymentTotals(planAmount float64, planCurrency string, charges []PaymentCha
 	}
 	totals := make([]CurrencyTotal, 0, len(currencies))
 	for _, currency := range currencies {
-		totals = append(totals, CurrencyTotal{Moneda: currency, Monto: RoundMoney(amounts[currency])})
+		totals = append(totals, CurrencyTotal{Currency: currency, Amount: RoundMoney(amounts[currency])})
 	}
 	return totals
 }

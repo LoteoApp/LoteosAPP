@@ -23,18 +23,18 @@ func (handler *SettleSaleHandler) Handle(w http.ResponseWriter, request *http.Re
 	if err != nil {
 		return err
 	}
-	paidAt, err := parsePaymentDate(body.FechaPago)
+	paidAt, err := parsePaymentDate(body.PaidAt)
 	if err != nil {
 		return err
 	}
 	payment, err := handler.settleSale.Execute(request.Context(), collections.SettleSaleInput{
 		Actor:          collections.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
 		SaleID:         request.PathValue("id"),
-		ExpectedAmount: body.MontoEsperado,
-		Charges:        paymentCharges(body.Cargos),
-		Medium:         body.MedioPago,
+		ExpectedAmount: body.ExpectedAmount,
+		Charges:        paymentCharges(body.Charges),
+		Medium:         body.Medium,
 		PaidAt:         paidAt,
-		Observation:    body.Observacion,
+		Observation:    body.Observation,
 	})
 	if err != nil {
 		return err

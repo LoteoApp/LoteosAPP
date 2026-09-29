@@ -15,10 +15,28 @@ import (
 
 type CollectionRepository struct {
 	pool *pgxpool.Pool
+	// afterStatementInstallments runs between reading the cuotas and the
+	// cobros of an estado de deuda. Tests use it to commit a cobro mid-read;
+	// it is nil in production.
+	afterStatementInstallments func()
 }
 
 func NewCollectionRepository(pool *pgxpool.Pool) *CollectionRepository {
 	return &CollectionRepository{pool: pool}
+}
+
+// readSnapshot runs read in a read-only REPEATABLE READ transaction, so every
+// query it makes sees the same committed data even while cobros commit.
+func (repository *CollectionRepository) readSnapshot(ctx context.Context, read func(tx pgx.Tx) error) error {
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return err
+	}
+	defer rollbackTransaction(tx)
+	if err := read(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // planRow is the collectable side of a plan de pago: the entrega and its
@@ -34,70 +52,95 @@ func (row planRow) entrega() *domain.DownPayment {
 	if row.downPayment == nil || *row.downPayment <= 0 {
 		return nil
 	}
-	entrega := &domain.DownPayment{Monto: *row.downPayment, Estado: domain.InstallmentStatePending}
+	entrega := &domain.DownPayment{Amount: *row.downPayment, State: domain.InstallmentStatePending}
 	if row.deliveredAt != nil {
-		entrega.Estado = domain.InstallmentStatePaid
-		entrega.FechaPago = row.deliveredAt
-		entrega.CobroID = stringValue(row.deliveryPaymentID)
+		entrega.State = domain.InstallmentStatePaid
+		entrega.PaidAt = row.deliveredAt
+		entrega.PaymentID = stringValue(row.deliveryPaymentID)
 	}
 	return entrega
 }
 
+// GetDebtStatement reads the venta, plan, cuotas and cobros in one snapshot:
+// a statement may be printed, so it must never show a cuota pendiente next to
+// the cobro that already paid it.
 func (repository *CollectionRepository) GetDebtStatement(ctx context.Context, saleID string, scope gateway.SaleScope, now time.Time) (domain.DebtStatement, error) {
-	sale, err := loadSale(ctx, repository.pool, saleID, scope, false)
+	var statement domain.DebtStatement
+	err := repository.readSnapshot(ctx, func(tx pgx.Tx) error {
+		sale, err := loadSale(ctx, tx, saleID, scope, false)
+		if err != nil {
+			return err
+		}
+		if sale.PlanPago == nil {
+			return domain.ErrSaleNotFinanced
+		}
+		plan, err := loadPlanRow(ctx, tx, sale.PlanPago.ID)
+		if err != nil {
+			return err
+		}
+		installments, err := loadInstallmentsAsOf(ctx, tx, plan.id, now, false)
+		if err != nil {
+			return err
+		}
+		if repository.afterStatementInstallments != nil {
+			repository.afterStatementInstallments()
+		}
+		payments, err := loadPayments(ctx, tx, sale.ID, plan)
+		if err != nil {
+			return err
+		}
+		entrega := plan.entrega()
+		charges := make([]domain.PaymentCharge, 0)
+		for _, payment := range payments {
+			charges = append(charges, payment.Charges...)
+		}
+		statement = domain.DebtStatement{
+			Sale:             sale,
+			DownPayment:      entrega,
+			Installments:     installments,
+			Summary:          domain.ComputeDebtSummary(entrega, installments),
+			Payments:         payments,
+			CollectedCharges: domain.ChargeTotals(charges),
+			IssuedAt:         now,
+		}
+		return nil
+	})
 	if err != nil {
 		return domain.DebtStatement{}, err
 	}
-	if sale.PlanPago == nil {
-		return domain.DebtStatement{}, domain.ErrSaleNotFinanced
-	}
-	plan, err := loadPlanRow(ctx, repository.pool, sale.PlanPago.ID)
-	if err != nil {
-		return domain.DebtStatement{}, err
-	}
-	installments, err := loadInstallmentsAsOf(ctx, repository.pool, plan.id, now, false)
-	if err != nil {
-		return domain.DebtStatement{}, err
-	}
-	payments, err := loadPayments(ctx, repository.pool, sale.ID, plan)
-	if err != nil {
-		return domain.DebtStatement{}, err
-	}
-	entrega := plan.entrega()
-	charges := make([]domain.PaymentCharge, 0)
-	for _, payment := range payments {
-		charges = append(charges, payment.Cargos...)
-	}
-	return domain.DebtStatement{
-		Venta:          sale,
-		Entrega:        entrega,
-		Cuotas:         installments,
-		Resumen:        domain.ComputeDebtSummary(entrega, installments),
-		Cobros:         payments,
-		CargosCobrados: domain.ChargeTotals(charges),
-		EmitidoEl:      now,
-	}, nil
+	return statement, nil
 }
 
-// dueInstallmentState is the cuota's state as of $now, the same rule
-// domain.EffectiveInstallmentState applies, so the list can filter on it.
+// dueInstallmentState is the cuota's state given the start of the current
+// business day in %[1]s: the same rule domain.EffectiveInstallmentState
+// applies, so the list can filter on it.
 const dueInstallmentState = `CASE
 	WHEN c.estado = 'pagada' THEN 'pagada'
 	WHEN c.fecha_vencimiento < %[1]s THEN 'vencida'
 	ELSE 'pendiente'
 END`
 
-const dueInstallmentFromClause = `
+// dueInstallmentFilterFrom joins only what the filters and the scope read.
+// Every join is inner, so it also decides which cuotas are listed at all.
+const dueInstallmentFilterFrom = `
 	FROM cuotas c
 	JOIN planes_pago plan ON plan.id = c.plan_pago_id AND plan.fecha_baja IS NULL
 	JOIN ventas v ON v.id = plan.venta_id AND v.estado_actual <> 'cancelada'
 	JOIN lotes lo ON lo.id = v.lote_id AND lo.fecha_baja IS NULL
 	JOIN loteos l ON l.id = lo.loteo_id AND l.fecha_baja IS NULL
-	LEFT JOIN manzanas mz ON mz.id = lo.manzana_id
 	JOIN clientes cl ON cl.id = v.cliente_id
-	JOIN usuarios seller ON seller.id = v.vendedor_id
+	JOIN usuarios seller ON seller.id = v.vendedor_id`
+
+const dueInstallmentDetailJoins = `
+	LEFT JOIN manzanas mz ON mz.id = lo.manzana_id
 	LEFT JOIN inmobiliarias agency ON agency.id = seller.inmobiliaria_id`
 
+const dueInstallmentOrder = `ORDER BY c.fecha_vencimiento, c.numero, c.id`
+
+// ListDueInstallments pages the ids first and loads the detail only for that
+// page, so a page doesn't pay for the detail of every cuota in scope. The
+// total is a plain count, skipped when the page itself tells it. Everything
+// is read in one snapshot so the page, the total and the summary agree.
 func (repository *CollectionRepository) ListDueInstallments(ctx context.Context, filter domain.DueInstallmentFilter, scope gateway.SaleScope, now time.Time) (domain.DueInstallmentPage, error) {
 	scope = normalizeSaleScope(scope)
 	var err error
@@ -109,6 +152,7 @@ func (repository *CollectionRepository) ListDueInstallments(ctx context.Context,
 	for i, state := range filter.States {
 		states[i] = string(state)
 	}
+	today := domain.StartOfBusinessDay(now)
 	page := domain.DueInstallmentPage{Page: filter.Page, Limit: filter.Limit, Items: []domain.DueInstallment{}}
 	offset := (filter.Page - 1) * filter.Limit
 	stateExpr := fmt.Sprintf(dueInstallmentState, "$1::timestamptz")
@@ -123,73 +167,89 @@ func (repository *CollectionRepository) ListDueInstallments(ctx context.Context,
 		  AND ($6::timestamptz IS NULL OR c.fecha_vencimiento >= $6::timestamptz)
 		  AND ($7::timestamptz IS NULL OR c.fecha_vencimiento <= $7::timestamptz)
 		  AND ` + fmt.Sprintf(saleScopePredicate, 8, 9)
-	args := []any{now, states, filter.DevelopmentID, filter.Search, containsPattern(filter.Search),
+	args := []any{today, states, filter.DevelopmentID, filter.Search, containsPattern(filter.Search),
 		filter.From, filter.To, scope.AssigneeAuthProviderID, scope.ByAgency}
-	rows, err := repository.pool.Query(ctx, `
-		SELECT c.id::text, v.id::text, c.numero, plan.cantidad_cuotas, c.monto::float8, plan.moneda,
-		       `+stateExpr+`, c.fecha_vencimiento, c.fecha_pago,
-		       l.id::text, l.nombre, lo.id::text, COALESCE(lo.numero, ''), COALESCE(mz.numero, ''),
-		       cl.id::text, cl.nombre, cl.apellido, cl.dni, cl.celular, cl.email,
-		       seller.id::text, seller.nombre, seller.apellido, seller.email, seller.rol,
-		       agency.id::text, COALESCE(agency.razon_social, ''),
-		       count(*) OVER()
-		`+dueInstallmentFromClause+where+`
-		ORDER BY c.fecha_vencimiento, c.numero, c.id
-		LIMIT $10 OFFSET $11
-	`, append(args, filter.Limit, offset)...)
+
+	err = repository.readSnapshot(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT c.id::text `+dueInstallmentFilterFrom+where+`
+			`+dueInstallmentOrder+`
+			LIMIT $10 OFFSET $11`, append(args, filter.Limit, offset)...)
+		if err != nil {
+			return err
+		}
+		ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return err
+		}
+		if (len(ids) > 0 && len(ids) < filter.Limit) || (len(ids) == 0 && offset == 0) {
+			page.Total = offset + len(ids)
+		} else if err := tx.QueryRow(ctx, `SELECT count(*) `+dueInstallmentFilterFrom+where, args...).Scan(&page.Total); err != nil {
+			return err
+		}
+		if page.Items, err = loadDueInstallments(ctx, tx, ids, today); err != nil {
+			return err
+		}
+
+		// The header counts over the whole scope (and loteo, when one is
+		// picked), not over the filtered page, so it reads the same whatever
+		// the user is looking at.
+		return tx.QueryRow(ctx, `
+			SELECT count(*) FILTER (WHERE c.fecha_vencimiento < $1::timestamptz),
+			       count(*) FILTER (WHERE c.fecha_vencimiento >= $1::timestamptz AND c.fecha_vencimiento < $2::timestamptz)
+			`+dueInstallmentFilterFrom+`
+			WHERE c.estado <> 'pagada'
+			  AND ($3 = '' OR l.id::text = $3)
+			  AND `+fmt.Sprintf(saleScopePredicate, 4, 5),
+			today, today.Add(domain.DueSoonWindow), filter.DevelopmentID, scope.AssigneeAuthProviderID, scope.ByAgency,
+		).Scan(&page.Summary.OverdueInstallments, &page.Summary.UpcomingInstallments)
+	})
 	if err != nil {
 		return domain.DueInstallmentPage{}, err
 	}
+	page.TotalPages = (page.Total + page.Limit - 1) / page.Limit
+	return page, nil
+}
+
+// loadDueInstallments reads the detail of one page of cuotas, in list order.
+func loadDueInstallments(ctx context.Context, tx pgx.Tx, ids []string, today time.Time) ([]domain.DueInstallment, error) {
+	items := make([]domain.DueInstallment, 0, len(ids))
+	if len(ids) == 0 {
+		return items, nil
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT c.id::text, v.id::text, c.numero, plan.cantidad_cuotas, c.monto::float8, plan.moneda,
+		       `+fmt.Sprintf(dueInstallmentState, "$1::timestamptz")+`, c.fecha_vencimiento, c.fecha_pago,
+		       l.id::text, l.nombre, lo.id::text, COALESCE(lo.numero, ''), COALESCE(mz.numero, ''),
+		       cl.id::text, cl.nombre, cl.apellido, cl.dni, cl.celular, cl.email,
+		       seller.id::text, seller.nombre, seller.apellido, seller.email, seller.rol,
+		       agency.id::text, COALESCE(agency.razon_social, '')
+		`+dueInstallmentFilterFrom+dueInstallmentDetailJoins+`
+		WHERE c.id = ANY($2::uuid[])
+		`+dueInstallmentOrder, today, ids)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
-	hasTotal := false
 	for rows.Next() {
 		var (
 			item       domain.DueInstallment
 			agencyID   *string
 			agencyName string
-			total      int64
 		)
-		if err := rows.Scan(&item.ID, &item.VentaID, &item.Numero, &item.CantidadCuotas, &item.Monto, &item.Moneda,
-			&item.Estado, &item.FechaVencimiento, &item.FechaPago,
-			&item.LoteoID, &item.LoteoNombre, &item.LoteID, &item.LoteNumero, &item.ManzanaNumero,
-			&item.Cliente.ID, &item.Cliente.Nombre, &item.Cliente.Apellido, &item.Cliente.DNI, &item.Cliente.Celular, &item.Cliente.Email,
-			&item.Vendedor.ID, &item.Vendedor.Nombre, &item.Vendedor.Apellido, &item.Vendedor.Email, &item.Vendedor.Rol,
-			&agencyID, &agencyName, &total); err != nil {
-			return domain.DueInstallmentPage{}, err
+		if err := rows.Scan(&item.ID, &item.SaleID, &item.Number, &item.InstallmentCount, &item.Amount, &item.Currency,
+			&item.State, &item.DueDate, &item.PaidAt,
+			&item.DevelopmentID, &item.DevelopmentName, &item.LotID, &item.LotNumber, &item.BlockNumber,
+			&item.Client.ID, &item.Client.Nombre, &item.Client.Apellido, &item.Client.DNI, &item.Client.Celular, &item.Client.Email,
+			&item.Seller.ID, &item.Seller.Nombre, &item.Seller.Apellido, &item.Seller.Email, &item.Seller.Rol,
+			&agencyID, &agencyName); err != nil {
+			return nil, err
 		}
 		if agencyID != nil {
-			item.Inmobiliaria = &domain.ReservationAgency{ID: *agencyID, BusinessName: agencyName}
+			item.Agency = &domain.ReservationAgency{ID: *agencyID, BusinessName: agencyName}
 		}
-		page.Items = append(page.Items, item)
-		page.Total = int(total)
-		hasTotal = true
+		items = append(items, item)
 	}
-	if err := rows.Err(); err != nil {
-		return domain.DueInstallmentPage{}, err
-	}
-	if !hasTotal {
-		if err := repository.pool.QueryRow(ctx, `SELECT count(*) `+dueInstallmentFromClause+where, args...).Scan(&page.Total); err != nil {
-			return domain.DueInstallmentPage{}, err
-		}
-	}
-	page.TotalPages = (page.Total + page.Limit - 1) / page.Limit
-
-	// The header counts over the whole scope (and loteo, when one is
-	// picked), not over the filtered page, so it reads the same whatever
-	// the user is looking at.
-	err = repository.pool.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE c.fecha_vencimiento < $1::timestamptz),
-		       count(*) FILTER (WHERE c.fecha_vencimiento >= $1::timestamptz AND c.fecha_vencimiento < $2::timestamptz)
-		`+dueInstallmentFromClause+`
-		WHERE c.estado <> 'pagada'
-		  AND ($3 = '' OR l.id::text = $3)
-		  AND `+fmt.Sprintf(saleScopePredicate, 4, 5),
-		now, now.Add(domain.DueSoonWindow), filter.DevelopmentID, scope.AssigneeAuthProviderID, scope.ByAgency,
-	).Scan(&page.Resumen.CuotasVencidas, &page.Resumen.CuotasProximas)
-	if err != nil {
-		return domain.DueInstallmentPage{}, err
-	}
-	return page, nil
+	return items, rows.Err()
 }
 
 // RegisterPayment collects in one transaction: the venta, its plan and its
@@ -291,7 +351,7 @@ func (repository *CollectionRepository) RegisterPayment(ctx context.Context, com
 	`, plan.id).Scan(&remaining); err != nil {
 		return domain.Payment{}, err
 	}
-	entregaSettled := entrega == nil || entrega.Estado == domain.InstallmentStatePaid || selection.IncludeDownPayment
+	entregaSettled := entrega == nil || entrega.State == domain.InstallmentStatePaid || selection.IncludeDownPayment
 	if remaining == 0 && entregaSettled {
 		reason := domain.SaleSettledByPaymentReason
 		if command.Type == domain.PaymentTypeSettlement {
@@ -360,7 +420,7 @@ func insertPaymentCharges(ctx context.Context, tx pgx.Tx, paymentID, currency st
 				usuario_modificacion, fecha_creacion, fecha_modificacion
 			)
 			VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''), $6::uuid, $7, $7)
-		`, paymentID, charge.Monto, charge.Moneda, string(charge.Tipo), charge.Detalle,
+		`, paymentID, charge.Amount, charge.Currency, string(charge.Type), charge.Detail,
 			command.ActorID, command.Now); err != nil {
 			return err
 		}
@@ -414,7 +474,7 @@ func loadInstallmentsAsOf(ctx context.Context, queryer reservationQueryer, planI
 	installments := make([]domain.Installment, 0)
 	for rows.Next() {
 		var installment domain.Installment
-		if err := rows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.CobroID); err != nil {
+		if err := rows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.PaymentID); err != nil {
 			return nil, err
 		}
 		installment.Estado = domain.EffectiveInstallmentState(installment, now)
@@ -439,17 +499,17 @@ func scanPayment(scanner reservationScanner) (domain.Payment, error) {
 		payment     domain.Payment
 		downPayment float64
 	)
-	if err := scanner.Scan(&payment.ID, &payment.VentaID, &payment.Tipo, &payment.Monto, &payment.Moneda, &payment.MedioPago, &payment.Observacion,
-		&payment.FechaPago, &payment.FechaCreacion,
-		&payment.UsuarioAlta.ID, &payment.UsuarioAlta.Nombre, &payment.UsuarioAlta.Apellido, &payment.UsuarioAlta.Email, &payment.UsuarioAlta.Rol,
-		&payment.IncluyeEntrega, &downPayment); err != nil {
+	if err := scanner.Scan(&payment.ID, &payment.SaleID, &payment.Type, &payment.Amount, &payment.Currency, &payment.Medium, &payment.Observation,
+		&payment.PaidAt, &payment.CreatedAt,
+		&payment.CreatedBy.ID, &payment.CreatedBy.Nombre, &payment.CreatedBy.Apellido, &payment.CreatedBy.Email, &payment.CreatedBy.Rol,
+		&payment.IncludesDownPayment, &downPayment); err != nil {
 		return domain.Payment{}, err
 	}
-	if payment.IncluyeEntrega {
-		payment.MontoEntrega = downPayment
+	if payment.IncludesDownPayment {
+		payment.DownPaymentAmount = downPayment
 	}
-	payment.Cuotas = []domain.Installment{}
-	payment.Cargos = []domain.PaymentCharge{}
+	payment.Installments = []domain.Installment{}
+	payment.Charges = []domain.PaymentCharge{}
 	return payment, nil
 }
 
@@ -470,10 +530,10 @@ func loadPayment(ctx context.Context, queryer reservationQueryer, paymentID stri
 	defer rows.Close()
 	for rows.Next() {
 		var installment domain.Installment
-		if err := rows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.CobroID); err != nil {
+		if err := rows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.PaymentID); err != nil {
 			return domain.Payment{}, err
 		}
-		payment.Cuotas = append(payment.Cuotas, installment)
+		payment.Installments = append(payment.Installments, installment)
 	}
 	if err := rows.Err(); err != nil {
 		return domain.Payment{}, err
@@ -491,12 +551,12 @@ func loadPayment(ctx context.Context, queryer reservationQueryer, paymentID stri
 		if err != nil {
 			return domain.Payment{}, err
 		}
-		payment.Cargos = append(payment.Cargos, charge)
+		payment.Charges = append(payment.Charges, charge)
 	}
 	if err := chargeRows.Err(); err != nil {
 		return domain.Payment{}, err
 	}
-	payment.Totales = domain.PaymentTotals(payment.Monto, payment.Moneda, payment.Cargos)
+	payment.Totals = domain.PaymentTotals(payment.Amount, payment.Currency, payment.Charges)
 	return payment, nil
 }
 
@@ -516,7 +576,7 @@ func scanCharge(scanner reservationScanner) (domain.PaymentCharge, string, error
 		charge    domain.PaymentCharge
 		paymentID string
 	)
-	if err := scanner.Scan(&charge.ID, &charge.Tipo, &charge.Monto, &charge.Moneda, &charge.Detalle, &paymentID); err != nil {
+	if err := scanner.Scan(&charge.ID, &charge.Type, &charge.Amount, &charge.Currency, &charge.Detail, &paymentID); err != nil {
 		return domain.PaymentCharge{}, "", err
 	}
 	return charge, paymentID, nil
@@ -560,11 +620,11 @@ func loadPayments(ctx context.Context, queryer reservationQueryer, saleID string
 	defer paidRows.Close()
 	for paidRows.Next() {
 		var installment domain.Installment
-		if err := paidRows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.CobroID); err != nil {
+		if err := paidRows.Scan(&installment.ID, &installment.Numero, &installment.Monto, &installment.Estado, &installment.FechaVencimiento, &installment.FechaPago, &installment.PaymentID); err != nil {
 			return nil, err
 		}
-		if position, ok := index[installment.CobroID]; ok {
-			payments[position].Cuotas = append(payments[position].Cuotas, installment)
+		if position, ok := index[installment.PaymentID]; ok {
+			payments[position].Installments = append(payments[position].Installments, installment)
 		}
 	}
 	if err := paidRows.Err(); err != nil {
@@ -584,14 +644,14 @@ func loadPayments(ctx context.Context, queryer reservationQueryer, saleID string
 			return nil, err
 		}
 		if position, ok := index[paymentID]; ok {
-			payments[position].Cargos = append(payments[position].Cargos, charge)
+			payments[position].Charges = append(payments[position].Charges, charge)
 		}
 	}
 	if err := chargeRows.Err(); err != nil {
 		return nil, err
 	}
 	for i := range payments {
-		payments[i].Totales = domain.PaymentTotals(payments[i].Monto, payments[i].Moneda, payments[i].Cargos)
+		payments[i].Totals = domain.PaymentTotals(payments[i].Amount, payments[i].Currency, payments[i].Charges)
 	}
 	return payments, nil
 }

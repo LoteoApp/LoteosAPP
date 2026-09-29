@@ -67,12 +67,12 @@ func (stub *settleSaleStub) Execute(_ context.Context, input collections.SettleS
 
 func TestGetDebtStatementHandler(t *testing.T) {
 	stub := &getDebtStatementStub{result: domain.DebtStatement{
-		Venta:          domain.Sale{ID: "sale-1"},
-		Entrega:        &domain.DownPayment{Monto: 40000, Estado: domain.InstallmentStatePending},
-		Cuotas:         []domain.Installment{{ID: "c-1", Numero: 1, Monto: 20000, Estado: domain.InstallmentStateOverdue}},
-		Resumen:        domain.DebtSummary{MontoTotal: 60000, MontoPendiente: 60000, MontoVencido: 20000, CuotasVencidas: 1},
-		Cobros:         []domain.Payment{},
-		CargosCobrados: []domain.CurrencyTotal{{Moneda: "ARS", Monto: 150000}},
+		Sale:             domain.Sale{ID: "sale-1"},
+		DownPayment:      &domain.DownPayment{Amount: 40000, State: domain.InstallmentStatePending},
+		Installments:     []domain.Installment{{ID: "c-1", Numero: 1, Monto: 20000, Estado: domain.InstallmentStateOverdue}},
+		Summary:          domain.DebtSummary{TotalAmount: 60000, PendingAmount: 60000, OverdueAmount: 20000, OverdueInstallments: 1},
+		Payments:         []domain.Payment{},
+		CollectedCharges: []domain.CurrencyTotal{{Currency: "ARS", Amount: 150000}},
 	}}
 	mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/ventas/{id}/estado-deuda", handler.NewGetDebtStatementHandler(stub))
 	recorder := performRequest(t, mux, http.MethodGet, "/api/v1/ventas/sale-1/estado-deuda", "token", nil)
@@ -122,8 +122,8 @@ func TestGetDebtStatementHandler(t *testing.T) {
 func TestListDueInstallmentsHandlerParsesTheQuery(t *testing.T) {
 	due := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	stub := &listDueInstallmentsStub{result: domain.DueInstallmentPage{
-		Items:   []domain.DueInstallment{{ID: "c-1", VentaID: "sale-1", Numero: 2, Monto: 100, Moneda: "USD", Estado: domain.InstallmentStatePending, FechaVencimiento: due, LoteoNombre: "Las Acacias"}},
-		Resumen: domain.DueSummary{CuotasVencidas: 3, CuotasProximas: 2},
+		Items:   []domain.DueInstallment{{ID: "c-1", SaleID: "sale-1", Number: 2, Amount: 100, Currency: "USD", State: domain.InstallmentStatePending, DueDate: due, DevelopmentName: "Las Acacias"}},
+		Summary: domain.DueSummary{OverdueInstallments: 3, UpcomingInstallments: 2},
 		Page:    2, Limit: 10, Total: 11, TotalPages: 2,
 	}}
 	mux := reservationHandlerMux(t, http.MethodGet, "/api/v1/cobranzas/vencimientos", handler.NewListDueInstallmentsHandler(stub))
@@ -189,7 +189,7 @@ func TestListDueInstallmentsHandlerRejectsBadQueries(t *testing.T) {
 
 func TestRegisterPaymentHandler(t *testing.T) {
 	paidAt := time.Date(2026, 9, 20, 15, 0, 0, 0, time.UTC)
-	stub := &registerPaymentStub{result: domain.Payment{ID: "cobro-1", Monto: 60000, Moneda: "USD", IncluyeEntrega: true, Cuotas: []domain.Installment{{Numero: 1}}}}
+	stub := &registerPaymentStub{result: domain.Payment{ID: "cobro-1", Amount: 60000, Currency: "USD", IncludesDownPayment: true, Installments: []domain.Installment{{Numero: 1}}}}
 	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/ventas/{id}/cobros", handler.NewRegisterPaymentHandler(stub))
 	recorder := performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cobros", "token",
 		`{"cuotaIds":["c-1","c-2"],"incluirEntrega":true,"medioPago":"transferencia","fechaPago":"2026-09-20T12:00:00-03:00","observacion":"Comprobante 5"}`)
@@ -228,11 +228,11 @@ func TestRegisterPaymentHandler(t *testing.T) {
 
 func TestRegisterPaymentHandlerPassesTheChargesAndPublishesTheTotals(t *testing.T) {
 	stub := &registerPaymentStub{result: domain.Payment{
-		ID: "cobro-3", Monto: 20000, Moneda: "USD",
-		Cargos: []domain.PaymentCharge{
-			{ID: "cargo-1", Tipo: domain.ChargeTypeServices, Monto: 150000, Moneda: "ARS", Detalle: "Agua y luz"},
+		ID: "cobro-3", Amount: 20000, Currency: "USD",
+		Charges: []domain.PaymentCharge{
+			{ID: "cargo-1", Type: domain.ChargeTypeServices, Amount: 150000, Currency: "ARS", Detail: "Agua y luz"},
 		},
-		Totales: []domain.CurrencyTotal{{Moneda: "USD", Monto: 20000}, {Moneda: "ARS", Monto: 150000}},
+		Totals: []domain.CurrencyTotal{{Currency: "USD", Amount: 20000}, {Currency: "ARS", Amount: 150000}},
 	}}
 	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/ventas/{id}/cobros", handler.NewRegisterPaymentHandler(stub))
 	recorder := performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cobros", "token",
@@ -323,7 +323,7 @@ func TestRegisterPaymentHandlerRejectsBadBodies(t *testing.T) {
 }
 
 func TestSettleSaleHandler(t *testing.T) {
-	stub := &settleSaleStub{result: domain.Payment{ID: "cobro-2", Tipo: domain.PaymentTypeSettlement, Monto: 40000}}
+	stub := &settleSaleStub{result: domain.Payment{ID: "cobro-2", Type: domain.PaymentTypeSettlement, Amount: 40000}}
 	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/ventas/{id}/cancelacion-total", handler.NewSettleSaleHandler(stub))
 	recorder := performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cancelacion-total", "token",
 		`{"montoEsperado":40000,"medioPago":"cheque","fechaPago":"2026-09-20T15:00:00Z","observacion":"Cheque 9"}`)
@@ -339,10 +339,18 @@ func TestSettleSaleHandler(t *testing.T) {
 		t.Errorf("body = %s", recorder.Body.String())
 	}
 
-	recorder = performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cancelacion-total", "token", `{"medioPago":"efectivo"}`)
-	if recorder.Code != http.StatusCreated || stub.input.ExpectedAmount != nil || stub.input.PaidAt != nil || len(stub.input.Charges) != 0 {
+	recorder = performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cancelacion-total", "token", `{"montoEsperado":0,"medioPago":"efectivo"}`)
+	if recorder.Code != http.StatusCreated || stub.input.ExpectedAmount == nil || *stub.input.ExpectedAmount != 0 || stub.input.PaidAt != nil || len(stub.input.Charges) != 0 {
 		t.Errorf("minimal body: status = %d, input = %#v", recorder.Code, stub.input)
 	}
+
+	// A missing montoEsperado reaches the use case as nil, which rejects it.
+	stub.err = domain.ErrSettlementExpectedAmountRequired
+	recorder = performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cancelacion-total", "token", `{"medioPago":"efectivo"}`)
+	if recorder.Code != http.StatusBadRequest || stub.input.ExpectedAmount != nil {
+		t.Errorf("without montoEsperado: status = %d, input = %#v", recorder.Code, stub.input)
+	}
+	stub.err = nil
 
 	recorder = performRequest(t, mux, http.MethodPost, "/api/v1/ventas/sale-1/cancelacion-total", "token",
 		`{"medioPago":"efectivo","cargos":[{"tipo":"honorarios","monto":900,"moneda":"ARS"}]}`)

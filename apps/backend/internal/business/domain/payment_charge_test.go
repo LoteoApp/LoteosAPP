@@ -36,8 +36,8 @@ func TestNormalizeCurrency(t *testing.T) {
 
 func TestNormalizePaymentCharges(t *testing.T) {
 	charges, err := domain.NormalizePaymentCharges([]domain.PaymentChargeInput{
-		{Tipo: domain.ChargeTypeServices, Monto: 150000.5, Moneda: " ars ", Detalle: "  Agua y luz  "},
-		{Tipo: domain.ChargeTypeAdministrative, Monto: 25},
+		{Type: domain.ChargeTypeServices, Amount: 150000.5, Currency: " ars ", Detail: "  Agua y luz  "},
+		{Type: domain.ChargeTypeAdministrative, Amount: 25},
 	}, "usd")
 	if err != nil {
 		t.Fatalf("NormalizePaymentCharges() error = %v", err)
@@ -45,11 +45,11 @@ func TestNormalizePaymentCharges(t *testing.T) {
 	if len(charges) != 2 {
 		t.Fatalf("charges = %#v", charges)
 	}
-	if charges[0].Moneda != "ARS" || charges[0].Monto != 150000.5 || charges[0].Detalle != "Agua y luz" {
+	if charges[0].Currency != "ARS" || charges[0].Amount != 150000.5 || charges[0].Detail != "Agua y luz" {
 		t.Errorf("first charge = %#v", charges[0])
 	}
 	// A charge without its own currency takes the sale's.
-	if charges[1].Moneda != "USD" || charges[1].Tipo != domain.ChargeTypeAdministrative {
+	if charges[1].Currency != "USD" || charges[1].Type != domain.ChargeTypeAdministrative {
 		t.Errorf("second charge = %#v", charges[1])
 	}
 
@@ -60,18 +60,18 @@ func TestNormalizePaymentCharges(t *testing.T) {
 }
 
 func TestNormalizePaymentChargesRejections(t *testing.T) {
-	valid := domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: 100, Moneda: "ARS"}
+	valid := domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: 100, Currency: "ARS"}
 	cases := []struct {
 		name   string
 		charge domain.PaymentChargeInput
 		want   error
 	}{
-		{"unknown type", domain.PaymentChargeInput{Tipo: "propina", Monto: 100}, domain.ErrChargeInvalidType},
-		{"zero amount", domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: 0}, domain.ErrChargeInvalidAmount},
-		{"negative amount", domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: -10}, domain.ErrChargeInvalidAmount},
-		{"too many decimals", domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: 10.555}, domain.ErrChargeInvalidAmount},
-		{"currency too long", domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: 10, Moneda: "PESOS ARGENTINOS"}, domain.ErrChargeInvalidCurrency},
-		{"detail too long", domain.PaymentChargeInput{Tipo: domain.ChargeTypeServices, Monto: 10, Detalle: strings.Repeat("x", 201)}, domain.ErrChargeDetailTooLong},
+		{"unknown type", domain.PaymentChargeInput{Type: "propina", Amount: 100}, domain.ErrChargeInvalidType},
+		{"zero amount", domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: 0}, domain.ErrChargeInvalidAmount},
+		{"negative amount", domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: -10}, domain.ErrChargeInvalidAmount},
+		{"too many decimals", domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: 10.555}, domain.ErrChargeInvalidAmount},
+		{"currency too long", domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: 10, Currency: "PESOS ARGENTINOS"}, domain.ErrChargeInvalidCurrency},
+		{"detail too long", domain.PaymentChargeInput{Type: domain.ChargeTypeServices, Amount: 10, Detail: strings.Repeat("x", 201)}, domain.ErrChargeDetailTooLong},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -96,16 +96,16 @@ func TestNormalizePaymentChargesRejections(t *testing.T) {
 
 func TestPaymentTotalsKeepsEachCurrencyApart(t *testing.T) {
 	charges := []domain.PaymentCharge{
-		{Tipo: domain.ChargeTypeServices, Monto: 150000, Moneda: "ARS"},
-		{Tipo: domain.ChargeTypeMunicipalTax, Monto: 12000.5, Moneda: "ARS"},
-		{Tipo: domain.ChargeTypeFees, Monto: 300, Moneda: "USD"},
-		{Tipo: domain.ChargeTypeOther, Monto: 40, Moneda: "EUR"},
+		{Type: domain.ChargeTypeServices, Amount: 150000, Currency: "ARS"},
+		{Type: domain.ChargeTypeMunicipalTax, Amount: 12000.5, Currency: "ARS"},
+		{Type: domain.ChargeTypeFees, Amount: 300, Currency: "USD"},
+		{Type: domain.ChargeTypeOther, Amount: 40, Currency: "EUR"},
 	}
 	totals := domain.PaymentTotals(20000, "USD", charges)
 	want := []domain.CurrencyTotal{
-		{Moneda: "USD", Monto: 20300},
-		{Moneda: "ARS", Monto: 162000.5},
-		{Moneda: "EUR", Monto: 40},
+		{Currency: "USD", Amount: 20300},
+		{Currency: "ARS", Amount: 162000.5},
+		{Currency: "EUR", Amount: 40},
 	}
 	if len(totals) != len(want) {
 		t.Fatalf("totals = %#v, want %#v", totals, want)
@@ -118,13 +118,13 @@ func TestPaymentTotalsKeepsEachCurrencyApart(t *testing.T) {
 
 	// Without charges there is one total, the plan's.
 	plain := domain.PaymentTotals(500, "usd", nil)
-	if len(plain) != 1 || plain[0] != (domain.CurrencyTotal{Moneda: "USD", Monto: 500}) {
+	if len(plain) != 1 || plain[0] != (domain.CurrencyTotal{Currency: "USD", Amount: 500}) {
 		t.Errorf("plain totals = %#v", plain)
 	}
 	// A cobro of charges only (no amount applied to the plan) has no entry
 	// for the sale's currency.
-	onlyCharges := domain.PaymentTotals(0, "USD", []domain.PaymentCharge{{Monto: 10, Moneda: "ARS"}})
-	if len(onlyCharges) != 1 || onlyCharges[0].Moneda != "ARS" {
+	onlyCharges := domain.PaymentTotals(0, "USD", []domain.PaymentCharge{{Amount: 10, Currency: "ARS"}})
+	if len(onlyCharges) != 1 || onlyCharges[0].Currency != "ARS" {
 		t.Errorf("charges-only totals = %#v", onlyCharges)
 	}
 	if got := domain.PaymentTotals(0, "USD", nil); len(got) != 0 {
@@ -134,11 +134,11 @@ func TestPaymentTotalsKeepsEachCurrencyApart(t *testing.T) {
 
 func TestChargeTotals(t *testing.T) {
 	totals := domain.ChargeTotals([]domain.PaymentCharge{
-		{Monto: 1000, Moneda: "ARS"},
-		{Monto: 500.25, Moneda: "ARS"},
-		{Monto: 20, Moneda: "USD"},
+		{Amount: 1000, Currency: "ARS"},
+		{Amount: 500.25, Currency: "ARS"},
+		{Amount: 20, Currency: "USD"},
 	})
-	want := []domain.CurrencyTotal{{Moneda: "ARS", Monto: 1500.25}, {Moneda: "USD", Monto: 20}}
+	want := []domain.CurrencyTotal{{Currency: "ARS", Amount: 1500.25}, {Currency: "USD", Amount: 20}}
 	if len(totals) != 2 || totals[0] != want[0] || totals[1] != want[1] {
 		t.Errorf("ChargeTotals() = %#v, want %#v", totals, want)
 	}

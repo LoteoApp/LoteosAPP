@@ -26,19 +26,19 @@ func (handler *RegisterPaymentHandler) Handle(w http.ResponseWriter, request *ht
 	if err != nil {
 		return err
 	}
-	paidAt, err := parsePaymentDate(body.FechaPago)
+	paidAt, err := parsePaymentDate(body.PaidAt)
 	if err != nil {
 		return err
 	}
 	payment, err := handler.registerPayment.Execute(request.Context(), collections.RegisterPaymentInput{
 		Actor:              collections.Actor{AuthProviderID: principal.Subject, Roles: principal.Roles},
 		SaleID:             request.PathValue("id"),
-		InstallmentIDs:     body.CuotaIDs,
-		IncludeDownPayment: body.IncluirEntrega,
-		Charges:            paymentCharges(body.Cargos),
-		Medium:             body.MedioPago,
+		InstallmentIDs:     body.InstallmentIDs,
+		IncludeDownPayment: body.IncludeDownPayment,
+		Charges:            paymentCharges(body.Charges),
+		Medium:             body.Medium,
 		PaidAt:             paidAt,
-		Observation:        body.Observacion,
+		Observation:        body.Observation,
 	})
 	if err != nil {
 		return err
@@ -51,10 +51,10 @@ func paymentCharges(charges []dto.ChargeDTO) []collections.ChargeInput {
 	mapped := make([]collections.ChargeInput, len(charges))
 	for i, charge := range charges {
 		mapped[i] = collections.ChargeInput{
-			Type:     charge.Tipo,
-			Amount:   charge.Monto,
-			Currency: charge.Moneda,
-			Detail:   charge.Detalle,
+			Type:     charge.Type,
+			Amount:   charge.Amount,
+			Currency: charge.Currency,
+			Detail:   charge.Detail,
 		}
 	}
 	return mapped
