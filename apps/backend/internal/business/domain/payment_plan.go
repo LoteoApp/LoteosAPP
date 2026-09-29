@@ -17,12 +17,13 @@ const (
 const (
 	MaxSaleInstallments = 360
 	MaxSaleInterestRate = 1000
-	// DefaultInstallmentDueDay is the day of the month cuotas fall due on
-	// when the deployment doesn't choose another one.
+	// DefaultInstallmentDueDay is the day of the month installments fall due
+	// on when the deployment doesn't choose another one.
 	DefaultInstallmentDueDay = 10
 	MinInstallmentDueDay     = 1
 	// MaxInstallmentDueDay is 28 because every month has it: a later day
-	// would not exist in February and the cuota would land on another month.
+	// would not exist in February and the installment would land on another
+	// month.
 	MaxInstallmentDueDay = 28
 	installmentAmountMin = 0.01
 	interestRateDecimals = 4
@@ -49,8 +50,13 @@ var (
 	ErrInvalidInstallmentDueDay     = &Error{Kind: KindInvalid, Code: "invalid_installment_due_day", Message: "El día de vencimiento de las cuotas no es válido"}
 )
 
+// BusinessLocation is the time zone installment due dates are computed in.
+// Argentina has no daylight saving time, so a fixed UTC-3 offset is exact and
+// doesn't depend on tzdata, which the distroless production image lacks.
+var BusinessLocation = time.FixedZone("UTC-3", -3*60*60)
+
 // IsValidInstallmentDueDay reports whether a day of the month can be used as
-// the due day of every cuota.
+// the due day of every installment.
 func IsValidInstallmentDueDay(day int) bool {
 	return day >= MinInstallmentDueDay && day <= MaxInstallmentDueDay
 }
@@ -193,7 +199,10 @@ func RoundMoney(value float64) float64 {
 // installment k (1-based) is due on dueDay of the month k periods after the
 // sale month, whatever day the sale happened on (with dueDay 10, a sale on
 // Jan 5 and one on Jan 31 are both due Feb 10, Mar 10...), keeping the sale
-// date's clock. dueDay is a deployment-wide setting, not a per-sale one.
+// date's clock. The sale month and clock are read in BusinessLocation, so a
+// sale at 01:00 UTC on Feb 1 (still Jan 31 in Argentina) is due Feb 10 at
+// 22:00 there; due dates are returned in UTC. dueDay is a deployment-wide
+// setting, not a per-sale one.
 func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time, dueDay int) (PaymentSchedule, error) {
 	if !IsValidInstallmentDueDay(dueDay) {
 		return PaymentSchedule{}, ErrInvalidInstallmentDueDay
@@ -229,7 +238,8 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 }
 
 func dueDateAfter(date time.Time, months, dueDay int) time.Time {
-	year, month, _ := date.Date()
-	hour, minute, second := date.Clock()
-	return time.Date(year, month+time.Month(months), dueDay, hour, minute, second, date.Nanosecond(), date.Location())
+	local := date.In(BusinessLocation)
+	year, month, _ := local.Date()
+	hour, minute, second := local.Clock()
+	return time.Date(year, month+time.Month(months), dueDay, hour, minute, second, local.Nanosecond(), BusinessLocation).UTC()
 }

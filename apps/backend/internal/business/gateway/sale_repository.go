@@ -27,8 +27,8 @@ type CreateSaleCommand struct {
 	// PaymentPlan is nil for contado; the repository builds and persists its
 	// schedule over the lote price.
 	PaymentPlan *domain.PaymentPlanInput
-	// InstallmentDueDay is the day of the month every cuota falls due on, a
-	// deployment-wide setting the use case reads from configuration.
+	// InstallmentDueDay is the day of the month every installment falls due
+	// on, a deployment-wide setting the use case reads from configuration.
 	InstallmentDueDay int
 	CreatedAt         time.Time
 }

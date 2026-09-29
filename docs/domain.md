@@ -344,6 +344,11 @@ el 10 de marzo, el 10 de abril… Con cuotas trimestrales, una venta del 15 de
 enero vence el 10 de abril, el 10 de julio, etc. No se ingresa una fecha de
 primer vencimiento.
 
+El mes de la venta y el día de vencimiento se calculan en hora de Argentina
+(UTC-3), no en UTC: una venta registrada el 1 de febrero a las 01:00 UTC
+todavía es del 31 de enero en Argentina, así que su primera cuota vence el 10
+de febrero. El vencimiento se guarda en UTC.
+
 El día no está fijo en el código: lo define `INSTALLMENT_DUE_DAY` por
 instalación (ver [development.md](development.md#variables-de-entorno)),
 entre el 1 y el 28 —del 29 al 31 no existen en todos los meses—. Cambiarlo

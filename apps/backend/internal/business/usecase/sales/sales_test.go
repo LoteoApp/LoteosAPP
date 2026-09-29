@@ -86,16 +86,32 @@ func TestCreateSaleCarriesTheConfiguredDueDay(t *testing.T) {
 		t.Errorf("due day = %d, want the configured 5", repository.CreateCommand.InstallmentDueDay)
 	}
 
-	// A day the calendar can't honour never reaches the repository; the
-	// configuration is what rejects it at startup.
-	for _, day := range []int{0, 31} {
-		useCase = sales.NewCreateSale(repository, users, day)
-		if _, err := useCase.Execute(context.Background(), validInput()); err != nil {
-			t.Fatalf("Execute() with day %d error = %v", day, err)
+}
+
+func TestCreateSaleRejectsAFinancedSaleWithAnInvalidDueDay(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	financed := validInput()
+	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
+	financed.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
+
+	for _, day := range []int{0, domain.MaxInstallmentDueDay + 1, 31} {
+		repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
+		useCase := sales.NewCreateSale(repository, users, day)
+		if _, err := useCase.Execute(context.Background(), financed); !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
+			t.Errorf("Execute() with day %d error = %v, want %v", day, err, domain.ErrInvalidInstallmentDueDay)
 		}
-		if repository.CreateCommand.InstallmentDueDay != domain.DefaultInstallmentDueDay {
-			t.Errorf("due day for %d = %d, want the default", day, repository.CreateCommand.InstallmentDueDay)
+		if repository.CreateCalls != 0 {
+			t.Errorf("Execute() with day %d created the sale %d times, want none", day, repository.CreateCalls)
 		}
+	}
+
+	// A contado sale has no installments, so the due day doesn't apply.
+	repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
+	if _, err := sales.NewCreateSale(repository, users, 0).Execute(context.Background(), validInput()); err != nil {
+		t.Fatalf("Execute() contado with day 0 error = %v", err)
+	}
+	if repository.CreateCalls != 1 {
+		t.Errorf("contado sale created %d times, want 1", repository.CreateCalls)
 	}
 }
 

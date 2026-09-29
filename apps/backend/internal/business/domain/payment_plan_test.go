@@ -182,7 +182,7 @@ func TestBuildPaymentScheduleWithoutInterest(t *testing.T) {
 }
 
 func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
-	saleDate := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+	saleDate := time.Date(2026, 1, 31, 0, 0, 0, 0, domain.BusinessLocation)
 	plan := domain.PaymentPlanInput{Installments: 3, InterestRate: 10, Period: domain.PaymentPeriodMonthly, DownPayment: 1000}
 	schedule, err := domain.BuildPaymentSchedule(1100, plan, saleDate, domain.DefaultInstallmentDueDay)
 	if err != nil {
@@ -200,9 +200,9 @@ func TestBuildPaymentScheduleWithInterestAndDownPayment(t *testing.T) {
 	}
 	// A sale late in the month still falls due on the 10th.
 	wantDue := []time.Time{
-		time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 2, 10, 0, 0, 0, 0, domain.BusinessLocation),
+		time.Date(2026, 3, 10, 0, 0, 0, 0, domain.BusinessLocation),
+		time.Date(2026, 4, 10, 0, 0, 0, 0, domain.BusinessLocation),
 	}
 	for i, installment := range schedule.Installments {
 		if !installment.FechaVencimiento.Equal(wantDue[i]) {
@@ -250,12 +250,12 @@ func TestBuildPaymentScheduleDueDatesAlwaysFallOnDayTen(t *testing.T) {
 		},
 		{
 			name:     "sale on the 10th",
-			saleDate: time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC),
+			saleDate: time.Date(2026, 1, 10, 0, 0, 0, 0, domain.BusinessLocation),
 			period:   domain.PaymentPeriodMonthly,
 			count:    2,
 			wantDue: []time.Time{
-				time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC),
-				time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC),
+				time.Date(2026, 2, 10, 0, 0, 0, 0, domain.BusinessLocation),
+				time.Date(2026, 3, 10, 0, 0, 0, 0, domain.BusinessLocation),
 			},
 		},
 		{
@@ -315,8 +315,8 @@ func TestBuildPaymentScheduleDueDatesAlwaysFallOnDayTen(t *testing.T) {
 				if !installment.FechaVencimiento.Equal(testCase.wantDue[i]) {
 					t.Errorf("installment %d due = %s, want %s", i+1, installment.FechaVencimiento, testCase.wantDue[i])
 				}
-				if installment.FechaVencimiento.Day() != domain.DefaultInstallmentDueDay {
-					t.Errorf("installment %d due day = %d, want %d", i+1, installment.FechaVencimiento.Day(), domain.DefaultInstallmentDueDay)
+				if installment.FechaVencimiento.In(domain.BusinessLocation).Day() != domain.DefaultInstallmentDueDay {
+					t.Errorf("installment %d due day = %d, want %d", i+1, installment.FechaVencimiento.In(domain.BusinessLocation).Day(), domain.DefaultInstallmentDueDay)
 				}
 			}
 		})
@@ -342,11 +342,11 @@ func TestBuildPaymentScheduleHonoursTheConfiguredDueDay(t *testing.T) {
 	}
 
 	// 28 is the last day every month has, February included.
-	lastDay, err := domain.BuildPaymentSchedule(1200, monthlyPlan(1, 0), time.Date(2026, 1, 20, 0, 0, 0, 0, time.UTC), domain.MaxInstallmentDueDay)
+	lastDay, err := domain.BuildPaymentSchedule(1200, monthlyPlan(1, 0), time.Date(2026, 1, 20, 0, 0, 0, 0, domain.BusinessLocation), domain.MaxInstallmentDueDay)
 	if err != nil {
 		t.Fatalf("BuildPaymentSchedule() with day 28 error = %v", err)
 	}
-	if got := lastDay.Installments[0].FechaVencimiento; !got.Equal(time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC)) {
+	if got := lastDay.Installments[0].FechaVencimiento; !got.Equal(time.Date(2026, 2, 28, 0, 0, 0, 0, domain.BusinessLocation)) {
 		t.Errorf("due with day 28 = %s, want 2026-02-28", got)
 	}
 }
@@ -364,19 +364,57 @@ func TestBuildPaymentScheduleRejectsAnImpossibleDueDay(t *testing.T) {
 	}
 }
 
-func TestBuildPaymentScheduleDueDatesKeepTheSaleLocation(t *testing.T) {
-	buenosAires := time.FixedZone("ART", -3*60*60)
-	saleDate := time.Date(2026, 1, 25, 18, 0, 0, 0, buenosAires)
-	schedule, err := domain.BuildPaymentSchedule(500, monthlyPlan(1, 0), saleDate, domain.DefaultInstallmentDueDay)
-	if err != nil {
-		t.Fatalf("BuildPaymentSchedule() error = %v", err)
+func TestBuildPaymentScheduleComputesDueDatesInTheBusinessZone(t *testing.T) {
+	// Between 00:00 and 02:59 UTC it is still the previous day in Argentina,
+	// and on the 1st of a month still the previous month.
+	cases := []struct {
+		name     string
+		saleDate time.Time
+		wantDue  time.Time
+	}{
+		{
+			name:     "midnight UTC on the 1st is the previous month",
+			saleDate: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+			wantDue:  time.Date(2026, 2, 10, 21, 0, 0, 0, domain.BusinessLocation),
+		},
+		{
+			name:     "01:00 UTC on the 1st is the previous month",
+			saleDate: time.Date(2026, 2, 1, 1, 0, 0, 0, time.UTC),
+			wantDue:  time.Date(2026, 2, 10, 22, 0, 0, 0, domain.BusinessLocation),
+		},
+		{
+			name:     "02:59 UTC on the 1st is the previous month",
+			saleDate: time.Date(2026, 2, 1, 2, 59, 59, 0, time.UTC),
+			wantDue:  time.Date(2026, 2, 10, 23, 59, 59, 0, domain.BusinessLocation),
+		},
+		{
+			name:     "03:00 UTC on the 1st is already that month",
+			saleDate: time.Date(2026, 2, 1, 3, 0, 0, 0, time.UTC),
+			wantDue:  time.Date(2026, 3, 10, 0, 0, 0, 0, domain.BusinessLocation),
+		},
+		{
+			name:     "a sale from another zone",
+			saleDate: time.Date(2026, 1, 25, 18, 0, 0, 0, time.FixedZone("UTC+9", 9*60*60)),
+			wantDue:  time.Date(2026, 2, 10, 6, 0, 0, 0, domain.BusinessLocation),
+		},
 	}
-	due := schedule.Installments[0].FechaVencimiento
-	if !due.Equal(time.Date(2026, 2, 10, 18, 0, 0, 0, buenosAires)) {
-		t.Errorf("due = %s, want 2026-02-10 18:00 -03:00", due)
-	}
-	if _, offset := due.Zone(); offset != -3*60*60 {
-		t.Errorf("due offset = %d, want the sale date's offset", offset)
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			schedule, err := domain.BuildPaymentSchedule(500, monthlyPlan(1, 0), testCase.saleDate, domain.DefaultInstallmentDueDay)
+			if err != nil {
+				t.Fatalf("BuildPaymentSchedule() error = %v", err)
+			}
+			due := schedule.Installments[0].FechaVencimiento
+			if !due.Equal(testCase.wantDue) {
+				t.Errorf("due = %s, want %s", due, testCase.wantDue)
+			}
+			if due.Location() != time.UTC {
+				t.Errorf("due location = %s, want UTC", due.Location())
+			}
+			if day := due.In(domain.BusinessLocation).Day(); day != domain.DefaultInstallmentDueDay {
+				t.Errorf("due day in the business zone = %d, want %d", day, domain.DefaultInstallmentDueDay)
+			}
+		})
 	}
 }
 
