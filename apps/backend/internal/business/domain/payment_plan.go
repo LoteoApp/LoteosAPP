@@ -130,6 +130,7 @@ type Installment struct {
 	Estado           InstallmentState `json:"estado"`
 	FechaVencimiento time.Time        `json:"fechaVencimiento"`
 	FechaPago        *time.Time       `json:"fechaPago,omitempty"`
+	PaymentID        string           `json:"cobroId,omitempty"`
 }
 
 // PaymentPlan is a plan de pago as the API publishes it. MontoFinanciado,

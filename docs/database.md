@@ -207,6 +207,27 @@ para que `vendido → finalizado` acepte también el origen `venta`, además de
 en la misma transacción. El `Down` vuelve a exigir `cobranza` sin tocar el
 historial ya registrado.
 
+`00013_create_cobros.sql` crea `cobros` (un cobro por operación: `venta_id`,
+`tipo` `pago`/`cancelacion_total`, `monto`, `moneda`, `medio_pago`,
+`observacion`, `usuario_alta`, `fecha_pago`) y enlaza lo que cada cobro pagó:
+`cuotas.cobro_id` (con el check `cuotas_cobro_pagada_chk`: un cobro implica
+`estado = 'pagada'` y `fecha_pago`) y `planes_pago.cobro_entrega_id` junto al
+`fecha_entrega` que ya existía. Habilita RLS y revoca `anon`/`authenticated`
+como el resto. El `Down` elimina las columnas y la tabla, así que un rollback
+pierde el historial de cobros aunque las cuotas conservan `estado` y
+`fecha_pago`.
+
+`00014_add_payment_charges.sql` habilita los cargos adicionales de un cobro:
+`cargos_adicionales` gana `cobro_id` y su `cuota_id` pasa a ser opcional (un
+cargo se ingresa al cobrar, no queda agendado en una cuota), con
+`cargos_adicionales_origen_chk` para que siempre cuelgue de uno de los dos.
+El CHECK de `tipo` suma `gasto_administrativo`, `honorarios` y `servicios` a
+los cuatro originales, y se agregan `monto > 0` y un formato mínimo para
+`moneda`. La moneda del cargo es la suya: puede diferir de la de la venta —
+una cuota en USD con servicios en ARS— y por eso nunca se suma con el monto
+del cobro. El `Down` borra los cargos sin `cuota_id` (los que este esquema
+hizo posibles) antes de volver a exigirla.
+
 Cada archivo debe tener una sección `Up` y una sección `Down`:
 
 ```sql

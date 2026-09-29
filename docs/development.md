@@ -151,6 +151,40 @@ Endpoints operativos del backend:
   inmobiliaria las vendidas por su agencia. El listado admite `estado`,
   `loteoId`, `loteId`, `q`, `pagina` y `porPagina` y trae el resumen del
   `planPago`; el detalle agrega sus `cuotas`.
+- `GET /api/v1/ventas/{id}/estado-deuda`: estado de deuda de una venta
+  financiada (`sale_not_financed` para una venta al contado): la venta, la
+  `entrega` (si la modalidad la tiene), las `cuotas` con su estado a la fecha
+  (`vencida` se deriva del vencimiento, no se persiste), el `resumen`
+  (totales, pagado, pendiente, vencido, próximo vencimiento), los `cobros`
+  registrados con las cuotas y los cargos de cada uno, y `cargosCobrados`:
+  los cargos adicionales totalizados por moneda, aparte del plan.
+- `POST /api/v1/ventas/{id}/cobros`: registra un cobro con `cuotaIds` y/o
+  `incluirEntrega`, más `medioPago` (`efectivo`, `transferencia`, `cheque`,
+  `otro`), `fechaPago` (RFC 3339, opcional; no futura), `observacion`
+  (opcional, hasta 500 caracteres) y `cargos` (opcional, hasta 20): cada
+  cargo lleva `tipo` (`impuesto_municipal`, `impuesto_provincial`,
+  `gasto_administrativo`, `honorarios`, `servicios`, `cargo_inmobiliaria`,
+  `otros`), `monto` (mayor a cero, hasta 2 decimales), `moneda` (opcional; la
+  de la venta si falta, y **puede ser distinta de la de la cuota**) y
+  `detalle` (opcional, hasta 200 caracteres). La respuesta trae `cargos` y
+  `totales`, un importe por moneda: `monto`/`moneda` son solo lo imputado al
+  plan y los cargos nunca se convierten ni se suman entre monedas. Las cuotas se cobran en orden: elegir la 3
+  con la 2 pendiente es `payment_installment_order`; repetir una pagada es
+  `payment_installment_paid`. Devuelve `201` con el cobro. Si no queda nada
+  pendiente, la venta pasa a `completada` y el lote a `finalizado`.
+- `POST /api/v1/ventas/{id}/cancelacion-total`: cobra todo el saldo en un
+  solo cobro (`tipo = cancelacion_total`). Exige `montoEsperado`, el saldo
+  que vio el cliente: sin él responde `settlement_expected_amount_required`
+  (400), y si ya no coincide responde `settlement_amount_mismatch` (409) en
+  lugar de cobrar otro total. También acepta `cargos`, con las
+  mismas reglas que el cobro de cuotas. Una venta que no está `activa` es
+  `sale_not_active`.
+- `GET /api/v1/cobranzas/vencimientos`: cuotas de todas las ventas del
+  alcance, ordenadas por vencimiento. Admite `estado` (`pendiente`,
+  `vencida`, `pagada`; sin filtro lista pendientes y vencidas), `loteoId`,
+  `q`, `desde`/`hasta` (fecha `YYYY-MM-DD` en hora argentina o RFC 3339),
+  `pagina` y `porPagina`, y trae un `resumen` con cuotas vencidas y a vencer
+  en 30 días sobre todo el alcance.
 
 El backend ejecuta el vencimiento automático al iniciar y cada minuto. Se
 puede deshabilitar o ajustar sin recompilar mediante las variables

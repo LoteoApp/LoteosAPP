@@ -689,6 +689,90 @@ Decisiones de este recorte:
   misma regla que usa el enlace «Vender» del visor). El recibo imprime el
   plan y el detalle (`SaleDetails`) lista las cuotas con número,
   vencimiento, monto y estado.
+- **Cobranza cobra sobre el plan de pago y cierra la venta.**
+  `usecase/collections` (`GetDebtStatement`, `ListDueInstallments`,
+  `RegisterPayment`, `SettleSale`) y `postgres.CollectionRepository`
+  persisten cada cobro en `cobros` (`00013_create_cobros.sql`) y marcan lo
+  que pagó: `cuotas.cobro_id`/`fecha_pago`/`estado = 'pagada'` y, para la
+  entrega, `planes_pago.fecha_entrega`/`cobro_entrega_id`. El estado
+  `vencida` no se escribe nunca: `domain.EffectiveInstallmentState` (y la
+  misma expresión `CASE` en SQL para filtrar el listado y contar el resumen)
+  lo deriva de `fecha_vencimiento < domain.StartOfBusinessDay(now)`, así no
+  hace falta un worker que regularice cuotas. Se comparan días calendario
+  en hora de Argentina (`domain.BusinessLocation`, UTC-3), no instantes:
+  `fecha_vencimiento` conserva la hora de la venta pero la UI muestra solo
+  la fecha, así que una cuota que vence hoy sigue pendiente hasta que el día
+  termina. Las reglas viven en dominio como funciones puras:
+  `SelectPayment` exige que las cuotas elegidas sean las primeras
+  pendientes en orden (`payment_installment_order`) y que la entrega no se
+  cobre dos veces; `SelectSettlement` toma todo lo adeudado y compara,
+  dentro de la transacción, con el `montoEsperado` que vio el cliente
+  (`settlement_amount_mismatch`) para que una pantalla desactualizada no
+  cobre otro total. `montoEsperado` es obligatorio: sin él, `SettleSale`
+  responde `settlement_expected_amount_required` antes de abrir la
+  transacción;
+  `ComputeDebtSummary` totaliza. `RegisterPayment` bloquea la venta
+  (`FOR UPDATE OF v` con el mismo predicado de alcance que `ventas`), el
+  plan y las cuotas, inserta el cobro y, si no queda nada pendiente,
+  inserta `venta_estados = completada` (razón «Plan de pago completado» o
+  «Cancelación anticipada del saldo») y pasa el lote de `vendido` a
+  `finalizado` con origen `cobranza`, todo en una transacción. No hay
+  clave de idempotencia: un reintento encuentra las cuotas ya pagadas y
+  recibe `payment_installment_paid`, nunca cobra dos veces. El alcance es
+  el de ventas: internos cobran cualquier venta; un usuario de inmobiliaria,
+  las vendidas por su agencia. Los cuatro casos de uso lo derivan del rol
+  vigente en `usuarios` (`authorizeCollector`), no de los roles del token:
+  un token emitido antes de pasar de administrador a inmobiliaria conserva
+  el rol viejo hasta vencer. `GET /api/v1/ventas/{id}/estado-deuda` lee
+  venta, plan, cuotas y cobros en una sola transacción de solo lectura
+  `REPEATABLE READ`, porque el estado se imprime y nunca debe mostrar una
+  cuota pendiente junto al cobro que ya la pagó.
+  `GET /api/v1/cobranzas/vencimientos` lista cuotas por vencimiento a
+  través de todas las ventas del alcance y suma un `resumen` de conteos
+  (vencidas y a vencer en 30 días) sobre todo el alcance, no sobre la
+  página; no totaliza montos porque cada venta está en la moneda de su
+  lote. Pagina primero los ids (solo con los joins que filtran), carga el
+  detalle solo de esa página y cuenta el total con un `count(*)` aparte que
+  se omite cuando la página ya lo dice (la última, incompleta), todo en la
+  misma instantánea. Con 5.000 ventas y 300.000 cuotas (alcance de
+  administrador, sin filtros, página de 25), `EXPLAIN ANALYZE` midió 3,3 s
+  para la consulta anterior con `count(*) OVER()` sobre el detalle, contra
+  2 ms (ids) + 204 ms (conteo) + 1 ms (detalle) + 69 ms (resumen).
+- **Un cobro puede mezclar monedas, y por eso no tiene un único total.**
+  Los cargos adicionales viven en `cargos_adicionales`, ahora colgados del
+  cobro por `cobro_id` y con `cuota_id` opcional
+  (`00014_add_payment_charges.sql`), y llevan su propia moneda:
+  `cobros.monto`/`moneda` son solo lo imputado al plan, siempre en la moneda
+  de la venta, y `domain.PaymentTotals` arma un total por moneda (la de la
+  venta primero, el resto alfabético) que es lo que el cliente entregó. Nada
+  se convierte: no hay tipo de cambio en el sistema.
+  `domain.NormalizePaymentCharges` valida tipo, monto (mayor a cero, 2
+  decimales), moneda y detalle, y corre en el caso de uso y otra vez en el
+  repositorio, que es el primero que conoce la moneda de la venta y la usa
+  para los cargos que no traen una. Los cargos no tocan cuotas ni saldo: el
+  cierre de la venta sigue dependiendo solo del plan y el estado de deuda los
+  publica aparte en `cargosCobrados`. Se leen en el mismo orden que los
+  totales (`chargeOrder`), porque los cargos de un cobro comparten
+  `fecha_creacion` y ordenar por ella no decide nada.
+- **La UI de cobranzas vive en `features/billing`.** `/cobranzas`
+  (`BillingPage`, `useDueInstallments`) es el tablero de vencimientos con
+  búsqueda, estado (`pendientes` = pendiente + vencida, el default del API),
+  rango de fechas y paginación; cada fila lleva a `/cobranzas/{ventaId}`
+  (`DebtStatementPage`, `useDebtStatement`), el estado de deuda de la venta:
+  resumen, tabla de entrega y cuotas con casillas para elegir qué se cobra
+  (`toggleInstallment` marca en orden: tildar la cuota 3 tilda también 1 y
+  2), «Registrar cobro» y «Cancelar saldo total» abren `PaymentDialog`
+  (medio de pago, fecha, observación y los cargos adicionales de
+  `ChargesEditor`, validados con las mismas reglas del backend: `parseCharges`
+  y `paymentTotals` son el espejo de `NormalizePaymentCharges` y
+  `PaymentTotals`, así el diálogo previsualiza un total por moneda antes de
+  enviar), y el cobro registrado abre `PaymentReceiptDialog`, que imprime los
+  cargos y un importe por moneda. «Imprimir
+  estado de deuda» (`DebtStatementDialog`) y el recibo usan `PrintDialog`,
+  el mismo mecanismo `data-print-area` + `window.print()` del recibo de
+  venta. `billing` no importa `sales`: declara sus propios tipos del
+  contrato y `SaleDetailsPage` solo enlaza por URL a `/cobranzas/{id}` en
+  ventas financiadas.
 - **La jerarquía lote → manzana la manda el cliente.** `parseDxf` no la arma.
   Cada manzana lleva una `ref` que eligió el cliente (hoy el `id` del polígono
   del parseo) y cada lote nombra la suya con `manzanaRef`. La referencia vive
