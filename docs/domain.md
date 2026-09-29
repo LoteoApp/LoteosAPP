@@ -122,6 +122,13 @@ quien asigna loteos y permisos.
 
 Los clientes no son usuarios del sistema.
 
+Cualquier selector que ofrezca usuarios para asignarles algo (vendedor de una
+reserva o venta, y los que se agreguen, como el agrimensor o el escribano de
+un loteo) solo incluye usuarios activos (sin `fecha_baja`) y con el perfil
+completo (`perfil_completo`). El backend valida la misma regla al guardar, no
+solo al listar. La excepción es el ABM de usuarios, que los muestra a todos
+para poder gestionarlos.
+
 ### ABM de administrativo, escribano, inmobiliaria y agrimensor
 
 El administrador da de alta, edita (nombre y apellido), da de baja y
