@@ -93,9 +93,11 @@ describe('SalesPage', () => {
     await user.type(screen.getByLabelText('Buscar'), 'Ana')
     expect(useSalesMock).toHaveBeenLastCalledWith('token', { q: 'Ana', estado: undefined, pagina: 1 })
 
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Todas')
     await user.click(screen.getByRole('combobox', { name: 'Estado' }))
     await user.click(await screen.findByRole('option', { name: 'Canceladas' }))
     expect(useSalesMock).toHaveBeenLastCalledWith('token', { q: 'Ana', estado: 'cancelada', pagina: 1 })
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Canceladas')
   })
 
   it('describes a cancelled venta directa of a lote without numbers', () => {

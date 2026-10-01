@@ -3,6 +3,12 @@ import { Field, FieldLabel } from '../../../shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
 import { SALE_STATES, SALE_STATE_LABELS, type SaleState } from '../types'
 
+type StateFilter = SaleState | 'todos'
+
+function stateFilterLabel(filter: StateFilter) {
+  return filter === 'todos' ? 'Todas' : `${SALE_STATE_LABELS[filter]}s`
+}
+
 type SaleFiltersProps = {
   search: string
   state: SaleState | ''
@@ -30,14 +36,13 @@ export default function SaleFilters({ search, state, onSearchChange, onStateChan
           onValueChange={(value) => onStateChange(value === 'todos' ? '' : (value as SaleState))}
         >
           <SelectTrigger id="estado-venta">
-            <SelectValue />
+            <SelectValue>{(current: StateFilter) => stateFilterLabel(current)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectList>
-              <SelectItem value="todos">Todas</SelectItem>
-              {SALE_STATES.map((candidate) => (
+              {(['todos', ...SALE_STATES] as const).map((candidate) => (
                 <SelectItem key={candidate} value={candidate}>
-                  {SALE_STATE_LABELS[candidate]}s
+                  {stateFilterLabel(candidate)}
                 </SelectItem>
               ))}
             </SelectList>
