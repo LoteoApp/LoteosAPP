@@ -188,6 +188,7 @@ describe('DebtStatementPage', () => {
     expect(dialog).toHaveTextContent('Entrega + Cuota 1')
     await user.click(within(dialog).getByRole('combobox', { name: 'Medio de pago' }))
     await user.click(await screen.findByRole('option', { name: 'Transferencia' }))
+    expect(within(dialog).getByRole('combobox', { name: 'Medio de pago' })).toHaveTextContent('Transferencia')
     await user.clear(within(dialog).getByLabelText('Fecha de pago'))
     await user.type(within(dialog).getByLabelText('Fecha de pago'), '2026-05-01')
     await user.click(within(dialog).getByLabelText('Observación'))
@@ -237,6 +238,7 @@ describe('DebtStatementPage', () => {
     // A cargo is typed fresh every time: the browser must not offer what was
     // saved for another one.
     expect(within(dialog).getByLabelText('Detalle')).toHaveAttribute('autocomplete', 'off')
+    expect(within(dialog).getByRole('combobox', { name: 'Tipo' })).toHaveTextContent('Servicios')
     await user.click(within(dialog).getByLabelText('Monto'))
     await user.paste('150000')
     // The currency starts on the sale's and the list offers the usual ones.
