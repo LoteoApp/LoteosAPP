@@ -103,6 +103,7 @@
   --lot-completed: oklch(0.96 0.01 260);
   --lot-completed-foreground: oklch(0.4 0.02 260);
   --lot-completed-plan: oklch(0.905 0.015 260);
+  /* Mirrors the RGB palette of the reservation PDF in apps/backend/internal/infrastructure/delivery/webapp/handler/reservation_receipt.go; keep both in sync. */
   --receipt-brand: rgb(31 57 48);
   --receipt-brand-soft: rgb(205 221 211);
   --receipt-summary: rgb(239 244 241);

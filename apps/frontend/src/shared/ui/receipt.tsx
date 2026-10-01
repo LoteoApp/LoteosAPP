@@ -98,7 +98,7 @@ export function ReceiptSummary({ label, asideLabel, aside, children }: ReceiptSu
   )
 }
 
-export function ReceiptSectionTitle({ children }: { children: ReactNode }) {
+function ReceiptSectionTitle({ children }: { children: ReactNode }) {
   return (
     <span className="block border-b border-receipt-rule pb-1.5 text-left text-xs font-bold tracking-[0.08em] text-receipt-brand uppercase">
       {children}
