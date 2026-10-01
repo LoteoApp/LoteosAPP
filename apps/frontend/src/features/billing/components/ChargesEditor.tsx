@@ -30,22 +30,27 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
   }
 
   return (
-    <fieldset className="flex flex-col gap-3 rounded-lg border border-border px-4 py-3">
+    <fieldset className="flex min-w-0 flex-col gap-3 rounded-lg border border-border px-4 py-3">
       <legend className="px-1 text-sm font-medium">Cargos adicionales</legend>
       <FieldDescription>
         Impuestos, gastos administrativos, honorarios o servicios que se cobran junto con la cuota. Cada cargo puede
         estar en otra moneda: se cobra aparte, no se convierte.
       </FieldDescription>
       {rows.map((row, index) => (
-        <div key={row.key} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto] sm:items-end">
-          <Field>
+        <div
+          key={row.key}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_6rem_auto] sm:items-end"
+        >
+          <Field className="col-span-2 min-w-0 sm:col-span-1">
             <FieldLabel htmlFor={`cargo-tipo-${row.key}`}>Tipo</FieldLabel>
             <Select
               value={row.tipo}
               onValueChange={(value) => update(row.key, { tipo: value as ChargeType })}
             >
-              <SelectTrigger id={`cargo-tipo-${row.key}`}>
-                <SelectValue />
+              <SelectTrigger id={`cargo-tipo-${row.key}`} className="min-h-11 sm:min-h-9">
+                <SelectValue className="min-w-0 truncate text-left">
+                  {(current: ChargeType) => CHARGE_TYPE_LABELS[current]}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectList>
@@ -58,22 +63,23 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
               </SelectContent>
             </Select>
           </Field>
-          <Field>
+          <Field className="min-w-0">
             <FieldLabel htmlFor={`cargo-monto-${row.key}`}>Monto</FieldLabel>
             <Input
               id={`cargo-monto-${row.key}`}
               inputMode="decimal"
               placeholder="0,00"
               autoComplete="off"
+              className="min-h-11 sm:min-h-9"
               value={row.monto}
               onChange={(event) => update(row.key, { monto: event.target.value })}
             />
           </Field>
-          <Field>
+          <Field className="min-w-0">
             <FieldLabel htmlFor={`cargo-moneda-${row.key}`}>Moneda</FieldLabel>
             <Select value={row.moneda} onValueChange={(value) => update(row.key, { moneda: value as string })}>
-              <SelectTrigger id={`cargo-moneda-${row.key}`}>
-                <SelectValue />
+              <SelectTrigger id={`cargo-moneda-${row.key}`} className="min-h-11 sm:min-h-9">
+                <SelectValue className="min-w-0 truncate text-left" />
               </SelectTrigger>
               <SelectContent>
                 <SelectList>
@@ -94,9 +100,9 @@ export default function ChargesEditor({ rows, currency, onChange }: ChargesEdito
             aria-label={`Quitar el cargo ${index + 1}`}
           >
             <Trash2 aria-hidden />
-            Quitar
+            <span className="sm:sr-only">Quitar</span>
           </Button>
-          <Field className="sm:col-span-4">
+          <Field className="col-span-2 sm:col-span-4">
             <FieldLabel htmlFor={`cargo-detalle-${row.key}`}>Detalle</FieldLabel>
             <Input
               id={`cargo-detalle-${row.key}`}

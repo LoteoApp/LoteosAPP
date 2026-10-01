@@ -116,7 +116,7 @@ export default function PaymentDialog({
               onValueChange={(value) => setTerms({ ...terms, medioPago: value as PaymentMedium })}
             >
               <SelectTrigger id="medio-pago">
-                <SelectValue />
+                <SelectValue>{(current: PaymentMedium) => PAYMENT_MEDIUM_LABELS[current]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectList>
