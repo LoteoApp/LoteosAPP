@@ -49,7 +49,9 @@ function isReservation(value: unknown): value is Reservation {
     isActor(value.vendedor) &&
     isActor(value.usuarioAlta) &&
     (value.inmobiliaria === undefined || isAgency(value.inmobiliaria)) &&
-    (value.puedeCancelar === undefined || typeof value.puedeCancelar === 'boolean')
+    (value.puedeCancelar === undefined || typeof value.puedeCancelar === 'boolean') &&
+    (value.puedeConvertir === undefined || typeof value.puedeConvertir === 'boolean') &&
+    isOptionalText(value.ventaId)
   )
 }
 

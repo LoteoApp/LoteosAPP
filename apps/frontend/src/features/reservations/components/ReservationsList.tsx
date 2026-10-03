@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent } from '../../../shared/ui/card'
 import { formatDateTime } from '../../../shared/lib/formatDateTime'
-import type { Reservation } from '../types'
+import { canConvertReservation, type Reservation } from '../types'
 import ReservationStatusBadge from './ReservationStatusBadge'
 
 export default function ReservationsList({ reservations, onCancel }: {
@@ -34,6 +34,16 @@ export default function ReservationsList({ reservations, onCancel }: {
                 )}>
                   Ver detalle
                 </Button>
+                {canConvertReservation(reservation) && (
+                  <Button variant="outline" render={(
+                    <Link
+                      to={`/reservas/${reservation.id}/convertir`}
+                      aria-label={`Convertir en venta la reserva del ${reservation.loteNumero ? `lote ${reservation.loteNumero}` : 'lote sin número'} en ${reservation.loteoNombre}`}
+                    />
+                  )}>
+                    Convertir en venta
+                  </Button>
+                )}
                 {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" onClick={() => onCancel(reservation)}>Cancelar</Button>}
               </div>
             </CardContent>

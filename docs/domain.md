@@ -260,7 +260,8 @@ agencia está asignada al loteo (`usuario_alta`):
 - lote vendido, cliente comprador;
 - la venta se inicia desde el visualizador del loteo, con el lote ya
   elegido —solo un lote `disponible` con número y precio—, igual que la
-  reserva;
+  reserva; un lote `reservado` se vende convirtiendo su reserva (ver
+  «Convertir una reserva en venta»);
 - vendedor responsable (`vendedor_id`); si tiene rol inmobiliaria, la
   agencia se lee de `usuarios.inmobiliaria_id`. Administrador y administrativo
   eligen primero la inmobiliaria —cualquiera activa con al menos un vendedor
@@ -295,12 +296,51 @@ agencia está asignada al loteo (`usuario_alta`):
   lote o vendedor y se filtra por estado; el detalle vuelve a imprimir el
   recibo.
 
-Vender un lote `reservado` solo lo puede hacer el vendedor responsable de esa
-reserva (`reservas.vendedor_id`): la reserva le pertenece a quien la tomó, y
-la venta la concreta esa misma persona. El vendedor de la venta no se elige
-entonces, sale de la reserva. Un lote `disponible` no tiene esa restricción y
-lo vende cualquier vendedor elegible. La conversión de una reserva en venta
-todavía no está implementada: hoy solo se vende un lote `disponible`.
+Un lote `reservado` se vende convirtiendo su reserva: el vendedor de la venta
+no se elige, es el responsable de la reserva (`reservas.vendedor_id`). Un lote
+`disponible` lo vende cualquier vendedor elegible.
+
+### Convertir una reserva en venta
+
+«Convertir en venta» —en el detalle de la reserva, el listado de reservas, el
+panel del lote en el visor del loteo y la pantalla de nueva reserva (al
+crearla o si el lote ya estaba reservado)— aparece mientras la reserva esté
+activa y el usuario pueda convertirla, y registra la venta del mismo lote,
+cliente y vendedor sin liberar el lote en el medio:
+
+- Solo se convierte una reserva `activa` cuyo plazo no venció: el backend
+  compara contra su reloj después de bloquear lote y reserva, y el instante
+  exacto del vencimiento ya está fuera de plazo. Un retraso del worker no
+  extiende la reserva; si venció, la conversión se rechaza y el lote queda
+  para que el worker lo libere.
+- Convierten el vendedor responsable (`reservas.vendedor_id`) y, como en el
+  alta de una venta, donde eligen a cualquier vendedor, el administrador y el
+  administrativo, sobre cualquier reserva; la venta queda a nombre del vendedor
+  de la reserva y cargada por quien la convierte. Si convierte otra persona,
+  el vendedor tiene que seguir elegible, como en una venta ajena: cuenta
+  activa con rol de venta y, si es de inmobiliaria, la agencia activa. Un
+  usuario de inmobiliaria solo convierte las reservas que tiene a su nombre
+  —un colega de la misma agencia puede verlas pero no convertirlas— y
+  necesita, además, su agencia activa y asignada al loteo.
+- Lote, cliente y vendedor salen de la reserva; el pedido solo trae la
+  modalidad y el plan. Precio y moneda se copian del lote al confirmar y la
+  fecha de la venta —y con ella el vencimiento de las cuotas— es el instante
+  de la conversión, no el de la reserva. El cliente tiene que seguir activo y
+  el lote, con número, precio y moneda.
+- En una sola transacción se crea la venta (con plan y cuotas si es
+  financiada), la reserva pasa a `convertida` y el lote de `reservado` a
+  `vendido` con un evento que referencia reserva y venta. Al contado, la venta
+  además queda `completada` y el lote `finalizado`. Un fallo revierte todo.
+- Una reserva origina una sola venta en toda su vida, aunque esa venta se
+  cancele después. La venta guarda `reservaId`; la reserva publica `ventaId`
+  y `puedeConvertir`. Esos vínculos no amplían el acceso: cada detalle sigue
+  con su propio alcance.
+- La clave de idempotencia es por actor, compartida con el alta de ventas:
+  repetir la misma clave y condiciones devuelve la misma venta aunque la
+  reserva ya esté convertida o el precio del lote haya cambiado; usarla con
+  otras condiciones, otra reserva o una venta ordinaria es un conflicto.
+- La reserva no tiene costo: la conversión no crea cobros ni imputa señas.
+  Reasignar el vendedor, cambiar el comprador o prorrogar quedan fuera.
 
 Al completarse, se genera un recibo con descripción de lo comprado, comprador,
 vendedor e inmobiliaria y medio de pago, que se imprime desde el navegador (o

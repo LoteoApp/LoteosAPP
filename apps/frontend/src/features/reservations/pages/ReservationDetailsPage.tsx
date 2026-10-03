@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
-import { Button } from '../../../shared/ui/button'
+import { Button, buttonVariants } from '../../../shared/ui/button'
 import { downloadReservationReceipt, getReservation } from '../api/reservations'
 import CancelReservationDialog from '../components/CancelReservationDialog'
 import ReservationDetails from '../components/ReservationDetails'
 import ReservationDetailsPageSkeleton from '../components/ReservationDetailsPageSkeleton'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
-import type { Reservation } from '../types'
+import { canConvertReservation, type Reservation } from '../types'
 
 type ReservationDetailsPageProps = {
   accessToken?: string
@@ -100,6 +100,8 @@ export default function ReservationDetailsPage({ accessToken = '', renderPlan }:
               <Button variant="outline" className="w-fit" onClick={handleDownloadReceipt} disabled={isDownloadingReceipt}>
                 {isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante'}
               </Button>
+              {canConvertReservation(reservation) && <Link className={buttonVariants({ className: 'w-fit' })} to={`/reservas/${reservation.id}/convertir`}>Convertir en venta</Link>}
+              {reservation.ventaId !== undefined && <Link className={buttonVariants({ variant: 'outline', className: 'w-fit' })} to={`/ventas/${reservation.ventaId}`}>Ver venta</Link>}
               {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>}
               {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}
             </div>

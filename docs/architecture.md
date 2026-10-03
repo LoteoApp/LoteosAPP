@@ -655,6 +655,75 @@ Decisiones de este recorte:
   Los identificadores internos de `features/sales` van en inglés
   (`LotOption`, `ClientOption`, `SaleReceipt.issuedAt`, `development`); el español queda
   solo en los nombres de propiedad que son contrato JSON de la API.
+- **Convertir una reserva es una operación propia de ventas.**
+  `POST /api/v1/reservas/{id}/convertir` (`ConvertReservationToSaleHandler`,
+  `usecase/sales/convert_reservation_to_sale.go`) recibe solo `modalidadPago`
+  y `planPago` con `Idempotency-Key`; el caso de uso resuelve el actor,
+  canonicaliza el id de la reserva (UUID en minúsculas con guiones; otro
+  formato es `reservation_not_found`) y firma la clave con
+  `reservation-to-sale:v1`, la reserva y las condiciones. El
+  alcance de lectura de reservas no viaja en el comando: el repositorio lo
+  deriva del rol persistido del actor, primero para ubicar el lote y otra vez
+  después de bloquear al actor, así un cambio de rol en el medio no deja un
+  alcance viejo. No compone
+  `CreateSale` ni `CancelReservation`: `SaleRepository.ConvertReservation`
+  (`postgres/reservation_sale.go`) hace todo en un `pgx.Tx`. Primero ubica el
+  lote de la reserva dentro del alcance, después bloquea loteo (`FOR SHARE`),
+  lote y reserva (`FOR UPDATE`), en el mismo orden que la cancelación y el
+  worker, así una sola de las tres operaciones gana y las otras ven el estado
+  final. Con los locks tomados revalida el actor, el alcance y que sea el
+  vendedor de la reserva o un usuario administrativo
+  (`domain.CanConvertReservation`; si no, `reservation_convert_forbidden`;
+  si es otra persona, además bloquea al vendedor y exige que siga elegible), y recién entonces
+  busca la clave: un replay devuelve la venta original antes de mirar si la
+  reserva sigue activa. Para una conversión nueva exige reserva `activa`,
+  lote `reservado` por esa misma reserva (el último evento de `lote_estados`
+  es su `reservado`), cliente activo, lote completo y, para una inmobiliaria,
+  agencia asignada; lee el reloj del repositorio (inyectable, como el de
+  reservas) después de todas las esperas y rechaza con
+  `reservation_expired` si llegó al vencimiento, sin tocar el lote.
+  `writeSale` (`postgres/sale.go`) es el bloque que comparte con `Create`:
+  inserta la venta con `reserva_id`, el plan y las cuotas, mueve el lote a
+  `vendido` con `reserva_id` y `venta_id` en el mismo evento y, al contado,
+  la completa con `settleSale`. Cada alta conserva sus propios guardas: el
+  alta ordinaria sigue exigiendo un lote `disponible`. Un `COMMIT` ambiguo se
+  reconcilia por actor y clave, revalidando cuenta activa y alcance antes de
+  devolver la venta.
+- **La reserva publica qué se puede hacer con ella.** `reservationColumns`
+  calcula `puedeConvertir` en el mismo `SELECT` (actor = vendedor, o actor
+  administrativo con el vendedor todavía elegible; cuenta
+  activa, reserva vigente al instante de la lectura, lote `reservado` por esa
+  reserva y completo, cliente activo y, para una inmobiliaria, que su agencia
+  actual sea la de la reserva y esté asignada al loteo) y resuelve
+  `ventaId` con un `LEFT JOIN` sobre el índice único de `ventas.reserva_id`,
+  sin consultas por fila. La venta publica `reservaId`. Son solo enlaces: los
+  `GET` de cada recurso siguen con su alcance.
+- **La pantalla de conversión reutiliza el bloque de pago de la venta.**
+  `SalePaymentForm` (modalidad, plan, vista previa, validación y confirmar) se
+  extrajo de `SaleForm`, que conserva sus selectores y le pasa los
+  participantes elegidos. `ReservationSalePage` le pasa participantes fijos
+  como datos de solo lectura, sin catálogos de clientes ni vendedores.
+  `app/ReservationSaleRoute.tsx` carga la reserva (`AbortSignal`) y el loteo,
+  y los mapea a `ReservationSaleContext`, así ventas no importa reservas ni
+  lotes. La ruta monta la página con `key` = usuario + reserva: otro usuario
+  u otra reserva empiezan un intento nuevo y descartan la respuesta pendiente,
+  mientras que la renovación del token de la misma sesión vuelve a pedir la
+  reserva sin desmontar el formulario; si una recarga falla, la ruta sigue
+  mostrando los últimos datos con un aviso en vez de reemplazar la pantalla.
+  La página guarda una clave por intento: un error de red, `408` o 5xx deja
+  el resultado incierto, conserva la clave, bloquea las condiciones y guarda
+  una copia de las enviadas, que es lo que manda cualquier reintento aunque el
+  formulario se haya reconstruido; un error de negocio (otro 4xx) conserva el
+  borrador y ofrece «Actualizar reserva». Tras el éxito, la ruta vuelve a pedir
+  la reserva. El éxito muestra la venta persistida (al
+  contado, completada con el lote finalizado), el recibo y el enlace a
+  `/ventas/{id}`. `canConvertReservation` (`reservations/types.ts`: activa,
+  `puedeConvertir` y sin `ventaId`) decide dónde se ofrece «Convertir en
+  venta»: el detalle de la reserva, cada fila de `ReservationsList`, el panel
+  del lote en el visor (`LoteoDetailRoute`) y `ReservationCreatePage`, tanto
+  para la reserva recién creada como para la reserva activa de un lote que ya
+  llega reservado. El detalle de la reserva muestra «Ver venta» cuando hay
+  `ventaId`; el de la venta, «Ver reserva de origen».
 - **El plan de pago se calcula en dominio y se persiste con la venta.**
   `domain.ValidatePaymentPlan` aplica las reglas que no dependen del precio
   (plan obligatorio en `financiado`/`entrega_financiada` y prohibido en
