@@ -333,6 +333,7 @@ describe('UsersPage', () => {
     expect(screen.queryByLabelText('Inmobiliaria')).not.toBeInTheDocument()
 
     await selectOption(user, 'Rol', 'Inmobiliaria')
+    expect(screen.getByRole('combobox', { name: 'Rol' })).toHaveTextContent('Inmobiliaria')
     expect(await screen.findByLabelText('Inmobiliaria')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Nueva inmobiliaria' })).toHaveAttribute(
       'href',
@@ -592,8 +593,10 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('Ana Pérez')
 
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Todos')
     await selectOption(user, 'Estado', 'Invitación pendiente')
 
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Invitación pendiente')
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
     expect(screen.queryByText('Luis Gómez')).not.toBeInTheDocument()
     expect(screen.queryByText('Marta Ruiz')).not.toBeInTheDocument()
@@ -678,9 +681,11 @@ describe('UsersPage', () => {
     ]
     renderUsersPage()
     await screen.findByText('Ana Pérez')
+    expect(screen.getByRole('combobox', { name: 'Rol' })).toHaveTextContent('Todos')
 
     await selectOption(user, 'Rol', 'Escribano')
 
+    expect(screen.getByRole('combobox', { name: 'Rol' })).toHaveTextContent('Escribano')
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
     expect(screen.getByText('Luis Gómez')).toBeInTheDocument()
   })
