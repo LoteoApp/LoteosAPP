@@ -173,7 +173,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	}
 	var schedule domain.PaymentSchedule
 	if command.PaymentPlan != nil {
-		schedule, err = domain.BuildPaymentSchedule(*lotPrice, *command.PaymentPlan, command.CreatedAt)
+		schedule, err = domain.BuildPaymentSchedule(*lotPrice, *command.PaymentPlan, command.CreatedAt, command.InstallmentDueDay)
 		if err != nil {
 			return domain.Sale{}, err
 		}
