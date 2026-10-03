@@ -40,6 +40,8 @@ var (
 	ErrReservationExpired             = &Error{Kind: KindConflict, Code: "reservation_expired", Message: "La reserva ya venció y el lote fue liberado"}
 	ErrReservationConverted           = &Error{Kind: KindConflict, Code: "reservation_converted", Message: "La reserva ya fue convertida en una venta"}
 	ErrReservationAlreadyCancelled    = &Error{Kind: KindConflict, Code: "reservation_already_cancelled", Message: "La reserva ya fue cancelada"}
+	ErrReservationConversionExpired   = &Error{Kind: KindConflict, Code: "reservation_expired", Message: "La reserva venció y ya no se puede convertir en venta"}
+	ErrReservationConvertForbidden    = &Error{Kind: KindForbidden, Code: "reservation_convert_forbidden", Message: "Solo el vendedor responsable o un usuario administrativo puede convertir la reserva en venta"}
 	ErrReservationInvalidState        = &Error{Kind: KindInvalid, Code: "invalid_reservation_state", Message: "El estado de la reserva no es válido"}
 	ErrReservationInvalidPage         = &Error{Kind: KindInvalid, Code: "invalid_reservation_page", Message: "La paginación solicitada no es válida"}
 )
@@ -74,6 +76,13 @@ func CanCancelReservation(actorRole Rol, actorID, sellerID string, sameAgency, a
 		return true
 	}
 	return actorRole == RolInmobiliaria && sameAgency && agencyAssigned
+}
+
+// CanConvertReservation mirrors who may register a venta for someone else:
+// administrador and administrativo convert any reserva, as they pick any
+// seller in an ordinary sale; anyone else only the reserva they hold.
+func CanConvertReservation(actorRole Rol, actorID, sellerID string) bool {
+	return IsAdministrativeRole(actorRole) || actorID == sellerID
 }
 
 func CanCancelReservationForAgency(actorRole Rol, actorAgency, reservationAgency *string) bool {
@@ -142,6 +151,8 @@ type Reservation struct {
 	Inmobiliaria      *ReservationAgency        `json:"inmobiliaria,omitempty"`
 	Estado            ReservationState          `json:"estado"`
 	PuedeCancelar     bool                      `json:"puedeCancelar"`
+	PuedeConvertir    bool                      `json:"puedeConvertir"`
+	VentaID           *string                   `json:"ventaId,omitempty"`
 	FechaVencimiento  time.Time                 `json:"fechaVencimiento"`
 	FechaCreacion     time.Time                 `json:"fechaCreacion"`
 	FechaModificacion time.Time                 `json:"fechaModificacion"`

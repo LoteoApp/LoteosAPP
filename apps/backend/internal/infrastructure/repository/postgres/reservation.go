@@ -134,7 +134,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 		if existingHash != command.IdempotencyPayloadHash {
 			return domain.Reservation{}, domain.ErrReservationIdempotencyConflict
 		}
-		result, readErr := loadReservationForActor(ctx, tx, existingID, command.ActorAuthProviderID)
+		result, readErr := loadReservationForActor(ctx, tx, existingID, command.ActorAuthProviderID, repository.clock.Now())
 		if readErr != nil {
 			return domain.Reservation{}, readErr
 		}
@@ -252,7 +252,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 		return domain.Reservation{}, err
 	}
 
-	result, err := loadReservationForActor(ctx, tx, reservationID, command.ActorAuthProviderID)
+	result, err := loadReservationForActor(ctx, tx, reservationID, command.ActorAuthProviderID, createdAt)
 	if err != nil {
 		return domain.Reservation{}, err
 	}
@@ -296,7 +296,7 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 	offset := (filter.Page - 1) * filter.Limit
 	predicate := fmt.Sprintf(reservationScopePredicate, 5, 6)
 	rows, err := repository.pool.Query(ctx, `
-		SELECT `+reservationColumns+`, count(*) OVER()
+		SELECT `+fmt.Sprintf(reservationColumns, 11)+`, count(*) OVER()
 		FROM reservas r
 		JOIN lotes lo ON lo.id = r.lote_id AND lo.fecha_baja IS NULL
 		JOIN loteos l ON l.id = lo.loteo_id AND l.fecha_baja IS NULL
@@ -304,7 +304,7 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 		JOIN usuarios seller ON seller.id = r.vendedor_id
 		JOIN usuarios alta ON alta.id = r.usuario_alta
 		LEFT JOIN inmobiliarias agency ON agency.id = r.inmobiliaria_id
-		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $10::uuid
+		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $10::uuid`+reservationSaleJoin+`
 		WHERE (cardinality($1::text[]) = 0 OR r.estado_actual = ANY($1::text[]))
 		  AND ($2 = '' OR l.id::text = $2)
 		  AND ($3 = '' OR l.nombre ILIKE $7 ESCAPE '\'
@@ -317,7 +317,8 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 		ORDER BY r.fecha_creacion DESC, r.id DESC
 		LIMIT $8 OFFSET $9
 	`, states, filter.LoteoID, filter.Search, filter.LoteID, scope.AssigneeAuthProviderID,
-		scope.ByAgencyAssignment, containsPattern(filter.Search), filter.Limit, offset, scope.ActorAuthProviderID)
+		scope.ByAgencyAssignment, containsPattern(filter.Search), filter.Limit, offset, scope.ActorAuthProviderID,
+		repository.clock.Now().UTC())
 	if err != nil {
 		return domain.ReservationPage{}, err
 	}
@@ -364,7 +365,7 @@ func (repository *ReservationRepository) List(ctx context.Context, filter domain
 }
 
 func (repository *ReservationRepository) Get(ctx context.Context, id string, scope gateway.ReservationScope) (domain.Reservation, error) {
-	return loadReservationFromPool(ctx, repository.pool, id, scope, true)
+	return loadReservationFromPool(ctx, repository.pool, id, scope, true, repository.clock.Now())
 }
 
 func (repository *ReservationRepository) Cancel(ctx context.Context, command gateway.CancelReservationCommand, scope gateway.ReservationScope) (domain.Reservation, error) {
@@ -433,7 +434,7 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 	}
 
 	if state == domain.ReservationStateCancelled {
-		result, err := loadReservation(ctx, tx, command.ReservationID, true)
+		result, err := loadReservation(ctx, tx, command.ReservationID, true, repository.clock.Now())
 		if err != nil {
 			return domain.Reservation{}, err
 		}
@@ -482,7 +483,7 @@ func (repository *ReservationRepository) Cancel(ctx context.Context, command gat
 	}); err != nil {
 		return domain.Reservation{}, err
 	}
-	result, err := loadReservation(ctx, tx, command.ReservationID, true)
+	result, err := loadReservation(ctx, tx, command.ReservationID, true, cancelledAt)
 	if err != nil {
 		return domain.Reservation{}, err
 	}
@@ -749,6 +750,9 @@ func waitForReservationRetry(ctx context.Context, attempt int) error {
 	}
 }
 
+// reservationColumns is formatted with the placeholder of the read instant.
+// puedeConvertir mirrors the guards of SaleRepository.ConvertReservation so
+// the UI only offers what the POST would accept; the POST still decides.
 const reservationColumns = `
 	r.id::text, l.id::text, l.nombre, lo.id::text, COALESCE(lo.numero, ''),
 	c.id::text, c.nombre, c.apellido, c.dni, c.celular, c.email,
@@ -761,7 +765,45 @@ const reservationColumns = `
 	              AND r.inmobiliaria_id IS NOT NULL
 	              AND reservation_actor.inmobiliaria_id = r.inmobiliaria_id)
 	     THEN true ELSE false END,
+	CASE WHEN r.estado_actual = 'activa'
+	          AND r.fecha_vencimiento > $%[1]d::timestamptz
+	          AND venta.id IS NULL
+	          AND (reservation_actor.id = r.vendedor_id
+	               OR reservation_actor.rol IN ('administrador', 'administrativo')
+	                  AND seller.fecha_baja IS NULL
+	                  AND seller.rol IN ('administrador', 'administrativo', 'inmobiliaria')
+	                  AND (seller.rol <> 'inmobiliaria' OR EXISTS (
+	                      SELECT 1 FROM inmobiliarias seller_agency
+	                      WHERE seller_agency.id = seller.inmobiliaria_id AND seller_agency.fecha_baja IS NULL
+	                  )))
+	          AND reservation_actor.fecha_baja IS NULL
+	          AND reservation_actor.rol IN ('administrador', 'administrativo', 'inmobiliaria')
+	          AND lo.estado_actual = 'reservado'
+	          AND (
+	              SELECT le.reserva_id
+	              FROM lote_estados le
+	              WHERE le.lote_id = lo.id
+	              ORDER BY le.fecha_creacion DESC, le.id DESC
+	              LIMIT 1
+	          ) = r.id
+	          AND COALESCE(lo.numero, '') <> ''
+	          AND COALESCE(lo.precio, 0) > 0
+	          AND COALESCE(lo.moneda, '') <> ''
+	          AND c.fecha_baja IS NULL
+	          AND (reservation_actor.rol <> 'inmobiliaria' OR reservation_actor.inmobiliaria_id = r.inmobiliaria_id AND EXISTS (
+	              SELECT 1
+	              FROM inmobiliarias actor_agency
+	              JOIN inmobiliaria_loteos il ON il.inmobiliaria_id = actor_agency.id
+	                AND il.loteo_id = l.id AND il.fecha_baja IS NULL
+	              WHERE actor_agency.id = reservation_actor.inmobiliaria_id
+	                AND actor_agency.fecha_baja IS NULL
+	          ))
+	     THEN true ELSE false END,
+	venta.id::text,
 	r.estado_actual, r.fecha_vencimiento, r.fecha_creacion, r.fecha_modificacion`
+
+const reservationSaleJoin = `
+	LEFT JOIN ventas venta ON venta.reserva_id = r.id`
 
 const reservationScopePredicate = `($%[1]d::uuid IS NULL OR ($%[2]d AND EXISTS (
 	SELECT 1
@@ -798,19 +840,19 @@ type reservationQueryer interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
-func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id string, scope gateway.ReservationScope, withHistory bool) (domain.Reservation, error) {
+func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id string, scope gateway.ReservationScope, withHistory bool, now time.Time) (domain.Reservation, error) {
 	scope = normalizeReservationScope(scope)
 	predicate := fmt.Sprintf(reservationScopePredicate, 2, 3)
-	row := pool.QueryRow(ctx, `SELECT `+reservationColumns+` FROM reservas r
+	row := pool.QueryRow(ctx, `SELECT `+fmt.Sprintf(reservationColumns, 5)+` FROM reservas r
 		JOIN lotes lo ON lo.id = r.lote_id AND lo.fecha_baja IS NULL
 		JOIN loteos l ON l.id = lo.loteo_id AND l.fecha_baja IS NULL
 		JOIN clientes c ON c.id = r.cliente_id
 		JOIN usuarios seller ON seller.id = r.vendedor_id
 		JOIN usuarios alta ON alta.id = r.usuario_alta
 		LEFT JOIN inmobiliarias agency ON agency.id = r.inmobiliaria_id
-		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $4::uuid
+		LEFT JOIN usuarios reservation_actor ON reservation_actor.auth_provider_id = $4::uuid`+reservationSaleJoin+`
 		WHERE r.id = $1::uuid AND `+predicate,
-		id, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment, scope.ActorAuthProviderID)
+		id, scope.AssigneeAuthProviderID, scope.ByAgencyAssignment, scope.ActorAuthProviderID, now.UTC())
 	reservation, err := scanReservation(row)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return domain.Reservation{}, domain.ErrReservationNotFound
@@ -827,12 +869,12 @@ func loadReservationFromPool(ctx context.Context, pool reservationQueryer, id st
 	return reservation, nil
 }
 
-func loadReservation(ctx context.Context, tx pgx.Tx, id string, withHistory bool) (domain.Reservation, error) {
-	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{}, withHistory)
+func loadReservation(ctx context.Context, tx pgx.Tx, id string, withHistory bool, now time.Time) (domain.Reservation, error) {
+	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{}, withHistory, now)
 }
 
-func loadReservationForActor(ctx context.Context, tx pgx.Tx, id, actorAuthProviderID string) (domain.Reservation, error) {
-	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{ActorAuthProviderID: uuidReference(actorAuthProviderID)}, false)
+func loadReservationForActor(ctx context.Context, tx pgx.Tx, id, actorAuthProviderID string, now time.Time) (domain.Reservation, error) {
+	return loadReservationFromPool(ctx, tx, id, gateway.ReservationScope{ActorAuthProviderID: uuidReference(actorAuthProviderID)}, false, now)
 }
 
 func normalizeReservationScope(scope gateway.ReservationScope) gateway.ReservationScope {
@@ -907,7 +949,7 @@ func scanReservation(row reservationScanner) (domain.Reservation, error) {
 		&client.ID, &client.Nombre, &client.Apellido, &client.DNI, &client.Celular, &client.Email,
 		&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol,
 		&alta.ID, &alta.Nombre, &alta.Apellido, &alta.Email, &alta.Rol,
-		&agencyID, &agencyName, &reservation.PuedeCancelar,
+		&agencyID, &agencyName, &reservation.PuedeCancelar, &reservation.PuedeConvertir, &reservation.VentaID,
 		&reservation.Estado, &reservation.FechaVencimiento, &reservation.FechaCreacion, &reservation.FechaModificacion,
 	)
 	if err != nil {
@@ -935,7 +977,7 @@ func scanReservationWithTotal(row reservationScanner) (domain.Reservation, int64
 		&client.ID, &client.Nombre, &client.Apellido, &client.DNI, &client.Celular, &client.Email,
 		&seller.ID, &seller.Nombre, &seller.Apellido, &seller.Email, &seller.Rol,
 		&alta.ID, &alta.Nombre, &alta.Apellido, &alta.Email, &alta.Rol,
-		&agencyID, &agencyName, &reservation.PuedeCancelar,
+		&agencyID, &agencyName, &reservation.PuedeCancelar, &reservation.PuedeConvertir, &reservation.VentaID,
 		&reservation.Estado, &reservation.FechaVencimiento, &reservation.FechaCreacion, &reservation.FechaModificacion,
 		&total,
 	)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, ExternalLink, X } from 'lucide-react'
+import { BadgeDollarSign, Clock, ExternalLink, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { formatDateTime } from '../shared/lib/formatDateTime'
 import { useAuth } from '../features/auth/hooks/use-auth'
@@ -206,6 +206,15 @@ function LotReservationSummary({
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
+        {reservation.puedeConvertir === true && (
+          <Link
+            to={`/reservas/${reservation.id}/convertir`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-lot-reserved-foreground px-3 text-sm font-medium text-lot-reserved hover:bg-lot-reserved-foreground/90"
+          >
+            <BadgeDollarSign aria-hidden className="size-4" />
+            Convertir en venta
+          </Link>
+        )}
         {reservation.puedeCancelar === true && <Button
             type="button"
             variant="outline"

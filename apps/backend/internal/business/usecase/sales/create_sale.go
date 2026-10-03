@@ -89,23 +89,8 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	if sellerID == "" {
 		return domain.Sale{}, domain.ErrSaleSellerRequired
 	}
-	method := domain.PaymentMethod(strings.TrimSpace(input.PaymentMethod))
-	if method == "" {
-		method = domain.PaymentMethodCash
-	}
-	if !method.IsValid() {
-		return domain.Sale{}, domain.ErrSaleInvalidPaymentMethod
-	}
-	var plan *domain.PaymentPlanInput
-	if input.PaymentPlan != nil {
-		plan = &domain.PaymentPlanInput{
-			Installments: input.PaymentPlan.Installments,
-			InterestRate: input.PaymentPlan.InterestRate,
-			Period:       domain.PaymentPeriod(strings.TrimSpace(input.PaymentPlan.Period)),
-			DownPayment:  input.PaymentPlan.DownPayment,
-		}
-	}
-	if err := domain.ValidatePaymentPlan(method, plan); err != nil {
+	method, plan, err := normalizePaymentTerms(input.PaymentMethod, input.PaymentPlan)
+	if err != nil {
 		return domain.Sale{}, err
 	}
 
@@ -135,13 +120,44 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	return sale, nil
 }
 
-func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod, plan *domain.PaymentPlanInput) string {
-	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s%d:%s",
-		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
-		len(sellerID), sellerID, len(method), method)
-	if plan != nil {
-		payload += fmt.Sprintf("|%d:%g:%s:%g", plan.Installments, plan.InterestRate, plan.Period, plan.DownPayment)
+// normalizePaymentTerms applies the request defaults (contado when no method
+// is sent) and validates the plan shape; the repository validates again
+// against the lote price.
+func normalizePaymentTerms(rawMethod string, input *PaymentPlanInput) (domain.PaymentMethod, *domain.PaymentPlanInput, error) {
+	method := domain.PaymentMethod(strings.TrimSpace(rawMethod))
+	if method == "" {
+		method = domain.PaymentMethodCash
 	}
+	if !method.IsValid() {
+		return "", nil, domain.ErrSaleInvalidPaymentMethod
+	}
+	var plan *domain.PaymentPlanInput
+	if input != nil {
+		plan = &domain.PaymentPlanInput{
+			Installments: input.Installments,
+			InterestRate: input.InterestRate,
+			Period:       domain.PaymentPeriod(strings.TrimSpace(input.Period)),
+			DownPayment:  input.DownPayment,
+		}
+	}
+	if err := domain.ValidatePaymentPlan(method, plan); err != nil {
+		return "", nil, err
+	}
+	return method, plan, nil
+}
+
+func paymentTermsPayload(method domain.PaymentMethod, plan *domain.PaymentPlanInput) string {
+	terms := fmt.Sprintf("%d:%s", len(method), method)
+	if plan != nil {
+		terms += fmt.Sprintf("|%d:%g:%s:%g", plan.Installments, plan.InterestRate, plan.Period, plan.DownPayment)
+	}
+	return terms
+}
+
+func salePayloadHash(developmentID, lotID, clientID, sellerID string, method domain.PaymentMethod, plan *domain.PaymentPlanInput) string {
+	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s",
+		len(developmentID), developmentID, len(lotID), lotID, len(clientID), clientID,
+		len(sellerID), sellerID) + paymentTermsPayload(method, plan)
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
 }

@@ -7,6 +7,13 @@ type CreateSaleRequest struct {
 	PlanPago      *CreateSalePaymentPlanDTO `json:"planPago,omitempty"`
 }
 
+// ConvertReservationRequest carries only the payment terms: lote, cliente,
+// vendedor and price come from the reserva, so any other field is ignored.
+type ConvertReservationRequest struct {
+	ModalidadPago string                    `json:"modalidadPago,omitempty"`
+	PlanPago      *CreateSalePaymentPlanDTO `json:"planPago,omitempty"`
+}
+
 // CreateSalePaymentPlanDTO describes the financing of a sale. TasaInteres is
 // a percentage over the financed amount and MontoEntrega only applies to
 // entrega_financiada. Due dates derive from the sale date, so none is sent.

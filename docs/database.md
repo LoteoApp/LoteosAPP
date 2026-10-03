@@ -331,6 +331,30 @@ candidatos en lotes pequeños y vuelve a verificar la reserva activa y su
 vencimiento después de bloquear lote y reserva. Así un reintento o una segunda
 instancia puede omitir un candidato ya procesado sin duplicar eventos.
 
+### Venta originada en una reserva
+
+`00015_link_sale_to_reservation.sql` agrega `ventas.reserva_id UUID NULL`: las
+ventas existentes y las del alta ordinaria quedan en `NULL` y no se completa
+nada a partir de coincidencias de lote o cliente, porque no hay evidencia
+histórica de qué venta vino de qué reserva.
+
+- `ventas_reserva_lote_fk`: FK compuesta `(reserva_id, lote_id)` hacia
+  `reservas (id, lote_id)` (la unicidad existe desde `00008`), así la venta no
+  puede apuntar a una reserva de otro lote. Sin borrado en cascada.
+- `ventas_reserva_id_idx`: índice único parcial sobre `reserva_id` no nulo,
+  sin condición de estado: una reserva origina una sola venta aunque esa venta
+  se cancele. El mismo índice sirve la búsqueda reserva → venta.
+- `ventas_protect_reserva_id`: trigger `BEFORE UPDATE` que rechaza cambiar el
+  vínculo después del alta; el resto de los campos de `ventas` no cambia de
+  régimen.
+- No se agrega `reservas.venta_id`: la reserva encuentra su venta por el
+  índice. RLS y privilegios quedan como estaban.
+
+El `Down` elimina el trigger, el índice, la FK y la columna: se pierde qué venta
+vino de qué reserva, aunque la reserva conserva su estado `convertida` y el lote
+su historial (con `reserva_id` y `venta_id` en el evento de venta). Solo debe
+usarse sobre una base descartable.
+
 ## Reglas del esquema
 
 - Nunca modificar una migración que ya fue aplicada en algún ambiente.

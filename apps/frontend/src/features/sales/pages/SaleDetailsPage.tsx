@@ -80,6 +80,11 @@ export default function SaleDetailsPage({ accessToken = '', renderPlan }: SaleDe
                   Estado de deuda
                 </Link>
               )}
+              {sale.reservaId !== undefined && (
+                <Link className={buttonVariants({ variant: 'outline' })} to={`/reservas/${sale.reservaId}`}>
+                  Ver reserva de origen
+                </Link>
+              )}
               <Link className={buttonVariants({ variant: 'ghost' })} to={`/lotes/${sale.loteoId}`}>
                 Ver loteo
               </Link>

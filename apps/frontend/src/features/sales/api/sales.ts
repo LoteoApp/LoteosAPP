@@ -8,6 +8,7 @@ import type {
   SaleActor,
   SaleListFilters,
   SalePage,
+  SalePaymentTerms,
 } from '../types'
 
 const SALES_PATH = '/api/v1/ventas'
@@ -82,7 +83,8 @@ function isSale(value: unknown): value is Sale {
     typeof value.moneda === 'string' &&
     (value.planPago === undefined || isPaymentPlan(value.planPago)) &&
     typeof value.fechaCreacion === 'string' &&
-    typeof value.fechaModificacion === 'string'
+    typeof value.fechaModificacion === 'string' &&
+    (value.reservaId === undefined || typeof value.reservaId === 'string')
   )
 }
 
@@ -138,11 +140,34 @@ export async function createSale(
       body: {
         clienteId: values.clienteId,
         vendedorId: values.vendedorId,
-        modalidadPago: values.modalidadPago,
-        ...(values.planPago === undefined ? {} : { planPago: values.planPago }),
+        ...paymentTermsBody(values),
       },
       headers: { 'Idempotency-Key': idempotencyKey },
     },
   )
   return readBody(body, isSale)
+}
+
+// Only the terms are sent: the backend takes lote, cliente, vendedor and
+// price from the reserva.
+export async function convertReservationToSale(
+  token: string,
+  reservationId: string,
+  terms: SalePaymentTerms,
+  idempotencyKey: string,
+): Promise<Sale> {
+  const body = await apiFetch<unknown>(`/api/v1/reservas/${encodeURIComponent(reservationId)}/convertir`, {
+    method: 'POST',
+    token,
+    body: paymentTermsBody(terms),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+  return readBody(body, isSale)
+}
+
+function paymentTermsBody(terms: SalePaymentTerms): SalePaymentTerms {
+  return {
+    modalidadPago: terms.modalidadPago,
+    ...(terms.planPago === undefined ? {} : { planPago: terms.planPago }),
+  }
 }
