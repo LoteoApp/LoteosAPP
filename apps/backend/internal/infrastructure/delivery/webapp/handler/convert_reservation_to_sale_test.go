@@ -86,7 +86,7 @@ func TestConvertReservationToSaleHandlerMapsErrors(t *testing.T) {
 		"invalid plan":    {body: `{}`, err: domain.ErrSalePaymentPlanRequired, status: http.StatusBadRequest, code: "sale_payment_plan_required"},
 		"not the seller":  {body: `{}`, err: domain.ErrReservationConvertForbidden, status: http.StatusForbidden, code: "reservation_convert_forbidden"},
 		"out of scope":    {body: `{}`, err: domain.ErrReservationNotFound, status: http.StatusNotFound, code: "reservation_not_found"},
-		"expired":         {body: `{}`, err: domain.ErrReservationConversionExpired, status: http.StatusConflict, code: "reservation_expired"},
+		"expired":         {body: `{}`, err: domain.ErrReservationConversionExpired, status: http.StatusConflict, code: "reservation_conversion_expired"},
 		"converted":       {body: `{}`, err: domain.ErrReservationConverted, status: http.StatusConflict, code: "reservation_converted"},
 		"key reused":      {body: `{}`, err: domain.ErrSaleIdempotencyConflict, status: http.StatusConflict, code: "idempotency_key_conflict"},
 		"database failed": {body: `{}`, err: domain.ErrDatabaseUnavailable.WithCause(errors.New("SQLSTATE 08006 secret detail")), status: http.StatusServiceUnavailable, code: "database_unavailable"},

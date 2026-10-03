@@ -71,16 +71,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	}
 	defer rollbackTransaction(tx)
 
-	var developmentID string
-	err = tx.QueryRow(ctx, `
-		SELECT id::text
-		FROM loteos
-		WHERE id = $1::uuid AND fecha_baja IS NULL
-		FOR SHARE
-	`, command.DevelopmentID).Scan(&developmentID)
-	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
-		return domain.Sale{}, domain.ErrLoteNotFound
-	}
+	developmentID, err := lockActiveDevelopment(ctx, tx, command.DevelopmentID, domain.ErrLoteNotFound)
 	if err != nil {
 		return domain.Sale{}, err
 	}
@@ -142,29 +133,14 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		return domain.Sale{}, err
 	}
 
-	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.SellerID)
+	sellerAgency, err := lockEligibleSeller(ctx, tx, command.SellerID)
 	if err != nil {
-		if errors.Is(err, domain.ErrReservationSellerNotEligible) {
-			return domain.Sale{}, domain.ErrSaleSellerNotEligible
-		}
 		return domain.Sale{}, err
 	}
-	if !sellerActive || !domain.IsSaleRole(sellerRole) {
-		return domain.Sale{}, domain.ErrSaleSellerNotEligible
-	}
 	// An agency user sells for their own agency only; the seller's agency
-	// itself must still be active, though it needn't be assigned to the loteo.
+	// needn't be assigned to the loteo.
 	if actorRole == domain.RolInmobiliaria && !sameString(actorAgency, sellerAgency) {
 		return domain.Sale{}, domain.ErrSaleSellerNotEligible
-	}
-	if sellerRole == domain.RolInmobiliaria {
-		active, activeErr := agencyActive(ctx, tx, sellerAgency)
-		if activeErr != nil {
-			return domain.Sale{}, activeErr
-		}
-		if !active {
-			return domain.Sale{}, domain.ErrSaleSellerNotEligible
-		}
 	}
 
 	if err := lockActiveClient(ctx, tx, command.ClientID); err != nil {
@@ -592,6 +568,45 @@ func scanSaleWithTotal(scanner reservationScanner) (domain.Sale, int64, error) {
 		return domain.Sale{}, 0, err
 	}
 	return row.assemble(), total, nil
+}
+
+// lockActiveDevelopment share-locks a loteo that isn't given de baja and
+// returns its canonical id, or notFound.
+func lockActiveDevelopment(ctx context.Context, tx pgx.Tx, developmentID string, notFound error) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		SELECT id::text FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL FOR SHARE
+	`, developmentID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
+		return "", notFound
+	}
+	return id, err
+}
+
+// lockEligibleSeller is who may be the vendedor of a venta: an active user
+// with a sales role whose agency, if any, is still active. It returns the
+// seller's agency.
+func lockEligibleSeller(ctx context.Context, tx pgx.Tx, sellerID string) (*string, error) {
+	role, agency, active, err := lockSeller(ctx, tx, sellerID)
+	if errors.Is(err, domain.ErrReservationSellerNotEligible) {
+		return nil, domain.ErrSaleSellerNotEligible
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !active || !domain.IsSaleRole(role) {
+		return nil, domain.ErrSaleSellerNotEligible
+	}
+	if role == domain.RolInmobiliaria {
+		agencyIsActive, err := agencyActive(ctx, tx, agency)
+		if err != nil {
+			return nil, err
+		}
+		if !agencyIsActive {
+			return nil, domain.ErrSaleSellerNotEligible
+		}
+	}
+	return agency, nil
 }
 
 func agencyActive(ctx context.Context, tx pgx.Tx, agencyID *string) (bool, error) {

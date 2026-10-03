@@ -37,7 +37,8 @@ dependencias, un scheduler, una store global ni una API genérica de estados.
 
 ## Resultado y alcance
 
-Desde el detalle de una reserva vigente, su vendedor responsable puede abrir
+Desde el detalle de una reserva vigente, su vendedor responsable (o, por la
+decisión posterior de la regla 2, un administrador o administrativo) puede abrir
 «Convertir en venta», consultar los datos comerciales fijos y elegir contado,
 financiado o entrega + financiación. Al confirmar, la reserva queda
 `convertida`, aparece la venta y el lote pasa a `vendido`; al contado también
@@ -73,8 +74,12 @@ frontend, a `apps/frontend/src`. Los DTO actuales son `dto/sales/sales.go` y
    no extiende la reserva.
 2. El actor debe ser una cuenta activa y habilitada para ventas **y su ID de
    usuario debe coincidir con `reservas.vendedor_id`**. Comparar UUID de usuario,
-   no el `sub` de Supabase ni `usuario_alta` de la reserva. Administrador y
-   administrativo pueden convertir si son el vendedor, nunca por su rol solo.
+   no el `sub` de Supabase ni `usuario_alta` de la reserva. ~~Administrador y
+   administrativo pueden convertir si son el vendedor, nunca por su rol solo.~~
+   **Reemplazado por decisión posterior del usuario:** administrador y
+   administrativo convierten cualquier reserva, como en el alta de venta; si no
+   son el vendedor, este tiene que seguir elegible. La inmobiliaria sigue
+   convirtiendo solo sus propias reservas.
 3. Para actor inmobiliaria, mantener alcance de consulta, agencia activa y
    asignación vigente al loteo exigida para una nueva venta. Un colega de la
    misma agencia puede consultar según el alcance actual, pero no convertir.
@@ -361,7 +366,7 @@ Ubicaciones propuestas, sin crear directorios genéricos:
 | Grupo | Casos y observaciones exigidas |
 | --- | --- |
 | Conversión válida | Tres modalidades; mismos lote/cliente/vendedor; precio y moneda actuales; vínculo bidireccional; reserva convertida; estado final y cuotas correctos. |
-| Roles/propietario | Administrador dueño y administrativo dueño admitidos, internos ajenos rechazados, inmobiliaria dueña admitida con agencia/asignación, colega de agencia rechazado, agrimensor/escribano rechazados. Mantener vendedores internos sin agencia. |
+| Roles/propietario | Administrador y administrativo admitidos sobre cualquier reserva (~~internos ajenos rechazados~~, reemplazado por la regla 2), con el vendedor todavía elegible; inmobiliaria dueña admitida con agencia/asignación, colega de agencia rechazado, agrimensor/escribano rechazados. Mantener vendedores internos sin agencia. |
 | Vigencia | Antes, exactamente en y después del vencimiento; activa cuyo plazo pasó; cancelada/vencida/convertida; reloj después de espera de lock. |
 | Validaciones | Actor no aprovisionado/inactivo, cliente inactivo, agencia inactiva o desasignada, lote/loteo dados de baja, número/precio/moneda incompletos, planes inválidos y payload comercial manipulado. |
 | Idempotencia | Misma clave/términos antes y después de conversión o vencimiento original; términos distintos; otra reserva; clave ya usada en alta ordinaria; otra clave sobre convertida; cambios posteriores de precio no alteran replay. |

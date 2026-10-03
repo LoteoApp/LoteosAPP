@@ -129,7 +129,7 @@ describe('ReservationSalePage', () => {
   it('keeps the draft on a business error and lets the user refresh the reserva', async () => {
     const user = userEvent.setup()
     const onRefresh = vi.fn()
-    const convert = vi.fn().mockRejectedValue(new ApiError('La reserva venció y ya no se puede convertir en venta', 'reservation_expired', 409))
+    const convert = vi.fn().mockRejectedValue(new ApiError('La reserva venció y ya no se puede convertir en venta', 'reservation_conversion_expired', 409))
     renderPage({ convert, onRefresh })
 
     await user.click(screen.getByLabelText('Condiciones de pago'))

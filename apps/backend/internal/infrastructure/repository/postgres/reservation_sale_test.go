@@ -413,10 +413,28 @@ func TestConvertReservationRejectsReservasThatCannotBeSold(t *testing.T) {
 	reservedAt := time.Date(2027, 3, 1, 12, 0, 0, 0, time.UTC)
 	due := reservedAt.Add(domain.ReservationDuration)
 	reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
+	// Every rejection is checked on both sides: the POST refuses it and the
+	// read never offers it, so puedeConvertir can't drift from the guards.
+	canConvertAt := func(now time.Time) bool {
+		t.Helper()
+		read, err := postgres.NewReservationRepository(pool, fixedReservationClock{now: now}).
+			Get(context.Background(), reservation.ID, gateway.ReservationScope{ActorAuthProviderID: &setup.adminAuthID})
+		if err != nil {
+			t.Fatalf("Get() at %s error = %v", now, err)
+		}
+		return read.PuedeConvertir
+	}
 	convert := func(now time.Time) error {
+		t.Helper()
+		if canConvertAt(now) {
+			t.Errorf("puedeConvertir = true at %s for a reserva the conversion rejects", now)
+		}
 		_, err := postgres.NewSaleRepository(pool, fixedReservationClock{now: now}).
 			ConvertReservation(context.Background(), conversionCommand(t, reservation.ID, setup.adminID, setup.adminAuthID))
 		return err
+	}
+	if !canConvertAt(due.Add(-time.Minute)) {
+		t.Fatal("puedeConvertir = false for a convertible reserva, so the checks below prove nothing")
 	}
 
 	// The due instant itself is already late, and the lote stays reservado

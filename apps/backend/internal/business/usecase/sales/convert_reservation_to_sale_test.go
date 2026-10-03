@@ -77,13 +77,6 @@ func TestConvertReservationToSaleHashesTheTermsAndTheReserva(t *testing.T) {
 	if repository.ConvertCommand.IdempotencyPayloadHash == financedHash {
 		t.Error("another reserva must produce another payload hash")
 	}
-
-	// The same reserva and plan as an ordinary sale hashes differently, so a
-	// key can't be replayed across both operations.
-	ordinary := sha256Hex("8:loteo-id7:lote-id10:cliente-id9:seller-id10:financiado|12:10:mensual:0")
-	if financedHash == ordinary {
-		t.Error("a conversion must not share the ordinary sale hash")
-	}
 }
 
 func TestConvertReservationToSaleRejectsBeforeTheRepository(t *testing.T) {

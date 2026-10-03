@@ -179,6 +179,21 @@ describe('ReservationCreatePage', () => {
     expect(await screen.findByText('Lote no disponible')).toBeInTheDocument()
   })
 
+  it('looks for the reservation of a reserved lote without flashing it as unavailable', async () => {
+    configureMocks()
+    const reservedLoteo = { ...loteo, lotes: [{ ...loteo.lotes[0], estado: 'reservado' as const }] }
+    let resolve: (value: unknown) => void = () => undefined
+    listReservationsMock.mockReturnValueOnce(new Promise((done) => { resolve = done }))
+    renderPage({ loteo: reservedLoteo })
+
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Buscando la reserva del lote…')
+    expect(screen.queryByText('Lote no disponible')).not.toBeInTheDocument()
+
+    resolve({ reservas: [{ ...reservation, puedeConvertir: true }], pagina: 1, porPagina: 1, total: 1, paginas: 1 })
+    expect(await screen.findByText('Lote reservado')).toBeInTheDocument()
+    expect(screen.queryByText('Buscando la reserva del lote…')).not.toBeInTheDocument()
+  })
+
   it('downloads the PDF automatically after the reservation is saved', async () => {
     configureMocks()
     downloadReceiptMock.mockResolvedValue(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))

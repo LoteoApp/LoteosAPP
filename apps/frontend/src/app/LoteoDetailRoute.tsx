@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BadgeDollarSign, Clock, ExternalLink, X } from 'lucide-react'
+import { Clock, ExternalLink, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { formatDateTime } from '../shared/lib/formatDateTime'
 import { useAuth } from '../features/auth/hooks/use-auth'
@@ -8,13 +8,14 @@ import { Alert, AlertDescription, AlertTitle } from '../shared/ui/alert'
 import { Button } from '../shared/ui/button'
 import LoteoDetailPage from '../features/lots/pages/LoteoDetailPage'
 import CancelReservationDialog from '../features/reservations/components/CancelReservationDialog'
+import ConvertReservationLink from '../features/reservations/components/ConvertReservationLink'
 import ReservationsList from '../features/reservations/components/ReservationsList'
 import ReservationsPagination from '../features/reservations/components/ReservationsPagination'
 import ReserveLotDialog from '../features/reservations/components/ReserveLotDialog'
 import SellLotLink from '../features/sales/components/SellLotLink'
 import { useReservationMutations } from '../features/reservations/hooks/use-reservation-mutations'
 import { useReservations } from '../features/reservations/hooks/use-reservations'
-import type { Reservation } from '../features/reservations/types'
+import { canConvertReservation, type Reservation } from '../features/reservations/types'
 import type { LoteoDetail, LoteoLote } from '../features/lots/types'
 import { useParams } from 'react-router'
 
@@ -206,14 +207,11 @@ function LotReservationSummary({
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
-        {reservation.puedeConvertir === true && (
-          <Link
-            to={`/reservas/${reservation.id}/convertir`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-lot-reserved-foreground px-3 text-sm font-medium text-lot-reserved hover:bg-lot-reserved-foreground/90"
-          >
-            <BadgeDollarSign aria-hidden className="size-4" />
-            Convertir en venta
-          </Link>
+        {canConvertReservation(reservation) && (
+          <ConvertReservationLink
+            reservationId={reservation.id}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-lot-reserved-foreground px-3 text-sm font-medium text-lot-reserved hover:bg-lot-reserved-foreground/90 [&_svg]:size-4"
+          />
         )}
         {reservation.puedeCancelar === true && <Button
             type="button"

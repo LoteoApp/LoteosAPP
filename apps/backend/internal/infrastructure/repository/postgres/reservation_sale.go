@@ -77,7 +77,7 @@ func (repository *SaleRepository) convertReservation(ctx context.Context, comman
 		return domain.Sale{}, err
 	}
 
-	if err := lockActiveDevelopment(ctx, tx, developmentID); err != nil {
+	if _, err := lockActiveDevelopment(ctx, tx, developmentID, domain.ErrReservationNotFound); err != nil {
 		return domain.Sale{}, err
 	}
 	var lotState domain.LotState
@@ -159,7 +159,7 @@ func (repository *SaleRepository) convertReservation(ctx context.Context, comman
 		}
 	}
 	if reservation.sellerID != command.ActorID {
-		if err := lockEligibleSeller(ctx, tx, reservation.sellerID); err != nil {
+		if _, err := lockEligibleSeller(ctx, tx, reservation.sellerID); err != nil {
 			return domain.Sale{}, err
 		}
 	}
@@ -230,43 +230,6 @@ func conversionScope(role domain.Rol, authProviderID string) gateway.Reservation
 		return gateway.ReservationScope{}
 	}
 	return normalizeReservationScope(gateway.ReservationScope{AssigneeAuthProviderID: &authProviderID, ByAgencyAssignment: true})
-}
-
-// lockEligibleSeller applies to the reserva's seller, when someone else
-// converts it, the rule of an ordinary sale: an active user with a sales
-// role whose agency, if any, is still active.
-func lockEligibleSeller(ctx context.Context, tx pgx.Tx, sellerID string) error {
-	role, agency, active, err := lockSeller(ctx, tx, sellerID)
-	if errors.Is(err, domain.ErrReservationSellerNotEligible) {
-		return domain.ErrSaleSellerNotEligible
-	}
-	if err != nil {
-		return err
-	}
-	if !active || !domain.IsSaleRole(role) {
-		return domain.ErrSaleSellerNotEligible
-	}
-	if role == domain.RolInmobiliaria {
-		agencyIsActive, err := agencyActive(ctx, tx, agency)
-		if err != nil {
-			return err
-		}
-		if !agencyIsActive {
-			return domain.ErrSaleSellerNotEligible
-		}
-	}
-	return nil
-}
-
-func lockActiveDevelopment(ctx context.Context, tx pgx.Tx, developmentID string) error {
-	var id string
-	err := tx.QueryRow(ctx, `
-		SELECT id::text FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL FOR SHARE
-	`, developmentID).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.ErrReservationNotFound
-	}
-	return err
 }
 
 // lotReservedBy reports whether the lote's latest state event is the
@@ -386,7 +349,7 @@ func (repository *SaleRepository) reconcileConversion(ctx context.Context, comma
 	if err != nil {
 		return domain.Sale{}, original
 	}
-	if sale.ReservaID == nil || *sale.ReservaID != command.ReservationID || sale.UsuarioAlta.ID != command.ActorID ||
+	if sale.ReservaID == nil || *sale.ReservaID != command.ReservationID ||
 		!domain.CanConvertReservation(domain.Rol(role), command.ActorID, sale.Vendedor.ID) {
 		return domain.Sale{}, domain.ErrSaleIdempotencyConflict
 	}

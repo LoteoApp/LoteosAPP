@@ -59,7 +59,7 @@ func (useCase *convertReservationToSaleUseCase) Execute(ctx context.Context, inp
 	if err != nil {
 		return domain.Sale{}, fromRepository(err)
 	}
-	if !hasSaleRole([]string{string(actor.Rol)}) {
+	if !domain.IsSaleRole(actor.Rol) {
 		return domain.Sale{}, domain.ErrNoAutorizado
 	}
 

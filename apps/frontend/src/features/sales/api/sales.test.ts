@@ -142,11 +142,11 @@ describe('convertReservationToSale', () => {
   })
 
   it('omits the plan for contado and surfaces the backend conflict', async () => {
-    const fetchMock = stubFetch(jsonResponse(409, { code: 'reservation_expired', message: 'La reserva venció y ya no se puede convertir en venta' }))
+    const fetchMock = stubFetch(jsonResponse(409, { code: 'reservation_conversion_expired', message: 'La reserva venció y ya no se puede convertir en venta' }))
 
     await expect(
       convertReservationToSale('token-123', 'reservation-1', { modalidadPago: 'contado' }, 'convert-key-2'),
-    ).rejects.toMatchObject({ code: 'reservation_expired', status: 409 })
+    ).rejects.toMatchObject({ code: 'reservation_conversion_expired', status: 409 })
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({ modalidadPago: 'contado' })
   })

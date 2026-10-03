@@ -40,7 +40,7 @@ var (
 	ErrReservationExpired             = &Error{Kind: KindConflict, Code: "reservation_expired", Message: "La reserva ya venció y el lote fue liberado"}
 	ErrReservationConverted           = &Error{Kind: KindConflict, Code: "reservation_converted", Message: "La reserva ya fue convertida en una venta"}
 	ErrReservationAlreadyCancelled    = &Error{Kind: KindConflict, Code: "reservation_already_cancelled", Message: "La reserva ya fue cancelada"}
-	ErrReservationConversionExpired   = &Error{Kind: KindConflict, Code: "reservation_expired", Message: "La reserva venció y ya no se puede convertir en venta"}
+	ErrReservationConversionExpired   = &Error{Kind: KindConflict, Code: "reservation_conversion_expired", Message: "La reserva venció y ya no se puede convertir en venta"}
 	ErrReservationConvertForbidden    = &Error{Kind: KindForbidden, Code: "reservation_convert_forbidden", Message: "Solo el vendedor responsable o un usuario administrativo puede convertir la reserva en venta"}
 	ErrReservationInvalidState        = &Error{Kind: KindInvalid, Code: "invalid_reservation_state", Message: "El estado de la reserva no es válido"}
 	ErrReservationInvalidPage         = &Error{Kind: KindInvalid, Code: "invalid_reservation_page", Message: "La paginación solicitada no es válida"}

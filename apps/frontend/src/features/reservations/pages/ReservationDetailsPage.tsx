@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { downloadReservationReceipt, getReservation } from '../api/reservations'
 import CancelReservationDialog from '../components/CancelReservationDialog'
+import ConvertReservationLink from '../components/ConvertReservationLink'
 import ReservationDetails from '../components/ReservationDetails'
 import ReservationDetailsPageSkeleton from '../components/ReservationDetailsPageSkeleton'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
@@ -100,7 +101,7 @@ export default function ReservationDetailsPage({ accessToken = '', renderPlan }:
               <Button variant="outline" className="w-fit" onClick={handleDownloadReceipt} disabled={isDownloadingReceipt}>
                 {isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante'}
               </Button>
-              {canConvertReservation(reservation) && <Link className={buttonVariants({ className: 'w-fit' })} to={`/reservas/${reservation.id}/convertir`}>Convertir en venta</Link>}
+              {canConvertReservation(reservation) && <ConvertReservationLink reservationId={reservation.id} className={buttonVariants({ className: 'w-fit' })} />}
               {reservation.ventaId !== undefined && <Link className={buttonVariants({ variant: 'outline', className: 'w-fit' })} to={`/ventas/${reservation.ventaId}`}>Ver venta</Link>}
               {reservation.estado === 'activa' && reservation.puedeCancelar === true && <Button variant="outline" className="w-fit" onClick={() => { mutations.reset(); setIsCancelDialogOpen(true) }}>Cancelar</Button>}
               {isCancelDialogOpen && <CancelReservationDialog reservation={reservation} isSubmitting={mutations.isSubmitting} error={mutations.error} onSubmit={handleCancel} onClose={closeCancelDialog} />}

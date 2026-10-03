@@ -585,10 +585,8 @@ export type SalePaymentTerms = {
   planPago?: PaymentPlanInput
 }
 
-// What converting a reserva needs to show and check before the request. `app`
-// maps the reserva and its loteo into this shape: sales never imports the
-// reservations or lots features. The backend resolves lote, cliente,
-// vendedor and price again, so these values only inform.
+// The backend resolves lote, cliente, vendedor and price again on the
+// conversion, so these values only inform.
 export type ReservationSaleContext = {
   reservationId: string
   reservationState: string

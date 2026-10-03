@@ -681,7 +681,7 @@ Decisiones de este recorte:
   es su `reservado`), cliente activo, lote completo y, para una inmobiliaria,
   agencia asignada; lee el reloj del repositorio (inyectable, como el de
   reservas) después de todas las esperas y rechaza con
-  `reservation_expired` si llegó al vencimiento, sin tocar el lote.
+  `reservation_conversion_expired` si llegó al vencimiento, sin tocar el lote.
   `writeSale` (`postgres/sale.go`) es el bloque que comparte con `Create`:
   inserta la venta con `reserva_id`, el plan y las cuotas, mueve el lote a
   `vendido` con `reserva_id` y `venta_id` en el mismo evento y, al contado,
