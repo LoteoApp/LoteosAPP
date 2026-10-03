@@ -46,6 +46,18 @@ Cubren cosas distintas y no son redundantes:
   del proyecto realmente llama, incluyendo la librería estándar de Go (no
   solo módulos de terceros).
 
+### Excepciones de `pnpm audit`
+
+Una vulnerabilidad se corrige actualizando a la versión parcheada (o con un
+`override` en el `package.json` raíz). Solo cuando no existe parche y la
+dependencia no llega al código que corre en producción se ignora con
+`pnpm.auditConfig.ignoreGhsas`, y se registra acá con su motivo para
+quitarla en cuanto salga la corrección:
+
+| Advisory | Paquete | Motivo |
+| --- | --- | --- |
+| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` ≤ 3.0.3 (vía `shadcn > fast-glob > micromatch`) | Sin versión parcheada. Solo lo usa la CLI de `shadcn` en desarrollo; la app importa de `shadcn` únicamente `shadcn/tailwind.css`, así que no entra al bundle ni procesa patrones de usuarios. Quitar la excepción al publicarse un parche. |
+
 ## Versión de Go en CI
 
 `build`, `test`, `coverage` y `dependency-audit` usan la versión de Go
