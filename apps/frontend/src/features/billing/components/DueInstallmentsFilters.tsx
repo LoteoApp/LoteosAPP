@@ -66,7 +66,7 @@ export default function DueInstallmentsFilters({ values, developments, onChange 
           onValueChange={(value) => onChange({ ...values, state: value as DueFilter })}
         >
           <SelectTrigger id="estado-cuota">
-            <SelectValue />
+            <SelectValue>{(current: DueFilter) => DUE_FILTER_LABELS[current]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectList>

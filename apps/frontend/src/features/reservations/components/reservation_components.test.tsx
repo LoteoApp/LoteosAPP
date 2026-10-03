@@ -65,12 +65,15 @@ describe('reservation components', () => {
 		const user = userEvent.setup()
 		const onSearchChange = vi.fn()
 		const onStateChange = vi.fn()
-		render(<ReservationFilters search="Ana" state="" onSearchChange={onSearchChange} onStateChange={onStateChange} />)
+		const { rerender } = render(<ReservationFilters search="Ana" state="" onSearchChange={onSearchChange} onStateChange={onStateChange} />)
+		expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Todos')
 		await user.type(screen.getByRole('searchbox', { name: 'Buscar' }), ' Pérez')
 		expect(onSearchChange).toHaveBeenCalled()
 		await user.click(screen.getByRole('combobox', { name: 'Estado' }))
 		await user.click(await screen.findByRole('option', { name: 'Canceladas' }))
 		expect(onStateChange).toHaveBeenCalledWith('cancelada')
+		rerender(<ReservationFilters search="Ana" state="cancelada" onSearchChange={onSearchChange} onStateChange={onStateChange} />)
+		expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Canceladas')
 	})
 
 	it('renders an empty list and only offers cancellation for active reservations', async () => {

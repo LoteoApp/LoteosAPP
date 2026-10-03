@@ -6,6 +6,19 @@ import { GESTIONABLE_ROLES, ROLE_LABELS, type GestionableRol } from '../types'
 export type RolFilter = 'todos' | GestionableRol
 export type EstadoFilter = 'todos' | 'activos' | 'pendientes' | 'inactivos'
 
+const ESTADO_FILTER_LABELS: Record<EstadoFilter, string> = {
+  todos: 'Todos',
+  activos: 'Activos',
+  pendientes: 'Invitación pendiente',
+  inactivos: 'Dados de baja',
+}
+
+const ESTADO_FILTERS = Object.keys(ESTADO_FILTER_LABELS) as EstadoFilter[]
+
+function rolFilterLabel(filter: RolFilter) {
+  return filter === 'todos' ? 'Todos' : ROLE_LABELS[filter]
+}
+
 type UsersFiltersProps = {
   search: string
   rolFilter: RolFilter
@@ -39,14 +52,13 @@ export default function UsersFilters({
           onValueChange={(value) => onRolFilterChange(value as RolFilter)}
         >
           <SelectTrigger id="filtro-rol" className="sm:w-48">
-            <SelectValue />
+            <SelectValue>{(current: RolFilter) => rolFilterLabel(current)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectList>
-              <SelectItem value="todos">Todos</SelectItem>
-              {GESTIONABLE_ROLES.map((candidate) => (
+              {(['todos', ...GESTIONABLE_ROLES] as const).map((candidate) => (
                 <SelectItem key={candidate} value={candidate}>
-                  {ROLE_LABELS[candidate]}
+                  {rolFilterLabel(candidate)}
                 </SelectItem>
               ))}
             </SelectList>
@@ -60,14 +72,15 @@ export default function UsersFilters({
           onValueChange={(value) => onEstadoFilterChange(value as EstadoFilter)}
         >
           <SelectTrigger id="filtro-estado" className="sm:w-48">
-            <SelectValue />
+            <SelectValue>{(current: EstadoFilter) => ESTADO_FILTER_LABELS[current]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectList>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="activos">Activos</SelectItem>
-              <SelectItem value="pendientes">Invitación pendiente</SelectItem>
-              <SelectItem value="inactivos">Dados de baja</SelectItem>
+              {ESTADO_FILTERS.map((candidate) => (
+                <SelectItem key={candidate} value={candidate}>
+                  {ESTADO_FILTER_LABELS[candidate]}
+                </SelectItem>
+              ))}
             </SelectList>
           </SelectContent>
         </Select>
