@@ -97,11 +97,13 @@ describe('BillingPage', () => {
       expect(listDueInstallmentsMock).toHaveBeenLastCalledWith('token', { estado: 'pendientes', pagina: 2 }, expect.anything()),
     )
 
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('A cobrar')
     await user.click(screen.getByRole('combobox', { name: 'Estado' }))
     await user.click(await screen.findByRole('option', { name: 'Vencidas' }))
     await waitFor(() =>
       expect(listDueInstallmentsMock).toHaveBeenLastCalledWith('token', { estado: 'vencida', pagina: 1 }, expect.anything()),
     )
+    expect(screen.getByRole('combobox', { name: 'Estado' })).toHaveTextContent('Vencidas')
 
     await user.type(screen.getByLabelText('Buscar'), 'Ana')
     await waitFor(() =>
