@@ -129,7 +129,7 @@ export default function UserForm(props: UserFormProps) {
                 onValueChange={(value) => handleRolChange(value as GestionableRol)}
               >
                 <SelectTrigger id="rol">
-                  <SelectValue />
+                  <SelectValue>{(current: GestionableRol) => ROLE_LABELS[current]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectList>
