@@ -1,7 +1,17 @@
 import { Input } from '../../../shared/ui/input'
 import { Field, FieldLabel } from '../../../shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
-import type { ReservationState } from '../types'
+import { RESERVATION_STATES, type ReservationState } from '../types'
+
+type StateFilter = ReservationState | 'todos'
+
+const STATE_FILTER_LABELS: Record<StateFilter, string> = {
+  todos: 'Todos',
+  activa: 'Activas',
+  vencida: 'Vencidas',
+  cancelada: 'Canceladas',
+  convertida: 'Convertidas',
+}
 
 type Props = {
   search: string
@@ -27,15 +37,15 @@ export default function ReservationFilters({ search, state, onSearchChange, onSt
         <FieldLabel htmlFor="estado-reserva">Estado</FieldLabel>
         <Select value={state || 'todos'} onValueChange={(value) => onStateChange(value === 'todos' ? '' : value as ReservationState)}>
           <SelectTrigger id="estado-reserva">
-            <SelectValue />
+            <SelectValue>{(current: StateFilter) => STATE_FILTER_LABELS[current]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectList>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="activa">Activas</SelectItem>
-              <SelectItem value="vencida">Vencidas</SelectItem>
-              <SelectItem value="cancelada">Canceladas</SelectItem>
-              <SelectItem value="convertida">Convertidas</SelectItem>
+              {(['todos', ...RESERVATION_STATES] as const).map((candidate) => (
+                <SelectItem key={candidate} value={candidate}>
+                  {STATE_FILTER_LABELS[candidate]}
+                </SelectItem>
+              ))}
             </SelectList>
           </SelectContent>
         </Select>
