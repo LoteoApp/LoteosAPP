@@ -14,6 +14,11 @@ type SaleRepository struct {
 	CreateResult  domain.Sale
 	CreateCommand gateway.CreateSaleCommand
 
+	ConvertCalls   int
+	ConvertErr     error
+	ConvertResult  domain.Sale
+	ConvertCommand gateway.ConvertReservationCommand
+
 	ListCalls  int
 	ListErr    error
 	ListResult domain.SalePage
@@ -34,6 +39,15 @@ func (fake *SaleRepository) Create(_ context.Context, command gateway.CreateSale
 		return domain.Sale{}, fake.CreateErr
 	}
 	return fake.CreateResult, nil
+}
+
+func (fake *SaleRepository) ConvertReservation(_ context.Context, command gateway.ConvertReservationCommand) (domain.Sale, error) {
+	fake.ConvertCalls++
+	fake.ConvertCommand = command
+	if fake.ConvertErr != nil {
+		return domain.Sale{}, fake.ConvertErr
+	}
+	return fake.ConvertResult, nil
 }
 
 func (fake *SaleRepository) List(_ context.Context, filter domain.SaleListFilter, scope gateway.SaleScope) (domain.SalePage, error) {

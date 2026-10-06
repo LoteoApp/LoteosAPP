@@ -8,13 +8,14 @@ import { Alert, AlertDescription, AlertTitle } from '../shared/ui/alert'
 import { Button } from '../shared/ui/button'
 import LoteoDetailPage from '../features/lots/pages/LoteoDetailPage'
 import CancelReservationDialog from '../features/reservations/components/CancelReservationDialog'
+import ConvertReservationLink from '../features/reservations/components/ConvertReservationLink'
 import ReservationsList from '../features/reservations/components/ReservationsList'
 import ReservationsPagination from '../features/reservations/components/ReservationsPagination'
 import ReserveLotDialog from '../features/reservations/components/ReserveLotDialog'
 import SellLotLink from '../features/sales/components/SellLotLink'
 import { useReservationMutations } from '../features/reservations/hooks/use-reservation-mutations'
 import { useReservations } from '../features/reservations/hooks/use-reservations'
-import type { Reservation } from '../features/reservations/types'
+import { canConvertReservation, type Reservation } from '../features/reservations/types'
 import type { LoteoDetail, LoteoLote } from '../features/lots/types'
 import { useParams } from 'react-router'
 
@@ -206,6 +207,12 @@ function LotReservationSummary({
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
+        {canConvertReservation(reservation) && (
+          <ConvertReservationLink
+            reservationId={reservation.id}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-lot-reserved-foreground px-3 text-sm font-medium text-lot-reserved hover:bg-lot-reserved-foreground/90 [&_svg]:size-4"
+          />
+        )}
         {reservation.puedeCancelar === true && <Button
             type="button"
             variant="outline"

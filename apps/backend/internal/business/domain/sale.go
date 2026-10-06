@@ -107,6 +107,8 @@ type Sale struct {
 	FechaCreacion     time.Time          `json:"fechaCreacion"`
 	FechaModificacion time.Time          `json:"fechaModificacion"`
 	Historial         []SaleHistoryEntry `json:"historial,omitempty"`
+	// ReservaID is set only on a venta converted from a reserva.
+	ReservaID *string `json:"reservaId,omitempty"`
 }
 
 type SaleListFilter struct {

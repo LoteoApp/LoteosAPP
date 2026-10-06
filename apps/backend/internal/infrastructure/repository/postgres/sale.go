@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,16 +16,27 @@ import (
 const (
 	saleActiveIndex      = "ventas_lote_id_activa_idx"
 	saleIdempotencyIndex = "ventas_usuario_alta_idempotency_key_idx"
+	saleReservationIndex = "ventas_reserva_id_idx"
 	saleRetryCount       = 3
 	saleSettledReason    = "Pago al contado"
 )
 
 type SaleRepository struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	clock reservationClock
+	// afterConversionWrite lets tests fail a conversion after its writes and
+	// before commit; it is nil outside tests.
+	afterConversionWrite func(ctx context.Context, tx pgx.Tx) error
 }
 
-func NewSaleRepository(pool *pgxpool.Pool) *SaleRepository {
-	return &SaleRepository{pool: pool}
+// NewSaleRepository reads the conversion instant from clocks[0] when given,
+// after the conversion's locks are held, so a wait never extends a reserva.
+func NewSaleRepository(pool *pgxpool.Pool, clocks ...reservationClock) *SaleRepository {
+	clock := reservationClock(systemReservationClock{})
+	if len(clocks) > 0 && clocks[0] != nil {
+		clock = clocks[0]
+	}
+	return &SaleRepository{pool: pool, clock: clock}
 }
 
 // Create registers the venta and moves the lote to vendido in one
@@ -59,16 +71,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	}
 	defer rollbackTransaction(tx)
 
-	var developmentID string
-	err = tx.QueryRow(ctx, `
-		SELECT id::text
-		FROM loteos
-		WHERE id = $1::uuid AND fecha_baja IS NULL
-		FOR SHARE
-	`, command.DevelopmentID).Scan(&developmentID)
-	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
-		return domain.Sale{}, domain.ErrLoteNotFound
-	}
+	developmentID, err := lockActiveDevelopment(ctx, tx, command.DevelopmentID, domain.ErrLoteNotFound)
 	if err != nil {
 		return domain.Sale{}, err
 	}
@@ -130,29 +133,14 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		return domain.Sale{}, err
 	}
 
-	sellerRole, sellerAgency, sellerActive, err := lockSeller(ctx, tx, command.SellerID)
+	sellerAgency, err := lockEligibleSeller(ctx, tx, command.SellerID)
 	if err != nil {
-		if errors.Is(err, domain.ErrReservationSellerNotEligible) {
-			return domain.Sale{}, domain.ErrSaleSellerNotEligible
-		}
 		return domain.Sale{}, err
 	}
-	if !sellerActive || !domain.IsSaleRole(sellerRole) {
-		return domain.Sale{}, domain.ErrSaleSellerNotEligible
-	}
 	// An agency user sells for their own agency only; the seller's agency
-	// itself must still be active, though it needn't be assigned to the loteo.
+	// needn't be assigned to the loteo.
 	if actorRole == domain.RolInmobiliaria && !sameString(actorAgency, sellerAgency) {
 		return domain.Sale{}, domain.ErrSaleSellerNotEligible
-	}
-	if sellerRole == domain.RolInmobiliaria {
-		active, activeErr := agencyActive(ctx, tx, sellerAgency)
-		if activeErr != nil {
-			return domain.Sale{}, activeErr
-		}
-		if !active {
-			return domain.Sale{}, domain.ErrSaleSellerNotEligible
-		}
 	}
 
 	if err := lockActiveClient(ctx, tx, command.ClientID); err != nil {
@@ -168,58 +156,24 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 	if lotState != domain.LotStateAvailable {
 		return domain.Sale{}, domain.ErrSaleLotUnavailable
 	}
-	if err := domain.ValidatePaymentPlan(command.PaymentMethod, command.PaymentPlan); err != nil {
-		return domain.Sale{}, err
-	}
-	var schedule domain.PaymentSchedule
-	if command.PaymentPlan != nil {
-		schedule, err = domain.BuildPaymentSchedule(*lotPrice, *command.PaymentPlan, command.CreatedAt)
-		if err != nil {
-			return domain.Sale{}, err
-		}
-	}
 
-	var saleID string
-	err = tx.QueryRow(ctx, `
-		INSERT INTO ventas (
-			lote_id, cliente_id, modalidad_pago, monto, moneda, vendedor_id, usuario_alta,
-			fecha_creacion, fecha_modificacion, idempotency_key, idempotency_payload_hash
-		)
-		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid, $8, $8, $9, $10)
-		RETURNING id::text
-	`, command.LotID, command.ClientID, command.PaymentMethod, *lotPrice, currency,
-		command.SellerID, command.ActorID, command.CreatedAt,
-		command.IdempotencyKey, command.IdempotencyPayloadHash).Scan(&saleID)
+	saleID, err := writeSale(ctx, tx, saleWrite{
+		developmentID:          developmentID,
+		lotID:                  command.LotID,
+		lotState:               lotState,
+		clientID:               command.ClientID,
+		sellerID:               command.SellerID,
+		actorID:                command.ActorID,
+		method:                 command.PaymentMethod,
+		plan:                   command.PaymentPlan,
+		price:                  *lotPrice,
+		currency:               currency,
+		createdAt:              command.CreatedAt,
+		idempotencyKey:         command.IdempotencyKey,
+		idempotencyPayloadHash: command.IdempotencyPayloadHash,
+	})
 	if err != nil {
-		if isConstraint(err, saleIdempotencyIndex) {
-			return domain.Sale{}, errRetrySaleWrite
-		}
-		if isConstraint(err, saleActiveIndex) {
-			return domain.Sale{}, domain.ErrSaleActiveConflict
-		}
 		return domain.Sale{}, err
-	}
-	if command.PaymentPlan != nil {
-		if err := insertPaymentPlan(ctx, tx, saleID, currency, command, schedule); err != nil {
-			return domain.Sale{}, err
-		}
-	}
-
-	if _, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
-		DevelopmentID: developmentID,
-		LotID:         command.LotID,
-		ExpectedState: domain.LotStateAvailable,
-		NextState:     domain.LotStateSold,
-		Origin:        domain.LotStateOriginSale,
-		ActorID:       command.ActorID,
-		SaleID:        stringReference(saleID),
-	}, lotState); err != nil {
-		return domain.Sale{}, err
-	}
-	if command.PaymentMethod.SettlesOnRegistration() {
-		if err := settleSale(ctx, tx, saleID, developmentID, command); err != nil {
-			return domain.Sale{}, err
-		}
 	}
 
 	sale, err := loadSale(ctx, tx, saleID, gateway.SaleScope{}, true)
@@ -342,7 +296,7 @@ const saleColumns = `
 	COALESCE(plan.tasa_interes, 0)::float8, COALESCE(plan.periodicidad, ''), COALESCE(plan.moneda, ''),
 	COALESCE((SELECT c1.monto FROM cuotas c1 WHERE c1.plan_pago_id = plan.id AND c1.numero = 1), 0)::float8,
 	COALESCE((SELECT sum(cs.monto) FROM cuotas cs WHERE cs.plan_pago_id = plan.id), 0)::float8,
-	v.estado_actual, v.fecha_creacion, v.fecha_modificacion`
+	v.estado_actual, v.fecha_creacion, v.fecha_modificacion, v.reserva_id::text`
 
 // saleScopePredicate keeps an agency actor within the sales of their own
 // agency: the seller's agency, since ventas doesn't store one.
@@ -382,10 +336,93 @@ func loadSale(ctx context.Context, queryer reservationQueryer, id string, scope 
 	return sale, nil
 }
 
-func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID, currency string, command gateway.CreateSaleCommand, schedule domain.PaymentSchedule) error {
+// saleWrite is a venta whose lote, participants and guards the caller has
+// already locked and checked; reservationID is set only on a conversion.
+type saleWrite struct {
+	developmentID          string
+	lotID                  string
+	lotState               domain.LotState
+	clientID               string
+	sellerID               string
+	actorID                string
+	reservationID          *string
+	method                 domain.PaymentMethod
+	plan                   *domain.PaymentPlanInput
+	price                  float64
+	currency               string
+	createdAt              time.Time
+	idempotencyKey         string
+	idempotencyPayloadHash string
+}
+
+// writeSale inserts the venta with its plan and cuotas, moves the locked lote
+// to vendido and, for contado, settles both at once. It returns the venta id.
+func writeSale(ctx context.Context, tx pgx.Tx, write saleWrite) (string, error) {
+	if err := domain.ValidatePaymentPlan(write.method, write.plan); err != nil {
+		return "", err
+	}
+	var schedule domain.PaymentSchedule
+	if write.plan != nil {
+		var err error
+		schedule, err = domain.BuildPaymentSchedule(write.price, *write.plan, write.createdAt)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	var saleID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO ventas (
+			lote_id, cliente_id, modalidad_pago, monto, moneda, vendedor_id, usuario_alta,
+			fecha_creacion, fecha_modificacion, idempotency_key, idempotency_payload_hash, reserva_id
+		)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid, $8, $8, $9, $10, $11::uuid)
+		RETURNING id::text
+	`, write.lotID, write.clientID, write.method, write.price, write.currency,
+		write.sellerID, write.actorID, write.createdAt,
+		write.idempotencyKey, write.idempotencyPayloadHash, write.reservationID).Scan(&saleID)
+	if err != nil {
+		if isConstraint(err, saleIdempotencyIndex) {
+			return "", errRetrySaleWrite
+		}
+		if isConstraint(err, saleActiveIndex) {
+			return "", domain.ErrSaleActiveConflict
+		}
+		if isConstraint(err, saleReservationIndex) {
+			return "", domain.ErrReservationConverted
+		}
+		return "", err
+	}
+	if write.plan != nil {
+		if err := insertPaymentPlan(ctx, tx, saleID, write, schedule); err != nil {
+			return "", err
+		}
+	}
+
+	if _, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
+		DevelopmentID: write.developmentID,
+		LotID:         write.lotID,
+		ExpectedState: write.lotState,
+		NextState:     domain.LotStateSold,
+		Origin:        domain.LotStateOriginSale,
+		ActorID:       write.actorID,
+		ReservationID: write.reservationID,
+		SaleID:        stringReference(saleID),
+	}, write.lotState); err != nil {
+		return "", err
+	}
+	if write.method.SettlesOnRegistration() {
+		if err := settleSale(ctx, tx, saleID, write); err != nil {
+			return "", err
+		}
+	}
+	return saleID, nil
+}
+
+func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID string, write saleWrite, schedule domain.PaymentSchedule) error {
 	var downPayment *float64
-	if command.PaymentMethod == domain.PaymentMethodDownAndFi {
-		downPayment = &command.PaymentPlan.DownPayment
+	if write.method == domain.PaymentMethodDownAndFi {
+		downPayment = &write.plan.DownPayment
 	}
 	var planID string
 	err := tx.QueryRow(ctx, `
@@ -395,15 +432,15 @@ func insertPaymentPlan(ctx context.Context, tx pgx.Tx, saleID, currency string, 
 		)
 		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::uuid, $8, $8)
 		RETURNING id::text
-	`, saleID, downPayment, command.PaymentPlan.Installments, command.PaymentPlan.InterestRate,
-		string(command.PaymentPlan.Period), currency, command.ActorID, command.CreatedAt).Scan(&planID)
+	`, saleID, downPayment, write.plan.Installments, write.plan.InterestRate,
+		string(write.plan.Period), write.currency, write.actorID, write.createdAt).Scan(&planID)
 	if err != nil {
 		return err
 	}
 	rows := make([][]any, len(schedule.Installments))
 	for i, installment := range schedule.Installments {
 		rows[i] = []any{planID, installment.Numero, installment.Monto, string(installment.Estado),
-			installment.FechaVencimiento, command.ActorID, command.CreatedAt, command.CreatedAt}
+			installment.FechaVencimiento, write.actorID, write.createdAt, write.createdAt}
 	}
 	_, err = tx.CopyFrom(ctx, pgx.Identifier{"cuotas"},
 		[]string{"plan_pago_id", "numero", "monto", "estado", "fecha_vencimiento", "usuario_modificacion", "fecha_creacion", "fecha_modificacion"},
@@ -492,7 +529,7 @@ func (row *saleRow) targets() []any {
 		&row.planID, &row.plan.MontoEntrega, &row.planCuotas,
 		&row.plan.TasaInteres, &row.plan.Periodicidad, &row.plan.Moneda,
 		&row.plan.MontoCuota, &row.plan.MontoTotal,
-		&row.sale.Estado, &row.sale.FechaCreacion, &row.sale.FechaModificacion,
+		&row.sale.Estado, &row.sale.FechaCreacion, &row.sale.FechaModificacion, &row.sale.ReservaID,
 	}
 }
 
@@ -533,6 +570,45 @@ func scanSaleWithTotal(scanner reservationScanner) (domain.Sale, int64, error) {
 	return row.assemble(), total, nil
 }
 
+// lockActiveDevelopment share-locks a loteo that isn't given de baja and
+// returns its canonical id, or notFound.
+func lockActiveDevelopment(ctx context.Context, tx pgx.Tx, developmentID string, notFound error) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		SELECT id::text FROM loteos WHERE id = $1::uuid AND fecha_baja IS NULL FOR SHARE
+	`, developmentID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
+		return "", notFound
+	}
+	return id, err
+}
+
+// lockEligibleSeller is who may be the vendedor of a venta: an active user
+// with a sales role whose agency, if any, is still active. It returns the
+// seller's agency.
+func lockEligibleSeller(ctx context.Context, tx pgx.Tx, sellerID string) (*string, error) {
+	role, agency, active, err := lockSeller(ctx, tx, sellerID)
+	if errors.Is(err, domain.ErrReservationSellerNotEligible) {
+		return nil, domain.ErrSaleSellerNotEligible
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !active || !domain.IsSaleRole(role) {
+		return nil, domain.ErrSaleSellerNotEligible
+	}
+	if role == domain.RolInmobiliaria {
+		agencyIsActive, err := agencyActive(ctx, tx, agency)
+		if err != nil {
+			return nil, err
+		}
+		if !agencyIsActive {
+			return nil, domain.ErrSaleSellerNotEligible
+		}
+	}
+	return agency, nil
+}
+
 func agencyActive(ctx context.Context, tx pgx.Tx, agencyID *string) (bool, error) {
 	if agencyID == nil {
 		return false, nil
@@ -553,20 +629,20 @@ func agencyActive(ctx context.Context, tx pgx.Tx, agencyID *string) (bool, error
 // moves to completada and the lote, already vendido in this transaction, to
 // finalizado. The estado row uses clock_timestamp() so it sorts after the
 // activa row the ventas_seed_estado_inicial trigger stamped with now().
-func settleSale(ctx context.Context, tx pgx.Tx, saleID, developmentID string, command gateway.CreateSaleCommand) error {
+func settleSale(ctx context.Context, tx pgx.Tx, saleID string, write saleWrite) error {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO venta_estados (venta_id, estado, razon, usuario_modificacion, fecha_creacion)
 		VALUES ($1::uuid, $2, $3, $4::uuid, clock_timestamp())
-	`, saleID, string(domain.SaleStateCompleted), saleSettledReason, command.ActorID); err != nil {
+	`, saleID, string(domain.SaleStateCompleted), saleSettledReason, write.actorID); err != nil {
 		return err
 	}
 	_, err := transitionLotStateWithLockedLot(ctx, tx, domain.LotStateTransition{
-		DevelopmentID: developmentID,
-		LotID:         command.LotID,
+		DevelopmentID: write.developmentID,
+		LotID:         write.lotID,
 		ExpectedState: domain.LotStateSold,
 		NextState:     domain.LotStateCompleted,
 		Origin:        domain.LotStateOriginSale,
-		ActorID:       command.ActorID,
+		ActorID:       write.actorID,
 		SaleID:        stringReference(saleID),
 	}, domain.LotStateSold)
 	return err

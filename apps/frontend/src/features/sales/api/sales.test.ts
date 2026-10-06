@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSale, getSale, listSales } from './sales'
+import { convertReservationToSale, createSale, getSale, listSales } from './sales'
 
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
 
@@ -110,6 +110,45 @@ describe('getSale', () => {
     stubFetch(jsonResponse(200, { id: 'sale-1' }))
 
     await expect(getSale('token-123', 'sale-1')).rejects.toThrow(GENERIC_ERROR)
+  })
+
+  it('reads the reserva a converted sale came from', async () => {
+    stubFetch(jsonResponse(200, { ...sale, reservaId: 'reservation-1' }))
+    await expect(getSale('token-123', 'sale-1')).resolves.toMatchObject({ reservaId: 'reservation-1' })
+
+    stubFetch(jsonResponse(200, { ...sale, reservaId: 7 }))
+    await expect(getSale('token-123', 'sale-1')).rejects.toThrow(GENERIC_ERROR)
+  })
+})
+
+describe('convertReservationToSale', () => {
+  it('posts only the payment terms with the idempotency key', async () => {
+    const fetchMock = stubFetch(jsonResponse(201, { ...sale, reservaId: 'reservation 1' }))
+
+    const created = await convertReservationToSale('token-123', 'reservation 1', {
+      modalidadPago: 'financiado',
+      planPago: { cantidadCuotas: 12, tasaInteres: 0, periodicidad: 'mensual', montoEntrega: 0 },
+    }, 'convert-key-1')
+
+    expect(created.reservaId).toBe('reservation 1')
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toContain('/api/v1/reservas/reservation%201/convertir')
+    expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('convert-key-1')
+    expect(JSON.parse(String(init.body))).toEqual({
+      modalidadPago: 'financiado',
+      planPago: { cantidadCuotas: 12, tasaInteres: 0, periodicidad: 'mensual', montoEntrega: 0 },
+    })
+  })
+
+  it('omits the plan for contado and surfaces the backend conflict', async () => {
+    const fetchMock = stubFetch(jsonResponse(409, { code: 'reservation_conversion_expired', message: 'La reserva venció y ya no se puede convertir en venta' }))
+
+    await expect(
+      convertReservationToSale('token-123', 'reservation-1', { modalidadPago: 'contado' }, 'convert-key-2'),
+    ).rejects.toMatchObject({ code: 'reservation_conversion_expired', status: 409 })
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({ modalidadPago: 'contado' })
   })
 })
 
