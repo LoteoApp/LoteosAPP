@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -47,8 +48,12 @@ var (
 	ErrSaleInvalidDownPayment       = &Error{Kind: KindInvalid, Code: "invalid_sale_down_payment", Message: "La entrega tiene que ser mayor a cero y menor al precio del lote"}
 	ErrSaleDownPaymentNotApplicable = &Error{Kind: KindInvalid, Code: "sale_down_payment_not_applicable", Message: "Solo entrega + financiación lleva un monto de entrega"}
 	ErrSaleInstallmentTooSmall      = &Error{Kind: KindInvalid, Code: "sale_installment_too_small", Message: "El monto financiado no alcanza para esa cantidad de cuotas"}
-	ErrInvalidInstallmentDueDay     = &Error{Kind: KindInvalid, Code: "invalid_installment_due_day", Message: "El día de vencimiento de las cuotas no es válido"}
 )
+
+// ErrInvalidInstallmentDueDay must not become a *Error: an out-of-range due
+// day is a server misconfiguration, not a bad request, so it has to surface
+// as a generic 500.
+var ErrInvalidInstallmentDueDay = fmt.Errorf("installment due day must be between %d and %d", MinInstallmentDueDay, MaxInstallmentDueDay)
 
 // IsValidInstallmentDueDay reports whether a day of the month can be used as
 // the due day of every installment.
@@ -197,8 +202,7 @@ func RoundMoney(value float64) float64 {
 // Jan 5 and one on Jan 31 are both due Feb 10, Mar 10...), keeping the sale
 // date's clock. The sale month and clock are read in BusinessLocation, so a
 // sale at 01:00 UTC on Feb 1 (still Jan 31 in Argentina) is due Feb 10 at
-// 22:00 there; due dates are returned in UTC. dueDay is a deployment-wide
-// setting, not a per-sale one.
+// 22:00 there; due dates are returned in UTC.
 func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time, dueDay int) (PaymentSchedule, error) {
 	if !IsValidInstallmentDueDay(dueDay) {
 		return PaymentSchedule{}, ErrInvalidInstallmentDueDay

@@ -37,6 +37,13 @@ func validInput() sales.CreateSaleInput {
 	}
 }
 
+func financedInput() sales.CreateSaleInput {
+	input := validInput()
+	input.PaymentMethod = string(domain.PaymentMethodFinanced)
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
+	return input
+}
+
 func sha256Hex(payload string) string {
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
@@ -79,26 +86,31 @@ func TestCreateSaleCarriesTheConfiguredDueDay(t *testing.T) {
 	repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
 
 	useCase := sales.NewCreateSale(repository, users, 5)
-	if _, err := useCase.Execute(context.Background(), validInput()); err != nil {
+	if _, err := useCase.Execute(context.Background(), financedInput()); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if repository.CreateCommand.InstallmentDueDay != 5 {
-		t.Errorf("due day = %d, want the configured 5", repository.CreateCommand.InstallmentDueDay)
+	command := repository.CreateCommand
+	if command.PaymentPlan == nil {
+		t.Fatal("command has no payment plan, want the financed plan")
 	}
-
+	if command.InstallmentDueDay != 5 {
+		t.Errorf("due day = %d, want the configured 5", command.InstallmentDueDay)
+	}
 }
 
 func TestCreateSaleRejectsAFinancedSaleWithAnInvalidDueDay(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
-	financed := validInput()
-	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
-	financed.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
 
 	for _, day := range []int{0, domain.MaxInstallmentDueDay + 1, 31} {
 		repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
 		useCase := sales.NewCreateSale(repository, users, day)
-		if _, err := useCase.Execute(context.Background(), financed); !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
+		_, err := useCase.Execute(context.Background(), financedInput())
+		if !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
 			t.Errorf("Execute() with day %d error = %v, want %v", day, err, domain.ErrInvalidInstallmentDueDay)
+		}
+		var domainErr *domain.Error
+		if errors.As(err, &domainErr) {
+			t.Errorf("Execute() with day %d error = %#v, want a misconfiguration error rather than a request error", day, domainErr)
 		}
 		if repository.CreateCalls != 0 {
 			t.Errorf("Execute() with day %d created the sale %d times, want none", day, repository.CreateCalls)

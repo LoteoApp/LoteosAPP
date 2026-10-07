@@ -79,30 +79,43 @@ func TestConvertReservationToSaleHashesTheTermsAndTheReserva(t *testing.T) {
 	}
 }
 
+func financedConversion() sales.ConvertReservationToSaleInput {
+	input := validConversion()
+	input.PaymentMethod = string(domain.PaymentMethodFinanced)
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
+	return input
+}
+
 func TestConvertReservationToSaleCarriesTheConfiguredDueDay(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
 
 	useCase := sales.NewConvertReservationToSale(repository, users, 5)
-	if _, err := useCase.Execute(context.Background(), validConversion()); err != nil {
+	if _, err := useCase.Execute(context.Background(), financedConversion()); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if repository.ConvertCommand.InstallmentDueDay != 5 {
-		t.Errorf("due day = %d, want the configured 5", repository.ConvertCommand.InstallmentDueDay)
+	command := repository.ConvertCommand
+	if command.PaymentPlan == nil {
+		t.Fatal("command has no payment plan, want the financed plan")
+	}
+	if command.InstallmentDueDay != 5 {
+		t.Errorf("due day = %d, want the configured 5", command.InstallmentDueDay)
 	}
 }
 
 func TestConvertReservationToSaleRejectsAFinancedSaleWithAnInvalidDueDay(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
-	financed := validConversion()
-	financed.PaymentMethod = string(domain.PaymentMethodFinanced)
-	financed.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
 
 	for _, day := range []int{0, domain.MaxInstallmentDueDay + 1, 31} {
 		repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
 		useCase := sales.NewConvertReservationToSale(repository, users, day)
-		if _, err := useCase.Execute(context.Background(), financed); !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
+		_, err := useCase.Execute(context.Background(), financedConversion())
+		if !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
 			t.Errorf("Execute() with day %d error = %v, want %v", day, err, domain.ErrInvalidInstallmentDueDay)
+		}
+		var domainErr *domain.Error
+		if errors.As(err, &domainErr) {
+			t.Errorf("Execute() with day %d error = %#v, want a misconfiguration error rather than a request error", day, domainErr)
 		}
 		if repository.ConvertCalls != 0 {
 			t.Errorf("Execute() with day %d converted the reserva %d times, want none", day, repository.ConvertCalls)

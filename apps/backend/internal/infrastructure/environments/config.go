@@ -117,10 +117,6 @@ func loadReservationExpiry() (ReservationExpiry, error) {
 	return ReservationExpiry{Enabled: enabled, Interval: interval, Batch: batch, Timeout: timeout}, nil
 }
 
-// loadInstallmentDueDay reads the day of the month every installment falls
-// due on. It is a business rule that changes per deployment, not per sale, so
-// an invalid value is rejected here at startup instead of when a sale is
-// registered.
 func loadInstallmentDueDay() (int, error) {
 	raw := envOrDefault("INSTALLMENT_DUE_DAY", strconv.Itoa(domain.DefaultInstallmentDueDay))
 	day, err := strconv.Atoi(raw)

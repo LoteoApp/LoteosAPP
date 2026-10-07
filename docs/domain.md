@@ -376,13 +376,13 @@ cuotas y puede diferir del interés exacto en unos centavos (4.600 en 12
 cuotas son 12 de 383,33 = 4.599,96). Si la cuota queda por debajo de un
 centavo, la venta se rechaza.
 
-Vencimientos: toda cuota vence el **mismo día de cada mes**, hoy el **10**.
-La cuota `k` vence ese día del mes que resulta de sumar `k` períodos al mes
-de la venta, sin importar qué día del mes se vendió: una venta del 5 de enero
-y una del 31 de enero, ambas con cuotas mensuales, vencen el 10 de febrero,
-el 10 de marzo, el 10 de abril… Con cuotas trimestrales, una venta del 15 de
-enero vence el 10 de abril, el 10 de julio, etc. No se ingresa una fecha de
-primer vencimiento.
+Vencimientos: toda cuota vence el **mismo día de cada mes**, por defecto el
+**10**. La cuota `k` vence ese día del mes que resulta de sumar `k` períodos
+al mes de la venta, sin importar qué día del mes se vendió: una venta del 5
+de enero y una del 31 de enero, ambas con cuotas mensuales, vencen el 10 de
+febrero, el 10 de marzo, el 10 de abril… Con cuotas trimestrales, una venta
+del 15 de enero vence el 10 de abril, el 10 de julio, etc. No se ingresa una
+fecha de primer vencimiento.
 
 El mes de la venta y el día de vencimiento se calculan en hora de Argentina
 (UTC-3), no en UTC: una venta registrada el 1 de febrero a las 01:00 UTC

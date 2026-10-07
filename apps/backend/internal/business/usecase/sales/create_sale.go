@@ -61,8 +61,7 @@ type createSaleUseCase struct {
 	clock      Clock
 }
 
-// NewCreateSale takes the day of the month every installment falls due on,
-// which the composition root reads from the environment.
+// NewCreateSale takes the day of the month every installment falls due on.
 func NewCreateSale(repository gateway.SaleRepository, users gateway.UserRepository, dueDay int, clocks ...Clock) CreateSale {
 	clock := Clock(SystemClock{})
 	if len(clocks) > 0 && clocks[0] != nil {
@@ -97,7 +96,7 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 		return domain.Sale{}, err
 	}
 	if plan != nil && !domain.IsValidInstallmentDueDay(useCase.dueDay) {
-		return domain.Sale{}, domain.ErrInvalidInstallmentDueDay
+		return domain.Sale{}, fmt.Errorf("create sale with installment due day %d: %w", useCase.dueDay, domain.ErrInvalidInstallmentDueDay)
 	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)

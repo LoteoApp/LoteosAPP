@@ -36,7 +36,7 @@ type convertReservationToSaleUseCase struct {
 }
 
 // NewConvertReservationToSale takes the day of the month every installment
-// falls due on, which the composition root reads from the environment.
+// falls due on.
 func NewConvertReservationToSale(repository gateway.SaleRepository, users gateway.UserRepository, dueDay int) ConvertReservationToSale {
 	return &convertReservationToSaleUseCase{repository: repository, users: users, dueDay: dueDay}
 }
@@ -58,7 +58,7 @@ func (useCase *convertReservationToSaleUseCase) Execute(ctx context.Context, inp
 		return domain.Sale{}, err
 	}
 	if plan != nil && !domain.IsValidInstallmentDueDay(useCase.dueDay) {
-		return domain.Sale{}, domain.ErrInvalidInstallmentDueDay
+		return domain.Sale{}, fmt.Errorf("convert reservation with installment due day %d: %w", useCase.dueDay, domain.ErrInvalidInstallmentDueDay)
 	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
