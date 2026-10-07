@@ -25,7 +25,7 @@ func validConversion() sales.ConvertReservationToSaleInput {
 func TestConvertReservationToSaleBuildsTheCommandFromTheReserva(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
-	useCase := sales.NewConvertReservationToSale(repository, users)
+	useCase := sales.NewConvertReservationToSale(repository, users, domain.DefaultInstallmentDueDay)
 
 	sale, err := useCase.Execute(context.Background(), validConversion())
 	if err != nil {
@@ -52,7 +52,7 @@ func TestConvertReservationToSaleBuildsTheCommandFromTheReserva(t *testing.T) {
 func TestConvertReservationToSaleHashesTheTermsAndTheReserva(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{}
-	useCase := sales.NewConvertReservationToSale(repository, users)
+	useCase := sales.NewConvertReservationToSale(repository, users, domain.DefaultInstallmentDueDay)
 
 	financed := validConversion()
 	financed.PaymentMethod = " financiado "
@@ -76,6 +76,59 @@ func TestConvertReservationToSaleHashesTheTermsAndTheReserva(t *testing.T) {
 	}
 	if repository.ConvertCommand.IdempotencyPayloadHash == financedHash {
 		t.Error("another reserva must produce another payload hash")
+	}
+}
+
+func financedConversion() sales.ConvertReservationToSaleInput {
+	input := validConversion()
+	input.PaymentMethod = string(domain.PaymentMethodFinanced)
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
+	return input
+}
+
+func TestConvertReservationToSaleCarriesTheConfiguredDueDay(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
+
+	useCase := sales.NewConvertReservationToSale(repository, users, 5)
+	if _, err := useCase.Execute(context.Background(), financedConversion()); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	command := repository.ConvertCommand
+	if command.PaymentPlan == nil {
+		t.Fatal("command has no payment plan, want the financed plan")
+	}
+	if command.InstallmentDueDay != 5 {
+		t.Errorf("due day = %d, want the configured 5", command.InstallmentDueDay)
+	}
+}
+
+func TestConvertReservationToSaleRejectsAFinancedSaleWithAnInvalidDueDay(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+
+	for _, day := range []int{0, domain.MaxInstallmentDueDay + 1, 31} {
+		repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
+		useCase := sales.NewConvertReservationToSale(repository, users, day)
+		_, err := useCase.Execute(context.Background(), financedConversion())
+		if !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
+			t.Errorf("Execute() with day %d error = %v, want %v", day, err, domain.ErrInvalidInstallmentDueDay)
+		}
+		var domainErr *domain.Error
+		if errors.As(err, &domainErr) {
+			t.Errorf("Execute() with day %d error = %#v, want a misconfiguration error rather than a request error", day, domainErr)
+		}
+		if repository.ConvertCalls != 0 {
+			t.Errorf("Execute() with day %d converted the reserva %d times, want none", day, repository.ConvertCalls)
+		}
+	}
+
+	// A contado sale has no installments, so the due day doesn't apply.
+	repository := &gatewayfake.SaleRepository{ConvertResult: domain.Sale{ID: "sale-1"}}
+	if _, err := sales.NewConvertReservationToSale(repository, users, 0).Execute(context.Background(), validConversion()); err != nil {
+		t.Fatalf("Execute() contado with day 0 error = %v", err)
+	}
+	if repository.ConvertCalls != 1 {
+		t.Errorf("contado conversion called the repository %d times, want 1", repository.ConvertCalls)
 	}
 }
 
@@ -170,7 +223,7 @@ func TestConvertReservationToSaleRejectsBeforeTheRepository(t *testing.T) {
 			if test.mutate != nil {
 				test.mutate(&input)
 			}
-			_, err := sales.NewConvertReservationToSale(repository, users).Execute(context.Background(), input)
+			_, err := sales.NewConvertReservationToSale(repository, users, domain.DefaultInstallmentDueDay).Execute(context.Background(), input)
 			if !errors.Is(err, test.want) {
 				t.Fatalf("Execute() error = %v, want %v", err, test.want)
 			}
@@ -185,19 +238,19 @@ func TestConvertReservationToSaleMapsRepositoryErrors(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 
 	business := &gatewayfake.SaleRepository{ConvertErr: domain.ErrReservationConvertForbidden}
-	if _, err := sales.NewConvertReservationToSale(business, users).Execute(context.Background(), validConversion()); !errors.Is(err, domain.ErrReservationConvertForbidden) {
+	if _, err := sales.NewConvertReservationToSale(business, users, domain.DefaultInstallmentDueDay).Execute(context.Background(), validConversion()); !errors.Is(err, domain.ErrReservationConvertForbidden) {
 		t.Fatalf("Execute() business error = %v, want it unchanged", err)
 	}
 
 	cause := errors.New("connection reset")
 	failing := &gatewayfake.SaleRepository{ConvertErr: cause}
-	_, err := sales.NewConvertReservationToSale(failing, users).Execute(context.Background(), validConversion())
+	_, err := sales.NewConvertReservationToSale(failing, users, domain.DefaultInstallmentDueDay).Execute(context.Background(), validConversion())
 	if !errors.Is(err, domain.ErrDatabaseUnavailable) || !errors.Is(err, cause) {
 		t.Fatalf("Execute() unexpected error = %v, want database unavailable wrapping the cause", err)
 	}
 
 	lookup := &gatewayfake.UserRepository{FindByAuthProviderIDErr: cause}
-	_, err = sales.NewConvertReservationToSale(&gatewayfake.SaleRepository{}, lookup).Execute(context.Background(), validConversion())
+	_, err = sales.NewConvertReservationToSale(&gatewayfake.SaleRepository{}, lookup, domain.DefaultInstallmentDueDay).Execute(context.Background(), validConversion())
 	if !errors.Is(err, domain.ErrDatabaseUnavailable) {
 		t.Fatalf("Execute() user lookup error = %v, want database unavailable", err)
 	}

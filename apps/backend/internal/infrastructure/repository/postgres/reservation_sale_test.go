@@ -91,8 +91,9 @@ func conversionCommand(t *testing.T, reservationID, actorID, actorAuthID string)
 	t.Helper()
 	return gateway.ConvertReservationCommand{
 		ReservationID: reservationID, ActorID: actorID, ActorAuthProviderID: actorAuthID,
-		PaymentMethod:  domain.PaymentMethodCash,
-		IdempotencyKey: "conversion-" + newUUID(t), IdempotencyPayloadHash: saleHash(t),
+		PaymentMethod:     domain.PaymentMethodCash,
+		InstallmentDueDay: domain.DefaultInstallmentDueDay,
+		IdempotencyKey:    "conversion-" + newUUID(t), IdempotencyPayloadHash: saleHash(t),
 	}
 }
 
@@ -258,8 +259,8 @@ func TestConvertReservationFinancedStartsAtTheConversionInstant(t *testing.T) {
 	if sale.PlanPago.MontoTotal != 110000.04 || sale.PlanPago.MontoCuota != 9166.67 {
 		t.Errorf("plan amounts = %#v", sale.PlanPago)
 	}
-	if !sale.PlanPago.Cuotas[0].FechaVencimiento.Equal(time.Date(2027, 2, 28, 15, 0, 0, 0, time.UTC)) {
-		t.Errorf("first due date = %s, want one month after the conversion", sale.PlanPago.Cuotas[0].FechaVencimiento)
+	if !sale.PlanPago.Cuotas[0].FechaVencimiento.Equal(time.Date(2027, 2, 10, 15, 0, 0, 0, time.UTC)) {
+		t.Errorf("first due date = %s, want the 10th of the month after the conversion", sale.PlanPago.Cuotas[0].FechaVencimiento)
 	}
 	if got := readState(t, pool, "lotes", setup.lotID); got != string(domain.LotStateSold) {
 		t.Errorf("financed lot state = %q, want vendido", got)

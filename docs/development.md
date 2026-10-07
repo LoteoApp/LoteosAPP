@@ -148,8 +148,9 @@ Endpoints operativos del backend:
   decimales, opcional), `periodicidad` (`mensual`, `bimestral`, `trimestral`,
   `semestral`) y, solo en `entrega_financiada`, `montoEntrega` (mayor a 0,
   hasta 2 decimales y menor al precio del lote); `contado` no admite
-  `planPago`. Los vencimientos se derivan de la
-  fecha de la venta. El monto y la moneda salen del precio del lote. La
+  `planPago`. Los vencimientos se derivan de la fecha de la venta: toda
+  cuota vence el día del mes que fija `INSTALLMENT_DUE_DAY` (por defecto, el
+  10). El monto y la moneda salen del precio del lote. La
   respuesta incluye `planPago` con el resumen (`montoFinanciado`,
   `montoCuota`, `montoTotal`) y las `cuotas`. Un usuario de inmobiliaria
   solo puede vender en un loteo al que su agencia está asignada
@@ -202,6 +203,12 @@ puede deshabilitar o ajustar sin recompilar mediante las variables
 `RESERVATION_EXPIRY_BATCH` y `RESERVATION_EXPIRY_TIMEOUT`; los valores por
 defecto son `true`, `1m`, `50` y `10s`. El worker no extiende reservas: si se
 retrasa, la siguiente alta o ejecución regulariza los vencimientos pendientes.
+
+`INSTALLMENT_DUE_DAY` fija el día del mes en que vencen las cuotas de una
+venta financiada; por defecto es `10`. Se admite del 1 al 28 —el 29, 30 y 31
+no existen en todos los meses—, y el backend no arranca si el valor está
+fuera de ese rango. Cambiarlo solo afecta a los planes de pago nuevos: las
+cuotas ya generadas conservan sus vencimientos.
 
 ### Content-Security-Policy del frontend
 
@@ -323,6 +330,7 @@ RESERVATION_EXPIRY_ENABLED=true
 RESERVATION_EXPIRY_INTERVAL=1m
 RESERVATION_EXPIRY_BATCH=50
 RESERVATION_EXPIRY_TIMEOUT=10s
+INSTALLMENT_DUE_DAY=10
 ```
 
 `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_PORT` solo los usa

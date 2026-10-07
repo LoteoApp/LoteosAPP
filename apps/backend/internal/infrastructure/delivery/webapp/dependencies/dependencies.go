@@ -162,8 +162,8 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 	listEligibleSellersHandler := handler.NewListEligibleSellersHandler(reservations.NewListEligibleSellers(reservationRepo))
 
 	saleRepo := postgres.NewSaleRepository(pool)
-	createSaleHandler := handler.NewCreateSaleHandler(sales.NewCreateSale(saleRepo, userRepo))
-	convertReservationHandler := handler.NewConvertReservationToSaleHandler(sales.NewConvertReservationToSale(saleRepo, userRepo))
+	createSaleHandler := handler.NewCreateSaleHandler(sales.NewCreateSale(saleRepo, userRepo, cfg.InstallmentDueDay))
+	convertReservationHandler := handler.NewConvertReservationToSaleHandler(sales.NewConvertReservationToSale(saleRepo, userRepo, cfg.InstallmentDueDay))
 	listSalesHandler := handler.NewListSalesHandler(sales.NewListSales(saleRepo))
 	getSaleHandler := handler.NewGetSaleHandler(sales.NewGetSale(saleRepo))
 

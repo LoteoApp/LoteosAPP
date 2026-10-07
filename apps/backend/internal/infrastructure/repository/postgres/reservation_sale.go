@@ -191,6 +191,7 @@ func (repository *SaleRepository) convertReservation(ctx context.Context, comman
 		reservationID:          stringReference(command.ReservationID),
 		method:                 command.PaymentMethod,
 		plan:                   command.PaymentPlan,
+		installmentDueDay:      command.InstallmentDueDay,
 		price:                  *lotPrice,
 		currency:               currency,
 		createdAt:              convertedAt,
