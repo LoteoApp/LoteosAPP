@@ -88,6 +88,14 @@ export type Reservation = {
     razonSocial: string
   }
   puedeCancelar?: boolean
+  // The backend decides who may convert a vigente reserva (its seller or an
+  // internal user) and checks again on the conversion.
+  puedeConvertir?: boolean
+  ventaId?: string
+}
+
+export function canConvertReservation(reservation: Reservation): boolean {
+  return reservation.estado === 'activa' && reservation.puedeConvertir === true && reservation.ventaId === undefined
 }
 
 // The endpoint carries the agency of each seller so a caller can group them

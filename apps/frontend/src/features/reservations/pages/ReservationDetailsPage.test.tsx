@@ -157,6 +157,23 @@ describe('ReservationDetailsPage', () => {
 		expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
 	})
 
+	it('offers the conversion only to whoever may convert, and links a converted reserva to its venta', async () => {
+		getReservationMock.mockResolvedValueOnce(reservation({ puedeConvertir: true }))
+		renderPage()
+		expect(await screen.findByRole('link', { name: 'Convertir en venta' })).toHaveAttribute('href', '/reservas/reservation-1/convertir')
+		expect(screen.queryByRole('link', { name: 'Ver venta' })).not.toBeInTheDocument()
+
+		getReservationMock.mockResolvedValueOnce(reservation({ loteoNombre: 'Los Cedros', puedeConvertir: false }))
+		renderPage()
+		expect(await screen.findByText('Los Cedros')).toBeInTheDocument()
+		expect(screen.queryAllByRole('link', { name: 'Convertir en venta' })).toHaveLength(1)
+
+		getReservationMock.mockResolvedValueOnce(reservation({ loteoNombre: 'Los Robles', estado: 'convertida', puedeConvertir: false, puedeCancelar: false, ventaId: 'sale-9' }))
+		renderPage()
+		expect(await screen.findByText('Los Robles')).toBeInTheDocument()
+		expect(screen.getByRole('link', { name: 'Ver venta' })).toHaveAttribute('href', '/ventas/sale-9')
+	})
+
 	it('does not apply a cancellation response after navigating to another reservation', async () => {
 		const current = reservation()
 		const other = reservation({ id: 'reservation-2', loteoNombre: 'Los Aromos', loteId: 'lot-2' })

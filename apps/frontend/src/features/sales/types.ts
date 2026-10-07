@@ -548,6 +548,8 @@ export type Sale = {
   estado: SaleState
   fechaCreacion: string
   fechaModificacion: string
+  // Only on a venta converted from a reserva.
+  reservaId?: string
 }
 
 export type SalePage = {
@@ -574,6 +576,49 @@ export type CreateSaleValues = {
   vendedorId: string
   modalidadPago: PaymentMethod
   planPago?: PaymentPlanInput
+}
+
+// The payment terms a sale is registered with; the participants travel apart
+// because a conversion takes them from the reserva.
+export type SalePaymentTerms = {
+  modalidadPago: PaymentMethod
+  planPago?: PaymentPlanInput
+}
+
+// The backend resolves lote, cliente, vendedor and price again on the
+// conversion, so these values only inform.
+export type ReservationSaleContext = {
+  reservationId: string
+  reservationState: string
+  canConvert: boolean
+  saleId?: string
+  dueAt: string
+  lot: LotOption
+  client: ClientOption
+  seller: SellerOption
+}
+
+// Why a reserva can't be converted here, or null when the form may be used.
+export function reservationSaleBlockedReason(context: ReservationSaleContext): string | null {
+  if (context.saleId !== undefined) {
+    return 'Esta reserva ya se convirtió en una venta.'
+  }
+  if (context.reservationState !== 'activa') {
+    return `La reserva está ${context.reservationState} y ya no se puede convertir.`
+  }
+  if (context.lot.state !== 'reservado') {
+    return 'El lote ya no figura reservado. Actualizá la reserva para ver su estado.'
+  }
+  const lotReason = saleDisabledReason(context.lot)
+  if (lotReason !== null) {
+    return lotReason
+  }
+  // The backend's capability also covers what the client can't see (who the
+  // seller is, its agency, the client, the due instant), so it explains the rest.
+  if (!context.canConvert) {
+    return 'Solo el vendedor responsable o un usuario administrativo pueden convertir una reserva vigente en venta.'
+  }
+  return null
 }
 
 export function saleLotLabel(sale: Pick<Sale, 'loteoNombre' | 'manzanaNumero' | 'loteNumero'>): string {

@@ -14,6 +14,7 @@ import ClientsPage from '../features/clients/pages/ClientsPage'
 import ReservationsRoute from './ReservationsRoute'
 import ReservationDetailsRoute from './ReservationDetailsRoute'
 import ReservationCreateRoute from './ReservationCreateRoute'
+import ReservationSaleRoute from './ReservationSaleRoute'
 import SaleCreateRoute from './SaleCreateRoute'
 import SaleDetailsRoute from './SaleDetailsRoute'
 import SalesRoute from './SalesRoute'
@@ -91,6 +92,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireRole roles={RESERVATION_ROLES}>
             <ReservationDetailsRoute />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/reservas/:id/convertir',
+        element: (
+          <RequireRole roles={RESERVATION_ROLES}>
+            <ReservationSaleRoute />
           </RequireRole>
         ),
       },

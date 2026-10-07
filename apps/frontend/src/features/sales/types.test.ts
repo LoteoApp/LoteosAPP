@@ -11,6 +11,7 @@ import {
   isLotState,
   lotOptionFromDevelopment,
   lotOptionLabel,
+  reservationSaleBlockedReason,
   saleDisabledReason,
   saleLotLabel,
   saleReceiptFromSale,
@@ -18,8 +19,38 @@ import {
   sellerOptionLabel,
   sellersOfAgency,
   type LotOption,
+  type ReservationSaleContext,
   type SellerOption,
 } from './types'
+
+describe('reservationSaleBlockedReason', () => {
+  const context: ReservationSaleContext = {
+    reservationId: 'reservation-1',
+    reservationState: 'activa',
+    canConvert: true,
+    dueAt: '2026-10-10T15:00:00Z',
+    lot: {
+      id: 'lot-1', number: '7', blockId: 'block-1', blockNumber: '2', developmentId: 'loteo-1',
+      developmentName: 'Norte', state: 'reservado', price: 100000, currency: 'USD', area: null,
+    },
+    client: { id: 'client-1', nombre: 'Ana', apellido: 'Pérez', dni: '1' },
+    seller: { id: 'seller-1', nombre: 'Beto', apellido: 'Gómez', rol: 'administrativo' },
+  }
+
+  it('lets a convertible reserva through', () => {
+    expect(reservationSaleBlockedReason(context)).toBeNull()
+  })
+
+  it('explains every reason a reserva cannot be converted', () => {
+    expect(reservationSaleBlockedReason({ ...context, saleId: 'sale-1' })).toBe('Esta reserva ya se convirtió en una venta.')
+    expect(reservationSaleBlockedReason({ ...context, reservationState: 'vencida' })).toBe('La reserva está vencida y ya no se puede convertir.')
+    expect(reservationSaleBlockedReason({ ...context, canConvert: false })).toMatch(/Solo el vendedor responsable/)
+    // The backend also answers canConvert = false for these, so the visible
+    // lote problem must win over the generic explanation.
+    expect(reservationSaleBlockedReason({ ...context, canConvert: false, lot: { ...context.lot, state: 'disponible' } })).toMatch(/ya no figura reservado/)
+    expect(reservationSaleBlockedReason({ ...context, canConvert: false, lot: { ...context.lot, price: null } })).toBe('Completá el precio del lote para habilitar la venta.')
+  })
+})
 
 const agencySeller: SellerOption = {
   id: 'us-1',

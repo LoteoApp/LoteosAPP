@@ -33,8 +33,26 @@ type CreateSaleCommand struct {
 	CreatedAt         time.Time
 }
 
+// ConvertReservationCommand turns a reserva into a venta. Lote, cliente,
+// vendedor, price and sale date are resolved by the repository from the
+// locked reserva and lote, never taken from the caller; so is the actor's
+// read scope, from their role as locked in the same transaction.
+type ConvertReservationCommand struct {
+	ReservationID          string
+	ActorID                string
+	ActorAuthProviderID    string
+	PaymentMethod          domain.PaymentMethod
+	PaymentPlan            *domain.PaymentPlanInput
+	IdempotencyKey         string
+	IdempotencyPayloadHash string
+	// InstallmentDueDay is the day of the month every installment falls due
+	// on, a deployment-wide setting the use case reads from configuration.
+	InstallmentDueDay int
+}
+
 type SaleRepository interface {
 	Create(ctx context.Context, command CreateSaleCommand) (domain.Sale, error)
+	ConvertReservation(ctx context.Context, command ConvertReservationCommand) (domain.Sale, error)
 	List(ctx context.Context, filter domain.SaleListFilter, scope SaleScope) (domain.SalePage, error)
 	Get(ctx context.Context, id string, scope SaleScope) (domain.Sale, error)
 }

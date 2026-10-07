@@ -56,6 +56,7 @@ type Container struct {
 	ReservationReceiptHandler   *handler.ReservationReceiptHandler
 	CancelReservationHandler    *handler.CancelReservationHandler
 	CreateSaleHandler           *handler.CreateSaleHandler
+	ConvertReservationHandler   *handler.ConvertReservationToSaleHandler
 	ListSalesHandler            *handler.ListSalesHandler
 	GetSaleHandler              *handler.GetSaleHandler
 	GetDebtStatementHandler     *handler.GetDebtStatementHandler
@@ -162,6 +163,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 
 	saleRepo := postgres.NewSaleRepository(pool)
 	createSaleHandler := handler.NewCreateSaleHandler(sales.NewCreateSale(saleRepo, userRepo, cfg.InstallmentDueDay))
+	convertReservationHandler := handler.NewConvertReservationToSaleHandler(sales.NewConvertReservationToSale(saleRepo, userRepo, cfg.InstallmentDueDay))
 	listSalesHandler := handler.NewListSalesHandler(sales.NewListSales(saleRepo))
 	getSaleHandler := handler.NewGetSaleHandler(sales.NewGetSale(saleRepo))
 
@@ -214,6 +216,7 @@ func New(ctx context.Context, cfg environments.Server) (*Container, error) {
 		ReservationReceiptHandler:   reservationReceiptHandler,
 		CancelReservationHandler:    cancelReservationHandler,
 		CreateSaleHandler:           createSaleHandler,
+		ConvertReservationHandler:   convertReservationHandler,
 		ListSalesHandler:            listSalesHandler,
 		GetSaleHandler:              getSaleHandler,
 		GetDebtStatementHandler:     getDebtStatementHandler,

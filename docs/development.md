@@ -117,6 +117,16 @@ Endpoints operativos del backend:
 - `POST /api/v1/reservas/{id}/cancelar`: cancela una reserva activa con el
   body `{ "razon": "..." }`, si el actor es administrativo o pertenece a la
   inmobiliaria persistida en la reserva.
+- `POST /api/v1/reservas/{id}/convertir` (requiere `Idempotency-Key`):
+  convierte una reserva vigente en venta. El body lleva solo `modalidadPago`
+  y, si es financiada, `planPago`; lote, cliente, vendedor y precio salen de
+  la reserva y del lote. La ejecutan el vendedor responsable de la reserva,
+  un administrador o un administrativo. Responde `201` con la venta (incluido `reservaId`), también en un
+  reintento con la misma clave; `403 reservation_convert_forbidden` si el
+  actor es una inmobiliaria que no es el vendedor, `403 sale_seller_not_eligible`
+  si el vendedor de la reserva ya no está habilitado, `404` si la reserva no
+  existe o está fuera de su alcance y `409` si venció, se canceló, ya se
+  convirtió o la clave se usó con otros datos.
 - `GET /api/v1/reservas/{id}/comprobante`: descarga el comprobante PDF para
   una reserva dentro del alcance del actor. El documento incluye fecha de
   emisión y un croquis de referencia sin escala con el lote reservado marcado;

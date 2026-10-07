@@ -1,18 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Alert, AlertDescription } from '../../../shared/ui/alert'
-import { Button } from '../../../shared/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/ui/card'
 import { useSaleSellers } from '../hooks/use-sale-sellers'
 import AgencyCombobox from './AgencyCombobox'
 import ClientCombobox from './ClientCombobox'
-import PaymentConditions from './PaymentConditions'
+import SalePaymentForm from './SalePaymentForm'
 import SellerCombobox from './SellerCombobox'
 import {
   DIRECT_SALE,
-  EMPTY_PAYMENT_PLAN,
   agencyOfSeller,
   agencyOptionsFromSellers,
-  buildSaleReceipt,
   defaultSeller,
   sellersOfAgency,
 } from '../types'
@@ -21,8 +16,7 @@ import type {
   ClientOption,
   CreateSaleValues,
   LotOption,
-  PaymentMethod,
-  PaymentPlanValues,
+  SalePaymentTerms,
   SellerOption,
 } from '../types'
 
@@ -59,8 +53,6 @@ export default function SaleForm({
   error = null,
   disabled = false,
 }: SaleFormProps) {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contado')
-  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanValues>(EMPTY_PAYMENT_PLAN)
   const [client, setClient] = useState<ClientOption | null>(null)
   const [agency, setAgency] = useState<AgencyOption | null>(null)
   const [seller, setSeller] = useState<SellerOption | null>(null)
@@ -111,26 +103,60 @@ export default function SaleForm({
     [sellersState.sellers, agency],
   )
 
-  const draft = buildSaleReceipt(
-    { lot, client, seller, method: paymentMethod, plan: paymentPlan },
-    new Date().toISOString(),
-  )
-  const pendingReason = draft.ok ? null : draft.error
   const isBusy = disabled || isSubmitting
 
-  async function handleConfirm() {
-    if (lot === null || client === null || seller === null || !draft.ok) {
-      return
+  async function handleSubmit(terms: SalePaymentTerms): Promise<boolean> {
+    if (lot === null || client === null || seller === null) {
+      return false
     }
-    await onSubmit({
+    return onSubmit({
       loteoId: lot.developmentId,
       loteId: lot.id,
       clienteId: client.id,
       vendedorId: seller.id,
-      modalidadPago: paymentMethod,
-      ...(draft.plan === undefined ? {} : { planPago: draft.plan }),
+      ...terms,
     })
   }
+
+  const participants = (
+    <>
+      <ClientCombobox
+        clients={clients}
+        value={client}
+        onChange={setClient}
+        onRegisterClient={() => onRegisterClient?.()}
+        isLoading={clientsLoading}
+        disabled={isBusy}
+      />
+      <AgencyCombobox
+        agencies={agencies}
+        value={agency}
+        onChange={(next) => {
+          setAgency(next)
+          setSeller(next?.id === DIRECT_SALE.id ? directSaleSeller : null)
+        }}
+        isLoading={sellersState.isLoading}
+        disabled={isBusy || lot === null}
+      />
+      <SellerCombobox
+        sellers={agencySellers}
+        value={seller}
+        onChange={setSeller}
+        isLoading={sellersState.isLoading}
+        disabled={isBusy || agency === null || sellerIsFixedToActor}
+        description={
+          sellerIsFixedToActor
+            ? 'Vendés a tu nombre. Elegí una inmobiliaria para registrar la venta de uno de sus vendedores.'
+            : undefined
+        }
+      />
+      {sellersState.error !== null && (
+        <p role="alert" className="text-sm text-destructive">
+          {sellersState.error}
+        </p>
+      )}
+    </>
+  )
 
   return (
     <>
@@ -140,76 +166,16 @@ export default function SaleForm({
         </p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Datos de la venta</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <ClientCombobox
-            clients={clients}
-            value={client}
-            onChange={setClient}
-            onRegisterClient={() => onRegisterClient?.()}
-            isLoading={clientsLoading}
-            disabled={isBusy}
-          />
-          <AgencyCombobox
-            agencies={agencies}
-            value={agency}
-            onChange={(next) => {
-              setAgency(next)
-              setSeller(next?.id === DIRECT_SALE.id ? directSaleSeller : null)
-            }}
-            isLoading={sellersState.isLoading}
-            disabled={isBusy || lot === null}
-          />
-          <SellerCombobox
-            sellers={agencySellers}
-            value={seller}
-            onChange={setSeller}
-            isLoading={sellersState.isLoading}
-            disabled={isBusy || agency === null || sellerIsFixedToActor}
-            description={
-              sellerIsFixedToActor
-                ? 'Vendés a tu nombre. Elegí una inmobiliaria para registrar la venta de uno de sus vendedores.'
-                : undefined
-            }
-          />
-          {sellersState.error !== null && (
-            <p role="alert" className="text-sm text-destructive">
-              {sellersState.error}
-            </p>
-          )}
-          <PaymentConditions
-            method={paymentMethod}
-            plan={paymentPlan}
-            lot={lot}
-            onMethodChange={setPaymentMethod}
-            onPlanChange={setPaymentPlan}
-            disabled={isBusy}
-          />
-        </CardContent>
-      </Card>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        {pendingReason !== null && (
-          <p className="text-sm text-muted-foreground sm:mr-auto">{pendingReason}</p>
-        )}
-        <Button
-          type="button"
-          className="min-h-11 w-full sm:min-h-9 sm:w-auto"
-          onClick={() => void handleConfirm()}
-          disabled={isBusy || !draft.ok}
-        >
-          {isSubmitting ? 'Registrando venta…' : 'Confirmar venta'}
-        </Button>
-      </div>
+      <SalePaymentForm
+        lot={lot}
+        client={client}
+        seller={seller}
+        participants={participants}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        error={error}
+        disabled={disabled}
+      />
 
       {renderClientDialog}
     </>
