@@ -10,6 +10,7 @@ const useEligibleSellersMock = vi.hoisted(() => vi.fn())
 const useReservationMutationsMock = vi.hoisted(() => vi.fn())
 const createReservationMock = vi.hoisted(() => vi.fn())
 const downloadReceiptMock = vi.hoisted(() => vi.fn())
+const listReservationsMock = vi.hoisted(() => vi.fn())
 let restoreURLMocks: (() => void) | null = null
 
 vi.mock('../hooks/use-eligible-sellers', () => ({ useEligibleSellers: useEligibleSellersMock }))
@@ -17,6 +18,7 @@ vi.mock('../hooks/use-reservation-mutations', () => ({ useReservationMutations: 
 vi.mock('../api/reservations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/reservations')>()),
   downloadReservationReceipt: downloadReceiptMock,
+  listReservations: listReservationsMock,
 }))
 
 const loteo: ReservationCreateDevelopment = {
@@ -135,6 +137,61 @@ describe('ReservationCreatePage', () => {
     renderPage({ loteId: 'missing-lot' })
     expect(screen.getByText('El lote seleccionado no existe.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirmar reserva' })).toBeDisabled()
+  })
+
+  it('offers to convert the reservation just created when the server allows it', async () => {
+    configureMocks()
+    createReservationMock.mockResolvedValue({ ...reservation, puedeConvertir: true })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
+    await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
+    await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
+    await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
+
+    expect(await screen.findByRole('link', { name: 'Convertir en venta' })).toHaveAttribute('href', '/reservas/reservation-1/convertir')
+  })
+
+  it('shows the active reservation of a reserved lote and converts it when allowed', async () => {
+    configureMocks()
+    const reservedLoteo = { ...loteo, lotes: [{ ...loteo.lotes[0], estado: 'reservado' as const }] }
+    const page = (reservas: Reservation[]) => ({ reservas, pagina: 1, porPagina: 1, total: reservas.length, paginas: 1 })
+
+    listReservationsMock.mockResolvedValueOnce(page([{ ...reservation, puedeConvertir: true }]))
+    renderPage({ loteo: reservedLoteo })
+    expect(await screen.findByText('Lote reservado')).toBeInTheDocument()
+    expect(listReservationsMock).toHaveBeenCalledWith('token', { loteoId: 'loteo-1', loteId: 'lot-1', estado: 'activa', porPagina: 1 }, expect.any(AbortSignal))
+    expect(screen.getByRole('link', { name: 'Convertir en venta' })).toHaveAttribute('href', '/reservas/reservation-1/convertir')
+    expect(screen.getByRole('link', { name: 'Ver reserva' })).toHaveAttribute('href', '/reservas/reservation-1')
+    expect(screen.getByRole('button', { name: 'Confirmar reserva' })).toBeDisabled()
+
+    cleanup()
+    listReservationsMock.mockResolvedValueOnce(page([{ ...reservation, puedeConvertir: false }]))
+    renderPage({ loteo: reservedLoteo })
+    expect(await screen.findByText('Lote reservado')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Convertir en venta' })).not.toBeInTheDocument()
+
+    cleanup()
+    listReservationsMock.mockResolvedValueOnce(page([]))
+    renderPage({ loteo: reservedLoteo })
+    expect(await screen.findByText('Lote no disponible')).toBeInTheDocument()
+  })
+
+  it('looks for the reservation of a reserved lote without flashing it as unavailable', async () => {
+    configureMocks()
+    const reservedLoteo = { ...loteo, lotes: [{ ...loteo.lotes[0], estado: 'reservado' as const }] }
+    let resolve: (value: unknown) => void = () => undefined
+    listReservationsMock.mockReturnValueOnce(new Promise((done) => { resolve = done }))
+    renderPage({ loteo: reservedLoteo })
+
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Buscando la reserva del lote…')
+    expect(screen.queryByText('Lote no disponible')).not.toBeInTheDocument()
+
+    resolve({ reservas: [{ ...reservation, puedeConvertir: true }], pagina: 1, porPagina: 1, total: 1, paginas: 1 })
+    expect(await screen.findByText('Lote reservado')).toBeInTheDocument()
+    expect(screen.queryByText('Buscando la reserva del lote…')).not.toBeInTheDocument()
   })
 
   it('downloads the PDF automatically after the reservation is saved', async () => {

@@ -108,6 +108,34 @@ describe('LoteoDetailRoute', () => {
     expect(screen.getByRole('link', { name: 'Ver reserva' })).toBeInTheDocument()
   })
 
+  it('offers to convert the reserva only when the server allows it', () => {
+    useAuthMock.mockReturnValue({ session: { access_token: 'token' }, user: { app_metadata: { role: 'inmobiliaria' } } })
+    useReservationsMock.mockReturnValue({
+      page: { reservas: [{ ...reservation, puedeConvertir: true }], pagina: 1, porPagina: 25, total: 1, paginas: 1 },
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+      prepend: vi.fn(),
+    })
+
+    const view = renderRoute()
+
+    expect(screen.getByRole('link', { name: 'Convertir en venta' })).toHaveAttribute('href', '/reservas/reservation-1/convertir')
+    view.unmount()
+
+    useReservationsMock.mockReturnValue({
+      page: { reservas: [{ ...reservation, puedeConvertir: false }], pagina: 1, porPagina: 25, total: 1, paginas: 1 },
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+      prepend: vi.fn(),
+    })
+    renderRoute()
+
+    expect(screen.queryByRole('link', { name: 'Convertir en venta' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver reserva' })).toBeInTheDocument()
+  })
+
   it('offers to sell an available lote from the visor', () => {
     useAuthMock.mockReturnValue({ session: { access_token: 'token' }, user: { app_metadata: { role: 'administrativo' } } })
 

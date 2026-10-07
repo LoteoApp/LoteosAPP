@@ -64,6 +64,20 @@ describe('reservation API', () => {
 		)
 	})
 
+	it('reads the conversion capability and the linked venta', async () => {
+		apiFetchMock.mockResolvedValueOnce(reservation({ puedeConvertir: true }))
+		await expect(getReservation('token', 'reservation-1')).resolves.toMatchObject({ puedeConvertir: true })
+
+		apiFetchMock.mockResolvedValueOnce(reservation({ estado: 'convertida', puedeConvertir: false, ventaId: 'sale-1' }))
+		await expect(getReservation('token', 'reservation-1')).resolves.toMatchObject({ ventaId: 'sale-1' })
+
+		apiFetchMock.mockResolvedValueOnce(reservation({ puedeConvertir: 'yes' }))
+		await expect(getReservation('token', 'reservation-1')).rejects.toThrow()
+
+		apiFetchMock.mockResolvedValueOnce(reservation({ ventaId: 42 }))
+		await expect(getReservation('token', 'reservation-1')).rejects.toThrow()
+	})
+
 	it('gets, creates and cancels a reservation with the expected requests', async () => {
 		apiFetchMock
 			.mockResolvedValueOnce(reservation())

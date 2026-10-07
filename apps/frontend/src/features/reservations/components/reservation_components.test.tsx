@@ -97,6 +97,20 @@ describe('reservation components', () => {
 		expect(screen.getByRole('link', { name: 'Ver loteo Las Acacias' })).toHaveAttribute('href', '/lotes/loteo-1')
 	})
 
+	it('offers the conversion only for an active reservation the server allows', () => {
+		render(<MemoryRouter><ReservationsList onCancel={vi.fn()} reservations={[
+			reservation({ puedeConvertir: true }),
+			reservation({ id: 'reservation-2', loteNumero: '8', puedeConvertir: false }),
+			reservation({ id: 'reservation-3', loteNumero: '9', estado: 'vencida', puedeConvertir: true }),
+			reservation({ id: 'reservation-4', loteNumero: '10', estado: 'convertida', puedeConvertir: true, ventaId: 'sale-1' }),
+		]} /></MemoryRouter>)
+
+		const convert = screen.getAllByRole('link', { name: /^Convertir en venta/ })
+		expect(convert).toHaveLength(1)
+		expect(convert[0]).toHaveAccessibleName('Convertir en venta la reserva del lote 7 en Las Acacias')
+		expect(convert[0]).toHaveAttribute('href', '/reservas/reservation-1/convertir')
+	})
+
 	it('renders reservation details and its audit history', () => {
 		render(<ReservationDetails reservation={reservation({
 		loteNumero: '', historial: [

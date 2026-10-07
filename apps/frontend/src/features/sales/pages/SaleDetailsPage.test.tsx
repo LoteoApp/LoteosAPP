@@ -65,6 +65,7 @@ describe('SaleDetailsPage', () => {
     expect(screen.getByText('Contado')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver a ventas' })).toHaveAttribute('href', '/ventas')
     expect(screen.getByRole('link', { name: 'Ver loteo' })).toHaveAttribute('href', '/lotes/loteo-1')
+    expect(screen.queryByRole('link', { name: 'Ver reserva de origen' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Imprimir recibo' }))
     const dialog = await screen.findByRole('dialog')
@@ -73,6 +74,14 @@ describe('SaleDetailsPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Imprimir recibo' }))
     expect(print).toHaveBeenCalledTimes(1)
     print.mockRestore()
+  })
+
+  it('links a converted sale back to its reserva', async () => {
+    getSaleMock.mockResolvedValue({ ...sale, reservaId: 'reservation-1' })
+
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Ver reserva de origen' })).toHaveAttribute('href', '/reservas/reservation-1')
   })
 
   it('shows the plan and the cuotas of a financed sale', async () => {

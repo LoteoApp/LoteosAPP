@@ -1,15 +1,18 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft, Download } from 'lucide-react'
 import { Link } from 'react-router'
+import { formatDateTime } from '../../../shared/lib/formatDateTime'
 import { Alert, AlertDescription, AlertTitle } from '../../../shared/ui/alert'
 import { Button, buttonVariants } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
+import ConvertReservationLink from '../components/ConvertReservationLink'
 import ReservationCreatePageSkeleton from '../components/ReservationCreatePageSkeleton'
 import ReservationForm from '../components/ReservationForm'
 import { downloadReservationReceipt } from '../api/reservations'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
-import type { Reservation, ReservationClient, ReservationCreateDevelopment } from '../types'
+import { useReservations } from '../hooks/use-reservations'
+import { canConvertReservation, type Reservation, type ReservationClient, type ReservationCreateDevelopment } from '../types'
 
 type ReservationCreatePageProps = {
   accessToken?: string
@@ -53,6 +56,15 @@ export default function ReservationCreatePage({
   const selectedBlock = loteo?.manzanas.find((block) => block.id === selectedLot?.manzanaId) ?? null
   const fixedSeller = isAgencyUser ? sellersState.sellers[0] : undefined
   const isUnavailable = selectedLot === null || selectedLot.estado !== 'disponible'
+  const activeReservations = useReservations(
+    token,
+    { loteoId, loteId, estado: 'activa', porPagina: 1 },
+    { enabled: token !== '' && selectedLot?.estado === 'reservado' },
+  )
+  const isFindingReservation = selectedLot?.estado === 'reservado' && activeReservations.isLoading
+  const activeReservation = selectedLot?.estado === 'reservado' && !activeReservations.isLoading
+    ? activeReservations.page.reservas[0] ?? null
+    : null
 
   async function handleSubmit(values: { loteoId: string; loteId: string; clienteId: string; vendedorId?: string }, key: string) {
     const created = await mutations.create(values, key)
@@ -123,7 +135,23 @@ export default function ReservationCreatePage({
                 selectedBlock.tieneLuz && 'Luz',
                 selectedBlock.tieneGas && 'Gas',
               ].filter(Boolean).join(' · ') || 'Sin servicios informados'} />}
-              {isUnavailable && selectedLot && <Alert variant="destructive"><AlertTitle>Lote no disponible</AlertTitle><AlertDescription>El lote cambió de estado. Volvé al visor para elegir otro.</AlertDescription></Alert>}
+              {isUnavailable && selectedLot && !createdReservation && isFindingReservation && (
+                <p role="status" className="text-sm text-muted-foreground">Buscando la reserva del lote…</p>
+              )}
+              {isUnavailable && selectedLot && !createdReservation && !isFindingReservation && (activeReservation ? (
+                <Alert>
+                  <AlertTitle>Lote reservado</AlertTitle>
+                  <AlertDescription>
+                    <p>Reservado por {activeReservation.cliente.nombre} {activeReservation.cliente.apellido} · vence el {formatDateTime(activeReservation.fechaVencimiento)}.</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {canConvertReservation(activeReservation) && <ConvertReservationLink reservationId={activeReservation.id} />}
+                      <Link className={buttonVariants({ variant: 'outline' })} to={`/reservas/${activeReservation.id}`}>Ver reserva</Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert variant="destructive"><AlertTitle>Lote no disponible</AlertTitle><AlertDescription>El lote cambió de estado. Volvé al visor para elegir otro.</AlertDescription></Alert>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -135,6 +163,7 @@ export default function ReservationCreatePage({
               <CardHeader><CardTitle>Reserva creada</CardTitle><CardDescription>La reserva quedó registrada y vence el {new Date(createdReservation.fechaVencimiento).toLocaleString('es-AR')}.</CardDescription></CardHeader>
               <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button onClick={() => void handleDownloadReceipt()} disabled={isDownloadingReceipt}><Download aria-hidden />{isDownloadingReceipt ? 'Generando comprobante…' : 'Descargar comprobante PDF'}</Button>
+                {canConvertReservation(createdReservation) && <ConvertReservationLink reservationId={createdReservation.id} />}
                 <Link className={buttonVariants({ variant: 'outline' })} to={`/reservas/${createdReservation.id}`}>Ver detalle</Link>
               </CardContent>
               {receiptError && <Alert variant="destructive" className="mx-6 mb-6"><AlertDescription>{receiptError}</AlertDescription></Alert>}
