@@ -73,6 +73,7 @@ func New(ctx context.Context) (*App, error) {
 		ReservationReceiptHandler:  container.ReservationReceiptHandler,
 		CancelReservationHandler:   container.CancelReservationHandler,
 		CreateSaleHandler:          container.CreateSaleHandler,
+		ConvertReservationHandler:  container.ConvertReservationHandler,
 		ListSalesHandler:           container.ListSalesHandler,
 		GetSaleHandler:             container.GetSaleHandler,
 		GetDebtStatementHandler:    container.GetDebtStatementHandler,

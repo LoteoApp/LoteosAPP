@@ -117,6 +117,8 @@ doppler run -- pnpm test:backend
 | `postgres.TestLoteoRepository` | `DATABASE_URL` | Alta de loteo con plano, actualización de lote/manzana/calle, consulta de asignación y registro concurrente del DXF. Verifica la geometría PostGIS, que exista un solo archivo DXF activo, el alta/listado/descarga/baja de fotos y planos a nivel loteo y lote, que el DXF y un documento_legal sean inalcanzables por ese flujo, y que el cupo de 20 por entidad se respete bajo carga concurrente. |
 | `postgres.TestReservationRepository` | `DATABASE_URL` | Alta, alcance, idempotencia, cancelación y vencimiento de reservas contra PostgreSQL real, incluyendo la consistencia con el estado e historial del lote. |
 | `postgres.TestSaleRepository*` | `DATABASE_URL` | Alta de ventas al contado y financiadas, plan de pago y cuotas persistidas, idempotencia y alcance por agencia. |
+| `postgres.TestConvertReservation*`, `postgres.TestSaleReservaLinkConstraints` | `DATABASE_URL` | Conversión de reserva en venta en las tres modalidades, vínculo en ambos sentidos, vendedor y alcance (administrador ajeno, colega de agencia, otra agencia, agencia desasignada, actor que cambia de rol antes de que la conversión lo bloquee), vencimiento exacto y reloj leído después de esperar el lock del lote, reserva cancelada/vencida/convertida, reserva que no es la que tiene reservado el lote, cliente o lote incompletos, idempotencia (replay con otro precio, otras condiciones, clave de una venta ordinaria), rollback completo con un fallo inyectado después de escribir, reconciliación de un `COMMIT` ambiguo, carreras (dos conversiones, misma clave, contra cancelación y contra el worker) y las restricciones del vínculo. |
+| `migrate.TestSaleReservationLinkMigration` | `DATABASE_URL` | Aplica `00015` en un schema descartable sobre datos previos, verifica `NULL` en las ventas existentes, la FK compuesta, la unicidad por reserva aunque la venta se cancele, la inmutabilidad del vínculo y el `Down`. |
 | `postgres.TestCollectionRepository*` | `DATABASE_URL` | Estado de deuda, cobro de entrega y cuotas en orden, rechazo de cobros repetidos o salteados, cancelación total con saldo desactualizado, cierre de la venta y finalización del lote con origen `cobranza`, listado de vencimientos con filtros, alcance y paginación por ids, una cuota que vence hoy sigue pendiente hasta el día siguiente en hora de Argentina, el estado de deuda leído en una sola instantánea aunque un cobro confirme a mitad de la lectura, y cargos adicionales en otra moneda (totales por moneda y rollback del cobro si un cargo es inválido). |
 | `r2.TestClientIntegration` | `CLOUDFLARE_R2_*` | Sube, lee y borra un objeto en el bucket, bajo el prefijo `integration-test/`. |
 
@@ -136,6 +138,22 @@ la ejecución inmediata, el lote configurado, los fallos y el apagado sin sleeps
 de duración comercial. Las pruebas de reservas de PostgreSQL deben ejecutarse
 con las migraciones aplicadas y no se consideran realizadas cuando falta
 `DATABASE_URL`.
+
+Las pruebas de conversión crean sus propios loteos, usuarios y reservas y los
+borran al terminar; el cleanup (`deleteLoteo`) borra cobros, cuotas, planes y
+ventas antes que las reservas por la FK `ventas.reserva_id`. No modifican el
+esquema ni deshabilitan triggers fuera de ese cleanup: el fallo a mitad de la
+transacción se inyecta con el hook `afterConversionWrite` del repositorio
+(expuesto solo a los tests por `export_test.go`). Las carreras arrancan juntas
+detrás de un canal y aceptan cualquiera de los dos órdenes; además, el mismo hook
+pausa una conversión con todos sus locks tomados para forzar el orden en que la
+cancelación o el worker (que ya listó la reserva como candidata) esperan y
+después ven la reserva `convertida`. La prueba del reloj y las de orden forzado
+esperan a ver la otra sesión bloqueada con `pg_blocking_pids` en lugar de dormir.
+Como `ExpireDue` procesa todas las reservas vencidas de la base, las pruebas
+que lo llaman usan instantes ya pasados, para no vencer reservas vigentes de
+otros usuarios de la base compartida. Las demás crean reservas con fechas
+futuras, así el worker real del entorno no las vence en medio de la prueba.
 
 ## Prueba manual del alta de loteo
 

@@ -122,3 +122,23 @@ func TestReservationListFilterNormalize(t *testing.T) {
 		t.Fatalf("invalid state error = %v", err)
 	}
 }
+
+func TestCanConvertReservation(t *testing.T) {
+	for name, test := range map[string]struct {
+		role            domain.Rol
+		actorID, seller string
+		want            bool
+	}{
+		"administrador of someone else's reserva":  {domain.RolAdministrador, "actor", "seller", true},
+		"administrativo of someone else's reserva": {domain.RolAdministrativo, "actor", "seller", true},
+		"agency seller of their own reserva":       {domain.RolInmobiliaria, "seller", "seller", true},
+		"agency colleague":                         {domain.RolInmobiliaria, "colleague", "seller", false},
+		"surveyor":                                 {domain.RolAgrimensor, "actor", "seller", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := domain.CanConvertReservation(test.role, test.actorID, test.seller); got != test.want {
+				t.Errorf("CanConvertReservation(%q, %q, %q) = %v, want %v", test.role, test.actorID, test.seller, got, test.want)
+			}
+		})
+	}
+}
