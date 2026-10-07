@@ -294,6 +294,7 @@ func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
+	incompleteSellerID := incompleteProfileSellerFixture(t, pool)
 	repository := postgres.NewSaleRepository(pool)
 	now := time.Now().UTC()
 	valid := gateway.CreateSaleCommand{
@@ -310,6 +311,9 @@ func TestSaleRepositoryRejectsInvalidReferences(t *testing.T) {
 		"malformed lote": {func(c *gateway.CreateSaleCommand) { c.LotID = "nope" }, domain.ErrLoteNotFound},
 		"unknown actor":  {func(c *gateway.CreateSaleCommand) { c.ActorID = newUUID(t) }, domain.ErrActorNoAprovisionado},
 		"unknown seller": {func(c *gateway.CreateSaleCommand) { c.SellerID = newUUID(t) }, domain.ErrSaleSellerNotEligible},
+		"incomplete profile seller": {
+			func(c *gateway.CreateSaleCommand) { c.SellerID = incompleteSellerID }, domain.ErrSaleSellerNotEligible,
+		},
 		"unknown client": {func(c *gateway.CreateSaleCommand) { c.ClientID = newUUID(t) }, domain.ErrSaleInvalidClient},
 	} {
 		t.Run(name, func(t *testing.T) {

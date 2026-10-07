@@ -503,6 +503,7 @@ func (repository *ReservationRepository) ListEligibleSellers(ctx context.Context
 		LEFT JOIN inmobiliarias a ON a.id = u.inmobiliaria_id
 		JOIN loteos l ON l.id = $1::uuid AND l.fecha_baja IS NULL
 		WHERE u.fecha_baja IS NULL
+		  AND u.perfil_completo
 		  AND u.rol IN ('administrador', 'administrativo', 'inmobiliaria')
 		  AND ($2::uuid IS NULL OR ($3 AND (
 			 u.auth_provider_id = $2::uuid
@@ -1008,18 +1009,22 @@ func lockActor(ctx context.Context, tx pgx.Tx, id string) (domain.Rol, *string, 
 	return domain.Rol(role), agency, nil
 }
 
+// lockSeller reports whether the seller is enabled: active and with a
+// complete profile, the same users ListEligibleSellers offers.
 func lockSeller(ctx context.Context, tx pgx.Tx, id string) (domain.Rol, *string, bool, error) {
 	var role string
 	var agency *string
 	var inactive *time.Time
-	err := tx.QueryRow(ctx, `SELECT rol, inmobiliaria_id::text, fecha_baja FROM usuarios WHERE id = $1::uuid FOR UPDATE`, id).Scan(&role, &agency, &inactive)
+	var profileComplete bool
+	err := tx.QueryRow(ctx, `SELECT rol, inmobiliaria_id::text, fecha_baja, perfil_completo FROM usuarios WHERE id = $1::uuid FOR UPDATE`, id).
+		Scan(&role, &agency, &inactive, &profileComplete)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return "", nil, false, domain.ErrReservationSellerNotEligible
 	}
 	if err != nil {
 		return "", nil, false, err
 	}
-	return domain.Rol(role), agency, inactive == nil, nil
+	return domain.Rol(role), agency, inactive == nil && profileComplete, nil
 }
 
 func lockActiveClient(ctx context.Context, tx pgx.Tx, id string) error {

@@ -122,6 +122,13 @@ quien asigna loteos y permisos.
 
 Los clientes no son usuarios del sistema.
 
+Cualquier selector que ofrezca usuarios para asignarles algo (vendedor de una
+reserva o venta, y los que se agreguen, como el agrimensor o el escribano de
+un loteo) solo incluye usuarios activos (sin `fecha_baja`) y con el perfil
+completo (`perfil_completo`). El backend valida la misma regla al guardar, no
+solo al listar. La excepción es el ABM de usuarios, que los muestra a todos
+para poder gestionarlos.
+
 ### ABM de administrativo, escribano, inmobiliaria y agrimensor
 
 El administrador da de alta, edita (nombre y apellido), da de baja y
@@ -211,7 +218,9 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 - Quién reserva: usuario activo con rol `administrador`, `administrativo` o
   `inmobiliaria` (`usuario_alta`). La inmobiliaria solo puede reservar en un
   loteo asignado a su agencia y siempre queda como vendedor responsable.
-- Vendedor: usuario responsable comercial (`vendedor_id`); si tiene rol
+- Vendedor: usuario responsable comercial (`vendedor_id`) con rol
+  `administrador`, `administrativo` o `inmobiliaria`, activo y con el perfil
+  completo (`perfil_completo`), tanto en reservas como en ventas; si tiene rol
   `inmobiliaria`, debe pertenecer a una agencia activa asignada al loteo.
   Administrador y administrativo lo eligen desde el catálogo de vendedores
   elegibles; no se amplía por eso su acceso al ABM de usuarios.
