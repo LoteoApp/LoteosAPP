@@ -10,7 +10,7 @@ base de datos y la autenticación siguen siendo el proyecto de Supabase
 
 | Stage | Imagen | Por qué |
 | --- | --- | --- |
-| Build backend | `golang:1.26-alpine` | Misma versión que `apps/backend/go.mod` (`go 1.26.6`); alpine solo para compilar, no llega a producción. |
+| Build backend | `golang:1.26-alpine` | Misma versión que `apps/backend/go.mod` (`go 1.26.9`); alpine solo para compilar, no llega a producción. |
 | Runtime backend | `gcr.io/distroless/static-debian12:nonroot` | Sin shell, sin gestor de paquetes, corre como `nonroot` (uid 65532) por defecto. Incluye `ca-certificates`, necesario para TLS contra Supabase (`sslmode=require`) y R2. El binario se compila `CGO_ENABLED=0` (estático, verificado), así que no hace falta libc en la imagen final. |
 | Build frontend | `node:24-alpine` | Misma mayor que `engines.node` (`>=20.19.0`) en `apps/frontend/package.json`. |
 | Runtime frontend | `nginxinc/nginx-unprivileged:1.29-alpine` | Variante oficial de nginx que corre como usuario no root desde el arranque (sin necesidad de `USER`/`chown` manuales) y escucha en `8080`, un puerto no privilegiado. |
