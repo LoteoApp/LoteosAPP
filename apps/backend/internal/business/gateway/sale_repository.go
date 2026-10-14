@@ -27,7 +27,9 @@ type CreateSaleCommand struct {
 	// PaymentPlan is nil for contado; the repository builds and persists its
 	// schedule over the lote price.
 	PaymentPlan *domain.PaymentPlanInput
-	CreatedAt   time.Time
+	// InstallmentDueDay is the day of the month every installment falls due on.
+	InstallmentDueDay int
+	CreatedAt         time.Time
 }
 
 // ConvertReservationCommand turns a reserva into a venta. Lote, cliente,
@@ -42,6 +44,8 @@ type ConvertReservationCommand struct {
 	PaymentPlan            *domain.PaymentPlanInput
 	IdempotencyKey         string
 	IdempotencyPayloadHash string
+	// InstallmentDueDay is the day of the month every installment falls due on.
+	InstallmentDueDay int
 }
 
 type SaleRepository interface {

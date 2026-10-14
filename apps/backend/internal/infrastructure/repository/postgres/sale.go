@@ -166,6 +166,7 @@ func (repository *SaleRepository) create(ctx context.Context, command gateway.Cr
 		actorID:                command.ActorID,
 		method:                 command.PaymentMethod,
 		plan:                   command.PaymentPlan,
+		installmentDueDay:      command.InstallmentDueDay,
 		price:                  *lotPrice,
 		currency:               currency,
 		createdAt:              command.CreatedAt,
@@ -348,6 +349,7 @@ type saleWrite struct {
 	reservationID          *string
 	method                 domain.PaymentMethod
 	plan                   *domain.PaymentPlanInput
+	installmentDueDay      int
 	price                  float64
 	currency               string
 	createdAt              time.Time
@@ -364,7 +366,7 @@ func writeSale(ctx context.Context, tx pgx.Tx, write saleWrite) (string, error) 
 	var schedule domain.PaymentSchedule
 	if write.plan != nil {
 		var err error
-		schedule, err = domain.BuildPaymentSchedule(write.price, *write.plan, write.createdAt)
+		schedule, err = domain.BuildPaymentSchedule(write.price, *write.plan, write.createdAt, write.installmentDueDay)
 		if err != nil {
 			return "", err
 		}
