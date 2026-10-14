@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import SaleReceiptDialog from './SaleReceiptDialog'
@@ -40,7 +40,11 @@ describe('SaleReceiptDialog', () => {
     render(<SaleReceiptDialog open receipt={receipt()} onClose={vi.fn()} />)
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent('Recibo de venta')
+    expect(within(dialog).getByRole('heading', { name: 'Recibo de venta' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Datos de la venta' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument()
+    expect(dialog).toHaveTextContent('Total de la operación')
+    expect(dialog).toHaveTextContent('Firma del comprador')
     expect(dialog).toHaveTextContent('Norte · Mz 1 · Lote 7')
     expect(dialog).toHaveTextContent('300 m²')
     expect(dialog).toHaveTextContent('Pérez, Ana')
@@ -74,6 +78,7 @@ describe('SaleReceiptDialog', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveTextContent('Entrega + financiación')
+    expect(within(dialog).getByRole('heading', { name: 'Plan de pago' })).toBeInTheDocument()
     const plan = screen.getByLabelText('Plan de pago')
     expect(plan).toHaveTextContent('Entrega')
     expect(plan).toHaveTextContent('US$ 50.000,00')
