@@ -10,13 +10,29 @@ base de datos y la autenticación siguen siendo el proyecto de Supabase
 
 | Stage | Imagen | Por qué |
 | --- | --- | --- |
-| Build backend | `golang:1.26-alpine` | Misma versión que `apps/backend/go.mod` (`go 1.26.9`); alpine solo para compilar, no llega a producción. |
-| Runtime backend | `gcr.io/distroless/static-debian12:nonroot` | Sin shell, sin gestor de paquetes, corre como `nonroot` (uid 65532) por defecto. Incluye `ca-certificates`, necesario para TLS contra Supabase (`sslmode=require`) y R2. El binario se compila `CGO_ENABLED=0` (estático, verificado), así que no hace falta libc en la imagen final. |
+| Build backend | `golang:1.26-alpine` | Misma versión que `apps/backend/go.mod` (`go 1.26.10`); alpine solo para compilar, no llega a producción. |
+| Runtime backend | `gcr.io/distroless/static-debian13:nonroot` | Sin shell, sin gestor de paquetes, corre como `nonroot` (uid 65532) por defecto. Incluye `ca-certificates`, necesario para TLS contra Supabase (`sslmode=require`) y R2. El binario se compila `CGO_ENABLED=0` (estático, verificado), así que no hace falta libc en la imagen final. |
 | Build frontend | `node:24-alpine` | Misma mayor que `engines.node` (`>=20.19.0`) en `apps/frontend/package.json`. |
-| Runtime frontend | `nginxinc/nginx-unprivileged:1.29-alpine` | Variante oficial de nginx que corre como usuario no root desde el arranque (sin necesidad de `USER`/`chown` manuales) y escucha en `8080`, un puerto no privilegiado. |
+| Runtime frontend | `nginxinc/nginx-unprivileged:1.30-alpine` | Variante oficial de nginx que corre como usuario no root desde el arranque (sin necesidad de `USER`/`chown` manuales) y escucha en `8080`, un puerto no privilegiado. Rama estable de nginx. |
 
 Ninguna imagen usa `latest`: fijar tags concretos evita que un rebuild
 cambie de versión sin aviso.
+
+Fijar un tag no lo congela para siempre: cuando la rama upstream deja de
+recibir parches, el tag tampoco se reconstruye, y la imagen queda sin
+correcciones de seguridad (ni de nginx ni del Alpine/Debian de base). Por eso
+conviene revisar periódicamente que cada tag siga vivo:
+
+- **nginx**: usar la rama *stable* vigente de
+  [nginx.org/en/download.html](https://nginx.org/en/download.html). Una rama
+  *mainline* anterior (como `1.29`) se abandona en cuanto sale la siguiente
+  y deja de recibir parches.
+- **distroless**: usar la variante sobre la Debian que el proyecto publica
+  hoy (ver el [README de distroless](https://github.com/GoogleContainerTools/distroless));
+  las demás quedan marcadas como deprecadas y no se actualizan.
+- **golang**: el tag `1.26-alpine` sigue la última versión de parche, pero
+  un rebuild con caché puede reutilizar una imagen vieja; reconstruir sin
+  caché después de subir la directiva `go` de `go.mod`.
 
 ## Backend (`apps/backend/Dockerfile`)
 
@@ -56,7 +72,7 @@ El backend no exige auth en `GET /health` (agregado en este cambio —
 — justo porque todas las demás rutas la exigen y Dokploy necesita algo que
 pueda probar sin credenciales).
 
-Ninguna imagen `distroless` (ni siquiera `base-debian12`) trae `wget` ni
+Ninguna imagen `distroless` (ni siquiera `base-debian13`) trae `wget` ni
 `curl` — solo las variantes `:debug` agregan un shell busybox limitado, y no
 las usamos en producción porque pierden buena parte de las garantías de
 `distroless` (superficie de ataque mínima, sin shell). En vez de depender de

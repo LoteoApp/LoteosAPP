@@ -20,14 +20,14 @@ COPY apps/backend/. .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
-FROM gcr.io/distroless/static-debian12:nonroot AS migrate
+FROM gcr.io/distroless/static-debian13:nonroot AS migrate
 WORKDIR /app
 COPY --from=builder /out/migrate ./migrate
 COPY migrations /workspace/migrations
 ENV MIGRATIONS_DIR=/workspace/migrations
 ENTRYPOINT ["/app/migrate"]
 
-FROM gcr.io/distroless/static-debian12:nonroot AS server
+FROM gcr.io/distroless/static-debian13:nonroot AS server
 WORKDIR /app
 COPY --from=builder /out/server ./server
 EXPOSE 8080
