@@ -19,7 +19,8 @@
   "pnpm": {
     "overrides": {
       "fast-uri@<3.1.6": "^3.1.6",
-      "js-yaml@<4.3.2": "^4.3.2"
+      "js-yaml@<4.3.2": "^4.3.2",
+      "postcss-selector-parser@<7.1.6": "^7.1.6"
     },
     "auditConfig": {
       "ignoreGhsas": [

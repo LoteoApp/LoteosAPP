@@ -29,7 +29,7 @@ ENV VITE_API_URL=${VITE_API_URL} \
 
 RUN pnpm --filter @loteos/frontend build
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS server
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS server
 COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
 EXPOSE 8080
