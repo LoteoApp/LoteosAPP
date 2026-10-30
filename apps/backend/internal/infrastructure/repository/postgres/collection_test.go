@@ -37,9 +37,10 @@ func financedSaleFixture(t *testing.T, pool *pgxpool.Pool, saleDate time.Time) (
 	sale, err := postgres.NewSaleRepository(pool).Create(context.Background(), gateway.CreateSaleCommand{
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
-		PaymentMethod: domain.PaymentMethodDownAndFi,
-		PaymentPlan:   &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
-		CreatedAt:     saleDate,
+		PaymentMethod:     domain.PaymentMethodDownAndFi,
+		PaymentPlan:       &domain.PaymentPlanInput{Installments: 3, InterestRate: 0, Period: domain.PaymentPeriodQuarterly, DownPayment: 40000},
+		InstallmentDueDay: domain.DefaultInstallmentDueDay,
+		CreatedAt:         saleDate,
 	})
 	if err != nil {
 		t.Fatalf("create financed sale: %v", err)
@@ -263,9 +264,10 @@ func TestCollectionRepositoryCompletesWhenTheLastCuotaIsPaid(t *testing.T) {
 	sale, err := postgres.NewSaleRepository(pool).Create(context.Background(), gateway.CreateSaleCommand{
 		DevelopmentID: loteoID, LotID: lotID, ClientID: clientID, SellerID: actorID, ActorID: actorID,
 		IdempotencyKey: newUUID(t), IdempotencyPayloadHash: saleHash(t),
-		PaymentMethod: domain.PaymentMethodFinanced,
-		PaymentPlan:   &domain.PaymentPlanInput{Installments: 2, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
-		CreatedAt:     saleDate,
+		PaymentMethod:     domain.PaymentMethodFinanced,
+		PaymentPlan:       &domain.PaymentPlanInput{Installments: 2, InterestRate: 10, Period: domain.PaymentPeriodMonthly},
+		InstallmentDueDay: domain.DefaultInstallmentDueDay,
+		CreatedAt:         saleDate,
 	})
 	if err != nil {
 		t.Fatalf("create financed sale: %v", err)
@@ -311,7 +313,7 @@ func TestCollectionRepositoryListsDueInstallmentsWithinScope(t *testing.T) {
 	repository := postgres.NewCollectionRepository(pool)
 	scope := gateway.SaleScope{}
 
-	// Cuotas fall due on Apr 15, Jul 15 and Oct 15: one vencida, one within
+	// Cuotas fall due on Apr 10, Jul 10 and Oct 10: one vencida, one within
 	// the next 30 days, one further out.
 	page, err := repository.ListDueInstallments(context.Background(), domain.DueInstallmentFilter{DevelopmentID: sale.LoteoID}, scope, now)
 	if err != nil {
@@ -414,7 +416,7 @@ func TestCollectionRepositoryListsDueInstallmentsWithinScope(t *testing.T) {
 
 func TestCollectionRepositoryKeepsACuotaPendingOnItsDueDay(t *testing.T) {
 	pool := collectionPool(t)
-	// 12:00 in Argentina: cuota 1 falls due on Apr 15 at that clock.
+	// 12:00 in Argentina: cuota 1 falls due on Apr 10 at that clock.
 	saleDate := time.Date(2026, 1, 15, 15, 0, 0, 0, time.UTC)
 	sale, _ := financedSaleFixture(t, pool, saleDate)
 	repository := postgres.NewCollectionRepository(pool)
@@ -425,9 +427,9 @@ func TestCollectionRepositoryKeepsACuotaPendingOnItsDueDay(t *testing.T) {
 		now         time.Time
 		wantOverdue bool
 	}{
-		{"due day, past the sale's clock", time.Date(2026, 4, 15, 23, 59, 0, 0, domain.BusinessLocation), false},
-		{"due day, already the next day in UTC", time.Date(2026, 4, 16, 2, 59, 0, 0, time.UTC), false},
-		{"the day after", time.Date(2026, 4, 16, 0, 0, 0, 0, domain.BusinessLocation), true},
+		{"due day, past the sale's clock", time.Date(2026, 4, 10, 23, 59, 0, 0, domain.BusinessLocation), false},
+		{"due day, already the next day in UTC", time.Date(2026, 4, 11, 2, 59, 0, 0, time.UTC), false},
+		{"the day after", time.Date(2026, 4, 11, 0, 0, 0, 0, domain.BusinessLocation), true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
