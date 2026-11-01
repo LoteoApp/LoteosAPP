@@ -228,7 +228,7 @@ func (repository *ReservationRepository) create(ctx context.Context, command gat
 			$6, $7, $7, $8, $9)
 		RETURNING id::text
 	`, command.LoteID, command.ClienteID, command.VendedorID, command.ActorID,
-		reservationAgencyID, createdAt.Add(domain.ReservationDuration), createdAt,
+		reservationAgencyID, createdAt.Add(command.Validity), createdAt,
 		command.IdempotencyKey, command.IdempotencyPayloadHash).Scan(&reservationID)
 	if err != nil {
 		if isConstraint(err, reservationIdempotencyIndex) {

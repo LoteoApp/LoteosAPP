@@ -49,6 +49,7 @@ func TestReservationReceiptPDFRendersStructuredContentAndOnlyLabelsReservedLot(t
 		"Lote reservado",
 		"REFERENCIA - SIN ESCALA",
 		"CONDICIONES DE LA RESERVA",
+		"vencimiento",
 		"automáticamente",
 		"Página 1/1",
 	} {

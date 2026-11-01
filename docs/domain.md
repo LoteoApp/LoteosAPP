@@ -38,8 +38,8 @@ El estado vigente solo cambia al agregar un evento al historial.
 - **Cliente**: nombre y apellido, DNI, celular, mail. No tiene acceso al
   sistema. Puede tener múltiples lotes en distintos estados (en compra, en
   financiación, finalizados).
-- **Reserva**: vincula un cliente a un lote individual por 15 días, sin costo
-  ni pago.
+- **Reserva**: vincula un cliente a un lote individual por 15 días (o la
+  vigencia que indique un administrador), sin costo ni pago.
 - **Venta**: vincula lote, cliente, vendedor y modalidad de pago (contado,
   financiado, entrega + financiación).
 - **Cuota**: pago periódico de una venta financiada; puede incluir
@@ -234,9 +234,11 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
 - Estado vigente en `reservas.estado_actual`; las transiciones se registran
   solo en `reserva_estados`. Solo una reserva `activa` por lote. Los estados
   `cancelada`, `vencida` y `convertida` son terminales para este circuito.
-- Duración: exactamente 360 horas desde el instante autoritativo del servidor,
-  sin costo, prórroga ni edición manual. Se persiste como `TIMESTAMPTZ` y se
-  muestra en `America/Argentina/Buenos_Aires`.
+- Duración: por defecto exactamente 360 horas (15 días) desde el instante
+  autoritativo del servidor. Solo un `administrador` puede indicar otra
+  vigencia al crearla, como cantidad entera de días entre 1 y 365 (cada día
+  son 24 horas). No tiene costo, prórroga ni edición posterior. Se persiste
+  como `TIMESTAMPTZ` y se muestra en `America/Argentina/Buenos_Aires`.
 - Crear reserva mueve el lote de `disponible` a `reservado`. Cancelar antes
   del vencimiento, o vencerla, mueve el lote de `reservado` a `disponible` en
   la misma transacción.
@@ -259,7 +261,7 @@ Módulo de configuración exclusivo del administrador para definir, por usuario:
   estado ni numeración. Si el lote no tiene geometría cargada, el comprobante
   lo informa en lugar del croquis. También aclara que es un comprobante, no
   implica una venta, puede cancelarlo el cliente o la inmobiliaria y se cancela
-  automáticamente si no se concreta la venta en 15 días.
+  automáticamente si no se concreta la venta antes del vencimiento indicado.
 
 ## Venta
 

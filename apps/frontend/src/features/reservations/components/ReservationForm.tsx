@@ -2,10 +2,20 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '../../../shared/ui/alert'
 import { Button } from '../../../shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../shared/ui/card'
-import { Field, FieldError, FieldLabel } from '../../../shared/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '../../../shared/ui/field'
+import { Input } from '../../../shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger, SelectValue } from '../../../shared/ui/select'
 import { newIdempotencyKey } from '../../../shared/lib/idempotencyKey'
-import type { ReservationClient, ReservationDraft, ReservationLot, ReservationLoteoOption, SellerOption } from '../types'
+import {
+  DEFAULT_RESERVATION_VALIDITY_DAYS,
+  MAX_RESERVATION_VALIDITY_DAYS,
+  type ReservationClient,
+  type ReservationCreateValues,
+  type ReservationDraft,
+  type ReservationLot,
+  type ReservationLoteoOption,
+  type SellerOption,
+} from '../types'
 
 type Props = {
   loteos: ReservationLoteoOption[]
@@ -22,7 +32,7 @@ type Props = {
   onLoteoChange?: (value: string) => void
   onLoteChange?: (value: string) => void
   onReset?: () => void
-  onSubmit: (values: { loteoId: string; loteId: string; clienteId: string; vendedorId?: string }, key: string) => Promise<boolean>
+  onSubmit: (values: ReservationCreateValues, key: string) => Promise<boolean>
   onCancel?: () => void
   idempotencyKey?: string
   onCompleted?: () => void
@@ -31,6 +41,7 @@ type Props = {
   sellerIsFixed?: boolean
   fixedSeller?: SellerOption
   sellerRequired?: boolean
+  canSetValidity?: boolean
   renderClientAction?: ReactNode
 }
 
@@ -58,10 +69,12 @@ export default function ReservationForm({
   sellerIsFixed = false,
   fixedSeller,
   sellerRequired = sellers.length > 1,
+  canSetValidity = false,
   renderClientAction,
 }: Props) {
   const [localClienteId, setLocalClienteId] = useState('')
   const [localVendedorId, setLocalVendedorId] = useState('')
+  const [validityDays, setValidityDays] = useState(String(DEFAULT_RESERVATION_VALIDITY_DAYS))
   const [localIdempotencyKey, setLocalIdempotencyKey] = useState(newIdempotencyKey)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const selectedLote = lots.find((lot) => lot.id === selectedLoteId)
@@ -95,17 +108,21 @@ export default function ReservationForm({
     if (!clienteId) nextErrors.cliente = 'Seleccioná un cliente.'
     const selectedSellerId = sellerIsFixed ? fixedSeller?.id ?? sellers[0]?.id ?? '' : vendedorId
     if (sellerRequired && !selectedSellerId) nextErrors.vendedor = 'Seleccioná un vendedor.'
+    const diasVigencia = Number(validityDays.trim())
+    if (canSetValidity && !isValidValidity(validityDays, diasVigencia)) {
+      nextErrors.vigencia = `Ingresá una vigencia entre 1 y ${MAX_RESERVATION_VALIDITY_DAYS} días.`
+    }
     setFieldErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    const completed = await onSubmit(
-      { loteoId: selectedLoteoId, loteId: selectedLoteId, clienteId, vendedorId: selectedSellerId || undefined },
-      idempotencyKey ?? localIdempotencyKey,
-    )
+    const values: ReservationCreateValues = { loteoId: selectedLoteoId, loteId: selectedLoteId, clienteId, vendedorId: selectedSellerId || undefined }
+    if (canSetValidity) values.diasVigencia = diasVigencia
+    const completed = await onSubmit(values, idempotencyKey ?? localIdempotencyKey)
     if (completed) {
       if (idempotencyKey === undefined) setLocalIdempotencyKey(newIdempotencyKey())
       setClienteId('')
       setVendedorId('')
+      setValidityDays(String(DEFAULT_RESERVATION_VALIDITY_DAYS))
       setFieldErrors({})
       onReset?.()
       onCompleted?.()
@@ -116,7 +133,11 @@ export default function ReservationForm({
     <Card>
       <CardHeader>
         <CardTitle>Nueva reserva</CardTitle>
-        <CardDescription>El plazo es de 360 horas desde la confirmación del servidor.</CardDescription>
+        <CardDescription>
+          {canSetValidity
+            ? `El plazo se cuenta desde la confirmación del servidor; por defecto es de ${DEFAULT_RESERVATION_VALIDITY_DAYS} días.`
+            : 'El plazo es de 360 horas desde la confirmación del servidor.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
@@ -182,6 +203,26 @@ export default function ReservationForm({
               onOpenChange={(open) => { if (open) clearFieldError('vendedor') }}
             />
           )}
+          {canSetValidity && (
+            <Field data-invalid={Boolean(fieldErrors.vigencia)}>
+              <FieldLabel htmlFor="reserva-vigencia">Vigencia (días)</FieldLabel>
+              <Input
+                id="reserva-vigencia"
+                name="diasVigencia"
+                inputMode="numeric"
+                autoComplete="off"
+                value={validityDays}
+                onChange={(event) => { setValidityDays(event.target.value); clearFieldError('vigencia') }}
+                aria-invalid={Boolean(fieldErrors.vigencia)}
+                aria-describedby={fieldErrors.vigencia ? 'reserva-vigencia-error' : 'reserva-vigencia-description'}
+                className="min-h-11 md:min-h-9"
+              />
+              <FieldDescription id="reserva-vigencia-description">
+                Entre 1 y {MAX_RESERVATION_VALIDITY_DAYS} días.
+              </FieldDescription>
+              <FieldError id="reserva-vigencia-error">{fieldErrors.vigencia}</FieldError>
+            </Field>
+          )}
           <p className="text-sm text-muted-foreground">La fecha de vencimiento se calcula con la hora oficial del servidor.</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
@@ -193,6 +234,10 @@ export default function ReservationForm({
       </CardContent>
     </Card>
   )
+}
+
+function isValidValidity(raw: string, days: number): boolean {
+  return raw.trim() !== '' && Number.isInteger(days) && days >= 1 && days <= MAX_RESERVATION_VALIDITY_DAYS
 }
 
 function ReservationSelectField({

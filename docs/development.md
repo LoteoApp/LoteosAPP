@@ -106,9 +106,13 @@ Endpoints operativos del backend:
   conserva.
 - `POST /api/v1/loteos/{loteoId}/lotes/{loteId}/reservas` (requiere cuenta
   activa con rol `administrador`, `administrativo` o `inmobiliaria`): crea una
-  reserva de 360 horas. Recibe `clienteId` y, para los roles administrativos,
-  `vendedorId`; exige el header `Idempotency-Key`. La agencia del actor o del
-  vendedor seleccionado se persiste como atribución histórica.
+  reserva de 360 horas (15 días). Recibe `clienteId` y, para los roles
+  administrativos, `vendedorId`; un `administrador` puede enviar además
+  `diasVigencia` (entero de 1 a 365) para otra vigencia. Responde
+  `400 invalid_reservation_validity` si está fuera de rango y
+  `403 reservation_validity_forbidden` si la envía otro rol. Exige el header
+  `Idempotency-Key`. La agencia del actor o del vendedor seleccionado se
+  persiste como atribución histórica.
 - `GET /api/v1/reservas` y `GET /api/v1/reservas/{id}`: listan o consultan
   reservas dentro del alcance del actor: administrativos ven todas y los
   usuarios de inmobiliaria las asociadas a su agencia persistida. Incluyen
@@ -130,8 +134,8 @@ Endpoints operativos del backend:
 - `GET /api/v1/reservas/{id}/comprobante`: descarga el comprobante PDF para
   una reserva dentro del alcance del actor. El documento incluye fecha de
   emisión y un croquis de referencia sin escala con el lote reservado marcado;
-  aclara que no implica venta y que vence/cancela automáticamente a los 15 días
-  si no se concreta.
+  aclara que no implica venta y que se cancela automáticamente si no se
+  concreta antes del vencimiento indicado.
 - `GET /api/v1/loteos/{loteoId}/vendedores`: devuelve el catálogo mínimo de
   vendedores elegibles para ese loteo, sin otorgar acceso adicional al ABM de
   usuarios.

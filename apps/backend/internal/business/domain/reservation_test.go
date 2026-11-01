@@ -98,12 +98,44 @@ func TestValidateReservationReason(t *testing.T) {
 
 func TestReservationDurationAndBoundary(t *testing.T) {
 	created := time.Date(2026, time.January, 31, 20, 0, 0, 0, time.UTC)
-	expires := created.Add(domain.ReservationDuration)
+	expires := created.Add(domain.DefaultReservationDuration)
 	if expires.Sub(created) != 360*time.Hour {
 		t.Fatalf("duration = %s", expires.Sub(created))
 	}
 	if created.Before(expires) && !expires.Equal(created.Add(360*time.Hour)) {
 		t.Fatal("expiration should be exactly 360 hours")
+	}
+}
+
+func TestReservationValidity(t *testing.T) {
+	for _, tc := range []struct {
+		days int
+		want time.Duration
+	}{
+		{days: 1, want: 24 * time.Hour},
+		{days: domain.DefaultReservationValidityDays, want: domain.DefaultReservationDuration},
+		{days: domain.MaxReservationValidityDays, want: 365 * 24 * time.Hour},
+	} {
+		got, err := domain.ReservationValidity(tc.days)
+		if err != nil || got != tc.want {
+			t.Errorf("ReservationValidity(%d) = %s, %v; want %s", tc.days, got, err, tc.want)
+		}
+	}
+	for _, days := range []int{-1, 0, domain.MaxReservationValidityDays + 1} {
+		if _, err := domain.ReservationValidity(days); !errors.Is(err, domain.ErrReservationInvalidValidity) {
+			t.Errorf("ReservationValidity(%d) error = %v, want %v", days, err, domain.ErrReservationInvalidValidity)
+		}
+	}
+}
+
+func TestCanSetReservationValidityOnlyForAdministrador(t *testing.T) {
+	if !domain.CanSetReservationValidity(domain.RolAdministrador) {
+		t.Error("administrador should set the reservation validity")
+	}
+	for _, role := range []domain.Rol{domain.RolAdministrativo, domain.RolInmobiliaria, domain.RolAgrimensor} {
+		if domain.CanSetReservationValidity(role) {
+			t.Errorf("%s should not set the reservation validity", role)
+		}
 	}
 }
 
