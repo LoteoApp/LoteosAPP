@@ -40,13 +40,14 @@ func TestReservationRepository(t *testing.T) {
 		IdempotencyKey:         "reservation-create-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("a", 64),
 		CreatedAt:              now,
+		Validity:               domain.DefaultReservationDuration,
 	}
 
 	created, err := repository.Create(context.Background(), command)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if created.Estado != domain.ReservationStateActive || !created.FechaVencimiento.Equal(now.Add(domain.ReservationDuration)) {
+	if created.Estado != domain.ReservationStateActive || !created.FechaVencimiento.Equal(now.Add(domain.DefaultReservationDuration)) {
 		t.Errorf("created reservation = %#v", created)
 	}
 
@@ -227,6 +228,7 @@ func TestReservationRepository(t *testing.T) {
 		IdempotencyKey:         "reservation-incomplete-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("d", 64),
 		CreatedAt:              now,
+		Validity:               domain.DefaultReservationDuration,
 	})
 	if !errors.Is(err, domain.ErrReservationLotIncomplete) {
 		t.Fatalf("Create() incomplete lot error = %v, want %v", err, domain.ErrReservationLotIncomplete)
@@ -248,7 +250,7 @@ func TestReservationRepository(t *testing.T) {
 		t.Fatalf("restore lot commercial data: %v", err)
 	}
 
-	expiringRepository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now.Add(-domain.ReservationDuration)})
+	expiringRepository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now.Add(-domain.DefaultReservationDuration)})
 	expiring, err := expiringRepository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID:                loteoID,
 		LoteID:                 lotID,
@@ -258,7 +260,8 @@ func TestReservationRepository(t *testing.T) {
 		ActorAuthProviderID:    newUUID(t),
 		IdempotencyKey:         "reservation-expire-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("c", 64),
-		CreatedAt:              now.Add(-domain.ReservationDuration),
+		CreatedAt:              now.Add(-domain.DefaultReservationDuration),
+		Validity:               domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("Create() for expiration error = %v", err)
@@ -277,6 +280,35 @@ func TestReservationRepository(t *testing.T) {
 	}
 	if expired.Estado != domain.ReservationStateExpired || len(expired.Historial) != 2 {
 		t.Fatalf("expired reservation = %#v", expired)
+	}
+}
+
+func TestReservationRepositoryPersistsRequestedValidity(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set, skipping postgres integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	validity := 3 * 24 * time.Hour
+	repository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now})
+	created, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
+		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
+		IdempotencyKey: "reservation-custom-validity-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("c", 64),
+		CreatedAt: now, Validity: validity,
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if !created.FechaVencimiento.Equal(now.Add(validity)) {
+		t.Errorf("fecha vencimiento = %s, want %s", created.FechaVencimiento, now.Add(validity))
 	}
 }
 
@@ -374,7 +406,7 @@ func TestReservationCancelUsesThePostLockClock(t *testing.T) {
 
 	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	clock := &mutableReservationClock{now: now.Add(-domain.DefaultReservationDuration)}
 	repository := postgres.NewReservationRepository(pool, clock)
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID:                loteoID,
@@ -386,6 +418,7 @@ func TestReservationCancelUsesThePostLockClock(t *testing.T) {
 		IdempotencyKey:         "reservation-cancel-expired-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("e", 64),
 		CreatedAt:              clock.Now(),
+		Validity:               domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -395,7 +428,7 @@ func TestReservationCancelUsesThePostLockClock(t *testing.T) {
 		ReservationID: reservation.ID,
 		ActorID:       actorID,
 		Reason:        "Cliente desistió",
-		CancelledAt:   now.Add(-domain.ReservationDuration),
+		CancelledAt:   now.Add(-domain.DefaultReservationDuration),
 	}, gateway.ReservationScope{}); !errors.Is(err, domain.ErrReservationExpired) {
 		t.Fatalf("Cancel() expired error = %v, want %v", err, domain.ErrReservationExpired)
 	}
@@ -422,7 +455,7 @@ func TestReservationExpiryRegularizesDeletedLot(t *testing.T) {
 
 	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	clock := &mutableReservationClock{now: now.Add(-domain.DefaultReservationDuration)}
 	repository := postgres.NewReservationRepository(pool, clock)
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID:                loteoID,
@@ -434,6 +467,7 @@ func TestReservationExpiryRegularizesDeletedLot(t *testing.T) {
 		IdempotencyKey:         "reservation-detached-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("f", 64),
 		CreatedAt:              clock.Now(),
+		Validity:               domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -472,7 +506,7 @@ func TestReservationExpiryRegularizesLotOutsideReservedState(t *testing.T) {
 
 	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	clock := &mutableReservationClock{now: now.Add(-domain.DefaultReservationDuration)}
 	repository := postgres.NewReservationRepository(pool, clock)
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
@@ -601,6 +635,7 @@ func TestReservationAgencyMustRemainAssignedDuringCreate(t *testing.T) {
 		IdempotencyKey:         "reservation-agency-" + newUUID(t),
 		IdempotencyPayloadHash: strings.Repeat("1", 64),
 		CreatedAt:              now,
+		Validity:               domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("agency Create() error = %v", err)
@@ -661,7 +696,7 @@ func TestReservationCreateRejectsInvalidReferences(t *testing.T) {
 	repository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now})
 	base := gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyPayloadHash: strings.Repeat("2", 64), CreatedAt: now,
+		IdempotencyPayloadHash: strings.Repeat("2", 64), CreatedAt: now, Validity: domain.DefaultReservationDuration,
 	}
 	attempt := func(name string, command gateway.CreateReservationCommand, want error) {
 		t.Helper()
@@ -794,11 +829,11 @@ func TestReservationCreateRegularizesExpiredActiveReservation(t *testing.T) {
 
 	actorID, clientID, loteoID, lotID := reservationFixture(t, pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	clock := &mutableReservationClock{now: now.Add(-domain.DefaultReservationDuration)}
 	repository := postgres.NewReservationRepository(pool, clock)
 	expired, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyKey: "reservation-expired-before-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("3", 64), CreatedAt: clock.Now(),
+		IdempotencyKey: "reservation-expired-before-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("3", 64), CreatedAt: clock.Now(), Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("initial Create() error = %v", err)
@@ -806,7 +841,7 @@ func TestReservationCreateRegularizesExpiredActiveReservation(t *testing.T) {
 	clock.now = now
 	replacement, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyKey: "reservation-replacement-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("4", 64), CreatedAt: now,
+		IdempotencyKey: "reservation-replacement-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("4", 64), CreatedAt: now, Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("replacement Create() error = %v", err)
@@ -876,7 +911,7 @@ func TestReservationCancelRejectsUnauthorizedAndExpiredReservations(t *testing.T
 	repository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now})
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyKey: "reservation-unauthorized-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("5", 64), CreatedAt: now,
+		IdempotencyKey: "reservation-unauthorized-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("5", 64), CreatedAt: now, Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -901,11 +936,11 @@ func TestReservationCancelRejectsUnauthorizedAndExpiredReservations(t *testing.T
 		t.Fatalf("cleanup cancellation error = %v", err)
 	}
 
-	clock := &mutableReservationClock{now: now.Add(-domain.ReservationDuration)}
+	clock := &mutableReservationClock{now: now.Add(-domain.DefaultReservationDuration)}
 	expiringRepository := postgres.NewReservationRepository(pool, clock)
 	expiring, err := expiringRepository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyKey: "reservation-cancel-expired-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("6", 64), CreatedAt: clock.Now(),
+		IdempotencyKey: "reservation-cancel-expired-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("6", 64), CreatedAt: clock.Now(), Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("expired Create() error = %v", err)
@@ -913,7 +948,7 @@ func TestReservationCancelRejectsUnauthorizedAndExpiredReservations(t *testing.T
 	clock.now = now
 	if _, err := expiringRepository.Cancel(context.Background(), gateway.CancelReservationCommand{
 		ReservationID: expiring.ID, ActorID: actorID, Reason: "Cliente desistió",
-		CancelledAt: now.Add(-domain.ReservationDuration),
+		CancelledAt: now.Add(-domain.DefaultReservationDuration),
 	}, gateway.ReservationScope{}); !errors.Is(err, domain.ErrReservationExpired) {
 		t.Fatalf("expired Cancel() error = %v", err)
 	}
@@ -936,7 +971,7 @@ func TestReservationCancelRejectsConvertedReservation(t *testing.T) {
 	repository := postgres.NewReservationRepository(pool, fixedReservationClock{now: now})
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: actorID, ActorID: actorID, ActorAuthProviderID: newUUID(t),
-		IdempotencyKey: "reservation-converted-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("7", 64), CreatedAt: now,
+		IdempotencyKey: "reservation-converted-" + newUUID(t), IdempotencyPayloadHash: strings.Repeat("7", 64), CreatedAt: now, Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -992,7 +1027,7 @@ func TestReservationAgencyCannotCreateOutsideAssignedLoteo(t *testing.T) {
 	agencyCommand := gateway.CreateReservationCommand{
 		LoteoID: loteoID, LoteID: lotID, ClienteID: clientID, VendedorID: agencyUserID, ActorID: agencyUserID,
 		ActorAuthProviderID: authProviderID, SellerIsActor: true, IdempotencyKey: "reservation-unassigned-actor-" + newUUID(t),
-		IdempotencyPayloadHash: strings.Repeat("8", 64), CreatedAt: now,
+		IdempotencyPayloadHash: strings.Repeat("8", 64), CreatedAt: now, Validity: domain.DefaultReservationDuration,
 	}
 	if _, err := repository.Create(context.Background(), agencyCommand); !errors.Is(err, domain.ErrLoteNotFound) {
 		t.Fatalf("unassigned agency Create() error = %v, want %v", err, domain.ErrLoteNotFound)

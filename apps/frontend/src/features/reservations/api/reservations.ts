@@ -1,5 +1,5 @@
 import { ApiError, apiFetch, apiFetchBlob } from '../../../shared/api/client'
-import type { Reservation, ReservationListFilters, ReservationPage, SellerOption } from '../types'
+import type { Reservation, ReservationCreateValues, ReservationListFilters, ReservationPage, SellerOption } from '../types'
 
 const RESERVATIONS_PATH = '/api/v1/reservas'
 const GENERIC_ERROR = 'No se pudo completar la operación, intentá nuevamente.'
@@ -133,7 +133,7 @@ export async function listEligibleSellers(
 
 export async function createReservation(
   token: string,
-  values: { loteoId: string; loteId: string; clienteId: string; vendedorId?: string },
+  values: ReservationCreateValues,
   idempotencyKey: string,
 ): Promise<Reservation> {
   const body = await apiFetch<unknown>(
@@ -141,7 +141,7 @@ export async function createReservation(
     {
       method: 'POST',
       token,
-      body: { clienteId: values.clienteId, vendedorId: values.vendedorId },
+      body: { clienteId: values.clienteId, vendedorId: values.vendedorId, diasVigencia: values.diasVigencia },
       headers: { 'Idempotency-Key': idempotencyKey },
     },
   )

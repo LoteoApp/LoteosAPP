@@ -99,6 +99,68 @@ describe('ReservationCreatePage', () => {
     expect(screen.getByRole('link', { name: 'Ver detalle' })).toHaveAttribute('href', '/reservas/reservation-1')
   })
 
+  it('lets an administrador set the validity, defaulting to 15 days', async () => {
+    configureMocks()
+    const user = userEvent.setup()
+    renderPage({ canSetValidity: true })
+
+    const validity = screen.getByRole('textbox', { name: 'Vigencia (días)' })
+    expect(validity).toHaveValue('15')
+
+    await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
+    await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
+    await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
+    await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
+    await user.clear(validity)
+    await user.type(validity, '30')
+    await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
+
+    await waitFor(() => expect(createReservationMock).toHaveBeenCalledWith(
+      { loteoId: loteo.id, loteId: 'lot-1', clienteId: client.id, vendedorId: seller.id, diasVigencia: 30 },
+      expect.any(String),
+    ))
+  })
+
+  it('rejects a validity outside the allowed range without creating the reservation', async () => {
+    configureMocks()
+    const user = userEvent.setup()
+    renderPage({ canSetValidity: true })
+
+    await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
+    await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
+    await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
+    await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
+    const validity = screen.getByRole('textbox', { name: 'Vigencia (días)' })
+    for (const value of ['0', '366', '2,5']) {
+      await user.clear(validity)
+      await user.type(validity, value)
+      await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
+      expect(screen.getByText('Ingresá una vigencia entre 1 y 365 días.')).toBeInTheDocument()
+      expect(validity).toHaveAccessibleDescription('Ingresá una vigencia entre 1 y 365 días.')
+    }
+    expect(createReservationMock).not.toHaveBeenCalled()
+
+    await user.type(validity, '{Backspace}')
+    expect(screen.queryByText('Ingresá una vigencia entre 1 y 365 días.')).not.toBeInTheDocument()
+  })
+
+  it('keeps the default validity hidden from users who cannot change it', async () => {
+    configureMocks()
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(screen.queryByRole('textbox', { name: 'Vigencia (días)' })).not.toBeInTheDocument()
+    expect(screen.getByText('El plazo es de 360 horas desde la confirmación del servidor.')).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Cliente' }))
+    await user.click(await screen.findByRole('option', { name: /Pérez, Ana/ }))
+    await user.click(screen.getByRole('combobox', { name: 'Vendedor' }))
+    await user.click(await screen.findByRole('option', { name: /Gómez, Beto/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar reserva' }))
+
+    await waitFor(() => expect(createReservationMock).toHaveBeenCalled())
+    expect(createReservationMock.mock.calls[0][0]).not.toHaveProperty('diasVigencia')
+  })
+
   it('fixes the seller to the current agency user', async () => {
     configureMocks()
     const user = userEvent.setup()

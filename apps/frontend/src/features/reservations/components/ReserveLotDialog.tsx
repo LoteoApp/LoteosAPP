@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../../../shared/ui/dialog'
-import type { ReservationClient, ReservationDraft, ReservationLot } from '../types'
+import type { ReservationClient, ReservationCreateValues, ReservationDraft, ReservationLot } from '../types'
 import ReservationForm from './ReservationForm'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
@@ -105,10 +105,7 @@ function ReservationDialog({
     }
   }
 
-  async function handleSubmit(
-    values: { loteoId: string; loteId: string; clienteId: string; vendedorId?: string },
-    key: string,
-  ) {
+  async function handleSubmit(values: ReservationCreateValues, key: string) {
     if (disabledReason) {
       return false
     }
