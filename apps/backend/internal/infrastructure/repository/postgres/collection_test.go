@@ -92,6 +92,12 @@ func TestCollectionRepositoryStatementPaymentsAndCompletion(t *testing.T) {
 		t.Fatalf("out-of-order payment error = %v, want %v", err, domain.ErrPaymentInstallmentOrder)
 	}
 	if _, err := repository.RegisterPayment(context.Background(), gateway.RegisterPaymentCommand{
+		SaleID: sale.ID, ActorID: actorID, Type: domain.PaymentTypeRegular, InstallmentIDs: []string{statement.Installments[0].ID},
+		Medium: domain.PaymentMediumCash, PaidAt: now, Now: now,
+	}, scope); !errors.Is(err, domain.ErrPaymentDownPaymentFirst) {
+		t.Fatalf("cuota before the entrega error = %v, want %v", err, domain.ErrPaymentDownPaymentFirst)
+	}
+	if _, err := repository.RegisterPayment(context.Background(), gateway.RegisterPaymentCommand{
 		SaleID: sale.ID, ActorID: actorID, Type: domain.PaymentTypeRegular, InstallmentIDs: []string{newUUID(t)},
 		Medium: domain.PaymentMediumCash, PaidAt: now, Now: now,
 	}, scope); !errors.Is(err, domain.ErrPaymentInstallmentUnknown) {
@@ -469,7 +475,7 @@ func TestCollectionRepositoryReadsTheStatementInOneSnapshot(t *testing.T) {
 	postgres.SetAfterStatementInstallments(repository, func() {
 		_, paymentErr = postgres.NewCollectionRepository(pool).RegisterPayment(context.Background(), gateway.RegisterPaymentCommand{
 			SaleID: sale.ID, ActorID: actorID, Type: domain.PaymentTypeRegular, InstallmentIDs: []string{before.Installments[0].ID},
-			Medium: domain.PaymentMediumCash, PaidAt: now, Now: now,
+			IncludeDownPayment: true, Medium: domain.PaymentMediumCash, PaidAt: now, Now: now,
 		}, gateway.SaleScope{})
 	})
 	during, err := repository.GetDebtStatement(context.Background(), sale.ID, gateway.SaleScope{}, now)

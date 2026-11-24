@@ -414,8 +414,9 @@ venta; un usuario de inmobiliaria, las vendidas por su agencia.
   paga y se indica medio de pago (efectivo, transferencia, cheque, otro),
   fecha de pago (no futura; por defecto hoy) y una observación opcional. Las
   cuotas se cobran completas y en orden: no se puede cobrar la 3 con la 2
-  pendiente. La entrega no tiene vencimiento y se cobra cuando el cliente la
-  paga. Cada cobro genera un recibo con el detalle de lo cobrado, los datos
+  pendiente. La entrega no tiene vencimiento, pero va antes que las cuotas: si
+  está pendiente, un cobro que incluye cuotas tiene que incluirla (la pantalla
+  la marca sola al elegir una cuota). Cada cobro genera un recibo con el detalle de lo cobrado, los datos
   del lote y del cliente, que se vuelve a imprimir desde el historial.
 - **Cargos adicionales**: al cobrar se pueden sumar conceptos que no son
   parte del plan de pago —impuesto municipal, impuesto provincial, gasto

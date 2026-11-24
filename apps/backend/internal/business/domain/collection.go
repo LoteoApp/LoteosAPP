@@ -45,6 +45,7 @@ var (
 	ErrPaymentInstallmentUnknown        = &Error{Kind: KindInvalid, Code: "payment_installment_unknown", Message: "Alguna de las cuotas seleccionadas no pertenece a la venta"}
 	ErrPaymentInstallmentPaid           = &Error{Kind: KindConflict, Code: "payment_installment_paid", Message: "Alguna de las cuotas seleccionadas ya está pagada"}
 	ErrPaymentInstallmentOrder          = &Error{Kind: KindInvalid, Code: "payment_installment_order", Message: "Las cuotas se cobran en orden: no se puede saltear una pendiente"}
+	ErrPaymentDownPaymentFirst          = &Error{Kind: KindInvalid, Code: "payment_down_payment_first", Message: "La entrega se cobra antes que las cuotas: incluila en el cobro"}
 	ErrPaymentDownPaymentPaid           = &Error{Kind: KindConflict, Code: "payment_down_payment_paid", Message: "La entrega ya está cobrada"}
 	ErrPaymentNoDownPayment             = &Error{Kind: KindInvalid, Code: "payment_no_down_payment", Message: "La venta no tiene entrega para cobrar"}
 	ErrPaymentInvalidMedium             = &Error{Kind: KindInvalid, Code: "invalid_payment_medium", Message: "El medio de pago no es válido"}
@@ -272,7 +273,8 @@ func (selection PaymentSelection) Amount() float64 {
 
 // SelectPayment resolves which cuotas a cobro pays. Cuotas are collected in
 // order, so the selected ids must be exactly the first pending ones: paying
-// cuota 3 while 2 is still owed is rejected. installments must be sorted by
+// cuota 3 while 2 is still owed is rejected. A pending entrega comes before
+// every cuota, so a cobro that pays cuotas must include it. installments must be sorted by
 // numero, which is how the repository loads them.
 func SelectPayment(entrega *DownPayment, installments []Installment, installmentIDs []string, includeDownPayment bool) (PaymentSelection, error) {
 	if includeDownPayment {
@@ -324,6 +326,9 @@ func SelectPayment(entrega *DownPayment, installments []Installment, installment
 		}
 		selection.Installments = append(selection.Installments, installment)
 		remaining--
+	}
+	if entrega != nil && entrega.State != InstallmentStatePaid && !includeDownPayment && len(selection.Installments) > 0 {
+		return PaymentSelection{}, ErrPaymentDownPaymentFirst
 	}
 	return selection, nil
 }

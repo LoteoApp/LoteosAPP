@@ -124,6 +124,29 @@ function renderPage(token = 'token') {
 afterEach(() => vi.resetAllMocks())
 
 describe('DebtStatementPage', () => {
+  it('collects the pending entrega before any cuota', async () => {
+    mocks.getDebtStatement.mockResolvedValue(statement)
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByText('Pérez, Ana')
+    const entrega = screen.getByRole('checkbox', { name: 'Cobrar la entrega' })
+
+    await user.click(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' }))
+    expect(entrega).toBeChecked()
+    expect(screen.getByRole('button', { name: /Registrar cobro/ })).toHaveTextContent(/US\$\s?60\.000,00/)
+
+    await user.click(entrega)
+    expect(entrega).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: /Registrar cobro/ })).toBeDisabled()
+
+    await user.click(entrega)
+    expect(entrega).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: /Registrar cobro/ })).toHaveTextContent(/US\$\s?40\.000,00/)
+  })
+
   it('shows the sale, the summary, the cuotas and the printable statement', async () => {
     mocks.getDebtStatement.mockResolvedValue(statement)
     const user = userEvent.setup()
@@ -173,13 +196,15 @@ describe('DebtStatementPage', () => {
     const collect = screen.getByRole('button', { name: /Registrar cobro/ })
     expect(collect).toBeDisabled()
 
-    // Clicking cuota 2 takes cuota 1 with it; clicking it again drops it.
+    // Clicking cuota 2 takes cuota 1 and the pending entrega with it; clicking
+    // it again drops only cuota 2.
     await user.click(screen.getByRole('checkbox', { name: 'Cobrar la cuota 2' }))
+    expect(screen.getByRole('checkbox', { name: 'Cobrar la entrega' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Cobrar la cuota 1' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Cobrar la cuota 2' })).toBeChecked()
     await user.click(screen.getByRole('checkbox', { name: 'Cobrar la cuota 2' }))
     expect(screen.getByRole('checkbox', { name: 'Cobrar la cuota 2' })).not.toBeChecked()
-    await user.click(screen.getByRole('checkbox', { name: 'Cobrar la entrega' }))
+    expect(screen.getByRole('checkbox', { name: 'Cobrar la entrega' })).toBeChecked()
     expect(collect).toBeEnabled()
     expect(collect).toHaveTextContent(/US\$\s?60\.000,00/)
 
@@ -258,7 +283,7 @@ describe('DebtStatementPage', () => {
     // es-AR renders ARS as a bare "$"; the currency each amount belongs to is
     // the sr-only term next to it.
     const totals = within(dialog).getByRole('group', { name: 'Total a cobrar' })
-    expect(totals).toHaveTextContent(/US\$\s?20\.000,00/)
+    expect(totals).toHaveTextContent(/US\$\s?60\.000,00/)
     expect(totals).toHaveTextContent(/ARS\$\s?150\.000,00/)
 
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar cobro' }))
@@ -269,6 +294,7 @@ describe('DebtStatementPage', () => {
         'sale-1',
         expect.objectContaining({
           cuotaIds: ['c-1'],
+          incluirEntrega: true,
           cargos: [{ tipo: 'servicios', monto: 150000, moneda: 'ARS', detalle: 'Agua' }],
         }),
       ),

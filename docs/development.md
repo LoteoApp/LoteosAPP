@@ -179,7 +179,8 @@ Endpoints operativos del backend:
   `detalle` (opcional, hasta 200 caracteres). La respuesta trae `cargos` y
   `totales`, un importe por moneda: `monto`/`moneda` son solo lo imputado al
   plan y los cargos nunca se convierten ni se suman entre monedas. Las cuotas se cobran en orden: elegir la 3
-  con la 2 pendiente es `payment_installment_order`; repetir una pagada es
+  con la 2 pendiente es `payment_installment_order`; cobrar cuotas sin incluir
+  una entrega pendiente es `payment_down_payment_first`; repetir una pagada es
   `payment_installment_paid`. Devuelve `201` con el cobro. Si no queda nada
   pendiente, la venta pasa a `completada` y el lote a `finalizado`.
 - `POST /api/v1/ventas/{id}/cancelacion-total`: cobra todo el saldo en un

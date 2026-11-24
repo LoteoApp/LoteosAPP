@@ -773,8 +773,9 @@ Decisiones de este recorte:
   la fecha, así que una cuota que vence hoy sigue pendiente hasta que el día
   termina. Las reglas viven en dominio como funciones puras:
   `SelectPayment` exige que las cuotas elegidas sean las primeras
-  pendientes en orden (`payment_installment_order`) y que la entrega no se
-  cobre dos veces; `SelectSettlement` toma todo lo adeudado y compara,
+  pendientes en orden (`payment_installment_order`), que una entrega pendiente
+  se incluya antes de cualquier cuota (`payment_down_payment_first`) y que la
+  entrega no se cobre dos veces; `SelectSettlement` toma todo lo adeudado y compara,
   dentro de la transacción, con el `montoEsperado` que vio el cliente
   (`settlement_amount_mismatch`) para que una pantalla desactualizada no
   cobre otro total. `montoEsperado` es obligatorio: sin él, `SettleSale`
