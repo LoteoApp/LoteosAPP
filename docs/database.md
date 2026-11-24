@@ -178,6 +178,205 @@ columna `fecha_baja` ya venía de `00005`: la baja de una inmobiliaria es
 lógica (`fecha_baja IS NULL` = activa) porque borrar la fila rompería las FK
 que la nombran (`usuarios.inmobiliaria_id`, `inmobiliaria_loteos`).
 
+`00016_enforce_inmobiliaria_cuit_format.sql` agrega el CHECK
+`inmobiliarias_cuit_format_check` (`cuit IS NULL OR cuit ~ '^[0-9]{11}
+`00009_harden_reservations.sql` agrega la identidad idempotente por actor
+(`idempotency_key` y hash del payload), sus validaciones y el índice parcial
+de reservas activas ordenado por vencimiento e ID. También protege las
+transiciones de `reserva_estados` y vuelve inmutables la identidad comercial,
+la fecha de creación y el vencimiento. El `Down` elimina esos metadatos y
+constraints, por lo que no debe ejecutarse sobre datos reales: un rollback
+perdería las claves idempotentes y los hashes, aunque conserva las reservas y
+su historial.
+
+`00010_add_reservation_agency.sql` agrega `reservas.inmobiliaria_id` nullable,
+recupera la agencia histórica desde el vendedor cuando existe, crea un índice
+para el alcance por inmobiliaria y la incluye entre los campos inmutables de
+la reserva. Si el vendedor histórico no permite recuperar la agencia, queda
+`NULL`; el `Down` restaura el trigger anterior y elimina índice y columna, por
+lo que se perdería esa atribución histórica.
+
+`00011_add_sale_idempotency.sql` agrega a `ventas` la misma identidad
+idempotente por actor que tienen las reservas (`idempotency_key` y hash del
+payload, con sus validaciones) y el índice único parcial
+`ventas_usuario_alta_idempotency_key_idx`. El `Down` elimina columnas,
+constraints e índice, así que un rollback pierde las claves aunque conserva
+las ventas.
+
+`00012_allow_sale_to_finalize_lot.sql` reemplaza `lote_estados_validate_transition`
+para que `vendido → finalizado` acepte también el origen `venta`, además de
+`cobranza`: una venta al contado se cobra al registrarse y finaliza el lote
+en la misma transacción. El `Down` vuelve a exigir `cobranza` sin tocar el
+historial ya registrado.
+
+`00013_create_cobros.sql` crea `cobros` (un cobro por operación: `venta_id`,
+`tipo` `pago`/`cancelacion_total`, `monto`, `moneda`, `medio_pago`,
+`observacion`, `usuario_alta`, `fecha_pago`) y enlaza lo que cada cobro pagó:
+`cuotas.cobro_id` (con el check `cuotas_cobro_pagada_chk`: un cobro implica
+`estado = 'pagada'` y `fecha_pago`) y `planes_pago.cobro_entrega_id` junto al
+`fecha_entrega` que ya existía. Habilita RLS y revoca `anon`/`authenticated`
+como el resto. El `Down` elimina las columnas y la tabla, así que un rollback
+pierde el historial de cobros aunque las cuotas conservan `estado` y
+`fecha_pago`.
+
+`00014_add_payment_charges.sql` habilita los cargos adicionales de un cobro:
+`cargos_adicionales` gana `cobro_id` y su `cuota_id` pasa a ser opcional (un
+cargo se ingresa al cobrar, no queda agendado en una cuota), con
+`cargos_adicionales_origen_chk` para que siempre cuelgue de uno de los dos.
+El CHECK de `tipo` suma `gasto_administrativo`, `honorarios` y `servicios` a
+los cuatro originales, y se agregan `monto > 0` y un formato mínimo para
+`moneda`. La moneda del cargo es la suya: puede diferir de la de la venta —
+una cuota en USD con servicios en ARS— y por eso nunca se suma con el monto
+del cobro. El `Down` borra los cargos sin `cuota_id` (los que este esquema
+hizo posibles) antes de volver a exigirla.
+
+Cada archivo debe tener una sección `Up` y una sección `Down`:
+
+```sql
+-- +goose Up
+CREATE TABLE lots (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+-- +goose Down
+DROP TABLE lots;
+```
+
+Los marcadores `-- +goose Up` y `-- +goose Down` son obligatorios.
+
+## Crear una migración
+
+Desde la raíz, con la conexión traída de Doppler. Se usan las variables
+`GOOSE_DRIVER`/`GOOSE_DBSTRING` en vez de pasar la connection string como
+argumento: un argumento de línea de comandos queda visible para cualquier
+proceso de la máquina (Task Manager, `Get-Process`), mientras que una
+variable de entorno del proceso hijo no.
+
+```powershell
+$env:GOOSE_DRIVER = "postgres"
+$env:GOOSE_DBSTRING = doppler secrets get DATABASE_URL --plain
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations create create_lots_table sql
+```
+
+Usar nombres descriptivos y una migración por cambio coherente. Goose genera
+un archivo con numeración; no renombrarlo después de aplicarlo.
+
+## Aplicar migraciones
+
+La forma normal de desarrollo es:
+
+```powershell
+doppler run -- docker compose up --build
+```
+
+Compose ejecuta el servicio `migrate` contra Supabase y recién después inicia
+el backend.
+
+Para ejecutar únicamente el servicio de migraciones:
+
+```powershell
+doppler run -- docker compose up migrate
+```
+
+Para consultar el estado desde el host (con `$env:GOOSE_DRIVER`/
+`$env:GOOSE_DBSTRING` ya resueltas como en el paso anterior):
+
+```powershell
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations status
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations version
+```
+
+## Avanzar o retroceder manualmente
+
+Aplicar una sola migración:
+
+```powershell
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations up-by-one
+```
+
+Retroceder la última migración:
+
+```powershell
+go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir migrations down
+```
+
+`down` corre contra la base compartida de Supabase, no una base local
+descartable: no usarlo sin confirmar el impacto con el equipo.
+
+### Máquina de estados del lote
+
+`00008_add_lot_state_machine.sql` materializa el valor vigente en
+`lotes.estado_actual`, crea el evento inicial `disponible` para lotes sin
+historial y sincroniza los que ya tenían eventos. Los eventos anteriores a la
+migración quedan identificados como `sistema` con una razón de migración. Los
+lotes nuevos se inicializan por trigger; otro trigger valida la matriz de
+transiciones y actualiza el valor vigente. `lote_estados` rechaza `UPDATE`,
+`DELETE` y `TRUNCATE`, y su índice `(lote_id, fecha_creacion DESC, id DESC)`
+permite leer el historial en orden estable. El `Down` conserva las filas del
+historial y sus estados, pero elimina los metadatos agregados por esta migración
+(`origen`, `razon` y las referencias comerciales); solo debe usarse sobre una
+base descartable.
+
+### Reservas
+
+`reservas` mantiene una única fila activa por lote y
+`reserva_estados` conserva el historial append-only. La alta crea el evento
+`activa`; cancelación, vencimiento y conversión agregan un único evento
+terminal. `00009` rechaza el alta de un estado distinto de `activa`, las
+transiciones desde un terminal y los cambios directos de los campos
+inmutables. La liberación del lote se escribe junto con el evento de reserva
+mediante la máquina de estados de `lote_estados`.
+
+El worker consulta el índice parcial `reservas_active_expiration_idx`, toma
+candidatos en lotes pequeños y vuelve a verificar la reserva activa y su
+vencimiento después de bloquear lote y reserva. Así un reintento o una segunda
+instancia puede omitir un candidato ya procesado sin duplicar eventos.
+
+### Venta originada en una reserva
+
+`00015_link_sale_to_reservation.sql` agrega `ventas.reserva_id UUID NULL`: las
+ventas existentes y las del alta ordinaria quedan en `NULL` y no se completa
+nada a partir de coincidencias de lote o cliente, porque no hay evidencia
+histórica de qué venta vino de qué reserva.
+
+- `ventas_reserva_lote_fk`: FK compuesta `(reserva_id, lote_id)` hacia
+  `reservas (id, lote_id)` (la unicidad existe desde `00008`), así la venta no
+  puede apuntar a una reserva de otro lote. Sin borrado en cascada.
+- `ventas_reserva_id_idx`: índice único parcial sobre `reserva_id` no nulo,
+  sin condición de estado: una reserva origina una sola venta aunque esa venta
+  se cancele. El mismo índice sirve la búsqueda reserva → venta.
+- `ventas_protect_reserva_id`: trigger `BEFORE UPDATE` que rechaza cambiar el
+  vínculo después del alta; el resto de los campos de `ventas` no cambia de
+  régimen.
+- No se agrega `reservas.venta_id`: la reserva encuentra su venta por el
+  índice. RLS y privilegios quedan como estaban.
+
+El `Down` elimina el trigger, el índice, la FK y la columna: se pierde qué venta
+vino de qué reserva, aunque la reserva conserva su estado `convertida` y el lote
+su historial (con `reserva_id` y `venta_id` en el evento de venta). Solo debe
+usarse sobre una base descartable.
+
+## Reglas del esquema
+
+- Nunca modificar una migración que ya fue aplicada en algún ambiente.
+- Crear una nueva migración para cada cambio posterior.
+- Mantener `Up` y `Down` coherentes.
+- Preferir cambios compatibles hacia atrás cuando una API y una base se
+  actualizan en momentos distintos.
+- No poner migraciones automáticas dentro de cada instancia del backend.
+- Usar `-- +goose NO TRANSACTION` solo cuando PostgreSQL no permita ejecutar la
+  operación dentro de una transacción.
+- Revisar manualmente las migraciones destructivas antes de aplicarlas.
+`).
+El índice de `00007` compara texto, así que una fila cargada a mano con
+separadores (`30-71234567-8`) convivía con la misma agencia guardada como
+`30712345678`; con el CHECK la base rechaza cualquier valor que no sean 11
+dígitos. El `Up` normaliza las filas existentes (también las dadas de baja,
+porque el CHECK las alcanza) y aborta, antes de reescribir nada, si algún CUIT
+no son 11 dígitos una vez normalizado o si dos agencias activas pasarían a
+compartirlo. El `Down` quita el CHECK y no deshace la normalización.
+
 `00009_harden_reservations.sql` agrega la identidad idempotente por actor
 (`idempotency_key` y hash del payload), sus validaciones y el índice parcial
 de reservas activas ordenado por vencimiento e ID. También protege las
