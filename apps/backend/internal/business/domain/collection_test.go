@@ -173,6 +173,28 @@ func TestSelectPaymentTakesTheFirstPendingInstallmentsInOrder(t *testing.T) {
 	}
 }
 
+func TestSelectPaymentAcceptsCuotasWhenThereIsNothingToCollectFirst(t *testing.T) {
+	paidEntrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePaid}
+	cases := []struct {
+		name    string
+		entrega *domain.DownPayment
+	}{
+		{"sale without entrega", nil},
+		{"entrega already paid", paidEntrega},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			selection, err := domain.SelectPayment(tc.entrega, installmentsFixture(), []string{"c-2"}, false)
+			if err != nil {
+				t.Fatalf("SelectPayment() error = %v", err)
+			}
+			if selection.IncludeDownPayment || len(selection.Installments) != 1 || selection.Installments[0].ID != "c-2" {
+				t.Errorf("selection = %#v, want only c-2", selection)
+			}
+		})
+	}
+}
+
 func TestSelectPaymentRejections(t *testing.T) {
 	installments := installmentsFixture()
 	pendingEntrega := &domain.DownPayment{Amount: 250, State: domain.InstallmentStatePending}
@@ -190,6 +212,8 @@ func TestSelectPaymentRejections(t *testing.T) {
 		{"already paid", pendingEntrega, []string{"c-1"}, false, domain.ErrPaymentInstallmentPaid},
 		{"skips a pending one", pendingEntrega, []string{"c-3"}, false, domain.ErrPaymentInstallmentOrder},
 		{"skips in the middle", pendingEntrega, []string{"c-2", "c-4"}, false, domain.ErrPaymentInstallmentOrder},
+		{"cuotas before the pending entrega", pendingEntrega, []string{"c-2"}, false, domain.ErrPaymentDownPaymentFirst},
+		{"several cuotas before the pending entrega", pendingEntrega, []string{"c-2", "c-3"}, false, domain.ErrPaymentDownPaymentFirst},
 		{"no entrega", nil, []string{"c-2"}, true, domain.ErrPaymentNoDownPayment},
 		{"entrega already paid", paidEntrega, []string{"c-2"}, true, domain.ErrPaymentDownPaymentPaid},
 	}

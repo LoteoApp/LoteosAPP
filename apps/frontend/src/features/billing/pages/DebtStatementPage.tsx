@@ -48,6 +48,7 @@ export default function DebtStatementPage({ accessToken = '' }: DebtStatementPag
   const collectable = statement !== null && statement.venta.estado === 'activa'
   const amount = statement === null ? 0 : selectionAmount(statement, selected, includeDownPayment)
   const hasSelection = includeDownPayment || selected.length > 0
+  const downPaymentPending = statement?.entrega !== undefined && statement.entrega.estado !== 'pagada'
 
   async function submit(run: () => Promise<Payment>) {
     setIsSubmitting(true)
@@ -120,7 +121,7 @@ export default function DebtStatementPage({ accessToken = '' }: DebtStatementPag
               <CardTitle>Cuotas</CardTitle>
               <CardDescription>
                 {collectable
-                  ? 'Marcá lo que el cliente paga: las cuotas se cobran en orden, de la más antigua a la más nueva.'
+                  ? 'Marcá lo que el cliente paga: la entrega, si está pendiente, y después las cuotas, de la más antigua a la más nueva.'
                   : `La venta está ${SALE_STATE_LABELS[statement.venta.estado]?.toLowerCase() ?? statement.venta.estado}; no admite nuevos cobros.`}
               </CardDescription>
             </CardHeader>
@@ -134,8 +135,15 @@ export default function DebtStatementPage({ accessToken = '' }: DebtStatementPag
                     ? {
                         selected,
                         includeDownPayment,
-                        onToggleInstallment: (id) => setSelected(toggleInstallment(statement.cuotas, selected, id)),
-                        onToggleDownPayment: () => setIncludeDownPayment((value) => !value),
+                        onToggleInstallment: (id) => {
+                          const next = toggleInstallment(statement.cuotas, selected, id)
+                          setSelected(next)
+                          if (next.length > 0 && downPaymentPending) setIncludeDownPayment(true)
+                        },
+                        onToggleDownPayment: () => {
+                          if (includeDownPayment) setSelected([])
+                          setIncludeDownPayment(!includeDownPayment)
+                        },
                       }
                     : undefined
                 }
