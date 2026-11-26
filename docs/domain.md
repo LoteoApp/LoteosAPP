@@ -90,7 +90,9 @@ desde el módulo **Inmobiliarias**. Una inmobiliaria tiene razón social
   conserva la fila y con ella el historial de los loteos y usuarios que la
   nombran.
 - Dos inmobiliarias activas no pueden compartir CUIT. El CUIT se guarda como
-  11 dígitos, sin separadores, así que da igual cómo se tipee.
+  11 dígitos, sin separadores, así que da igual cómo se tipee; la base lo
+  garantiza con un CHECK, también para filas cargadas por fuera de la
+  aplicación.
 - Las inmobiliarias no acceden al sistema como tales: quien opera es un
   usuario con rol inmobiliaria.
 

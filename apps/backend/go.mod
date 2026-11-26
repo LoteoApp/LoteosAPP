@@ -1,6 +1,6 @@
 module loteosapp/backend
 
-go 1.26.10
+go 1.26.11
 
 require (
 	codeberg.org/go-fonts/dejavu v0.4.0
