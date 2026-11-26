@@ -37,6 +37,13 @@ func validInput() sales.CreateSaleInput {
 	}
 }
 
+func financedInput() sales.CreateSaleInput {
+	input := validInput()
+	input.PaymentMethod = string(domain.PaymentMethodFinanced)
+	input.PaymentPlan = &sales.PaymentPlanInput{Installments: 12, Period: string(domain.PaymentPeriodMonthly)}
+	return input
+}
+
 func sha256Hex(payload string) string {
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
@@ -46,7 +53,7 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
 	created := time.Date(2026, 9, 14, 15, 0, 0, 0, time.FixedZone("ART", -3*60*60))
-	useCase := sales.NewCreateSale(repository, users, fixedClock{now: created})
+	useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay, fixedClock{now: created})
 
 	sale, err := useCase.Execute(context.Background(), validInput())
 	if err != nil {
@@ -74,10 +81,56 @@ func TestCreateSaleNormalizesAndDefaultsToContado(t *testing.T) {
 	}
 }
 
+func TestCreateSaleCarriesTheConfiguredDueDay(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
+
+	useCase := sales.NewCreateSale(repository, users, 5)
+	if _, err := useCase.Execute(context.Background(), financedInput()); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	command := repository.CreateCommand
+	if command.PaymentPlan == nil {
+		t.Fatal("command has no payment plan, want the financed plan")
+	}
+	if command.InstallmentDueDay != 5 {
+		t.Errorf("due day = %d, want the configured 5", command.InstallmentDueDay)
+	}
+}
+
+func TestCreateSaleRejectsAFinancedSaleWithAnInvalidDueDay(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+
+	for _, day := range []int{0, domain.MaxInstallmentDueDay + 1, 31} {
+		repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
+		useCase := sales.NewCreateSale(repository, users, day)
+		_, err := useCase.Execute(context.Background(), financedInput())
+		if !errors.Is(err, domain.ErrInvalidInstallmentDueDay) {
+			t.Errorf("Execute() with day %d error = %v, want %v", day, err, domain.ErrInvalidInstallmentDueDay)
+		}
+		var domainErr *domain.Error
+		if errors.As(err, &domainErr) {
+			t.Errorf("Execute() with day %d error = %#v, want a misconfiguration error rather than a request error", day, domainErr)
+		}
+		if repository.CreateCalls != 0 {
+			t.Errorf("Execute() with day %d created the sale %d times, want none", day, repository.CreateCalls)
+		}
+	}
+
+	// A contado sale has no installments, so the due day doesn't apply.
+	repository := &gatewayfake.SaleRepository{CreateResult: domain.Sale{ID: "sale-1"}}
+	if _, err := sales.NewCreateSale(repository, users, 0).Execute(context.Background(), validInput()); err != nil {
+		t.Fatalf("Execute() contado with day 0 error = %v", err)
+	}
+	if repository.CreateCalls != 1 {
+		t.Errorf("contado sale created %d times, want 1", repository.CreateCalls)
+	}
+}
+
 func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{}
-	useCase := sales.NewCreateSale(repository, users)
+	useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay)
 
 	if _, err := useCase.Execute(context.Background(), validInput()); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -120,7 +173,7 @@ func TestCreateSalePayloadHashChangesWithTheSale(t *testing.T) {
 func TestCreateSalePassesTheNormalizedPlanToTheRepository(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{}
-	useCase := sales.NewCreateSale(repository, users, fixedClock{})
+	useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay, fixedClock{})
 
 	input := validInput()
 	input.PaymentMethod = string(domain.PaymentMethodDownAndFi)
@@ -140,7 +193,7 @@ func TestCreateSalePassesTheNormalizedPlanToTheRepository(t *testing.T) {
 	// The repository knows the lote price, so a down payment above it comes
 	// back from there as the same domain error.
 	repository = &gatewayfake.SaleRepository{CreateErr: domain.ErrSaleInvalidDownPayment}
-	useCase = sales.NewCreateSale(repository, users, fixedClock{})
+	useCase = sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay, fixedClock{})
 	if _, err := useCase.Execute(context.Background(), input); !errors.Is(err, domain.ErrSaleInvalidDownPayment) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrSaleInvalidDownPayment)
 	}
@@ -151,7 +204,7 @@ func TestCreateSaleLetsAnAgencyUserPickAColleague(t *testing.T) {
 		ID: "agency-user", AuthProviderID: "agency-subject", Rol: domain.RolInmobiliaria,
 	}}
 	repository := &gatewayfake.SaleRepository{}
-	useCase := sales.NewCreateSale(repository, users, fixedClock{})
+	useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay, fixedClock{})
 
 	input := validInput()
 	input.Actor = sales.Actor{AuthProviderID: "agency-subject", Roles: []string{domain.RolInmobiliaria}}
@@ -250,7 +303,7 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 			repository := &gatewayfake.SaleRepository{}
-			useCase := sales.NewCreateSale(repository, users)
+			useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay)
 
 			_, err := useCase.Execute(context.Background(), test.input())
 			if !errors.Is(err, test.want) {
@@ -266,7 +319,7 @@ func TestCreateSaleValidatesInput(t *testing.T) {
 func TestCreateSaleResolvesTheActor(t *testing.T) {
 	t.Run("unknown actor", func(t *testing.T) {
 		users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: domain.ErrUsuarioNoEncontrado}
-		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users)
+		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users, domain.DefaultInstallmentDueDay)
 		if _, err := useCase.Execute(context.Background(), validInput()); !errors.Is(err, domain.ErrActorNoAprovisionado) {
 			t.Fatalf("Execute() error = %v, want %v", err, domain.ErrActorNoAprovisionado)
 		}
@@ -276,14 +329,14 @@ func TestCreateSaleResolvesTheActor(t *testing.T) {
 		now := time.Now()
 		inactive.FechaBaja = &now
 		users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: inactive}
-		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users)
+		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users, domain.DefaultInstallmentDueDay)
 		if _, err := useCase.Execute(context.Background(), validInput()); !errors.Is(err, domain.ErrCuentaInactiva) {
 			t.Fatalf("Execute() error = %v, want %v", err, domain.ErrCuentaInactiva)
 		}
 	})
 	t.Run("token role that the local profile does not have", func(t *testing.T) {
 		users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "u", Rol: domain.RolEscribano}}
-		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users)
+		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users, domain.DefaultInstallmentDueDay)
 		if _, err := useCase.Execute(context.Background(), validInput()); !errors.Is(err, domain.ErrNoAutorizado) {
 			t.Fatalf("Execute() error = %v, want %v", err, domain.ErrNoAutorizado)
 		}
@@ -291,7 +344,7 @@ func TestCreateSaleResolvesTheActor(t *testing.T) {
 	t.Run("lookup failure", func(t *testing.T) {
 		cause := errors.New("connection reset")
 		users := &gatewayfake.UserRepository{FindByAuthProviderIDErr: cause}
-		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users)
+		useCase := sales.NewCreateSale(&gatewayfake.SaleRepository{}, users, domain.DefaultInstallmentDueDay)
 		_, err := useCase.Execute(context.Background(), validInput())
 		if !errors.Is(err, domain.ErrDatabaseUnavailable) || !errors.Is(err, cause) {
 			t.Fatalf("Execute() error = %v, want unavailable wrapping %v", err, cause)
@@ -302,14 +355,14 @@ func TestCreateSaleResolvesTheActor(t *testing.T) {
 func TestCreateSalePropagatesRepositoryErrors(t *testing.T) {
 	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
 	repository := &gatewayfake.SaleRepository{CreateErr: domain.ErrSaleLotUnavailable}
-	useCase := sales.NewCreateSale(repository, users)
+	useCase := sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay)
 	if _, err := useCase.Execute(context.Background(), validInput()); !errors.Is(err, domain.ErrSaleLotUnavailable) {
 		t.Fatalf("Execute() error = %v, want %v", err, domain.ErrSaleLotUnavailable)
 	}
 
 	cause := errors.New("insert failed")
 	repository = &gatewayfake.SaleRepository{CreateErr: cause}
-	useCase = sales.NewCreateSale(repository, users)
+	useCase = sales.NewCreateSale(repository, users, domain.DefaultInstallmentDueDay)
 	_, err := useCase.Execute(context.Background(), validInput())
 	if !errors.Is(err, domain.ErrDatabaseUnavailable) || !errors.Is(err, cause) {
 		t.Fatalf("Execute() error = %v, want unavailable wrapping %v", err, cause)

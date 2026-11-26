@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"loteosapp/backend/internal/business/domain"
 	"loteosapp/backend/internal/infrastructure/environments"
 )
 
@@ -64,6 +65,9 @@ func TestLoadServer(t *testing.T) {
 		if cfg.Mailer.APIKey != testResendAPIKey || cfg.Mailer.FromEmail != "no-reply@loteosapp.com" || cfg.Mailer.FromName != "LoteosAPP" {
 			t.Errorf("Mailer = %+v, want the api key plus default from address", cfg.Mailer)
 		}
+		if cfg.InstallmentDueDay != domain.DefaultInstallmentDueDay {
+			t.Errorf("InstallmentDueDay = %d, want the default %d", cfg.InstallmentDueDay, domain.DefaultInstallmentDueDay)
+		}
 	})
 
 	t.Run("reads the storage settings", func(t *testing.T) {
@@ -96,6 +100,7 @@ func TestLoadServer(t *testing.T) {
 		t.Setenv("RESERVATION_EXPIRY_TIMEOUT", "25s")
 		t.Setenv("MAIL_FROM_EMAIL", "alertas@loteosapp.com")
 		t.Setenv("MAIL_FROM_NAME", "Alertas LoteosAPP")
+		t.Setenv("INSTALLMENT_DUE_DAY", "1")
 
 		cfg, err := environments.LoadServer()
 		if err != nil {
@@ -118,6 +123,9 @@ func TestLoadServer(t *testing.T) {
 		if cfg.Mailer.FromEmail != "alertas@loteosapp.com" || cfg.Mailer.FromName != "Alertas LoteosAPP" {
 			t.Errorf("Mailer = %+v, want the overridden from address", cfg.Mailer)
 		}
+		if cfg.InstallmentDueDay != 1 {
+			t.Errorf("InstallmentDueDay = %d, want the overridden 1", cfg.InstallmentDueDay)
+		}
 	})
 
 	for _, test := range []struct {
@@ -129,6 +137,9 @@ func TestLoadServer(t *testing.T) {
 		{name: "interval", env: "RESERVATION_EXPIRY_INTERVAL", value: "0s"},
 		{name: "batch", env: "RESERVATION_EXPIRY_BATCH", value: "0"},
 		{name: "timeout", env: "RESERVATION_EXPIRY_TIMEOUT", value: "-1s"},
+		{name: "due day", env: "INSTALLMENT_DUE_DAY", value: "0"},
+		{name: "due day past the shortest month", env: "INSTALLMENT_DUE_DAY", value: "31"},
+		{name: "non numeric due day", env: "INSTALLMENT_DUE_DAY", value: "diez"},
 	} {
 		t.Run("rejects invalid "+test.name, func(t *testing.T) {
 			setRequiredServerEnv(t)

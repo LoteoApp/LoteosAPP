@@ -32,10 +32,13 @@ type ConvertReservationToSale interface {
 type convertReservationToSaleUseCase struct {
 	repository gateway.SaleRepository
 	users      gateway.UserRepository
+	dueDay     int
 }
 
-func NewConvertReservationToSale(repository gateway.SaleRepository, users gateway.UserRepository) ConvertReservationToSale {
-	return &convertReservationToSaleUseCase{repository: repository, users: users}
+// NewConvertReservationToSale takes the day of the month every installment
+// falls due on.
+func NewConvertReservationToSale(repository gateway.SaleRepository, users gateway.UserRepository, dueDay int) ConvertReservationToSale {
+	return &convertReservationToSaleUseCase{repository: repository, users: users, dueDay: dueDay}
 }
 
 func (useCase *convertReservationToSaleUseCase) Execute(ctx context.Context, input ConvertReservationToSaleInput) (domain.Sale, error) {
@@ -54,6 +57,9 @@ func (useCase *convertReservationToSaleUseCase) Execute(ctx context.Context, inp
 	if err != nil {
 		return domain.Sale{}, err
 	}
+	if plan != nil && !domain.IsValidInstallmentDueDay(useCase.dueDay) {
+		return domain.Sale{}, fmt.Errorf("convert reservation with installment due day %d: %w", useCase.dueDay, domain.ErrInvalidInstallmentDueDay)
+	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
 	if err != nil {
@@ -69,6 +75,7 @@ func (useCase *convertReservationToSaleUseCase) Execute(ctx context.Context, inp
 		ActorAuthProviderID:    input.Actor.AuthProviderID,
 		PaymentMethod:          method,
 		PaymentPlan:            plan,
+		InstallmentDueDay:      useCase.dueDay,
 		IdempotencyKey:         key,
 		IdempotencyPayloadHash: conversionPayloadHash(reservationID, method, plan),
 	})

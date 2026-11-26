@@ -57,15 +57,17 @@ type CreateSale interface {
 type createSaleUseCase struct {
 	repository gateway.SaleRepository
 	users      gateway.UserRepository
+	dueDay     int
 	clock      Clock
 }
 
-func NewCreateSale(repository gateway.SaleRepository, users gateway.UserRepository, clocks ...Clock) CreateSale {
+// NewCreateSale takes the day of the month every installment falls due on.
+func NewCreateSale(repository gateway.SaleRepository, users gateway.UserRepository, dueDay int, clocks ...Clock) CreateSale {
 	clock := Clock(SystemClock{})
 	if len(clocks) > 0 && clocks[0] != nil {
 		clock = clocks[0]
 	}
-	return &createSaleUseCase{repository: repository, users: users, clock: clock}
+	return &createSaleUseCase{repository: repository, users: users, dueDay: dueDay, clock: clock}
 }
 
 func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleInput) (domain.Sale, error) {
@@ -93,6 +95,9 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 	if err != nil {
 		return domain.Sale{}, err
 	}
+	if plan != nil && !domain.IsValidInstallmentDueDay(useCase.dueDay) {
+		return domain.Sale{}, fmt.Errorf("create sale with installment due day %d: %w", useCase.dueDay, domain.ErrInvalidInstallmentDueDay)
+	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
 	if err != nil {
@@ -112,6 +117,7 @@ func (useCase *createSaleUseCase) Execute(ctx context.Context, input CreateSaleI
 		IdempotencyKey:         key,
 		IdempotencyPayloadHash: salePayloadHash(developmentID, lotID, clientID, sellerID, method, plan),
 		PaymentPlan:            plan,
+		InstallmentDueDay:      useCase.dueDay,
 		CreatedAt:              useCase.clock.Now().UTC(),
 	})
 	if err != nil {

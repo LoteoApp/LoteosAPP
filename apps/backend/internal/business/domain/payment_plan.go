@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -15,8 +16,16 @@ const (
 )
 
 const (
-	MaxSaleInstallments  = 360
-	MaxSaleInterestRate  = 1000
+	MaxSaleInstallments = 360
+	MaxSaleInterestRate = 1000
+	// DefaultInstallmentDueDay is the day of the month installments fall due
+	// on when the deployment doesn't choose another one.
+	DefaultInstallmentDueDay = 10
+	MinInstallmentDueDay     = 1
+	// MaxInstallmentDueDay is 28 because every month has it: a later day
+	// would not exist in February and the installment would land on another
+	// month.
+	MaxInstallmentDueDay = 28
 	installmentAmountMin = 0.01
 	interestRateDecimals = 4
 	moneyDecimals        = 2
@@ -40,6 +49,17 @@ var (
 	ErrSaleDownPaymentNotApplicable = &Error{Kind: KindInvalid, Code: "sale_down_payment_not_applicable", Message: "Solo entrega + financiación lleva un monto de entrega"}
 	ErrSaleInstallmentTooSmall      = &Error{Kind: KindInvalid, Code: "sale_installment_too_small", Message: "El monto financiado no alcanza para esa cantidad de cuotas"}
 )
+
+// ErrInvalidInstallmentDueDay must not become a *Error: an out-of-range due
+// day is a server misconfiguration, not a bad request, so it has to surface
+// as a generic 500.
+var ErrInvalidInstallmentDueDay = fmt.Errorf("installment due day must be between %d and %d", MinInstallmentDueDay, MaxInstallmentDueDay)
+
+// IsValidInstallmentDueDay reports whether a day of the month can be used as
+// the due day of every installment.
+func IsValidInstallmentDueDay(day int) bool {
+	return day >= MinInstallmentDueDay && day <= MaxInstallmentDueDay
+}
 
 func (period PaymentPeriod) IsValid() bool {
 	_, ok := paymentPeriodMonths[period]
@@ -177,10 +197,16 @@ func RoundMoney(value float64) float64 {
 //
 // Every cuota is the same amount, so the total is what the cuotas add up to
 // and may differ from the exact interest by a few cents. Due dates:
-// installment k (1-based) falls k periods after the sale date, on the same
-// day of the month, clamped to the last day when the target month is
-// shorter (a sale on Jan 31 is due Feb 28/29, Mar 31...).
-func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time) (PaymentSchedule, error) {
+// installment k (1-based) is due on dueDay of the month k periods after the
+// sale month, whatever day the sale happened on (with dueDay 10, a sale on
+// Jan 5 and one on Jan 31 are both due Feb 10, Mar 10...), keeping the sale
+// date's clock. The sale month and clock are read in BusinessLocation, so a
+// sale at 01:00 UTC on Feb 1 (still Jan 31 in Argentina) is due Feb 10 at
+// 22:00 there; due dates are returned in UTC.
+func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.Time, dueDay int) (PaymentSchedule, error) {
+	if !IsValidInstallmentDueDay(dueDay) {
+		return PaymentSchedule{}, ErrInvalidInstallmentDueDay
+	}
 	if plan.DownPayment >= amount {
 		return PaymentSchedule{}, ErrSaleInvalidDownPayment
 	}
@@ -200,7 +226,7 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 			Numero:           number,
 			Monto:            installment,
 			Estado:           InstallmentStatePending,
-			FechaVencimiento: addMonthsClamped(saleDate, months*number),
+			FechaVencimiento: dueDateAfter(saleDate, months*number, dueDay),
 		}
 	}
 	return PaymentSchedule{
@@ -211,13 +237,9 @@ func BuildPaymentSchedule(amount float64, plan PaymentPlanInput, saleDate time.T
 	}, nil
 }
 
-func addMonthsClamped(date time.Time, months int) time.Time {
-	year, month, day := date.Date()
-	first := time.Date(year, month+time.Month(months), 1, 0, 0, 0, 0, date.Location())
-	lastDay := first.AddDate(0, 1, -1).Day()
-	if day > lastDay {
-		day = lastDay
-	}
-	hour, minute, second := date.Clock()
-	return time.Date(first.Year(), first.Month(), day, hour, minute, second, date.Nanosecond(), date.Location())
+func dueDateAfter(date time.Time, months, dueDay int) time.Time {
+	local := date.In(BusinessLocation)
+	year, month, _ := local.Date()
+	hour, minute, second := local.Clock()
+	return time.Date(year, month+time.Month(months), dueDay, hour, minute, second, local.Nanosecond(), BusinessLocation).UTC()
 }
