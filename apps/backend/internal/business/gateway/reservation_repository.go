@@ -31,6 +31,7 @@ type CreateReservationCommand struct {
 	IdempotencyKey         string
 	IdempotencyPayloadHash string
 	CreatedAt              time.Time
+	Validity               time.Duration
 }
 
 type CancelReservationCommand struct {

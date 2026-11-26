@@ -103,6 +103,16 @@ describe('reservation API', () => {
 		])
 	})
 
+	it('sends the requested validity days when creating a reservation', async () => {
+		apiFetchMock.mockResolvedValueOnce(reservation())
+
+		await createReservation('token', { loteoId: 'loteo-1', loteId: 'lot-1', clienteId: 'client-1', vendedorId: 'seller-1', diasVigencia: 30 }, 'key-1')
+
+		expect(apiFetchMock).toHaveBeenCalledWith('/api/v1/loteos/loteo-1/lotes/lot-1/reservas', expect.objectContaining({
+			body: { clienteId: 'client-1', vendedorId: 'seller-1', diasVigencia: 30 },
+		}))
+	})
+
 	it('downloads the generated receipt through the shared API client and preserves failures', async () => {
 		apiFetchBlobMock.mockResolvedValueOnce(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))
 		const file = await downloadReservationReceipt('token', 'reservation/1')

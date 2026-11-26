@@ -116,6 +116,49 @@ func TestCreateReservationHandler(t *testing.T) {
 	if stub.input.LoteoID != "development-1" || stub.input.LoteID != "lot-1" || stub.input.ClienteID != "client-1" || stub.input.VendedorID != "seller-1" || stub.input.IdempotencyKey != "request-1" {
 		t.Errorf("input = %#v", stub.input)
 	}
+	if stub.input.ValidityDays != nil {
+		t.Errorf("validity days = %d, want nil when the body omits it", *stub.input.ValidityDays)
+	}
+}
+
+func TestCreateReservationHandlerForwardsValidityDays(t *testing.T) {
+	stub := &createReservationHandlerStub{result: domain.Reservation{ID: "reservation-1"}}
+	mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", handler.NewCreateReservationHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/development-1/lotes/lot-1/reservas", strings.NewReader(`{"clienteId":"client-1","vendedorId":"seller-1","diasVigencia":30}`))
+	request.Header.Set("Authorization", "Bearer token")
+	request.Header.Set("Idempotency-Key", "request-1")
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
+	}
+	if stub.input.ValidityDays == nil || *stub.input.ValidityDays != 30 {
+		t.Errorf("validity days = %v, want 30", stub.input.ValidityDays)
+	}
+}
+
+func TestCreateReservationHandlerMapsValidityErrors(t *testing.T) {
+	for _, tc := range []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{err: domain.ErrReservationInvalidValidity, status: http.StatusBadRequest, code: "invalid_reservation_validity"},
+		{err: domain.ErrReservationValidityForbidden, status: http.StatusForbidden, code: "reservation_validity_forbidden"},
+	} {
+		stub := &createReservationHandlerStub{err: tc.err}
+		mux := reservationHandlerMux(t, http.MethodPost, "/api/v1/loteos/{loteoId}/lotes/{loteId}/reservas", handler.NewCreateReservationHandler(stub))
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/loteos/development-1/lotes/lot-1/reservas", strings.NewReader(`{"clienteId":"client-1","diasVigencia":0}`))
+		request.Header.Set("Authorization", "Bearer token")
+		request.Header.Set("Idempotency-Key", "request-1")
+		recorder := httptest.NewRecorder()
+		mux.ServeHTTP(recorder, request)
+
+		if recorder.Code != tc.status || !strings.Contains(recorder.Body.String(), tc.code) {
+			t.Errorf("status = %d, body = %s; want %d with %s", recorder.Code, recorder.Body.String(), tc.status, tc.code)
+		}
+	}
 }
 
 func TestReservationHandlersParseRequestsAndPrincipal(t *testing.T) {
@@ -147,7 +190,7 @@ func TestReservationHandlersParseRequestsAndPrincipal(t *testing.T) {
 		if disposition := recorder.Header().Get("Content-Disposition"); disposition != `attachment; filename="comprobante-reserva-reservation-1.pdf"` {
 			t.Errorf("content disposition = %q", disposition)
 		}
-		for _, text := range []string{"COMPROBANTE DE RESERVA", "FECHA DE EMISIÓN", "11/09/2026 12:30", "Las Acacias", "Croquis de ubicación del lote", "no implica una venta", "cancelada", "inmobiliaria", "15"} {
+		for _, text := range []string{"COMPROBANTE DE RESERVA", "FECHA DE EMISIÓN", "11/09/2026 12:30", "Las Acacias", "Croquis de ubicación del lote", "no implica una venta", "cancelada", "inmobiliaria", "vencimiento"} {
 			if !bytes.Contains(recorder.Body.Bytes(), receiptUTF16Bytes(text)) {
 				t.Errorf("PDF does not include %q", text)
 			}

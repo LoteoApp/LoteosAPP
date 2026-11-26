@@ -61,6 +61,17 @@ export type ReservationDraft = {
   vendedorId: string
 }
 
+export const DEFAULT_RESERVATION_VALIDITY_DAYS = 15
+export const MAX_RESERVATION_VALIDITY_DAYS = 365
+
+export type ReservationCreateValues = {
+  loteoId: string
+  loteId: string
+  clienteId: string
+  vendedorId?: string
+  diasVigencia?: number
+}
+
 export type ReservationHistoryEntry = {
   id: string
   estado: ReservationState

@@ -46,11 +46,85 @@ func TestCreateReservationNormalizesAndUsesTheAuthoritativeClock(t *testing.T) {
 	if !command.CreatedAt.Equal(created.UTC()) {
 		t.Errorf("created at = %s, want %s", command.CreatedAt, created.UTC())
 	}
-	if command.CreatedAt.Add(domain.ReservationDuration).Sub(command.CreatedAt) != 360*time.Hour {
-		t.Error("reservation should expire after exactly 360 hours")
+	if command.Validity != 360*time.Hour {
+		t.Errorf("validity = %s, want the default 360 hours", command.Validity)
 	}
 	if command.IdempotencyPayloadHash == "" || len(command.IdempotencyPayloadHash) != 64 {
 		t.Errorf("payload hash = %q", command.IdempotencyPayloadHash)
+	}
+}
+
+func TestCreateReservationAdministradorSetsTheValidity(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.ReservationRepository{}
+	useCase := reservations.NewCreateReservation(repository, users, fixedClock{})
+	input := reservations.CreateReservationInput{
+		Actor:   reservations.Actor{AuthProviderID: "actor-subject", Roles: []string{domain.RolAdministrador}},
+		LoteoID: "loteo-id", LoteID: "lote-id", ClienteID: "cliente-id", VendedorID: "seller-id", IdempotencyKey: "key",
+	}
+
+	if _, err := useCase.Execute(context.Background(), input); err != nil {
+		t.Fatalf("default Execute() error = %v", err)
+	}
+	defaultHash := repository.CreateCommand.IdempotencyPayloadHash
+
+	days := 30
+	input.ValidityDays = &days
+	if _, err := useCase.Execute(context.Background(), input); err != nil {
+		t.Fatalf("custom Execute() error = %v", err)
+	}
+	if repository.CreateCommand.Validity != 30*24*time.Hour {
+		t.Errorf("validity = %s, want 720h", repository.CreateCommand.Validity)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash == defaultHash {
+		t.Error("a different validity should change the idempotency payload hash")
+	}
+
+	defaultDays := domain.DefaultReservationValidityDays
+	input.ValidityDays = &defaultDays
+	if _, err := useCase.Execute(context.Background(), input); err != nil {
+		t.Fatalf("explicit default Execute() error = %v", err)
+	}
+	if repository.CreateCommand.IdempotencyPayloadHash != defaultHash {
+		t.Error("an explicit default validity should keep the idempotency payload hash")
+	}
+}
+
+func TestCreateReservationRejectsValidityOutOfRange(t *testing.T) {
+	users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: activeAdmin()}
+	repository := &gatewayfake.ReservationRepository{}
+	useCase := reservations.NewCreateReservation(repository, users, fixedClock{})
+
+	for _, days := range []int{0, domain.MaxReservationValidityDays + 1} {
+		_, err := useCase.Execute(context.Background(), reservations.CreateReservationInput{
+			Actor:   reservations.Actor{AuthProviderID: "actor-subject", Roles: []string{domain.RolAdministrador}},
+			LoteoID: "loteo-id", LoteID: "lote-id", ClienteID: "cliente-id", VendedorID: "seller-id", IdempotencyKey: "key",
+			ValidityDays: &days,
+		})
+		if !errors.Is(err, domain.ErrReservationInvalidValidity) {
+			t.Errorf("days %d error = %v, want %v", days, err, domain.ErrReservationInvalidValidity)
+		}
+	}
+	if repository.CreateCalls != 0 {
+		t.Errorf("repository create calls = %d, want 0", repository.CreateCalls)
+	}
+}
+
+func TestCreateReservationOnlyAdministradorSetsTheValidity(t *testing.T) {
+	for _, role := range []domain.Rol{domain.RolAdministrativo, domain.RolInmobiliaria} {
+		users := &gatewayfake.UserRepository{FindByAuthProviderIDResult: domain.Usuario{ID: "actor-id", AuthProviderID: "actor-subject", Rol: role}}
+		repository := &gatewayfake.ReservationRepository{}
+		useCase := reservations.NewCreateReservation(repository, users, fixedClock{})
+		days := 30
+
+		_, err := useCase.Execute(context.Background(), reservations.CreateReservationInput{
+			Actor:   reservations.Actor{AuthProviderID: "actor-subject", Roles: []string{string(role)}},
+			LoteoID: "loteo-id", LoteID: "lote-id", ClienteID: "cliente-id", VendedorID: "seller-id", IdempotencyKey: "key",
+			ValidityDays: &days,
+		})
+		if !errors.Is(err, domain.ErrReservationValidityForbidden) || repository.CreateCalls != 0 {
+			t.Errorf("%s error = %v, create calls = %d", role, err, repository.CreateCalls)
+		}
 	}
 }
 

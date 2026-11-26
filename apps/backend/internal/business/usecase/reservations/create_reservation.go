@@ -27,6 +27,7 @@ type CreateReservationInput struct {
 	ClienteID      string
 	VendedorID     string
 	IdempotencyKey string
+	ValidityDays   *int
 }
 
 type CreateReservation interface {
@@ -64,6 +65,14 @@ func (useCase *createReservationUseCase) Execute(ctx context.Context, input Crea
 	if clienteID == "" {
 		return domain.Reservation{}, domain.ErrReservationInvalidClient
 	}
+	validityDays := domain.DefaultReservationValidityDays
+	if input.ValidityDays != nil {
+		validityDays = *input.ValidityDays
+	}
+	validity, err := domain.ReservationValidity(validityDays)
+	if err != nil {
+		return domain.Reservation{}, err
+	}
 
 	actor, err := resolveActor(ctx, useCase.users, input.Actor)
 	if err != nil {
@@ -71,6 +80,9 @@ func (useCase *createReservationUseCase) Execute(ctx context.Context, input Crea
 	}
 	if !hasReservationWriteRole([]string{string(actor.Rol)}) {
 		return domain.Reservation{}, domain.ErrNoAutorizado
+	}
+	if input.ValidityDays != nil && !domain.CanSetReservationValidity(actor.Rol) {
+		return domain.Reservation{}, domain.ErrReservationValidityForbidden
 	}
 
 	sellerID := strings.TrimSpace(input.VendedorID)
@@ -92,8 +104,9 @@ func (useCase *createReservationUseCase) Execute(ctx context.Context, input Crea
 		ActorAuthProviderID:    input.Actor.AuthProviderID,
 		SellerIsActor:          sellerIsActor,
 		IdempotencyKey:         key,
-		IdempotencyPayloadHash: reservationPayloadHash(loteoID, loteID, clienteID, sellerID),
+		IdempotencyPayloadHash: reservationPayloadHash(loteoID, loteID, clienteID, sellerID, validityDays),
 		CreatedAt:              now,
+		Validity:               validity,
 	})
 	if err != nil {
 		return domain.Reservation{}, fromRepository(err)
@@ -101,8 +114,8 @@ func (useCase *createReservationUseCase) Execute(ctx context.Context, input Crea
 	return reservation, nil
 }
 
-func reservationPayloadHash(loteoID, loteID, clienteID, sellerID string) string {
-	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s", len(loteoID), loteoID, len(loteID), loteID, len(clienteID), clienteID, len(sellerID), sellerID)
+func reservationPayloadHash(loteoID, loteID, clienteID, sellerID string, validityDays int) string {
+	payload := fmt.Sprintf("%d:%s%d:%s%d:%s%d:%s%d", len(loteoID), loteoID, len(loteID), loteID, len(clienteID), clienteID, len(sellerID), sellerID, validityDays)
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])
 }

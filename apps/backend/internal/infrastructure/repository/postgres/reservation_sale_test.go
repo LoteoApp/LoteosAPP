@@ -79,7 +79,7 @@ func (setup conversionSetup) reserve(t *testing.T, pool *pgxpool.Pool, lotID, se
 	reservation, err := repository.Create(context.Background(), gateway.CreateReservationCommand{
 		LoteoID: setup.loteoID, LoteID: lotID, ClienteID: setup.clientID, VendedorID: sellerID,
 		ActorID: setup.adminID, ActorAuthProviderID: setup.adminAuthID,
-		IdempotencyKey: "conversion-reserve-" + newUUID(t), IdempotencyPayloadHash: saleHash(t), CreatedAt: createdAt,
+		IdempotencyKey: "conversion-reserve-" + newUUID(t), IdempotencyPayloadHash: saleHash(t), CreatedAt: createdAt, Validity: domain.DefaultReservationDuration,
 	})
 	if err != nil {
 		t.Fatalf("reserve: %v", err)
@@ -411,7 +411,7 @@ func TestConvertReservationRejectsReservasThatCannotBeSold(t *testing.T) {
 	pool := conversionPool(t)
 	setup := newConversionSetup(t, pool)
 	reservedAt := time.Date(2027, 3, 1, 12, 0, 0, 0, time.UTC)
-	due := reservedAt.Add(domain.ReservationDuration)
+	due := reservedAt.Add(domain.DefaultReservationDuration)
 	reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
 	// Every rejection is checked on both sides: the POST refuses it and the
 	// read never offers it, so puedeConvertir can't drift from the guards.
@@ -485,7 +485,7 @@ func TestConvertReservationAfterTheWorkerExpiredIt(t *testing.T) {
 	pool := conversionPool(t)
 	setup := newConversionSetup(t, pool)
 	reservedAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	afterDue := reservedAt.Add(domain.ReservationDuration + time.Minute)
+	afterDue := reservedAt.Add(domain.DefaultReservationDuration + time.Minute)
 	reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
 
 	if _, err := postgres.NewReservationRepository(pool, fixedReservationClock{now: afterDue}).ExpireDue(context.Background(), afterDue, 1000); err != nil {
@@ -695,9 +695,9 @@ func TestConvertReservationScopesByTheRoleItLocks(t *testing.T) {
 func TestConvertReservationReadsTheClockAfterWaitingForTheLote(t *testing.T) {
 	pool := conversionPool(t)
 	setup := newConversionSetup(t, pool)
-	reservedAt := time.Now().UTC().Add(-domain.ReservationDuration + time.Hour).Truncate(time.Microsecond)
+	reservedAt := time.Now().UTC().Add(-domain.DefaultReservationDuration + time.Hour).Truncate(time.Microsecond)
 	reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
-	clock := &syncClock{now: reservedAt.Add(domain.ReservationDuration - time.Minute)}
+	clock := &syncClock{now: reservedAt.Add(domain.DefaultReservationDuration - time.Minute)}
 	repository := postgres.NewSaleRepository(pool, clock)
 
 	holder, err := pool.Begin(context.Background())
@@ -722,7 +722,7 @@ func TestConvertReservationReadsTheClockAfterWaitingForTheLote(t *testing.T) {
 	waitUntilBlockedBy(t, pool, holderPID)
 
 	// The reserva runs out while the conversion waits for the lote.
-	clock.Set(reservedAt.Add(domain.ReservationDuration))
+	clock.Set(reservedAt.Add(domain.DefaultReservationDuration))
 	if err := holder.Rollback(context.Background()); err != nil {
 		t.Fatalf("release lote: %v", err)
 	}
@@ -831,8 +831,8 @@ func TestConvertReservationRacesResolveToOneOutcome(t *testing.T) {
 	t.Run("conversion against the expiry worker", func(t *testing.T) {
 		setup := newConversionSetup(t, pool)
 		reservedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
-		beforeDue := reservedAt.Add(domain.ReservationDuration - time.Minute)
-		afterDue := reservedAt.Add(domain.ReservationDuration + time.Minute)
+		beforeDue := reservedAt.Add(domain.DefaultReservationDuration - time.Minute)
+		afterDue := reservedAt.Add(domain.DefaultReservationDuration + time.Minute)
 		reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
 		command := conversionCommand(t, reservation.ID, setup.adminID, setup.adminAuthID)
 		var report domain.ExpirationReport
@@ -962,7 +962,7 @@ func TestConvertReservationRequiresTheReservaThatHoldsTheLote(t *testing.T) {
 		INSERT INTO reservas (lote_id, cliente_id, vendedor_id, usuario_alta, fecha_vencimiento, fecha_creacion, fecha_modificacion)
 		VALUES ($1::uuid, $2::uuid, $3::uuid, $3::uuid, $4, $5, $5)
 		RETURNING id::text
-	`, setup.lotID, setup.clientID, setup.adminID, reservedAt.Add(domain.ReservationDuration), reservedAt).Scan(&orphanID); err != nil {
+	`, setup.lotID, setup.clientID, setup.adminID, reservedAt.Add(domain.DefaultReservationDuration), reservedAt).Scan(&orphanID); err != nil {
 		t.Fatalf("insert orphan reserva: %v", err)
 	}
 
@@ -1046,8 +1046,8 @@ func TestConvertReservationHoldsCancellationAndWorkerUntilItCommits(t *testing.T
 	t.Run("a worker that found the reserva first skips it after waiting", func(t *testing.T) {
 		setup := newConversionSetup(t, pool)
 		reservedAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
-		beforeDue := reservedAt.Add(domain.ReservationDuration - time.Minute)
-		afterDue := reservedAt.Add(domain.ReservationDuration + time.Minute)
+		beforeDue := reservedAt.Add(domain.DefaultReservationDuration - time.Minute)
+		afterDue := reservedAt.Add(domain.DefaultReservationDuration + time.Minute)
 		reservation := setup.reserve(t, pool, setup.lotID, setup.adminID, reservedAt)
 		ready, release, converted := pausedConversion(t, pool, beforeDue,
 			conversionCommand(t, reservation.ID, setup.adminID, setup.adminAuthID))

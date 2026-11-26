@@ -3,8 +3,9 @@ package dto
 import "loteosapp/backend/internal/business/domain"
 
 type CreateReservationRequest struct {
-	ClienteID  string `json:"clienteId"`
-	VendedorID string `json:"vendedorId,omitempty"`
+	ClienteID    string `json:"clienteId"`
+	VendedorID   string `json:"vendedorId,omitempty"`
+	DiasVigencia *int   `json:"diasVigencia,omitempty"`
 }
 
 type CancelReservationRequest struct {

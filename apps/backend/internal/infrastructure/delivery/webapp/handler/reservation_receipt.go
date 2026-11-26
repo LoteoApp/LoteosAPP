@@ -375,7 +375,7 @@ func writeReservationReceiptSketchFallback(pdf *fpdf.Fpdf, x, y float64, detail 
 }
 
 func writeReservationReceiptConditions(pdf *fpdf.Fpdf) {
-	disclaimer := "Este documento es un comprobante de reserva y no implica una venta. La reserva puede ser cancelada por el cliente o por la inmobiliaria. Si en 15 días no se concreta la venta, la reserva se cancela automáticamente."
+	disclaimer := "Este documento es un comprobante de reserva y no implica una venta. La reserva puede ser cancelada por el cliente o por la inmobiliaria. Si la venta no se concreta antes del vencimiento indicado, la reserva se cancela automáticamente."
 	pdf.SetFont("DejaVu", "", 9.5)
 	lineCount := max(1, len(pdf.SplitText(disclaimer, receiptContentWidth-12)))
 	height := 12 + float64(lineCount)*5.2

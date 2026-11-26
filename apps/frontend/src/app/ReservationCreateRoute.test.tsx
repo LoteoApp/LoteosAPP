@@ -114,5 +114,19 @@ describe('ReservationCreateRoute', () => {
 
     expect(screen.getByText('Gómez, Beto')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Vendedor' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Vigencia (días)' })).not.toBeInTheDocument()
+  })
+
+  it('offers the validity field only to an administrador', () => {
+    useLoteoMock.mockReturnValue({ status: 'loaded', loteo })
+    useClientsMock.mockReturnValue({ clientes: [client], isLoading: false, error: null })
+    useEligibleSellersMock.mockReturnValue({ sellers: [seller], isLoading: false, error: null })
+
+    const { unmount } = renderRoute('administrador')
+    expect(screen.getByRole('textbox', { name: 'Vigencia (días)' })).toHaveValue('15')
+    unmount()
+
+    renderRoute('administrativo')
+    expect(screen.queryByRole('textbox', { name: 'Vigencia (días)' })).not.toBeInTheDocument()
   })
 })

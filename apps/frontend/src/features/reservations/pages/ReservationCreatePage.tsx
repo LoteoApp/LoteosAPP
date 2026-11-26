@@ -12,7 +12,7 @@ import { downloadReservationReceipt } from '../api/reservations'
 import { useEligibleSellers } from '../hooks/use-eligible-sellers'
 import { useReservationMutations } from '../hooks/use-reservation-mutations'
 import { useReservations } from '../hooks/use-reservations'
-import { canConvertReservation, type Reservation, type ReservationClient, type ReservationCreateDevelopment } from '../types'
+import { canConvertReservation, type Reservation, type ReservationClient, type ReservationCreateDevelopment, type ReservationCreateValues } from '../types'
 
 type ReservationCreatePageProps = {
   accessToken?: string
@@ -25,6 +25,7 @@ type ReservationCreatePageProps = {
   clientsLoading: boolean
   clientsError: string | null
   isAgencyUser: boolean
+  canSetValidity?: boolean
   renderPlan?: ReactNode
   renderClientAction?: ReactNode
   renderClientDialog?: ReactNode
@@ -41,6 +42,7 @@ export default function ReservationCreatePage({
   clientsLoading,
   clientsError,
   isAgencyUser,
+  canSetValidity = false,
   renderPlan,
   renderClientAction,
   renderClientDialog,
@@ -66,7 +68,7 @@ export default function ReservationCreatePage({
     ? activeReservations.page.reservas[0] ?? null
     : null
 
-  async function handleSubmit(values: { loteoId: string; loteId: string; clienteId: string; vendedorId?: string }, key: string) {
+  async function handleSubmit(values: ReservationCreateValues, key: string) {
     const created = await mutations.create(values, key)
     if (created) {
       setCreatedReservation(created)
@@ -184,6 +186,7 @@ export default function ReservationCreatePage({
               sellerIsFixed={isAgencyUser}
               fixedSeller={fixedSeller}
               sellerRequired={!isAgencyUser}
+              canSetValidity={canSetValidity}
               renderClientAction={renderClientAction}
               onSubmit={handleSubmit}
             />

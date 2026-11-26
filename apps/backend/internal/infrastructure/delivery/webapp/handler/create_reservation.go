@@ -30,6 +30,7 @@ func (handler *CreateReservationHandler) Handle(w http.ResponseWriter, request *
 		ClienteID:      body.ClienteID,
 		VendedorID:     body.VendedorID,
 		IdempotencyKey: request.Header.Get("Idempotency-Key"),
+		ValidityDays:   body.DiasVigencia,
 	})
 	if err != nil {
 		return err

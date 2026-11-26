@@ -17,7 +17,8 @@ export default function ReservationCreateRoute() {
   const { session, user } = useAuth()
   const { loteoId = '', loteId = '' } = useParams()
   const token = session?.access_token ?? ''
-  const isAgencyUser = getUserRole(user ?? session?.user) === ROLE.inmobiliaria
+  const role = getUserRole(user ?? session?.user)
+  const isAgencyUser = role === ROLE.inmobiliaria
   const loteoState = useLoteo(loteoId, token)
   const clientsState = useClients(token, { enabled: token !== '' })
   const [createdClient, setCreatedClient] = useState<Cliente | null>(null)
@@ -48,6 +49,7 @@ export default function ReservationCreateRoute() {
       clientsLoading={clientsState.isLoading}
       clientsError={clientsState.error}
       isAgencyUser={isAgencyUser}
+      canSetValidity={role === ROLE.administrador}
       renderPlan={sourceLoteo && <ReservationLoteoPlan loteo={sourceLoteo} selectedLoteId={loteId} variant="reference" />}
       renderClientAction={<Button type="button" variant="outline" size="sm" onClick={() => setIsClientDialogOpen(true)}><UserPlus aria-hidden />Nuevo cliente</Button>}
       renderClientDialog={(

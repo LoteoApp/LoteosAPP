@@ -16,12 +16,14 @@ const (
 )
 
 const (
-	ReservationDuration      = 360 * time.Hour
-	MaxReservationReasonSize = 500
-	MaxIdempotencyKeySize    = 128
-	DefaultReservationPage   = 1
-	DefaultReservationLimit  = 25
-	MaxReservationLimit      = 100
+	DefaultReservationValidityDays = 15
+	MaxReservationValidityDays     = 365
+	DefaultReservationDuration     = DefaultReservationValidityDays * 24 * time.Hour
+	MaxReservationReasonSize       = 500
+	MaxIdempotencyKeySize          = 128
+	DefaultReservationPage         = 1
+	DefaultReservationLimit        = 25
+	MaxReservationLimit            = 100
 )
 
 var (
@@ -44,6 +46,8 @@ var (
 	ErrReservationConvertForbidden    = &Error{Kind: KindForbidden, Code: "reservation_convert_forbidden", Message: "Solo el vendedor responsable o un usuario administrativo puede convertir la reserva en venta"}
 	ErrReservationInvalidState        = &Error{Kind: KindInvalid, Code: "invalid_reservation_state", Message: "El estado de la reserva no es válido"}
 	ErrReservationInvalidPage         = &Error{Kind: KindInvalid, Code: "invalid_reservation_page", Message: "La paginación solicitada no es válida"}
+	ErrReservationInvalidValidity     = &Error{Kind: KindInvalid, Code: "invalid_reservation_validity", Message: "La vigencia tiene que ser una cantidad de días entre 1 y 365"}
+	ErrReservationValidityForbidden   = &Error{Kind: KindForbidden, Code: "reservation_validity_forbidden", Message: "Solo un administrador puede indicar la vigencia de la reserva"}
 )
 
 func (state ReservationState) IsValid() bool {
@@ -69,6 +73,17 @@ func IsReservationRole(role Rol) bool {
 
 func IsAdministrativeRole(role Rol) bool {
 	return role == RolAdministrador || role == RolAdministrativo
+}
+
+func CanSetReservationValidity(role Rol) bool {
+	return role == RolAdministrador
+}
+
+func ReservationValidity(days int) (time.Duration, error) {
+	if days < 1 || days > MaxReservationValidityDays {
+		return 0, ErrReservationInvalidValidity
+	}
+	return time.Duration(days) * 24 * time.Hour, nil
 }
 
 func CanCancelReservation(actorRole Rol, actorID, sellerID string, sameAgency, agencyAssigned bool) bool {
